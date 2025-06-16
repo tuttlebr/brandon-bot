@@ -1,0 +1,42 @@
+services:
+  app:
+    build:
+      context: docker
+      dockerfile: Dockerfile
+    image: streamlit-app
+    restart: always
+    env_file:
+      - .env
+    networks:
+      - app-network
+    ports:
+      - 8501:8501
+    depends_on:
+      - nginx
+    develop:
+      watch:
+        - action: sync
+          path: ./docker/app
+          target: /app
+          ignore:
+            - .venv/
+        - action: rebuild
+          path: ./docker/uv.lock
+
+  nginx:
+    image: nginx:alpine
+    restart: always
+    container_name: nginx-proxy
+    ports:
+      - "8017:80"
+      - "44317:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./nginx/logs:/var/log/nginx
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

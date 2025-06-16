@@ -1,0 +1,17 @@
+[browser]
+gatherUsageStats = false
+
+[client]
+showErrorDetails = true
+
+[server]
+runOnSave = true
+
+[theme]
+base = "dark"
+primaryColor = "#76b900"
+backgroundColor="#18191a"
+secondaryBackgroundColor="#403e41"
+
+[ui]
+hideTopBar = true
