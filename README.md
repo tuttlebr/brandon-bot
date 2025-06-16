@@ -174,7 +174,7 @@ When enabled, the chatbot automatically searches your knowledge base for relevan
 │   Streamlit UI  │    │   Chat Service   │    │  NVIDIA APIs    │
 │                 │───▶│                  │───▶│                 │
 │ • Chat Interface│    │ • Message Proc.  │    │ • LLM           │
-│ • Image Display │    │ • Context Enhancement│  │ • Embeddings   │
+│ • Image Display │    │ • Context ++     │    │ • Embed/Rerank  │
 │ • History Mgmt  │    │ • RAG Integration│    │ • Image Gen     │
 └─────────────────┘    └──────────────────┘    └─────────────────┘
          │                       │
@@ -182,9 +182,9 @@ When enabled, the chatbot automatically searches your knowledge base for relevan
          │              ┌──────────────────┐
          │              │ Vector Database  │
          │              │                  │
-         └──────────────│ • Milvus        │
-                        │ • Similarity    │
-                        │ • Reranking     │
+         └──────────────│ • Milvus         │
+                        │ • Similarity     │
+                        │ • Reranking      │
                         └──────────────────┘
 ```
 
@@ -205,8 +205,9 @@ When enabled, the chatbot automatically searches your knowledge base for relevan
 # Navigate to app directory
 cd docker/app
 
-# Install dependencies (if running locally)
-pip install -r requirements.txt
+# Install dependencies
+uv init .
+uv add -r requirements.txt
 
 # Run directly with Streamlit
 streamlit run streamlit_app.py
@@ -286,27 +287,3 @@ docker-compose ps
 # Restart services
 docker-compose restart
 ```
-
-## 📝 License
-
-This project is licensed under the [MIT License](LICENSE).
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## 📞 Support
-
-For issues and questions:
-
-- Check the [Issues](../../issues) section
-- Review the troubleshooting guide above
-- Consult NVIDIA's API documentation
-
----
-
-Built with ❤️ using Streamlit and NVIDIA AI APIs
