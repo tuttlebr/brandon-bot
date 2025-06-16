@@ -203,7 +203,7 @@ When enabled, the chatbot automatically searches your knowledge base for relevan
 
 ```bash
 # Navigate to app directory
-cd docker/app
+cd docker
 
 # Install dependencies
 uv init .
