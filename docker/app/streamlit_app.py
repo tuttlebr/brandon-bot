@@ -105,9 +105,10 @@ class StreamlitChatApp:
                 typing_indicator.empty()
 
                 # Generate streaming response
-                response_generator = self.llm_service.generate_streaming_response(
-                    prepared_messages, st.session_state["openai_model"]
-                )
+                with st.spinner("Thinking..."):
+                    response_generator = self.llm_service.generate_streaming_response(
+                        prepared_messages, st.session_state["openai_model"]
+                    )
 
                 # Stream response to UI
                 full_response = st.write_stream(response_generator)

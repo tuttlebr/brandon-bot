@@ -3,6 +3,7 @@ services:
     build:
       context: docker
       dockerfile: Dockerfile
+      target: app
     image: streamlit-app
     restart: always
     env_file:
@@ -36,6 +37,22 @@ services:
       - ./nginx/logs:/var/log/nginx
     networks:
       - app-network
+
+  jupyterlab:
+    build:
+      context: docker
+      dockerfile: Dockerfile
+      target: jupyterlab
+    image: jupyterlab
+    working_dir: /app
+    env_file:
+      - .env
+    networks:
+      - app-network
+    ports:
+      - 8888:8888
+    volumes:
+      - ./workspace/tool-calling.ipynb:/app/tool-calling.ipynb
 
 networks:
   app-network:

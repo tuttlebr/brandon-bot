@@ -261,3 +261,4 @@ cleanup.sh
 pdfs/
 nginx/
 .python-version
+workspace/
