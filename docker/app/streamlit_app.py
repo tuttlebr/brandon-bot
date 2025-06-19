@@ -72,14 +72,14 @@ class StreamlitChatApp:
             with st.spinner("Looking for relevant context..."):
                 prompt, context = self.chat_service.enhance_prompt_with_context(prompt)
 
-            # Display context if available
-            self.chat_history_component.display_context_expander(context)
+                # Display context if available
+                self.chat_history_component.display_context_expander(context)
 
-            # Add user message to chat history
-            st.session_state.messages.append({"role": "user", "content": prompt})
+                # Add user message to chat history
+                st.session_state.messages.append({"role": "user", "content": prompt})
 
-            # Prepare messages for API call
-            prepared_messages = self.chat_service.prepare_messages_for_api(st.session_state.messages, context)
+                # Prepare messages for API call
+                prepared_messages = self.chat_service.prepare_messages_for_api(st.session_state.messages, context)
 
             # Generate and display response
             self._generate_and_display_response(prepared_messages)
@@ -110,11 +110,11 @@ class StreamlitChatApp:
                         prepared_messages, st.session_state["openai_model"]
                     )
 
-                # Stream response to UI
-                full_response = st.write_stream(response_generator)
+                    # Stream response to UI
+                    full_response = st.write_stream(response_generator)
 
-                # Add response to chat history
-                self._update_chat_history(full_response, "assistant")
+                    # Add response to chat history
+                    self._update_chat_history(full_response, "assistant")
 
             except Exception as e:
                 error_msg = f"Error generating response: {e}"

@@ -12,20 +12,26 @@ logger = logging.getLogger(__name__)
 class CurrentWeather(BaseModel):
     """Current weather conditions"""
 
-    temperature: float = Field(description="Current temperature in Celsius")
-    wind_speed: float = Field(description="Current wind speed in km/h")
+    temperature: float = Field(description="Current temperature in Fahrenheit")
     relative_humidity: Optional[float] = Field(None, description="Current relative humidity in %")
+    wind_speed: float = Field(description="Current wind speed in km/h")
     weather_code: Optional[int] = Field(None, description="Weather condition code")
     is_day: Optional[bool] = Field(None, description="Whether it's day or night")
+    precipitation_probability: Optional[float] = Field(None, description="Precipitation probability in %")
 
 
 class HourlyWeather(BaseModel):
     """Hourly weather forecast"""
 
     time: List[str] = Field(default_factory=list, description="Hourly timestamps")
-    temperature: List[float] = Field(default_factory=list, description="Hourly temperatures in Celsius")
+    temperature: List[float] = Field(default_factory=list, description="Hourly temperatures in Fahrenheit")
     relative_humidity: List[float] = Field(default_factory=list, description="Hourly relative humidity in %")
     wind_speed: List[float] = Field(default_factory=list, description="Hourly wind speed in km/h")
+    weather_code: List[int] = Field(default_factory=list, description="Hourly weather condition code")
+    is_day: List[bool] = Field(default_factory=list, description="Hourly whether it's day or night")
+    precipitation_probability: List[float] = Field(
+        default_factory=list, description="Hourly precipitation probability in %"
+    )
 
 
 class WeatherResponse(BaseModel):
@@ -55,8 +61,8 @@ class WeatherTool:
     def __init__(self):
         self.name = "get_weather"
         self.description = (
-            "Get current temperature and weather conditions for a given location. "
-            "Provides current weather including temperature, wind speed, humidity, "
+            "Get current temperature, weather conditions and codes for a given location. "
+            "Provides current weather including temperature, wind speed, humidity, weather code, "
             "and can optionally include hourly forecasts. "
             "Input should be a location string of 'City' or 'ZIP code'."
         )
@@ -110,7 +116,7 @@ class WeatherTool:
         try:
             params = {
                 "name": location,
-                "count": 3,
+                "count": 1,
                 "language": "en",
                 "format": "json",
                 "countryCode": "US",
@@ -171,13 +177,15 @@ class WeatherTool:
         params = {
             "latitude": location_info.latitude,
             "longitude": location_info.longitude,
-            "current": "temperature_2m,wind_speed_10m,relative_humidity_2m,weather_code,is_day",
+            "current": "temperature_2m,wind_speed_10m,relative_humidity_2m,weather_code,precipitation_probability,is_day",
             "timezone": "auto",
         }
 
         if include_hourly:
-            params["hourly"] = "temperature_2m,relative_humidity_2m,wind_speed_10m"
-            params["forecast_days"] = 1  # Only include today's hourly forecast
+            params[
+                "hourly"
+            ] = "temperature_2m,wind_speed_10m,relative_humidity_2m,weather_code,precipitation_probability,is_day"
+            params["forecast_days"] = 14  # Only include today's hourly forecast
 
         try:
             logger.info(
@@ -196,6 +204,7 @@ class WeatherTool:
                 wind_speed=current_data["wind_speed_10m"],
                 relative_humidity=current_data.get("relative_humidity_2m"),
                 weather_code=current_data.get("weather_code"),
+                precipitation_probability=current_data.get("precipitation_probability"),
                 is_day=(current_data.get("is_day") == 1 if current_data.get("is_day") is not None else None),
             )
 
@@ -208,6 +217,9 @@ class WeatherTool:
                     temperature=[self._celcius_to_fahrenheit(temp) for temp in hourly_data.get("temperature_2m", [])],
                     relative_humidity=hourly_data.get("relative_humidity_2m", []),
                     wind_speed=hourly_data.get("wind_speed_10m", []),
+                    precipitation_probability=hourly_data.get("precipitation_probability", []),
+                    weather_code=hourly_data.get("weather_code", []),
+                    is_day=hourly_data.get("is_day", []),
                 )
 
             # Create the response
@@ -221,7 +233,7 @@ class WeatherTool:
             )
 
             logger.info(
-                f"Weather data retrieved successfully for '{location}'. Current temperature: {current_weather.temperature}°C"
+                f"Weather data retrieved successfully for '{location}'. Current temperature: {current_weather.temperature}°F"
             )
             return weather_response
 
