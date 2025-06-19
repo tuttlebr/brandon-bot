@@ -36,7 +36,7 @@ class ChatHistoryComponent:
         start_idx = current_page * messages_per_page
         end_idx = start_idx + messages_per_page
 
-        for message in display_messages[start_idx:end_idx]:
+        for i, message in enumerate(display_messages[start_idx:end_idx]):
             with st.chat_message(
                 message["role"],
                 avatar=(self.config.user_avatar if message["role"] == "user" else self.config.assistant_avatar),
@@ -64,6 +64,17 @@ class ChatHistoryComponent:
                     # Regular text message
                     content = chat_message.get_display_content()
                     st.markdown(content, unsafe_allow_html=True)
+
+                # Display tool context if this is the last assistant message and context exists
+                if (
+                    message["role"] == "assistant"
+                    and i == len(display_messages[start_idx:end_idx]) - 1
+                    and hasattr(st.session_state, 'last_tool_context')  # Last message in current page
+                    and st.session_state.last_tool_context
+                ):
+                    self.display_context_expander(st.session_state.last_tool_context)
+                    # Clear the context after displaying to avoid duplication
+                    st.session_state.last_tool_context = None
 
         # Display pagination controls if needed
         if total_pages > 1:

@@ -1,4 +1,5 @@
 import logging
+from typing import Any, Dict, List
 
 import streamlit as st
 from models import ChatConfig
@@ -58,9 +59,8 @@ class StreamlitChatApp:
         # Clean previous chat history from context
         st.session_state.messages = self.chat_service.clean_chat_history_context(st.session_state.messages)
 
-        # Display user message
-        with st.chat_message("user", avatar=self.config.user_avatar):
-            st.markdown(prompt, unsafe_allow_html=True)
+        # Add user message to chat history first (no inline display to avoid duplication)
+        st.session_state.messages.append({"role": "user", "content": prompt})
 
         # Check if this is an image generation request
         if self.image_service.detect_image_generation_request(prompt):
@@ -68,18 +68,8 @@ class StreamlitChatApp:
             return
 
         try:
-            # Enhance prompt with context if needed
-            with st.spinner("Looking for relevant context..."):
-                prompt, context = self.chat_service.enhance_prompt_with_context(prompt)
-
-                # Display context if available
-                self.chat_history_component.display_context_expander(context)
-
-                # Add user message to chat history
-                st.session_state.messages.append({"role": "user", "content": prompt})
-
-                # Prepare messages for API call
-                prepared_messages = self.chat_service.prepare_messages_for_api(st.session_state.messages, context)
+            # Prepare messages for API call - LLM service will handle tool message filtering
+            prepared_messages = self.chat_service.prepare_messages_for_api(st.session_state.messages)
 
             # Generate and display response
             self._generate_and_display_response(prepared_messages)
@@ -87,6 +77,64 @@ class StreamlitChatApp:
         except Exception as e:
             logging.error(f"Error processing prompt: {e}")
             st.error("An error occurred while processing your request. Please try again.")
+
+    def _extract_tool_context_from_messages(self, messages: List[Dict[str, Any]] = None) -> str:
+        """
+        Extract context from tool responses in the message history
+
+        Args:
+            messages: Optional list of messages to search, defaults to session state messages
+
+        Returns:
+            Formatted context string from tool responses, empty if none found
+        """
+        # Use provided messages or fall back to session state
+        search_messages = messages if messages is not None else st.session_state.messages
+
+        tool_contexts = []
+
+        # Look for recent tool messages
+        for message in reversed(search_messages):
+            if message.get("role") == "tool":
+                try:
+                    # Parse tool response content
+                    tool_content = message.get("content", "")
+                    if isinstance(tool_content, str):
+                        # Try to parse as JSON to extract formatted results
+                        import json
+
+                        try:
+                            tool_data = json.loads(tool_content)
+                            if isinstance(tool_data, dict) and "formatted_results" in tool_data:
+                                formatted_results = tool_data["formatted_results"]
+                                if formatted_results and formatted_results.strip():
+                                    tool_contexts.append(formatted_results)
+                                    logging.info(f"Found formatted_results from tool response")
+                            elif isinstance(tool_data, dict) and "results" in tool_data:
+                                # Handle other tool response formats
+                                results = tool_data["results"]
+                                if results:
+                                    tool_contexts.append(f"Found {len(results)} relevant results")
+                                    logging.info(f"Found {len(results)} results from tool response")
+                        except json.JSONDecodeError:
+                            # If not JSON, treat as plain text
+                            if tool_content.strip():
+                                tool_contexts.append(tool_content)
+                                logging.info(f"Found plain text tool response")
+                except Exception as e:
+                    logging.error(f"Error extracting tool context: {e}")
+                    continue
+
+        # Combine all tool contexts
+        if tool_contexts:
+            combined_context = "\n\n".join(tool_contexts)
+            logging.info(
+                f"Extracted tool context with {len(tool_contexts)} entries, total length: {len(combined_context)}"
+            )
+            return combined_context
+
+        logging.info("No tool context found in messages")
+        return ""
 
     def _generate_and_display_response(self, prepared_messages: list):
         """
@@ -99,30 +147,44 @@ class StreamlitChatApp:
         typing_indicator = st.empty()
         typing_indicator.markdown(get_typing_indicator_html(), unsafe_allow_html=True)
 
-        with st.chat_message("assistant", avatar=self.config.assistant_avatar):
-            try:
-                # Clear the typing indicator once we're ready to stream
-                typing_indicator.empty()
+        try:
+            # Clear the typing indicator once we're ready to stream
+            typing_indicator.empty()
 
-                # Generate streaming response
-                with st.spinner("Thinking..."):
-                    response_generator = self.llm_service.generate_streaming_response(
-                        prepared_messages, st.session_state["openai_model"]
-                    )
-
-                    # Stream response to UI
-                    full_response = st.write_stream(response_generator)
-
-                    # Add response to chat history
-                    self._update_chat_history(full_response, "assistant")
-
-            except Exception as e:
-                error_msg = f"Error generating response: {e}"
-                logging.error(error_msg)
-                st.error(f"I'm having trouble generating a response. Please try again. {error_msg}")
-                self._update_chat_history(
-                    "I apologize, but I encountered an error while generating a response.", "assistant"
+            # Generate streaming response
+            with st.spinner("Thinking..."):
+                response_generator = self.llm_service.generate_streaming_response(
+                    prepared_messages, st.session_state["openai_model"]
                 )
+
+                # Collect the full response without inline display
+                full_response = ""
+                for chunk in response_generator:
+                    full_response += chunk
+
+                # Add response to chat history
+                self._update_chat_history(full_response, "assistant")
+
+            # Extract tool context from the prepared_messages that now contain tool responses
+            tool_context = self._extract_tool_context_from_messages(prepared_messages)
+            if tool_context:
+                # Store tool context in session state to display it properly in history
+                st.session_state.last_tool_context = tool_context
+                logging.info("Stored tool context for display")
+
+            # Clear processing flag and trigger rerun to display the new messages properly
+            st.session_state.processing = False
+            st.rerun()
+
+        except Exception as e:
+            error_msg = f"Error generating response: {e}"
+            logging.error(error_msg)
+            self._update_chat_history(
+                "I apologize, but I encountered an error while generating a response.", "assistant"
+            )
+            # Clear processing flag even on error
+            st.session_state.processing = False
+            st.rerun()
 
     def _handle_image_generation(self, prompt: str):
         """
@@ -135,44 +197,40 @@ class StreamlitChatApp:
             # Extract the image description from the prompt
             image_prompt = self.image_service.extract_image_prompt(prompt)
 
-            # Add user message to chat history
-            st.session_state.messages.append({"role": "user", "content": prompt})
+            # Note: User message already added to session state in process_prompt()
 
             # Generate image with loading indicator
             with st.spinner("Generating image..."):
                 generated_image, confirmation_message = self.image_service.generate_image_response(image_prompt)
 
-            # Display the response
-            with st.chat_message("assistant", avatar=self.config.assistant_avatar):
-                if generated_image:
-                    # Display the generated image
-                    st.image(generated_image, caption=f"Generated image: {image_prompt}", use_container_width=True)
-                    st.markdown(confirmation_message)
+            # Process the response without inline display
+            if generated_image:
+                # Create a special message format for storing images in chat history
+                image_b64 = pil_image_to_base64(generated_image)
+                image_message = {
+                    "type": "image",
+                    "image_data": image_b64,
+                    "image_caption": image_prompt,
+                    "text": confirmation_message,
+                }
 
-                    # Create a special message format for storing images in chat history
-                    image_b64 = pil_image_to_base64(generated_image)
-                    image_message = {
-                        "type": "image",
-                        "image_data": image_b64,
-                        "image_caption": image_prompt,
-                        "text": confirmation_message,
-                    }
+                # Add image response to chat history
+                st.session_state.messages.append({"role": "assistant", "content": image_message})
+            else:
+                # Add error message to chat history
+                st.session_state.messages.append({"role": "assistant", "content": confirmation_message})
 
-                    # Add image response to chat history
-                    st.session_state.messages.append({"role": "assistant", "content": image_message})
-                else:
-                    # Display error message
-                    st.markdown(confirmation_message)
-                    st.session_state.messages.append({"role": "assistant", "content": confirmation_message})
+            # Clear processing flag and trigger rerun to display the new messages properly
+            st.session_state.processing = False
+            st.rerun()
 
         except Exception as e:
             logging.error(f"Error handling image generation: {e}")
             error_message = "I apologize, but I encountered an error while generating the image. Please try again."
-
-            with st.chat_message("assistant", avatar=self.config.assistant_avatar):
-                st.error(error_message)
-
             st.session_state.messages.append({"role": "assistant", "content": error_message})
+            # Clear processing flag even on error
+            st.session_state.processing = False
+            st.rerun()
 
     def _update_chat_history(self, text: str, role: str):
         """
@@ -191,11 +249,18 @@ class StreamlitChatApp:
 
     def run(self):
         """Run the main application"""
-        # Display chat history
+        # Display chat history (will include any new messages)
         self.display_chat_history()
 
-        # Handle user input
+        # Check if we're currently processing a message to prevent concurrent processing
+        if st.session_state.get("processing", False):
+            st.info("Processing your message, please wait...")
+            return
+
+        # Handle user input - let Streamlit's natural refresh cycle with smooth transitions handle updates
         if prompt := st.chat_input("Hello, how are you?"):
+            # Set processing flag to prevent concurrent requests
+            st.session_state.processing = True
             self.process_prompt(prompt)
 
 
