@@ -6,14 +6,14 @@ services:
       target: app
     image: streamlit-app
     restart: always
+    hostname: app
     env_file:
       - .env
     networks:
       - app-network
     ports:
       - 8501:8501
-    depends_on:
-      - nginx
+
     develop:
       watch:
         - action: sync
@@ -29,14 +29,17 @@ services:
     restart: always
     container_name: nginx-proxy
     ports:
-      - "8017:80"
-      - "44317:443"
+      - "80:80"
+      - "443:443"
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d
       - ./nginx/ssl:/etc/nginx/ssl
       - ./nginx/logs:/var/log/nginx
     networks:
       - app-network
+    depends_on:
+      app:
+        condition: service_healthy
 
   jupyterlab:
     build:

@@ -1,7 +1,10 @@
 [project]
-name = "workspace"
+authors = [
+    { name = "Brandon Tuttle", email = "tuttlebr@ncc-1701.biz" }
+]
+name = "brandonbot"
 version = "0.1.0"
-description = "Add your description here"
+description = "Agentic chatbot for the BrandonBot project"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -13,10 +16,14 @@ dependencies = [
     "pymilvus==2.5.7",
     "pytz==2025.2",
     "streamlit==1.45.1",
+]
+
+[project.optional-dependencies]
+jupyterlab = [
     "ipympl==0.9.7",
     "jupyterlab==4.4.3",
     "nodejs-bin==18.4.0a4",
     "pandas==2.3.0",
     "seaborn==0.13.2",
-    "theme-darcula==4.0.0"
+    "theme-darcula==4.0.0",
 ]
