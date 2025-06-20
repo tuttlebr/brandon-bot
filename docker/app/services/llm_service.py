@@ -44,6 +44,7 @@ class LLMService:
         """
         self.config = config
         self.client = self._initialize_client()
+        self.last_tool_responses = []  # Store tool responses for context extraction
 
     def _initialize_client(self) -> OpenAI:
         """Initialize the OpenAI client"""
@@ -493,7 +494,6 @@ class LLMService:
                 "messages": tool_decision_messages,
                 "stream": False,
                 "temperature": 0.0,
-                "top_p": 1,
                 "max_tokens": 512,
                 "tools": ALL_TOOLS,
                 "tool_choice": "auto",
@@ -527,10 +527,16 @@ class LLMService:
                 # Execute all tool calls concurrently using unified approach
                 tool_responses = await self._execute_tool_calls(all_tool_calls)
 
+                # Store tool responses for context extraction by streamlit app
+                self.last_tool_responses = tool_responses
+                logging.debug(f"Stored {len(tool_responses)} tool responses for context extraction")
+
                 # Add to original messages for context extraction
                 messages.extend(tool_responses)
             else:
                 logging.info("No tool calls detected in response")
+                # Clear previous tool responses if no tools were used
+                self.last_tool_responses = []
 
             # PHASE 3: Response Generation with Full Context
             if tool_responses:

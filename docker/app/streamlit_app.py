@@ -103,6 +103,10 @@ class StreamlitChatApp:
         if hasattr(st.session_state, 'last_tool_context'):
             st.session_state.last_tool_context = None
 
+        # Clear previous tool responses from LLM service
+        if hasattr(self.llm_service, 'last_tool_responses'):
+            self.llm_service.last_tool_responses = []
+
         # Validate that the prompt doesn't contain tool call instructions (shouldn't happen from user input)
         if self._contains_tool_call_instructions(prompt):
             logging.error("User prompt contains tool call instructions - this should not happen")
@@ -138,6 +142,90 @@ class StreamlitChatApp:
             logging.error(f"Error processing prompt: {e}")
             st.error("An error occurred while processing your request. Please try again.")
             st.session_state.processing = False
+
+    def _extract_tool_context_from_llm_responses(self) -> str:
+        """
+        Extract context from the LLM service's last tool responses
+
+        Returns:
+            Formatted context string from tool responses, empty if none found
+        """
+        if not hasattr(self.llm_service, 'last_tool_responses') or not self.llm_service.last_tool_responses:
+            logging.debug("No tool responses found in LLM service")
+            return ""
+
+        logging.debug(f"Found {len(self.llm_service.last_tool_responses)} tool responses to process")
+
+        tool_contexts = []
+
+        for tool_response in self.llm_service.last_tool_responses:
+            logging.debug(f"Processing tool response: {tool_response}")
+            if tool_response.get("role") == "tool":
+                try:
+                    tool_content = tool_response.get("content", "")
+                    logging.debug(f"Tool content type: {type(tool_content)}, length: {len(str(tool_content))}")
+                    if isinstance(tool_content, str):
+                        # Try to parse as JSON to extract formatted results
+                        import json
+
+                        try:
+                            tool_data = json.loads(tool_content)
+                            if isinstance(tool_data, dict):
+                                # Check for formatted_results first (preferred format)
+                                if "formatted_results" in tool_data:
+                                    formatted_results = tool_data["formatted_results"]
+                                    if formatted_results and formatted_results.strip():
+                                        tool_contexts.append(f"**Tool Response Data:**\n{formatted_results}")
+                                        logging.info(f"Found formatted_results from tool response")
+
+                                # Check for other common tool response formats
+                                elif "results" in tool_data:
+                                    results = tool_data["results"]
+                                    if isinstance(results, list) and results:
+                                        tool_contexts.append(f"**Tool found {len(results)} results**")
+                                        logging.info(f"Found {len(results)} results from tool response")
+                                    elif isinstance(results, str) and results.strip():
+                                        tool_contexts.append(f"**Tool Response:**\n{results}")
+                                        logging.info(f"Found string results from tool response")
+
+                                # Handle weather tool response format
+                                elif "location" in tool_data and "current" in tool_data:
+                                    location = tool_data.get("location", "Unknown")
+                                    current = tool_data.get("current", {})
+                                    temp = current.get("temperature", "N/A")
+                                    tool_contexts.append(f"**Weather data for {location}** (Current: {temp}°F)")
+                                    logging.info(f"Found weather tool response for {location}")
+
+                                # Generic fallback for other structured data
+                                else:
+                                    # Try to create a summary of the tool response
+                                    summary_parts = []
+                                    if "query" in tool_data:
+                                        summary_parts.append(f"Query: {tool_data['query']}")
+                                    if "total_results" in tool_data:
+                                        summary_parts.append(f"Results: {tool_data['total_results']}")
+                                    if summary_parts:
+                                        tool_contexts.append(f"**Tool Response:** {', '.join(summary_parts)}")
+
+                        except json.JSONDecodeError:
+                            # If not JSON, treat as plain text but format it nicely
+                            if tool_content.strip():
+                                tool_contexts.append(f"**Tool Response:**\n{tool_content.strip()}")
+                                logging.info(f"Found plain text tool response")
+                except Exception as e:
+                    logging.error(f"Error extracting tool context: {e}")
+                    continue
+
+        # Combine all tool contexts with proper formatting
+        if tool_contexts:
+            combined_context = "\n\n---\n\n".join(tool_contexts)
+            logging.info(
+                f"Extracted tool context with {len(tool_contexts)} entries, total length: {len(combined_context)}"
+            )
+            return combined_context
+
+        logging.debug("No tool context found in LLM responses")
+        return ""
 
     def _extract_tool_context_from_messages(self, messages: List[Dict[str, Any]] = None) -> str:
         """
@@ -290,14 +378,16 @@ class StreamlitChatApp:
                     # Use st.write_stream to handle the streaming display
                     full_response = st.write_stream(response_generator)
 
-                    # Extract and display tool context immediately after the response
-                    tool_context = self._extract_tool_context_from_messages(prepared_messages)
+                    # Extract and display tool context from LLM service tool responses
+                    tool_context = self._extract_tool_context_from_llm_responses()
                     if tool_context:
                         # Display the context expander for immediate user verification
                         self.display_tool_context_expander(tool_context)
                         # Store tool context in session state for chat history display
                         st.session_state.last_tool_context = tool_context
                         logging.info("Displayed and stored tool context for verification")
+                    else:
+                        logging.debug("No tool context found to display")
 
             # Add the complete response to chat history
             self._update_chat_history(full_response, "assistant")
