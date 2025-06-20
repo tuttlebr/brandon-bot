@@ -71,10 +71,9 @@ class ChatHistoryComponent:
                     and i == len(display_messages[start_idx:end_idx]) - 1
                     and hasattr(st.session_state, 'last_tool_context')  # Last message in current page
                     and st.session_state.last_tool_context
+                    and not st.session_state.get("processing", False)  # Don't show during active processing
                 ):
                     self.display_context_expander(st.session_state.last_tool_context)
-                    # Clear the context after displaying to avoid duplication
-                    st.session_state.last_tool_context = None
 
         # Display pagination controls if needed
         if total_pages > 1:
@@ -110,7 +109,7 @@ class ChatHistoryComponent:
             context: Context information to display
         """
         if context:
-            with st.expander("Expand for context"):
+            with st.expander("📋 View Tool Data Sources (for verification)", expanded=False):
                 st.markdown(
                     extract_context_regex(context).replace("$", "\\$").replace("\\${", "${"), unsafe_allow_html=True,
                 )

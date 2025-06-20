@@ -36,7 +36,7 @@ class TavilyTool:
 
     def __init__(self):
         self.name = "tavily_internet_search"
-        self.description = "Triggered when asks for the latest information found in a general internet search. Data are provided by [Tavily](https://tavily.com/). Input should be a search query string."
+        self.description = "Triggered when asks for the latest information found in a general internet search, not to be used for news or current events. Data are provided by [Tavily](https://tavily.com/). Input should be a search query string."
 
     def to_openai_format(self) -> Dict[str, Any]:
         """
@@ -152,7 +152,7 @@ class TavilyTool:
             "topic": "general",
             "search_depth": "advanced",
             "chunks_per_source": 5,
-            "max_results": 5,
+            "max_results": 2,
             "include_answer": False,
             "include_raw_content": False,
             "include_images": True,
@@ -175,13 +175,13 @@ class TavilyTool:
         }
 
         try:
-            logger.info(f"Making API request to Tavily for query: '{query}'")
+            logger.debug(f"Making API request to Tavily for query: '{query}'")
 
             # Make the API request
             response = requests.post(url, headers=headers, json=search_params)
             response.raise_for_status()  # Raises an HTTPError for bad responses
 
-            logger.info(f"Tavily API request successful (HTTP {response.status_code})")
+            logger.debug(f"Tavily API request successful (HTTP {response.status_code})")
 
             # Parse the JSON response and validate with Pydantic
             response_data = response.json()

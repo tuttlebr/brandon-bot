@@ -49,7 +49,7 @@ class NewsTool:
     def __init__(self):
         self.name = "tavily_news_search"
         self.description = (
-            "Triggered when asks for the latest news. News sources are limited to the following domains: "
+            "Triggered when asks for the latest news and current events. News sources are limited to the following domains: "
             + ", ".join(INCLUDED_DOMAINS)
             + ". Input should be a search query string."
         )
@@ -194,13 +194,13 @@ class NewsTool:
         }
 
         try:
-            logger.info(f"Making API request to Tavily news search for query: '{query}'")
+            logger.debug(f"Making API request to Tavily news search for query: '{query}'")
 
             # Make the API request
             response = requests.post(url, headers=headers, json=search_params)
             response.raise_for_status()  # Raises an HTTPError for bad responses
 
-            logger.info(f"Tavily news API request successful (HTTP {response.status_code})")
+            logger.debug(f"Tavily news API request successful (HTTP {response.status_code})")
 
             # Parse the JSON response and validate with Pydantic
             response_data = response.json()

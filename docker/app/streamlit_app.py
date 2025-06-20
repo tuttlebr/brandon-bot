@@ -47,6 +47,16 @@ class StreamlitChatApp:
         """Display the chat history using the chat history component"""
         self.chat_history_component.display_chat_history(st.session_state.messages)
 
+    def display_tool_context_expander(self, context: str):
+        """
+        Display tool context in an expandable section for user verification
+
+        Args:
+            context: Tool response context to display
+        """
+        if context:
+            self.chat_history_component.display_context_expander(context)
+
     def _clean_chat_history_of_tool_calls(self):
         """
         Clean existing chat history to remove any messages containing tool call instructions
@@ -88,6 +98,10 @@ class StreamlitChatApp:
         """
         # Clean the prompt
         prompt = prompt.strip()
+
+        # Clear any previous tool context when processing a new user message
+        if hasattr(st.session_state, 'last_tool_context'):
+            st.session_state.last_tool_context = None
 
         # Validate that the prompt doesn't contain tool call instructions (shouldn't happen from user input)
         if self._contains_tool_call_instructions(prompt):
@@ -152,29 +166,55 @@ class StreamlitChatApp:
 
                         try:
                             tool_data = json.loads(tool_content)
-                            if isinstance(tool_data, dict) and "formatted_results" in tool_data:
-                                formatted_results = tool_data["formatted_results"]
-                                if formatted_results and formatted_results.strip():
-                                    tool_contexts.append(formatted_results)
-                                    logging.info(f"Found formatted_results from tool response")
-                            elif isinstance(tool_data, dict) and "results" in tool_data:
-                                # Handle other tool response formats
-                                results = tool_data["results"]
-                                if results:
-                                    tool_contexts.append(f"Found {len(results)} relevant results")
-                                    logging.info(f"Found {len(results)} results from tool response")
+                            if isinstance(tool_data, dict):
+                                # Check for formatted_results first (preferred format)
+                                if "formatted_results" in tool_data:
+                                    formatted_results = tool_data["formatted_results"]
+                                    if formatted_results and formatted_results.strip():
+                                        tool_contexts.append(f"**Tool Response Data:**\n{formatted_results}")
+                                        logging.info(f"Found formatted_results from tool response")
+
+                                # Check for other common tool response formats
+                                elif "results" in tool_data:
+                                    results = tool_data["results"]
+                                    if isinstance(results, list) and results:
+                                        tool_contexts.append(f"**Tool found {len(results)} results**")
+                                        logging.info(f"Found {len(results)} results from tool response")
+                                    elif isinstance(results, str) and results.strip():
+                                        tool_contexts.append(f"**Tool Response:**\n{results}")
+                                        logging.info(f"Found string results from tool response")
+
+                                # Handle weather tool response format
+                                elif "location" in tool_data and "current" in tool_data:
+                                    location = tool_data.get("location", "Unknown")
+                                    current = tool_data.get("current", {})
+                                    temp = current.get("temperature", "N/A")
+                                    tool_contexts.append(f"**Weather data for {location}** (Current: {temp}°F)")
+                                    logging.info(f"Found weather tool response for {location}")
+
+                                # Generic fallback for other structured data
+                                else:
+                                    # Try to create a summary of the tool response
+                                    summary_parts = []
+                                    if "query" in tool_data:
+                                        summary_parts.append(f"Query: {tool_data['query']}")
+                                    if "total_results" in tool_data:
+                                        summary_parts.append(f"Results: {tool_data['total_results']}")
+                                    if summary_parts:
+                                        tool_contexts.append(f"**Tool Response:** {', '.join(summary_parts)}")
+
                         except json.JSONDecodeError:
-                            # If not JSON, treat as plain text
+                            # If not JSON, treat as plain text but format it nicely
                             if tool_content.strip():
-                                tool_contexts.append(tool_content)
+                                tool_contexts.append(f"**Tool Response:**\n{tool_content.strip()}")
                                 logging.info(f"Found plain text tool response")
                 except Exception as e:
                     logging.error(f"Error extracting tool context: {e}")
                     continue
 
-        # Combine all tool contexts
+        # Combine all tool contexts with proper formatting
         if tool_contexts:
-            combined_context = "\n\n".join(tool_contexts)
+            combined_context = "\n\n---\n\n".join(tool_contexts)
             logging.info(
                 f"Extracted tool context with {len(tool_contexts)} entries, total length: {len(combined_context)}"
             )
@@ -250,15 +290,17 @@ class StreamlitChatApp:
                     # Use st.write_stream to handle the streaming display
                     full_response = st.write_stream(response_generator)
 
+                    # Extract and display tool context immediately after the response
+                    tool_context = self._extract_tool_context_from_messages(prepared_messages)
+                    if tool_context:
+                        # Display the context expander for immediate user verification
+                        self.display_tool_context_expander(tool_context)
+                        # Store tool context in session state for chat history display
+                        st.session_state.last_tool_context = tool_context
+                        logging.info("Displayed and stored tool context for verification")
+
             # Add the complete response to chat history
             self._update_chat_history(full_response, "assistant")
-
-            # Extract tool context from the prepared_messages that now contain tool responses
-            tool_context = self._extract_tool_context_from_messages(prepared_messages)
-            if tool_context:
-                # Store tool context in session state to display it properly in history
-                st.session_state.last_tool_context = tool_context
-                logging.info("Stored tool context for display")
 
             # Clear processing flag - no need to rerun since we've already displayed the response
             st.session_state.processing = False

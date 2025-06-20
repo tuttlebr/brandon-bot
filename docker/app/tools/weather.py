@@ -211,7 +211,7 @@ class WeatherTool:
             params["forecast_days"] = 14  # Only include today's hourly forecast
 
         try:
-            logger.info(
+            logger.debug(
                 f"Making weather API request for coordinates: {location_info.latitude}, {location_info.longitude}"
             )
 
