@@ -1,5 +1,4 @@
 import logging
-import os
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -61,7 +60,7 @@ class WeatherTool:
 
     def __init__(self):
         self.name = "get_weather"
-        self.description = "Triggered when asks for the weather. Data are provided by [Open-Meteo](https://open-meteo.com/). Input should be a location string of 'City' or 'ZIP code'."
+        self.description = "Triggered when asks for weather or forecast related information. Data are provided by [Open-Meteo](https://open-meteo.com/). Input should be a location string of 'City' or 'ZIP code'. If input is in 'City, ST' format, only the city name will be used."
         self.geocoding_url = "https://geocoding-api.open-meteo.com/v1/search"
         self.weather_url = "https://api.open-meteo.com/v1/forecast"
         self.source = "[Open-Meteo](https://open-meteo.com/)"
@@ -81,7 +80,10 @@ class WeatherTool:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "location": {"type": "string", "description": "City and country e.g. Bogotá, Colombia",}
+                        "location": {
+                            "type": "string",
+                            "description": "City name or ZIP code. If provided as 'City, ST', only the city name will be used for weather lookup.",
+                        }
                     },
                     "required": ["location"],
                 },
@@ -93,6 +95,28 @@ class WeatherTool:
         Convert temperature from Celsius to Fahrenheit
         """
         return round((temperature * 9 / 5) + 32, 1)
+
+    def _extract_city_only(self, location: str) -> str:
+        """
+        Extract just the city name from "City, ST" format input
+
+        Args:
+            location: Location string that may be in "City, ST" format
+
+        Returns:
+            str: Just the city name
+        """
+        # Remove periods first
+        location = location.replace(".", "")
+
+        # If there's a comma, take only the part before it (the city)
+        if "," in location:
+            city = location.split(",")[0].strip()
+            logger.debug(f"Extracted city '{city}' from '{location}'")
+            return city
+
+        # If no comma, return the original location
+        return location.strip()
 
     def _geocode_location(self, location: str) -> LocationResult:
         """
@@ -108,6 +132,8 @@ class WeatherTool:
             ValueError: If location cannot be found
             requests.RequestException: If the API request fails
         """
+        # Extract only the city name from "City, ST" format
+        location = self._extract_city_only(location)
         logger.info(f"Geocoding location: '{location}'")
 
         try:
@@ -307,20 +333,6 @@ def execute_weather_search(location: str, include_hourly: bool = False) -> Weath
         WeatherResponse: The weather information
     """
     return weather_tool.get_weather(location, include_hourly)
-
-
-def get_simple_weather(location: str) -> float:
-    """
-    Simple function to get just the current temperature (matches the user's example)
-
-    Args:
-        location: The location string
-
-    Returns:
-        float: Current temperature in Celsius
-    """
-    weather_response = weather_tool.get_weather(location)
-    return weather_response.current.temperature
 
 
 def execute_weather_with_dict(params: Dict[str, Any]) -> WeatherResponse:

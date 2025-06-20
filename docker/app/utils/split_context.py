@@ -1,5 +1,4 @@
 import re
-from utils.environment import *
 
 
 START_CONTEXT = "<START_CONTEXT>"

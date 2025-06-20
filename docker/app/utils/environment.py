@@ -62,25 +62,5 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
-# Legacy variables for backward compatibility
-# These can be gradually removed as the codebase is updated
+# Configuration instance - use this instead of legacy variables
 config = Config()
-BOT_TITLE = config.BOT_TITLE
-META_USER = config.META_USER
-AUTH_USERNAME = config.AUTH_USERNAME
-AUTH_KEY = config.AUTH_KEY
-LLM_MODEL_NAME = config.LLM_MODEL_NAME
-LLM_ENDPOINT = config.LLM_ENDPOINT
-NVIDIA_API_KEY = config.NVIDIA_API_KEY
-OPENAI_API_TYPE = config.OPENAI_API_TYPE
-EMBEDDING_ENDPOINT = config.EMBEDDING_ENDPOINT
-EMBEDDING_MODEL = config.EMBEDDING_MODEL
-DATABASE_URL = config.DATABASE_URL
-COLLECTION_NAME = config.COLLECTION_NAME
-PARTITION_NAME = config.PARTITION_NAME
-DEFAULT_DB = config.DEFAULT_DB
-RERANKER_ENDPOINT = config.RERANKER_ENDPOINT
-RERANKER_MODEL = config.RERANKER_MODEL
-IMAGE_ENDPOINT = config.IMAGE_ENDPOINT
-USER_AVATAR = config.USER_AVATAR
-ASSISTANT_AVATAR = config.ASSISTANT_AVATAR

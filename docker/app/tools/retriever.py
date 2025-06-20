@@ -7,7 +7,7 @@ import requests
 from openai import OpenAI
 from pydantic import BaseModel, Field
 from pymilvus import MilvusClient
-from utils.environment import *
+from utils.environment import Config
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -121,15 +121,15 @@ class SimilaritySearch:
 
     def reranker(self, query: str, embedding_response: List[Dict[str, Any]]) -> Optional[List[Dict[str, Any]]]:
         """Rerank search results using external reranker service"""
-        from utils.environment import NVIDIA_API_KEY, RERANKER_ENDPOINT, RERANKER_MODEL
+        config = Config()
 
-        payload = self._prepare_reranker_payload(query, embedding_response, RERANKER_MODEL)
+        payload = self._prepare_reranker_payload(query, embedding_response, config.RERANKER_MODEL)
 
         if not payload["passages"]:
             return None
 
         try:
-            reranker_response = self._call_reranker_service(payload, RERANKER_ENDPOINT, NVIDIA_API_KEY)
+            reranker_response = self._call_reranker_service(payload, config.RERANKER_ENDPOINT, config.NVIDIA_API_KEY)
             combined_results = self._combine_results(embedding_response, reranker_response)
             validated_results, stats = self._remove_outliers(combined_results[0], std_threshold=0.85, key="logit")
             limit = int(self.config.topk * 0.5)
@@ -416,13 +416,19 @@ class RetrievalTool:
         self.name = "retrieval_search"
         self.description = "Triggered when asks for the latest information found in a document collection containing a knowledge base of NVIDIA and Mental Health information. Input should be a search query string."
 
+        # Get configuration
+        config = Config()
+
         # Initialize embedding creator and similarity search
         self.embedding_creator = EmbeddingCreator(
-            base_url=EMBEDDING_ENDPOINT, api_key=NVIDIA_API_KEY, model=EMBEDDING_MODEL
+            base_url=config.EMBEDDING_ENDPOINT, api_key=config.NVIDIA_API_KEY, model=config.EMBEDDING_MODEL
         )
 
         self.similarity_search = SimilaritySearch(
-            collection_name=COLLECTION_NAME, uri=DATABASE_URL, db_name=DEFAULT_DB, vector_field="embedding",
+            collection_name=config.COLLECTION_NAME,
+            uri=config.DATABASE_URL,
+            db_name=config.DEFAULT_DB,
+            vector_field="embedding",
         )
 
     def to_openai_format(self) -> Dict[str, Any]:

@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 
-from utils.environment import BOT_TITLE, META_USER
+from utils.environment import Config
 
 
 def get_local_time():
@@ -62,8 +62,10 @@ You are a helpful assistant that can use the following tools to answer questions
 No tool should be called when the user is simply responding to your prior message with a simple "ok" or "thanks" or "sure" or "no problem" or "I understand" or acknowledgments, minimal responses or backchannels.
 """
 
+config = Config()
+
 SYSTEM_PROMPT = f"""detailed thinking on
-You are {BOT_TITLE}, an AI assistant by NVIDIA. Today is {currentDateTime}. Your knowledge is current because you have access to the latest information.
+You are {config.BOT_TITLE}, an AI assistant by NVIDIA. Today is {currentDateTime}. Your knowledge is current because you have access to the latest information.
 
 When you're provided URLs from a tool, you should include the source of the information in your response as a markdown formatted URL. If you are reporting weather information, you should attempt to display the weather as a table with emojis for the weather conditions as this is easier for the user to understand.
 

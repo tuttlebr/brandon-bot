@@ -180,7 +180,7 @@ class StreamlitChatApp:
             )
             return combined_context
 
-        logging.info("No tool context found in messages")
+        logging.debug("No tool context found in messages")
         return ""
 
     def _run_async_streaming_response(self, prepared_messages: list, model: str) -> Generator[str, None, str]:
@@ -430,10 +430,6 @@ class StreamlitChatApp:
 
 def main():
     """Main function to run the Streamlit app"""
-    # Uncomment to enable password protection
-    # if not check_password():
-    #     st.stop()
-
     # Create and run the application
     app = StreamlitChatApp()
     app.run()
