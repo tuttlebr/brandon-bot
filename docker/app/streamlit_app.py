@@ -59,7 +59,11 @@ class StreamlitChatApp:
         # Clean previous chat history from context
         st.session_state.messages = self.chat_service.clean_chat_history_context(st.session_state.messages)
 
-        # Add user message to chat history first (no inline display to avoid duplication)
+        # Display user message immediately in the UI
+        with st.chat_message("user", avatar=self.config.user_avatar):
+            st.markdown(prompt)
+
+        # Add user message to chat history
         st.session_state.messages.append({"role": "user", "content": prompt})
 
         # Check if this is an image generation request
@@ -68,7 +72,6 @@ class StreamlitChatApp:
             return
 
         try:
-            # Prepare messages for API call - LLM service will handle tool message filtering
             prepared_messages = self.chat_service.prepare_messages_for_api(st.session_state.messages)
 
             # Generate and display response
@@ -151,19 +154,19 @@ class StreamlitChatApp:
             # Clear the typing indicator once we're ready to stream
             typing_indicator.empty()
 
-            # Generate streaming response
-            with st.spinner("Thinking..."):
-                response_generator = self.llm_service.generate_streaming_response(
-                    prepared_messages, st.session_state["openai_model"]
-                )
+            # Generate streaming response and display it in real-time
+            response_generator = self.llm_service.generate_streaming_response(
+                prepared_messages, st.session_state["openai_model"]
+            )
 
-                # Collect the full response without inline display
-                full_response = ""
-                for chunk in response_generator:
-                    full_response += chunk
+            # Create a chat message container for the assistant response
+            with st.spinner(""):
+                with st.chat_message("assistant", avatar=self.config.assistant_avatar):
+                    # Use st.write_stream to handle the streaming display
+                    full_response = st.write_stream(response_generator)
 
-                # Add response to chat history
-                self._update_chat_history(full_response, "assistant")
+            # Add the complete response to chat history
+            self._update_chat_history(full_response, "assistant")
 
             # Extract tool context from the prepared_messages that now contain tool responses
             tool_context = self._extract_tool_context_from_messages(prepared_messages)
@@ -172,9 +175,8 @@ class StreamlitChatApp:
                 st.session_state.last_tool_context = tool_context
                 logging.info("Stored tool context for display")
 
-            # Clear processing flag and trigger rerun to display the new messages properly
+            # Clear processing flag - no need to rerun since we've already displayed the response
             st.session_state.processing = False
-            st.rerun()
 
         except Exception as e:
             error_msg = f"Error generating response: {e}"
@@ -197,40 +199,49 @@ class StreamlitChatApp:
             # Extract the image description from the prompt
             image_prompt = self.image_service.extract_image_prompt(prompt)
 
-            # Note: User message already added to session state in process_prompt()
-
             # Generate image with loading indicator
             with st.spinner("Generating image..."):
                 generated_image, confirmation_message = self.image_service.generate_image_response(image_prompt)
 
-            # Process the response without inline display
-            if generated_image:
-                # Create a special message format for storing images in chat history
-                image_b64 = pil_image_to_base64(generated_image)
-                image_message = {
-                    "type": "image",
-                    "image_data": image_b64,
-                    "image_caption": image_prompt,
-                    "text": confirmation_message,
-                }
+            # Display the image response inline
+            with st.chat_message("assistant", avatar=self.config.assistant_avatar):
+                if generated_image:
+                    # Display the generated image
+                    st.image(generated_image, caption=f"Generated image: {image_prompt}", use_container_width=True)
+                    # Display the confirmation message
+                    st.markdown(confirmation_message)
 
-                # Add image response to chat history
-                st.session_state.messages.append({"role": "assistant", "content": image_message})
-            else:
-                # Add error message to chat history
-                st.session_state.messages.append({"role": "assistant", "content": confirmation_message})
+                    # Create a special message format for storing images in chat history
+                    image_b64 = pil_image_to_base64(generated_image)
+                    image_message = {
+                        "type": "image",
+                        "image_data": image_b64,
+                        "image_caption": image_prompt,
+                        "text": confirmation_message,
+                    }
+                    # Add image response to chat history
+                    st.session_state.messages.append({"role": "assistant", "content": image_message})
+                else:
+                    # Display error message
+                    st.markdown(confirmation_message)
+                    # Add error message to chat history
+                    st.session_state.messages.append({"role": "assistant", "content": confirmation_message})
 
-            # Clear processing flag and trigger rerun to display the new messages properly
+            # Clear processing flag - no need to rerun since we've already displayed the response
             st.session_state.processing = False
-            st.rerun()
 
         except Exception as e:
             logging.error(f"Error handling image generation: {e}")
             error_message = "I apologize, but I encountered an error while generating the image. Please try again."
+
+            # Display error message inline
+            with st.chat_message("assistant", avatar=self.config.assistant_avatar):
+                st.markdown(error_message)
+
+            # Add error message to chat history
             st.session_state.messages.append({"role": "assistant", "content": error_message})
-            # Clear processing flag even on error
+            # Clear processing flag
             st.session_state.processing = False
-            st.rerun()
 
     def _update_chat_history(self, text: str, role: str):
         """

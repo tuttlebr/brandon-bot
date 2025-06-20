@@ -9,6 +9,18 @@ from pydantic import BaseModel, Field
 logger = logging.getLogger(__name__)
 
 
+INCLUDED_DOMAINS = [
+    "apnews.com",
+    "npr.org",
+    "mlive.com",
+    "nvidianews.nvidia.com",
+    "freep.com",
+    "espn.com",
+    "thestreet.com",
+    "theinformation.com",
+]
+
+
 class SearchResult(BaseModel):
     """Individual search result from Tavily API"""
 
@@ -31,17 +43,17 @@ class TavilyResponse(BaseModel):
     response_time: float
 
 
-class TavilyTool:
-    """Tool for performing Tavily internet searches"""
+class NewsTool:
+    """Tool for performing Tavily news searches"""
 
     def __init__(self):
-        self.name = "tavily_internet_search"
+        self.name = "tavily_news_search"
         self.description = (
-            "A search engine optimized for comprehensive, accurate, and trusted web results but should not be used for retrieving news. "
-            "Useful for when you need to answer questions about local business, shoppig or general internet search."
-            "It not only retrieves URLs and snippets, but offers advanced search depths, "
-            "domain management, same-day search filtering this tool delivers "
-            "real-time, accurate, and citation-backed results."
+            "A news first search engine optimized for comprehensive, accurate, and trusted information on current events. "
+            "Useful for when you need to answer questions local or national news or major events. "
+            "Real-time, accurate, and citation-backed results from the following domains: "
+            + ", ".join(INCLUDED_DOMAINS)
+            + "."
             "Input should be a search query."
         )
 
@@ -60,7 +72,10 @@ class TavilyTool:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string", "description": "The search query to look up current information"}
+                        "query": {
+                            "type": "string",
+                            "description": "The search query to look up current news information",
+                        }
                     },
                     "required": ["query"],
                 },
@@ -107,24 +122,24 @@ class TavilyTool:
         import re
 
         # Remove markdown headers (# ## ###)
-        content = re.sub(r'^#+\s*', '', content, flags=re.MULTILINE)
+        content = re.sub(r"^#+\s*", "", content, flags=re.MULTILINE)
 
         # Remove markdown bold/italic formatting (**text**, *text*, __text__, _text_)
-        content = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', content)
-        content = re.sub(r'_{1,2}([^_]+)_{1,2}', r'\1', content)
+        content = re.sub(r"\*{1,2}([^*]+)\*{1,2}", r"\1", content)
+        content = re.sub(r"_{1,2}([^_]+)_{1,2}", r"\1", content)
 
         # Remove markdown links but keep the text [text](url) -> text
-        content = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', content)
+        content = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", content)
 
         # Remove HTML tags
-        content = re.sub(r'<[^>]+>', '', content)
+        content = re.sub(r"<[^>]+>", "", content)
 
         # Remove excessive whitespace and normalize line breaks
-        content = re.sub(r'\s+', ' ', content)
+        content = re.sub(r"\s+", " ", content)
         content = content.strip()
 
         # Remove leading/trailing quotes that might be artifacts
-        content = content.strip('"\'')
+        content = content.strip("\"'")
 
         return content[:500] + "..."
 
@@ -143,7 +158,7 @@ class TavilyTool:
             ValueError: If TAVILY_API_KEY environment variable is not set
             requests.RequestException: If the API request fails
         """
-        logger.info(f"Starting Tavily search for query: '{query}'")
+        logger.info(f"Starting Tavily news search for query: '{query}'")
 
         # Get API key from environment
         api_key = os.getenv("TAVILY_API_KEY")
@@ -156,16 +171,16 @@ class TavilyTool:
         # Default search parameters matching the shell script
         default_params = {
             "query": query,
-            "topic": "general",
+            "topic": "news",
             "search_depth": "advanced",
             "chunks_per_source": 5,
-            "max_results": 5,
+            "max_results": 3,
             "include_answer": False,
             "include_raw_content": False,
-            "include_images": True,
+            "include_images": False,
             "include_image_descriptions": False,
-            "time_range": "month",
-            "include_domains": [],
+            "days": 2,
+            "include_domains": INCLUDED_DOMAINS,
             "exclude_domains": [],
             "country": "united states",
         }
@@ -182,13 +197,13 @@ class TavilyTool:
         }
 
         try:
-            logger.info(f"Making API request to Tavily for query: '{query}'")
+            logger.info(f"Making API request to Tavily news search for query: '{query}'")
 
             # Make the API request
             response = requests.post(url, headers=headers, json=search_params)
             response.raise_for_status()  # Raises an HTTPError for bad responses
 
-            logger.info(f"Tavily API request successful (HTTP {response.status_code})")
+            logger.info(f"Tavily news API request successful (HTTP {response.status_code})")
 
             # Parse the JSON response and validate with Pydantic
             response_data = response.json()
@@ -207,7 +222,7 @@ class TavilyTool:
         except requests.exceptions.HTTPError as e:
             logger.error(f"HTTP error during Tavily API request: {e}")
             logger.error(f"Response status: {response.status_code}")
-            if hasattr(response, 'text'):
+            if hasattr(response, "text"):
                 logger.error(f"Response body: {response.text}")
             raise requests.RequestException(f"Tavily API HTTP error: {str(e)}")
         except requests.exceptions.RequestException as e:
@@ -229,8 +244,8 @@ class TavilyTool:
             TavilyResponse: The search results in a validated Pydantic model
         """
         # Support both direct parameter and dictionary input
-        if query is None and 'query' in kwargs:
-            query = kwargs['query']
+        if query is None and "query" in kwargs:
+            query = kwargs["query"]
         elif query is None:
             raise ValueError("Query parameter is required")
 
@@ -248,19 +263,19 @@ class TavilyTool:
         Returns:
             TavilyResponse: The search results in a validated Pydantic model
         """
-        if 'query' not in params:
+        if "query" not in params:
             raise ValueError("'query' key is required in parameters dictionary")
 
-        query = params['query']
+        query = params["query"]
         logger.debug(f"run_with_dict method called with query: '{query}'")
         return self.search_tavily(query)
 
 
 # Create a global instance and helper function for easy access
-tavily_tool = TavilyTool()
+tavily_tool = NewsTool()
 
 
-def get_tavily_tool_definition() -> Dict[str, Any]:
+def get_news_tool_definition() -> Dict[str, Any]:
     """
     Get the OpenAI-compatible tool definition for Tavily search
 
@@ -270,7 +285,7 @@ def get_tavily_tool_definition() -> Dict[str, Any]:
     return tavily_tool.to_openai_format()
 
 
-def execute_tavily_search(query: str) -> TavilyResponse:
+def execute_news_search(query: str) -> TavilyResponse:
     """
     Execute a Tavily search with the given query
 
@@ -283,7 +298,7 @@ def execute_tavily_search(query: str) -> TavilyResponse:
     return tavily_tool.search_tavily(query)
 
 
-def execute_tavily_with_dict(params: Dict[str, Any]) -> TavilyResponse:
+def execute_news_with_dict(params: Dict[str, Any]) -> TavilyResponse:
     """
     Execute a Tavily search with parameters provided as a dictionary
 

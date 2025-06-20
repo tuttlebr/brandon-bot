@@ -6,9 +6,11 @@ from typing import Any, Dict, Generator, List
 from models.chat_config import ChatConfig
 from openai import OpenAI
 from tools import (
+    execute_news_with_dict,
     execute_retrieval_with_dict,
     execute_tavily_with_dict,
     execute_weather_with_dict,
+    get_news_tool_definition,
     get_retrieval_tool_definition,
     get_tavily_tool_definition,
     get_weather_tool_definition,
@@ -17,11 +19,14 @@ from tools import (
 tavily_tool_def = get_tavily_tool_definition()
 weather_tool_def = get_weather_tool_definition()
 retrieval_tool_def = get_retrieval_tool_definition()
-
+news_tool_def = get_news_tool_definition()
+MAX_TURNS = 9
+ALL_TOOLS = [tavily_tool_def, weather_tool_def, retrieval_tool_def, news_tool_def]
 tools = {
     "tavily_internet_search": execute_tavily_with_dict,
     "get_weather": execute_weather_with_dict,
     "retrieval_search": execute_retrieval_with_dict,
+    "tavily_news_search": execute_news_with_dict,
 }
 
 
@@ -302,7 +307,7 @@ class LLMService:
                 "top_p": 0.95,
                 "frequency_penalty": 0,
                 "presence_penalty": 0,
-                "tools": [tavily_tool_def, weather_tool_def, retrieval_tool_def],
+                "tools": ALL_TOOLS,
                 "tool_choice": "auto",
             }
 
@@ -337,7 +342,7 @@ class LLMService:
                 logging.info(f"Generating response with tool results ({len(tool_responses)} tools used)")
 
                 # Apply sliding window to conversation history for response generation
-                windowed_messages = self._apply_sliding_window(clean_messages, max_turns=3)
+                windowed_messages = self._apply_sliding_window(clean_messages, max_turns=MAX_TURNS)
 
                 # Create full context: windowed conversation + tool results
                 response_messages = windowed_messages + tool_responses
@@ -357,7 +362,7 @@ class LLMService:
                 logging.info("No tools needed, generating response with conversation context")
 
                 # Apply sliding window for response generation
-                windowed_messages = self._apply_sliding_window(clean_messages, max_turns=3)
+                windowed_messages = self._apply_sliding_window(clean_messages, max_turns=MAX_TURNS)
 
                 # Generate response with conversation context (no tools)
                 stream = self.client.chat.completions.create(

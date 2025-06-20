@@ -21,9 +21,9 @@ class SearchConfig:
     uri: str
     db_name: str
     vector_field: str = "embedding"
-    radius: float = 1.25
+    radius: float = 2.0
     range_filter: float = 0.001
-    topk: int = 15
+    topk: int = 10
     output_fields: List[str] = None
 
     def __post_init__(self):
@@ -130,7 +130,7 @@ class SimilaritySearch:
         try:
             reranker_response = self._call_reranker_service(payload, RERANKER_ENDPOINT, NVIDIA_API_KEY)
             combined_results = self._combine_results(embedding_response, reranker_response)
-            validated_results, stats = self._remove_outliers(combined_results[0], std_threshold=1.0, key="logit")
+            validated_results, stats = self._remove_outliers(combined_results[0], std_threshold=0.85, key="logit")
             limit = int(self.config.topk * 0.5)
             return [validated_results[:limit]]
         except Exception as e:
@@ -413,7 +413,7 @@ class RetrievalTool:
     def __init__(self):
         self.name = "retrieval_search"
         self.description = (
-            "Perform vector similarity search on a knowledge base of NVIDIA documents using embeddings. "
+            "Perform vector similarity search on a knowledge base of NVIDIA documents as well as mental health documents using embeddings. "
             "This tool can search through documents using semantic similarity and optionally "
             "rerank results for better relevance. Useful for finding relevant information "
             "from a document collection based on natural language queries. "

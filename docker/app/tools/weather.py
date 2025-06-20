@@ -43,6 +43,7 @@ class WeatherResponse(BaseModel):
     timezone: str = Field(description="Timezone")
     current: CurrentWeather = Field(description="Current weather conditions")
     hourly: Optional[HourlyWeather] = Field(None, description="Hourly weather forecast")
+    source: str = Field(description="Source of the weather data")
 
 
 class LocationResult(BaseModel):
@@ -63,11 +64,12 @@ class WeatherTool:
         self.description = (
             "Get current temperature, weather conditions and codes for a given location. "
             "Provides current weather including temperature, wind speed, humidity, weather code, "
-            "and can optionally include hourly forecasts. "
+            "and can optionally include hourly forecasts from [Open-Meteo](https://open-meteo.com/). "
             "Input should be a location string of 'City' or 'ZIP code'."
         )
         self.geocoding_url = "https://geocoding-api.open-meteo.com/v1/search"
         self.weather_url = "https://api.open-meteo.com/v1/forecast"
+        self.source = "[Open-Meteo](https://open-meteo.com/)"
 
     def to_openai_format(self) -> Dict[str, Any]:
         """
@@ -230,6 +232,7 @@ class WeatherTool:
                 timezone=data.get("timezone", "UTC"),
                 current=current_weather,
                 hourly=hourly_weather,
+                source=self.source,
             )
 
             logger.info(

@@ -1,3 +1,4 @@
+from .news import NewsTool, execute_news_search, execute_news_with_dict, get_news_tool_definition
 from .retriever import (
     RetrievalTool,
     execute_retrieval_search,
@@ -22,4 +23,8 @@ __all__ = [
     "execute_retrieval_search",
     "execute_retrieval_with_dict",
     "get_simple_search_results",
+    "NewsTool",
+    "get_news_tool_definition",
+    "execute_news_search",
+    "execute_news_with_dict",
 ]

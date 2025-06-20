@@ -13,7 +13,6 @@ services:
       - app-network
     ports:
       - 8501:8501
-
     develop:
       watch:
         - action: sync
