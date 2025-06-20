@@ -7,10 +7,12 @@ from typing import Any, AsyncGenerator, Dict, List
 from models.chat_config import ChatConfig
 from openai import OpenAI
 from tools import (
+    execute_assistant_with_dict,
     execute_news_with_dict,
     execute_retrieval_with_dict,
     execute_tavily_with_dict,
     execute_weather_with_dict,
+    get_assistant_tool_definition,
     get_news_tool_definition,
     get_retrieval_tool_definition,
     get_tavily_tool_definition,
@@ -18,13 +20,15 @@ from tools import (
 )
 from utils.system_prompt import TOOL_PROMPT
 
+assistant_tool_def = get_assistant_tool_definition()
 tavily_tool_def = get_tavily_tool_definition()
 weather_tool_def = get_weather_tool_definition()
 retrieval_tool_def = get_retrieval_tool_definition()
 news_tool_def = get_news_tool_definition()
 MAX_TURNS = 9
-ALL_TOOLS = [tavily_tool_def, weather_tool_def, retrieval_tool_def, news_tool_def]
+ALL_TOOLS = [assistant_tool_def, tavily_tool_def, weather_tool_def, retrieval_tool_def, news_tool_def]
 tools = {
+    "text_assistant": execute_assistant_with_dict,
     "tavily_internet_search": execute_tavily_with_dict,
     "get_weather": execute_weather_with_dict,
     "retrieval_search": execute_retrieval_with_dict,
@@ -241,12 +245,15 @@ class LLMService:
 
         return normalized_calls
 
-    async def _execute_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def _execute_tool_calls(
+        self, tool_calls: List[Dict[str, Any]], current_user_message: Dict[str, Any] = None
+    ) -> List[Dict[str, Any]]:
         """
         Execute tool calls asynchronously using unified format
 
         Args:
             tool_calls: List of normalized tool call dictionaries
+            current_user_message: Original user message for tools that need unmodified input
 
         Returns:
             List of tool response messages
@@ -268,15 +275,39 @@ class LLMService:
                 return {"role": "tool", "content": f"Error: Unknown tool '{tool_name}'"}
 
             try:
+                # Special handling for text_assistant tool - use original user text
+                if tool_name == "text_assistant" and current_user_message:
+                    logging.debug(f"Using original user text for {tool_name} instead of LLM-generated parameters")
+
+                    # Extract original user content
+                    original_text = current_user_message.get("content", "")
+
+                    # Keep the task_type and instructions from LLM decision, but use original text
+                    modified_args = tool_args.copy()
+                    modified_args["text"] = original_text
+
+                    logging.debug(
+                        f"Modified args for {tool_name}: task_type={modified_args.get('task_type')}, original_text_length={len(original_text)}"
+                    )
+                    tool_args = modified_args
+
                 logging.debug(f"Executing tool call: {tool_name} with args: {tool_args} (from {source})")
                 tool_function = tools[tool_name]
 
                 # Run the tool function in a thread pool to avoid blocking
                 loop = asyncio.get_event_loop()
-                tool_response = await loop.run_in_executor(None, lambda: tool_function(tool_args).json())
+                tool_result = await loop.run_in_executor(None, lambda: tool_function(tool_args))
 
-                logging.debug(f"Tool {tool_name} executed successfully (from {source})")
-                return {"role": "tool", "content": tool_response}
+                # Check if this is a direct response tool (like assistant)
+                if hasattr(tool_result, 'direct_response') and tool_result.direct_response:
+                    logging.debug(f"Tool {tool_name} returned direct response")
+                    return {"role": "direct_response", "content": tool_result.result, "tool_name": tool_name}
+                else:
+                    # Standard tool response
+                    tool_response = tool_result.json()
+                    logging.debug(f"Tool {tool_name} executed successfully (from {source})")
+                    return {"role": "tool", "content": tool_response}
+
             except Exception as e:
                 logging.error(f"Error executing tool {tool_name} (from {source}): {e}")
                 return {"role": "tool", "content": f"Error executing {tool_name}: {str(e)}"}
@@ -494,7 +525,6 @@ class LLMService:
                 "messages": tool_decision_messages,
                 "stream": False,
                 "temperature": 0.0,
-                "max_tokens": 512,
                 "tools": ALL_TOOLS,
                 "tool_choice": "auto",
                 "parallel_tool_calls": True,
@@ -525,7 +555,7 @@ class LLMService:
                 )
 
                 # Execute all tool calls concurrently using unified approach
-                tool_responses = await self._execute_tool_calls(all_tool_calls)
+                tool_responses = await self._execute_tool_calls(all_tool_calls, current_user_message)
 
                 # Store tool responses for context extraction by streamlit app
                 self.last_tool_responses = tool_responses
@@ -540,6 +570,29 @@ class LLMService:
 
             # PHASE 3: Response Generation with Full Context
             if tool_responses:
+                # Check if any tool responses are direct responses (like assistant tool)
+                direct_responses = [resp for resp in tool_responses if resp.get("role") == "direct_response"]
+
+                if direct_responses:
+                    # If we have direct responses, process them through the response handler
+                    logging.info(f"Found {len(direct_responses)} direct response(s), processing and returning")
+                    direct_content = direct_responses[0]["content"]
+
+                    # Store the direct response for context extraction
+                    self.last_tool_responses = tool_responses
+
+                    # Ensure we have content to return
+                    if direct_content and direct_content.strip():
+                        # Process the direct response through the same filtering as streaming responses
+                        async for chunk in self._process_direct_response(direct_content):
+                            yield chunk
+                    else:
+                        # Fallback for empty direct response
+                        logging.warning("Direct response was empty, providing fallback")
+                        async for chunk in self._generate_simple_response("The task has been completed."):
+                            yield chunk
+                    return
+
                 logging.debug(
                     f"Generating response with tool results ({len(tool_responses)} tool responses from {len(all_tool_calls)} tool calls)"
                 )
@@ -605,6 +658,64 @@ class LLMService:
             The message
         """
         yield message
+
+    async def _process_direct_response(self, content: str) -> AsyncGenerator[str, str]:
+        """
+        Process direct response content with the same filtering as streaming responses
+
+        Args:
+            content: The direct response content to process
+
+        Yields:
+            Filtered content chunks without think tags or tool call instructions
+        """
+        logging.debug("Processing direct response content...")
+
+        if not content:
+            logging.warning("Direct response content was empty, providing fallback")
+            yield "The task has been completed."
+            return
+
+        # Check if response contains only tool call instructions
+        if self._contains_custom_tool_calls(content):
+            # Remove tool call instructions
+            cleaned_content = self._remove_tool_call_instructions(content)
+            if not cleaned_content.strip():
+                logging.warning("Direct response contained only tool call instructions, providing fallback")
+                yield "The task has been completed."
+                return
+            content = cleaned_content
+
+        # Remove any remaining custom tool call tags from the response
+        cleaned_content = self._remove_tool_call_instructions(content)
+
+        # Check if response contains think tags
+        if "<think>" not in cleaned_content and "</think>" not in cleaned_content:
+            logging.debug("No think tags found in direct response, returning with escaped dollar signs")
+            # Just escape dollar signs for markdown and yield
+            final_response = cleaned_content.replace("$", "\\$").replace("\\${", "${").strip()
+            if final_response:
+                yield final_response
+            else:
+                logging.warning("Direct response was empty after cleaning, providing fallback")
+                yield "The task has been completed."
+            return
+
+        # Filter out think tags using regex
+        filtered_response = re.sub(r"<think>.*?</think>", "", cleaned_content, flags=re.DOTALL).strip()
+
+        # Escape dollar signs for markdown
+        final_response = filtered_response.replace("$", "\\$").replace("\\${", "${")
+
+        logging.debug(f"Finished processing direct response. Filtered length: {len(final_response)} characters")
+
+        # Ensure we don't yield empty responses
+        if final_response:
+            logging.debug("Think tags and tool calls successfully removed from direct response")
+            yield final_response
+        else:
+            logging.warning("Direct response was entirely within think tags or tool calls, providing fallback")
+            yield "The task has been completed."
 
     async def _process_streaming_response(self, stream) -> AsyncGenerator[str, str]:
         """

@@ -122,7 +122,7 @@ class StreamlitChatApp:
 
         # Display user message immediately in the UI
         with st.chat_message("user", avatar=self.config.user_avatar):
-            st.markdown(prompt)
+            st.markdown(prompt[:2048] + "..." if len(prompt) > 2048 else prompt)
 
         # Add user message to chat history using safe method
         self._safe_add_message_to_history("user", prompt)
