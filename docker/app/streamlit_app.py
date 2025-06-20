@@ -1,12 +1,13 @@
+import asyncio
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, Generator, List
 
 import streamlit as st
 from models import ChatConfig
 from services import ChatService, ImageService, LLMService
 from ui import ChatHistoryComponent, apply_custom_styles, get_typing_indicator_html
 from utils.image import pil_image_to_base64
-from utils.system_prompt import SYSTEM_PROMPT, greeting_prompt
+from utils.system_prompt import SYSTEM_PROMPT, TOOL_PROMPT, greeting_prompt
 
 
 class StreamlitChatApp:
@@ -46,6 +47,38 @@ class StreamlitChatApp:
         """Display the chat history using the chat history component"""
         self.chat_history_component.display_chat_history(st.session_state.messages)
 
+    def _clean_chat_history_of_tool_calls(self):
+        """
+        Clean existing chat history to remove any messages containing tool call instructions
+        """
+        if not hasattr(st.session_state, 'messages') or not st.session_state.messages:
+            return
+
+        original_count = len(st.session_state.messages)
+        cleaned_messages = []
+
+        for message in st.session_state.messages:
+            content = message.get("content", "")
+
+            # Keep system messages and non-string content as-is
+            if message.get("role") == "system" or not isinstance(content, str):
+                cleaned_messages.append(message)
+                continue
+
+            # Check if message contains tool call instructions
+            if self._contains_tool_call_instructions(content):
+                logging.warning(
+                    f"Removing {message.get('role', 'unknown')} message with tool call instructions from chat history"
+                )
+                continue
+
+            # Keep clean messages
+            cleaned_messages.append(message)
+
+        if len(cleaned_messages) != original_count:
+            st.session_state.messages = cleaned_messages
+            logging.info(f"Cleaned chat history: {original_count} -> {len(cleaned_messages)} messages")
+
     def process_prompt(self, prompt: str):
         """
         Process user prompt and generate response
@@ -56,6 +89,16 @@ class StreamlitChatApp:
         # Clean the prompt
         prompt = prompt.strip()
 
+        # Validate that the prompt doesn't contain tool call instructions (shouldn't happen from user input)
+        if self._contains_tool_call_instructions(prompt):
+            logging.error("User prompt contains tool call instructions - this should not happen")
+            st.error("Invalid input detected. Please try again with a different message.")
+            st.session_state.processing = False
+            return
+
+        # Clean existing chat history of any tool call instructions
+        self._clean_chat_history_of_tool_calls()
+
         # Clean previous chat history from context
         st.session_state.messages = self.chat_service.clean_chat_history_context(st.session_state.messages)
 
@@ -63,8 +106,8 @@ class StreamlitChatApp:
         with st.chat_message("user", avatar=self.config.user_avatar):
             st.markdown(prompt)
 
-        # Add user message to chat history
-        st.session_state.messages.append({"role": "user", "content": prompt})
+        # Add user message to chat history using safe method
+        self._safe_add_message_to_history("user", prompt)
 
         # Check if this is an image generation request
         if self.image_service.detect_image_generation_request(prompt):
@@ -80,6 +123,7 @@ class StreamlitChatApp:
         except Exception as e:
             logging.error(f"Error processing prompt: {e}")
             st.error("An error occurred while processing your request. Please try again.")
+            st.session_state.processing = False
 
     def _extract_tool_context_from_messages(self, messages: List[Dict[str, Any]] = None) -> str:
         """
@@ -139,6 +183,47 @@ class StreamlitChatApp:
         logging.info("No tool context found in messages")
         return ""
 
+    def _run_async_streaming_response(self, prepared_messages: list, model: str) -> Generator[str, None, str]:
+        """
+        Wrapper to run async streaming response in a synchronous context
+
+        Args:
+            prepared_messages: Prepared messages for API call
+            model: Model name to use
+
+        Yields:
+            Filtered content chunks
+
+        Returns:
+            Complete filtered response
+        """
+        try:
+
+            async def collect_and_yield():
+                """Collect all chunks from async generator"""
+                chunks = []
+                async_gen = self.llm_service.generate_streaming_response(prepared_messages, model)
+                async for chunk in async_gen:
+                    chunks.append(chunk)
+                return chunks
+
+            # Run the async function
+            chunks = asyncio.run(collect_and_yield())
+
+            # Yield all chunks for streaming display
+            full_response = ""
+            for chunk in chunks:
+                full_response += chunk
+                yield chunk
+
+            return full_response
+
+        except Exception as e:
+            error_msg = f"Error in async streaming wrapper: {e}"
+            logging.error(error_msg)
+            yield "I apologize, but I encountered an error while generating a response."
+            return "Error occurred during response generation"
+
     def _generate_and_display_response(self, prepared_messages: list):
         """
         Generate and display streaming response from LLM
@@ -155,7 +240,7 @@ class StreamlitChatApp:
             typing_indicator.empty()
 
             # Generate streaming response and display it in real-time
-            response_generator = self.llm_service.generate_streaming_response(
+            response_generator = self._run_async_streaming_response(
                 prepared_messages, st.session_state["openai_model"]
             )
 
@@ -219,13 +304,13 @@ class StreamlitChatApp:
                         "image_caption": image_prompt,
                         "text": confirmation_message,
                     }
-                    # Add image response to chat history
-                    st.session_state.messages.append({"role": "assistant", "content": image_message})
+                    # Add image response to chat history using safe method
+                    self._safe_add_message_to_history("assistant", image_message)
                 else:
                     # Display error message
                     st.markdown(confirmation_message)
-                    # Add error message to chat history
-                    st.session_state.messages.append({"role": "assistant", "content": confirmation_message})
+                    # Add error message to chat history using safe method
+                    self._safe_add_message_to_history("assistant", confirmation_message)
 
             # Clear processing flag - no need to rerun since we've already displayed the response
             st.session_state.processing = False
@@ -238,10 +323,79 @@ class StreamlitChatApp:
             with st.chat_message("assistant", avatar=self.config.assistant_avatar):
                 st.markdown(error_message)
 
-            # Add error message to chat history
-            st.session_state.messages.append({"role": "assistant", "content": error_message})
+            # Add error message to chat history using safe method
+            self._safe_add_message_to_history("assistant", error_message)
             # Clear processing flag
             st.session_state.processing = False
+
+    def _contains_tool_call_instructions(self, content: str) -> bool:
+        """
+        Check if content contains custom tool call instructions
+
+        Args:
+            content: The content to check
+
+        Returns:
+            True if content contains tool call instructions, False otherwise
+        """
+        if not isinstance(content, str):
+            return False
+
+        # Check for various custom tool call patterns
+        import re
+
+        patterns = [
+            r'<TOOLCALL-\[.*?\]</TOOLCALL>',
+            r'<TOOLCALL\[.*?\]</TOOLCALL>',
+            r'<TOOLCALL"\[.*?\]</TOOLCALL>',
+            r'<TOOLCALL\s*-\s*\[.*?\]</TOOLCALL>',
+            r'<toolcall-\[.*?\]</toolcall>',
+            r'<TOOLCALL.?\[.*?\]</TOOLCALL>',
+        ]
+
+        for pattern in patterns:
+            if re.search(pattern, content, re.DOTALL | re.IGNORECASE):
+                return True
+
+        return False
+
+    def _safe_add_message_to_history(self, role: str, content: Any):
+        """
+        Safely add a message to chat history with validation
+
+        Args:
+            role: The role of the message sender
+            content: The content of the message (can be string, dict for images, etc.)
+        """
+        # Handle different content types
+        if isinstance(content, str):
+            # String content - validate it's not empty and doesn't contain tool calls
+            if not content or not content.strip():
+                logging.warning(f"Attempted to add empty {role} message to chat history, skipping")
+                return
+
+            # Check for tool call instructions
+            if self._contains_tool_call_instructions(content):
+                logging.warning(
+                    f"Attempted to add {role} message with tool call instructions to chat history, skipping"
+                )
+                return
+
+            content = content.strip()
+        elif isinstance(content, dict):
+            # Dict content (like image messages) - ensure it has meaningful data
+            if not content:
+                logging.warning(f"Attempted to add empty dict {role} message to chat history, skipping")
+                return
+        else:
+            # Other content types - ensure they're truthy
+            if not content:
+                logging.warning(f"Attempted to add empty {role} message to chat history, skipping")
+                return
+
+        # Add the validated message to history
+        st.session_state.messages.append({"role": role, "content": content})
+        logging.debug(f"Added {role} message to chat history")
 
     def _update_chat_history(self, text: str, role: str):
         """
@@ -254,9 +408,8 @@ class StreamlitChatApp:
         # Clean up message format before saving
         st.session_state.messages = self.chat_service.drop_verbose_messages_context(st.session_state.messages)
 
-        # Add message to history
-        st.session_state.messages.append({"role": role, "content": text})
-        logging.debug(f"Updated chat history: {st.session_state.messages}")
+        # Use the safe method to add the message
+        self._safe_add_message_to_history(role, text)
 
     def run(self):
         """Run the main application"""

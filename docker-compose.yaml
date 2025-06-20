@@ -15,7 +15,7 @@ services:
       - 8501:8501
     develop:
       watch:
-        - action: sync
+        - action: rebuild
           path: ./docker/app
           target: /app
           ignore:

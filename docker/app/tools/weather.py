@@ -61,12 +61,7 @@ class WeatherTool:
 
     def __init__(self):
         self.name = "get_weather"
-        self.description = (
-            "Get current temperature, weather conditions and codes for a given location. "
-            "Provides current weather including temperature, wind speed, humidity, weather code, "
-            "and can optionally include hourly forecasts from [Open-Meteo](https://open-meteo.com/). "
-            "Input should be a location string of 'City' or 'ZIP code'."
-        )
+        self.description = "Triggered when asks for the weather. Data are provided by [Open-Meteo](https://open-meteo.com/). Input should be a location string of 'City' or 'ZIP code'."
         self.geocoding_url = "https://geocoding-api.open-meteo.com/v1/search"
         self.weather_url = "https://api.open-meteo.com/v1/forecast"
         self.source = "[Open-Meteo](https://open-meteo.com/)"

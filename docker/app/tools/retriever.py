@@ -33,6 +33,7 @@ class SearchConfig:
                 "title",
                 "source",
                 "text",
+                "creation_date",
             ]
 
 
@@ -232,8 +233,8 @@ class SimilaritySearch:
                         valid_items.append(item)
 
                     if not raw_scores:
-                        logging.error("No valid numeric values found in data")
-                        return data, {"error": "No valid numeric values found"}
+                        logging.warning("No valid numeric values found in data")
+                        return data, {"warning": "No valid numeric values found"}
 
                     scores = np.array(raw_scores, dtype=np.float64)
                     original_data = valid_items  # Use only the items with valid scores
@@ -379,8 +380,8 @@ class SimilaritySearch:
         title = entity["title"].strip()
         text = entity["text"].replace(title, "").strip()
         source = entity["source"].strip()
-
-        base_text = f"<small>{index}. [{title}]({source}), " f"_'{text}'_"
+        creation_date = entity["creation_date"].strip()
+        base_text = f"<small>{index}. [{title}]({source}), " f"_'{text}'_, {creation_date}"
 
         return f"{base_text}</small>"
 
@@ -392,6 +393,7 @@ class SearchResult(BaseModel):
     title: str = Field(description="Title of the document")
     source: str = Field(description="Source URL or location of the document")
     text: str = Field(description="Text content of the document")
+    creation_date: str = Field(description="Creation date of the document")
     distance: Optional[float] = Field(None, description="Vector similarity distance")
     logit: Optional[float] = Field(None, description="Reranker logit score")
     index: Optional[int] = Field(None, description="Original index in search results")
@@ -412,13 +414,7 @@ class RetrievalTool:
 
     def __init__(self):
         self.name = "retrieval_search"
-        self.description = (
-            "Perform vector similarity search on a knowledge base of NVIDIA documents as well as mental health documents using embeddings. "
-            "This tool can search through documents using semantic similarity and optionally "
-            "rerank results for better relevance. Useful for finding relevant information "
-            "from a document collection based on natural language queries. "
-            "Input should be a search query string."
-        )
+        self.description = "Triggered when asks for the latest information found in a document collection containing a knowledge base of NVIDIA and Mental Health information. Input should be a search query string."
 
         # Initialize embedding creator and similarity search
         self.embedding_creator = EmbeddingCreator(
@@ -501,6 +497,7 @@ class RetrievalTool:
                     title=entity.get("title", ""),
                     source=entity.get("source", ""),
                     text=entity.get("text", ""),
+                    creation_date=entity.get("creation_date", ""),
                     distance=result.get("distance"),
                     logit=result.get("logit"),
                     index=result.get("index"),

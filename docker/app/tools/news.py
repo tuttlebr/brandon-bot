@@ -49,12 +49,9 @@ class NewsTool:
     def __init__(self):
         self.name = "tavily_news_search"
         self.description = (
-            "A news first search engine optimized for comprehensive, accurate, and trusted information on current events. "
-            "Useful for when you need to answer questions local or national news or major events. "
-            "Real-time, accurate, and citation-backed results from the following domains: "
+            "Triggered when asks for the latest news. News sources are limited to the following domains: "
             + ", ".join(INCLUDED_DOMAINS)
-            + "."
-            "Input should be a search query."
+            + ". Input should be a search query string."
         )
 
     def to_openai_format(self) -> Dict[str, Any]:

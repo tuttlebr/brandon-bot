@@ -36,14 +36,7 @@ class TavilyTool:
 
     def __init__(self):
         self.name = "tavily_internet_search"
-        self.description = (
-            "A search engine optimized for comprehensive, accurate, and trusted web results but should not be used for retrieving news. "
-            "Useful for when you need to answer questions about local business, shoppig or general internet search."
-            "It not only retrieves URLs and snippets, but offers advanced search depths, "
-            "domain management, same-day search filtering this tool delivers "
-            "real-time, accurate, and citation-backed results."
-            "Input should be a search query."
-        )
+        self.description = "Triggered when asks for the latest information found in a general internet search. Data are provided by [Tavily](https://tavily.com/). Input should be a search query string."
 
     def to_openai_format(self) -> Dict[str, Any]:
         """
@@ -60,7 +53,7 @@ class TavilyTool:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string", "description": "The search query to look up current information"}
+                        "query": {"type": "string", "description": "The search query to look up current information",}
                     },
                     "required": ["query"],
                 },
@@ -107,24 +100,24 @@ class TavilyTool:
         import re
 
         # Remove markdown headers (# ## ###)
-        content = re.sub(r'^#+\s*', '', content, flags=re.MULTILINE)
+        content = re.sub(r"^#+\s*", "", content, flags=re.MULTILINE)
 
         # Remove markdown bold/italic formatting (**text**, *text*, __text__, _text_)
-        content = re.sub(r'\*{1,2}([^*]+)\*{1,2}', r'\1', content)
-        content = re.sub(r'_{1,2}([^_]+)_{1,2}', r'\1', content)
+        content = re.sub(r"\*{1,2}([^*]+)\*{1,2}", r"\1", content)
+        content = re.sub(r"_{1,2}([^_]+)_{1,2}", r"\1", content)
 
         # Remove markdown links but keep the text [text](url) -> text
-        content = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', content)
+        content = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", content)
 
         # Remove HTML tags
-        content = re.sub(r'<[^>]+>', '', content)
+        content = re.sub(r"<[^>]+>", "", content)
 
         # Remove excessive whitespace and normalize line breaks
-        content = re.sub(r'\s+', ' ', content)
+        content = re.sub(r"\s+", " ", content)
         content = content.strip()
 
         # Remove leading/trailing quotes that might be artifacts
-        content = content.strip('"\'')
+        content = content.strip("\"'")
 
         return content[:500] + "..."
 
@@ -207,7 +200,7 @@ class TavilyTool:
         except requests.exceptions.HTTPError as e:
             logger.error(f"HTTP error during Tavily API request: {e}")
             logger.error(f"Response status: {response.status_code}")
-            if hasattr(response, 'text'):
+            if hasattr(response, "text"):
                 logger.error(f"Response body: {response.text}")
             raise requests.RequestException(f"Tavily API HTTP error: {str(e)}")
         except requests.exceptions.RequestException as e:
@@ -229,8 +222,8 @@ class TavilyTool:
             TavilyResponse: The search results in a validated Pydantic model
         """
         # Support both direct parameter and dictionary input
-        if query is None and 'query' in kwargs:
-            query = kwargs['query']
+        if query is None and "query" in kwargs:
+            query = kwargs["query"]
         elif query is None:
             raise ValueError("Query parameter is required")
 
@@ -248,10 +241,10 @@ class TavilyTool:
         Returns:
             TavilyResponse: The search results in a validated Pydantic model
         """
-        if 'query' not in params:
+        if "query" not in params:
             raise ValueError("'query' key is required in parameters dictionary")
 
-        query = params['query']
+        query = params["query"]
         logger.debug(f"run_with_dict method called with query: '{query}'")
         return self.search_tavily(query)
 

@@ -1,7 +1,8 @@
+import asyncio
 import json
 import logging
 import re
-from typing import Any, Dict, Generator, List
+from typing import Any, AsyncGenerator, Dict, List
 
 from models.chat_config import ChatConfig
 from openai import OpenAI
@@ -15,6 +16,7 @@ from tools import (
     get_tavily_tool_definition,
     get_weather_tool_definition,
 )
+from utils.system_prompt import TOOL_PROMPT
 
 tavily_tool_def = get_tavily_tool_definition()
 weather_tool_def = get_weather_tool_definition()
@@ -98,7 +100,7 @@ class LLMService:
                     matches = re.findall(pattern, content, re.DOTALL)
 
                 if matches:
-                    logging.info(f"Found tool calls using pattern: {pattern}")
+                    logging.debug(f"Found tool calls using pattern: {pattern}")
                     for match in matches:
                         parsed_calls.extend(self._parse_tool_call_json(match))
 
@@ -146,7 +148,7 @@ class LLMService:
             for tool_call in tool_calls_json:
                 if isinstance(tool_call, dict) and "name" in tool_call and "arguments" in tool_call:
                     parsed_calls.append(tool_call)
-                    logging.info(f"Parsed custom tool call: {tool_call['name']}")
+                    logging.debug(f"Parsed custom tool call: {tool_call['name']}")
                 else:
                     logging.warning(f"Invalid tool call format: {tool_call}")
 
@@ -181,7 +183,7 @@ class LLMService:
                     for tool_call in tool_calls_json:
                         if isinstance(tool_call, dict) and "name" in tool_call and "arguments" in tool_call:
                             parsed_calls.append(tool_call)
-                            logging.info(f"Extracted tool call from content: {tool_call['name']}")
+                            logging.debug(f"Extracted tool call from content: {tool_call['name']}")
                 except json.JSONDecodeError:
                     continue
 
@@ -190,39 +192,100 @@ class LLMService:
 
         return parsed_calls
 
-    def _execute_custom_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _normalize_tool_calls(self, openai_tool_calls=None, custom_tool_calls=None) -> List[Dict[str, Any]]:
         """
-        Execute custom tool calls and return tool responses
+        Normalize both standard OpenAI tool calls and custom tool calls to a unified format
 
         Args:
-            tool_calls: List of tool call dictionaries
+            openai_tool_calls: List of OpenAI tool call objects (optional)
+            custom_tool_calls: List of custom tool call dictionaries (optional)
+
+        Returns:
+            List of normalized tool call dictionaries
+        """
+        normalized_calls = []
+
+        # Process standard OpenAI tool calls
+        if openai_tool_calls:
+            for tool_call in openai_tool_calls:
+                try:
+                    normalized_calls.append(
+                        {
+                            "name": tool_call.function.name,
+                            "arguments": json.loads(tool_call.function.arguments),
+                            "source": "openai_standard",
+                        }
+                    )
+                except Exception as e:
+                    logging.error(f"Error normalizing OpenAI tool call: {e}")
+                    normalized_calls.append(
+                        {
+                            "name": "error",
+                            "arguments": {},
+                            "source": "openai_standard",
+                            "error": f"Failed to parse tool call: {str(e)}",
+                        }
+                    )
+
+        # Process custom tool calls
+        if custom_tool_calls:
+            for tool_call in custom_tool_calls:
+                normalized_calls.append(
+                    {
+                        "name": tool_call.get("name"),
+                        "arguments": tool_call.get("arguments", {}),
+                        "source": "custom_format",
+                    }
+                )
+
+        return normalized_calls
+
+    async def _execute_tool_calls(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Execute tool calls asynchronously using unified format
+
+        Args:
+            tool_calls: List of normalized tool call dictionaries
 
         Returns:
             List of tool response messages
         """
-        tool_responses = []
 
-        for tool_call in tool_calls:
+        async def execute_single_tool(tool_call: Dict[str, Any]) -> Dict[str, Any]:
+            """Execute a single tool call"""
             tool_name = tool_call.get("name")
             tool_args = tool_call.get("arguments", {})
+            source = tool_call.get("source", "unknown")
+
+            # Handle pre-existing errors from normalization
+            if "error" in tool_call:
+                logging.error(f"Tool call error from {source}: {tool_call['error']}")
+                return {"role": "tool", "content": f"Error: {tool_call['error']}"}
 
             if tool_name not in tools:
-                logging.error(f"Unknown tool: {tool_name}")
-                tool_responses.append({"role": "tool", "content": f"Error: Unknown tool '{tool_name}'"})
-                continue
+                logging.error(f"Unknown tool: {tool_name} (from {source})")
+                return {"role": "tool", "content": f"Error: Unknown tool '{tool_name}'"}
 
             try:
-                logging.info(f"Executing custom tool call: {tool_name} with args: {tool_args}")
+                logging.debug(f"Executing tool call: {tool_name} with args: {tool_args} (from {source})")
                 tool_function = tools[tool_name]
-                tool_response = tool_function(tool_args).json()
-                tool_responses.append({"role": "tool", "content": tool_response})
-                logging.info(f"Tool {tool_name} executed successfully")
-            except Exception as e:
-                logging.error(f"Error executing tool {tool_name}: {e}")
-                tool_responses.append(
-                    {"role": "tool", "content": f"Error executing {tool_name}: {str(e)}",}
-                )
 
+                # Run the tool function in a thread pool to avoid blocking
+                loop = asyncio.get_event_loop()
+                tool_response = await loop.run_in_executor(None, lambda: tool_function(tool_args).json())
+
+                logging.debug(f"Tool {tool_name} executed successfully (from {source})")
+                return {"role": "tool", "content": tool_response}
+            except Exception as e:
+                logging.error(f"Error executing tool {tool_name} (from {source}): {e}")
+                return {"role": "tool", "content": f"Error executing {tool_name}: {str(e)}"}
+
+        # Execute all tool calls concurrently
+        if not tool_calls:
+            return []
+
+        logging.info(f"Executing {len(tool_calls)} tool calls concurrently")
+        tool_responses = await asyncio.gather(*[execute_single_tool(tool_call) for tool_call in tool_calls])
         return tool_responses
 
     def _apply_sliding_window(self, messages: List[Dict[str, Any]], max_turns: int = 3) -> List[Dict[str, Any]]:
@@ -253,12 +316,130 @@ class LLMService:
             recent_conversation = conversation_messages[-keep_count:]
             windowed_messages = system_messages + recent_conversation
 
-        logging.info(
+        logging.debug(
             f"Applied sliding window: {len(messages)} -> {len(windowed_messages)} messages (keeping {max_turns} turns)"
         )
         return windowed_messages
 
-    def generate_streaming_response(self, messages: List[Dict[str, Any]], model: str) -> Generator[str, None, str]:
+    def _contains_custom_tool_calls(self, content: str) -> bool:
+        """
+        Check if content contains custom tool call instructions
+
+        Args:
+            content: The response content to check
+
+        Returns:
+            True if content contains custom tool calls, False otherwise
+        """
+        if not content:
+            return False
+
+        # Check for various custom tool call patterns
+        patterns = [
+            r'<TOOLCALL-\[.*?\]</TOOLCALL>',
+            r'<TOOLCALL\[.*?\]</TOOLCALL>',
+            r'<TOOLCALL"\[.*?\]</TOOLCALL>',
+            r'<TOOLCALL\s*-\s*\[.*?\]</TOOLCALL>',
+            r'<toolcall-\[.*?\]</toolcall>',
+            r'<TOOLCALL.?\[.*?\]</TOOLCALL>',
+        ]
+
+        for pattern in patterns:
+            if re.search(pattern, content, re.DOTALL | re.IGNORECASE):
+                logging.debug(f"Found custom tool call pattern: {pattern}")
+                return True
+
+        return False
+
+    def _remove_tool_call_instructions(self, content: str) -> str:
+        """
+        Remove all custom tool call instructions from content
+
+        Args:
+            content: The response content to clean
+
+        Returns:
+            Content with tool call instructions removed
+        """
+        if not content:
+            return content
+
+        # Remove various custom tool call patterns
+        patterns = [
+            r'<TOOLCALL-\[.*?\]</TOOLCALL>',
+            r'<TOOLCALL\[.*?\]</TOOLCALL>',
+            r'<TOOLCALL"\[.*?\]</TOOLCALL>',
+            r'<TOOLCALL\s*-\s*\[.*?\]</TOOLCALL>',
+            r'<toolcall-\[.*?\]</toolcall>',
+            r'<TOOLCALL.?\[.*?\]</TOOLCALL>',
+        ]
+
+        cleaned_content = content
+        for pattern in patterns:
+            cleaned_content = re.sub(pattern, '', cleaned_content, flags=re.DOTALL | re.IGNORECASE)
+
+        return cleaned_content.strip()
+
+    def _validate_and_clean_messages(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Validate and clean messages, removing any with empty content or tool call instructions
+
+        Args:
+            messages: List of message dictionaries
+
+        Returns:
+            Cleaned list of messages with non-empty content and no tool call instructions
+        """
+        cleaned_messages = []
+
+        for msg in messages:
+            content = msg.get("content", "")
+
+            # Handle different content types
+            if isinstance(content, str):
+                # Check if content contains custom tool call instructions
+                if self._contains_custom_tool_calls(content):
+                    logging.warning(
+                        f"Removing message with custom tool call instructions: {msg.get('role', 'unknown')}"
+                    )
+                    continue
+
+                # String content - check if it's empty after stripping
+                if content.strip():
+                    cleaned_messages.append(msg)
+                else:
+                    logging.warning(f"Removing message with empty string content: {msg.get('role', 'unknown')}")
+            elif isinstance(content, dict):
+                # Dict content (like image messages) - keep if it has meaningful data
+                if content:
+                    cleaned_messages.append(msg)
+                else:
+                    logging.warning(f"Removing message with empty dict content: {msg.get('role', 'unknown')}")
+            elif isinstance(content, list):
+                # List content - keep if it has items
+                if content:
+                    cleaned_messages.append(msg)
+                else:
+                    logging.warning(f"Removing message with empty list content: {msg.get('role', 'unknown')}")
+            else:
+                # Other content types - be conservative and keep if truthy
+                if content:
+                    cleaned_messages.append(msg)
+                else:
+                    logging.warning(
+                        f"Removing message with empty content: {msg.get('role', 'unknown')}, type: {type(content)}"
+                    )
+
+        if len(cleaned_messages) != len(messages):
+            logging.debug(
+                f"Cleaned messages: {len(messages)} -> {len(cleaned_messages)} (removed {len(messages) - len(cleaned_messages)} messages)"
+            )
+
+        return cleaned_messages
+
+    async def generate_streaming_response(
+        self, messages: List[Dict[str, Any]], model: str
+    ) -> AsyncGenerator[str, str]:
         """
         Generate streaming response from LLM
 
@@ -268,11 +449,11 @@ class LLMService:
 
         Yields:
             Filtered content chunks without <think> tags
-
-        Returns:
-            Final complete response text
         """
         try:
+            # First, validate and clean all messages to remove any with empty content
+            messages = self._validate_and_clean_messages(messages)
+
             # Filter out any tool messages from previous turns to prevent bias
             # Only keep system and user/assistant messages for clean conversation history
             clean_messages = []
@@ -280,7 +461,10 @@ class LLMService:
                 if msg.get("role") in ["system", "user", "assistant"]:
                     clean_messages.append(msg)
                 elif msg.get("role") == "tool":
-                    logging.info(f"Filtered out tool message from LLM input: {str(msg.get('content', ''))[:100]}...")
+                    logging.debug(f"Filtered out tool message from LLM input: {str(msg.get('content', ''))[:100]}...")
+
+            # Validate clean messages again after filtering
+            clean_messages = self._validate_and_clean_messages(clean_messages)
 
             # PHASE 1: Tool Decision Making - Use minimal context (system + current user message only)
             system_message = next((msg for msg in clean_messages if msg.get("role") == "system"), None)
@@ -288,13 +472,18 @@ class LLMService:
 
             if not current_user_message:
                 logging.error("No user message found for tool decision")
-                return self._generate_simple_response("I didn't receive a message from you.")
+                async for chunk in self._generate_simple_response("I didn't receive a message from you."):
+                    yield chunk
+                return
 
             # Create minimal context for tool decision
             tool_decision_messages = []
             if system_message:
-                tool_decision_messages.append(system_message)
+                tool_decision_messages.append({"role": "system", "content": TOOL_PROMPT})
             tool_decision_messages.append(current_user_message)
+
+            # Final validation of tool decision messages
+            tool_decision_messages = self._validate_and_clean_messages(tool_decision_messages)
 
             logging.info(f"Tool decision context: {len(tool_decision_messages)} messages (system + current user)")
 
@@ -303,49 +492,60 @@ class LLMService:
                 "model": model,
                 "messages": tool_decision_messages,
                 "stream": False,
-                "temperature": 0.6,
-                "top_p": 0.95,
-                "frequency_penalty": 0,
-                "presence_penalty": 0,
+                "temperature": 0.0,
+                "top_p": 1,
+                "max_tokens": 512,
                 "tools": ALL_TOOLS,
                 "tool_choice": "auto",
+                "parallel_tool_calls": True,
             }
-
+            logging.debug(f"Tool decision params: {tool_decision_params}")
             initial_response = self.client.chat.completions.create(**tool_decision_params)
 
-            # PHASE 2: Tool Execution (if needed)
+            # PHASE 2: Tool Detection and Execution (unified approach)
             tool_responses = []
 
-            # Check for standard OpenAI tool calls
-            if initial_response.choices[0].message.tool_calls:
-                logging.info("Standard tool calls found, executing tools")
-                for tool_call in initial_response.choices[0].message.tool_calls:
-                    args = json.loads(tool_call.function.arguments)
-                    tool_function = tools[tool_call.function.name]
-                    tool_response = tool_function(args).json()
-                    tool_responses.append({"role": "tool", "content": tool_response})
-                    # Also add to original messages for context extraction
-                    messages.append({"role": "tool", "content": tool_response})
-            else:
-                # Check for custom tool call format
-                response_content = initial_response.choices[0].message.content
-                custom_tool_calls = self._parse_custom_tool_calls(response_content)
+            # Check for both standard OpenAI tool calls and custom tool call format
+            openai_tool_calls = initial_response.choices[0].message.tool_calls
+            response_content = initial_response.choices[0].message.content
+            custom_tool_calls = self._parse_custom_tool_calls(response_content) if response_content else []
 
-                if custom_tool_calls:
-                    logging.info(f"Custom tool calls found: {len(custom_tool_calls)}")
-                    tool_responses = self._execute_custom_tool_calls(custom_tool_calls)
-                    # Also add to original messages for context extraction
-                    messages.extend(tool_responses)
+            # Normalize all tool calls to unified format
+            all_tool_calls = self._normalize_tool_calls(
+                openai_tool_calls=openai_tool_calls, custom_tool_calls=custom_tool_calls
+            )
+
+            if all_tool_calls:
+                tool_count = len(all_tool_calls)
+                openai_count = len(openai_tool_calls) if openai_tool_calls else 0
+                custom_count = len(custom_tool_calls)
+
+                logging.info(
+                    f"Found {tool_count} total tool calls: {openai_count} standard OpenAI, {custom_count} custom format"
+                )
+
+                # Execute all tool calls concurrently using unified approach
+                tool_responses = await self._execute_tool_calls(all_tool_calls)
+
+                # Add to original messages for context extraction
+                messages.extend(tool_responses)
+            else:
+                logging.info("No tool calls detected in response")
 
             # PHASE 3: Response Generation with Full Context
             if tool_responses:
-                logging.info(f"Generating response with tool results ({len(tool_responses)} tools used)")
+                logging.debug(
+                    f"Generating response with tool results ({len(tool_responses)} tool responses from {len(all_tool_calls)} tool calls)"
+                )
 
                 # Apply sliding window to conversation history for response generation
                 windowed_messages = self._apply_sliding_window(clean_messages, max_turns=MAX_TURNS)
 
                 # Create full context: windowed conversation + tool results
                 response_messages = windowed_messages + tool_responses
+
+                # Final validation before API call
+                response_messages = self._validate_and_clean_messages(response_messages)
 
                 # Generate final response with full context
                 stream = self.client.chat.completions.create(
@@ -357,12 +557,17 @@ class LLMService:
                     frequency_penalty=0,
                     presence_penalty=0,
                 )
-                return self._process_streaming_response(stream)
+                async for chunk in self._process_streaming_response(stream):
+                    yield chunk
+                return
             else:
                 logging.info("No tools needed, generating response with conversation context")
 
                 # Apply sliding window for response generation
                 windowed_messages = self._apply_sliding_window(clean_messages, max_turns=MAX_TURNS)
+
+                # Final validation before API call
+                windowed_messages = self._validate_and_clean_messages(windowed_messages)
 
                 # Generate response with conversation context (no tools)
                 stream = self.client.chat.completions.create(
@@ -374,14 +579,16 @@ class LLMService:
                     frequency_penalty=0,
                     presence_penalty=0,
                 )
-                return self._process_streaming_response(stream)
+                async for chunk in self._process_streaming_response(stream):
+                    yield chunk
+                return
 
         except Exception as e:
             error_msg = f"Error generating response: {e}"
             logging.error(error_msg)
             raise Exception(error_msg)
 
-    def _generate_simple_response(self, message: str) -> Generator[str, None, str]:
+    async def _generate_simple_response(self, message: str) -> AsyncGenerator[str, str]:
         """
         Generate a simple response without streaming for error cases
 
@@ -390,31 +597,25 @@ class LLMService:
 
         Yields:
             The message
-
-        Returns:
-            The message
         """
         yield message
-        return message
 
-    def _process_streaming_response(self, stream) -> Generator[str, None, str]:
+    async def _process_streaming_response(self, stream) -> AsyncGenerator[str, str]:
         """
-        Process streaming response and filter think tags
+        Process streaming response and filter think tags and tool call instructions
 
         Args:
             stream: OpenAI streaming response
 
         Yields:
-            Filtered content chunks
-
-        Returns:
-            Complete filtered response
+            Filtered content chunks without think tags or tool call instructions
         """
-        # Filter out <think> tags from streaming response
-        logging.info("Starting to process streaming response...")
+        # Filter out <think> tags and tool call instructions from streaming response
+        logging.debug("Starting to process streaming response...")
         full_response = ""
         thinking_mode = True  # Start in thinking mode
         buffer = ""
+        has_yielded_content = False
 
         for chunk in stream:
             # Skip empty chunks
@@ -426,10 +627,16 @@ class LLMService:
             full_response += content
             logging.debug(f"Received chunk: '{content}'")
 
+            # Check if chunk contains tool call instructions - if so, skip it entirely
+            if self._contains_custom_tool_calls(content):
+                logging.warning("Skipping chunk containing tool call instructions")
+                continue
+
             # Simple approach: if no think tags are present, yield immediately
             if "<think>" not in content and "</think>" not in content and not thinking_mode:
                 logging.debug(f"No think tags, yielding: '{content}'")
                 yield content.replace("$", "\\$").replace("\\${", "${")
+                has_yielded_content = True
                 continue
 
             # Complex think tag processing for content with think tags
@@ -460,64 +667,95 @@ class LLMService:
                 output += buffer
                 buffer = ""
 
-            # Yield the processed output (escape dollar signs for markdown)
+            # Before yielding, ensure no tool call instructions remain
             if output:
-                logging.debug(f"Yielding processed output: '{output}'")
-                yield output.replace("$", "\\$").replace("\\${", "${")
+                output = self._remove_tool_call_instructions(output)
+                if output:  # Only yield if there's content after removing tool calls
+                    logging.debug(f"Yielding processed output: '{output}'")
+                    yield output.replace("$", "\\$").replace("\\${", "${")
+                    has_yielded_content = True
 
-        logging.info("Finished processing streaming response")
+        logging.debug("Finished processing streaming response")
 
-        # Return the complete response with think tags filtered
-        final_response = re.sub(r"<think>.*?</think>", "", full_response, flags=re.DOTALL)
-        return final_response
+        # Final fallback: if no content was yielded and we have a response, process it
+        if not has_yielded_content and full_response:
+            # Remove think tags and tool call instructions
+            final_response = re.sub(r"<think>.*?</think>", "", full_response, flags=re.DOTALL)
+            final_response = self._remove_tool_call_instructions(final_response).strip()
 
-    def _process_non_streaming_response(self, response) -> Generator[str, None, str]:
+            if final_response:
+                logging.debug("Yielding final processed response after cleaning")
+                yield final_response.replace("$", "\\$").replace("\\${", "${")
+            else:
+                logging.warning("Response was entirely think tags or tool calls, providing fallback")
+                yield "I understand. Is there anything else I can help you with?"
+        elif not has_yielded_content:
+            # No response at all - provide fallback
+            logging.warning("No response content received, providing fallback")
+            yield "I understand. Is there anything else I can help you with?"
+
+    async def _process_non_streaming_response(self, response) -> AsyncGenerator[str, str]:
         """
-        Process non-streaming response and filter think tags
+        Process non-streaming response and filter think tags and tool call instructions
 
         Args:
             response: OpenAI ChatCompletion object
 
         Yields:
             Filtered content chunks (for compatibility with streaming interface)
-
-        Returns:
-            Complete filtered response with think tags removed
         """
-        logging.info("Starting to process non-streaming response...")
+        logging.debug("Starting to process non-streaming response...")
 
         # Extract content from ChatCompletion object
         response_content = response.choices[0].message.content
 
         if not response_content:
-            logging.warning("No content found in response")
-            return ""
+            logging.warning("No content found in response, providing fallback")
+            yield "I understand. Is there anything else I can help you with?"
+            return
 
-        # Remove custom tool call tags from the response
-        cleaned_content = re.sub(r"<TOOLCALL-\[.*?\]</TOOLCALL>", "", response_content, flags=re.DOTALL)
+        # Check if response contains only tool call instructions
+        if self._contains_custom_tool_calls(response_content):
+            # Remove tool call instructions
+            cleaned_content = self._remove_tool_call_instructions(response_content)
+            if not cleaned_content.strip():
+                logging.warning("Response contained only tool call instructions, providing fallback")
+                yield "I understand. Is there anything else I can help you with?"
+                return
+            response_content = cleaned_content
+
+        # Remove any remaining custom tool call tags from the response
+        cleaned_content = self._remove_tool_call_instructions(response_content)
 
         # Check if response contains think tags
         if "<think>" not in cleaned_content and "</think>" not in cleaned_content:
             logging.debug("No think tags found, returning response with escaped dollar signs")
-            # Just escape dollar signs for markdown and return
-            final_response = cleaned_content.replace("$", "\\$").replace("\\${", "${")
-            yield final_response
-            return final_response
+            # Just escape dollar signs for markdown and yield
+            final_response = cleaned_content.replace("$", "\\$").replace("\\${", "${").strip()
+            if final_response:
+                yield final_response
+            else:
+                logging.warning("Response was empty after cleaning, providing fallback")
+                yield "I understand. Is there anything else I can help you with?"
+            return
 
         # Filter out think tags using regex
-        filtered_response = re.sub(r"<think>.*?</think>", "", cleaned_content, flags=re.DOTALL)
+        filtered_response = re.sub(r"<think>.*?</think>", "", cleaned_content, flags=re.DOTALL).strip()
 
         # Escape dollar signs for markdown
         final_response = filtered_response.replace("$", "\\$").replace("\\${", "${")
 
-        logging.info(
+        logging.debug(
             f"Finished processing non-streaming response. " f"Filtered length: {len(final_response)} characters"
         )
-        logging.debug("Think tags successfully removed from response")
 
-        # Yield the complete filtered response
-        yield final_response
-        return final_response
+        # Ensure we don't yield empty responses
+        if final_response:
+            logging.debug("Think tags and tool calls successfully removed from response")
+            yield final_response
+        else:
+            logging.warning("Response was entirely within think tags or tool calls, providing fallback")
+            yield "I understand. Is there anything else I can help you with?"
 
     def _filter_think_tags(self, content: str) -> str:
         """

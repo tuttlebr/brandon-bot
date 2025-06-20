@@ -19,7 +19,7 @@ class ChatHistoryComponent:
         """
         self.config = config
 
-    def display_chat_history(self, messages: list, messages_per_page: int = 10):
+    def display_chat_history(self, messages: list, messages_per_page: int = 25):
         """
         Display the chat history with pagination
 
