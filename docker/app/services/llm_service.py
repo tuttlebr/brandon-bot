@@ -8,11 +8,13 @@ from models.chat_config import ChatConfig
 from openai import OpenAI
 from tools import (
     execute_assistant_with_dict,
+    execute_conversation_context_with_dict,
     execute_news_with_dict,
     execute_retrieval_with_dict,
     execute_tavily_with_dict,
     execute_weather_with_dict,
     get_assistant_tool_definition,
+    get_conversation_context_tool_definition,
     get_news_tool_definition,
     get_retrieval_tool_definition,
     get_tavily_tool_definition,
@@ -21,14 +23,23 @@ from tools import (
 from utils.system_prompt import TOOL_PROMPT
 
 assistant_tool_def = get_assistant_tool_definition()
+conversation_context_tool_def = get_conversation_context_tool_definition()
 tavily_tool_def = get_tavily_tool_definition()
 weather_tool_def = get_weather_tool_definition()
 retrieval_tool_def = get_retrieval_tool_definition()
 news_tool_def = get_news_tool_definition()
 MAX_TURNS = 9
-ALL_TOOLS = [assistant_tool_def, tavily_tool_def, weather_tool_def, retrieval_tool_def, news_tool_def]
+ALL_TOOLS = [
+    assistant_tool_def,
+    conversation_context_tool_def,
+    tavily_tool_def,
+    weather_tool_def,
+    retrieval_tool_def,
+    news_tool_def,
+]
 tools = {
     "text_assistant": execute_assistant_with_dict,
+    "conversation_context": execute_conversation_context_with_dict,
     "tavily_internet_search": execute_tavily_with_dict,
     "get_weather": execute_weather_with_dict,
     "retrieval_search": execute_retrieval_with_dict,
@@ -288,6 +299,19 @@ class LLMService:
 
                     logging.debug(
                         f"Modified args for {tool_name}: task_type={modified_args.get('task_type')}, original_text_length={len(original_text)}"
+                    )
+                    tool_args = modified_args
+
+                # Special handling for conversation_context tool - inject conversation messages
+                elif tool_name == "conversation_context":
+                    logging.debug(f"Injecting conversation messages for {tool_name}")
+
+                    # Add conversation messages to the tool arguments
+                    modified_args = tool_args.copy()
+                    modified_args["messages"] = messages  # Pass the full conversation messages
+
+                    logging.debug(
+                        f"Modified args for {tool_name}: context_type={modified_args.get('context_type')}, message_count={modified_args.get('message_count', 6)}, total_messages={len(messages)}"
                     )
                     tool_args = modified_args
 
