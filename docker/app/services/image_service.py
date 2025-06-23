@@ -98,7 +98,7 @@ class ImageService:
 
             if generated_image:
                 confirmation_msg = f"I've generated an image based on your request: '{image_prompt}'"
-                return generated_image, confirmation_msg
+                return generated_image, ""
             else:
                 return None, "I apologize, but I wasn't able to generate an image at this time."
 
