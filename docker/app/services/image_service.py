@@ -93,12 +93,7 @@ class ImageService:
         try:
             # Generate image using the image generation service
             generated_image = generate_image(
-                invoke_url=self.config.image_endpoint,
-                prompt=image_prompt,
-                mode="base",
-                cfg_scale=0,
-                steps=4,
-                return_bytes_io=False,
+                invoke_url=self.config.image_endpoint, prompt=image_prompt, mode="base", return_bytes_io=False,
             )
 
             if generated_image:

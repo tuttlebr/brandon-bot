@@ -16,17 +16,24 @@ logger = logging.getLogger(__name__)
 DEFAULT_PROMPT = "A simple coffee shop interior"
 DEFAULT_MODE = "base"
 DEFAULT_CFG_SCALE = 3.5
-DEFAULT_WIDTH = 1344
-DEFAULT_HEIGHT = 1344
-DEFAULT_SEED = 0
+DEFAULT_WIDTH = 1024
+DEFAULT_HEIGHT = 1024
+DEFAULT_SEED = 42
 DEFAULT_STEPS = 50
 DEFAULT_FORMAT = "PNG"
 MIME_FORMAT = "image/{}"
 DATA_URI_FORMAT = "data:{};base64,{}"
-BASE64_PREFIX_PATTERN = r'^data:image/.+;base64,'
+BASE64_PREFIX_PATTERN = r"^data:image/.+;base64,"
 
 # Allowed values for width and height
-ALLOWED_DIMENSIONS = [1024, 1088, 1152, 1216, 1280, 1344]
+ALLOWED_DIMENSIONS = [
+    1024,
+    1088,
+    1152,
+    1216,
+    1280,
+    1344,
+]
 
 # Allowed modes for image generation
 ALLOWED_MODES = ["base", "lora"]
@@ -76,7 +83,7 @@ class ImageProcessingRequest(BaseModel):
             }
         }
 
-    @validator('width', 'height')
+    @validator("width", "height")
     def validate_dimensions(cls, value, values, **kwargs):
         """Validate that width and height are among the allowed values."""
         if value is not None and value not in ALLOWED_DIMENSIONS:
@@ -84,7 +91,7 @@ class ImageProcessingRequest(BaseModel):
             raise ValueError(f"Value must be one of the following: {allowed_values}")
         return value
 
-    @validator('mode')
+    @validator("mode")
     def validate_mode(cls, value, values, **kwargs):
         """Validate that mode is among the allowed values."""
         if value is not None and value not in ALLOWED_MODES:
@@ -204,7 +211,7 @@ def pil_image_to_base64(pil_image: Image.Image, format: str = DEFAULT_FORMAT) ->
         img_binary = buffered.getvalue()
 
         # Encode the binary data to base64
-        img_base64 = base64.b64encode(img_binary).decode('utf-8')
+        img_base64 = base64.b64encode(img_binary).decode("utf-8")
 
         return img_base64
     except Exception as e:
@@ -228,7 +235,7 @@ def base64_to_pil_image(base64_str: str) -> Optional[Image.Image]:
     try:
         # Remove data URI prefix if present (e.g., "data:image/jpeg;base64,")
         if "data:" in base64_str and ";base64," in base64_str:
-            base64_str = re.sub(BASE64_PREFIX_PATTERN, '', base64_str)
+            base64_str = re.sub(BASE64_PREFIX_PATTERN, "", base64_str)
 
         # Decode the base64 string to binary
         image_data = base64.b64decode(base64_str)
