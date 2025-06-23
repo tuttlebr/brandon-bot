@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import random
 from typing import Any, Dict, Generator, List
 
 import streamlit as st
@@ -187,9 +188,45 @@ class StreamlitChatApp:
 
         for tool_response in self.llm_service.last_tool_responses:
             logging.debug(f"Processing tool response: {tool_response}")
-            if tool_response.get("role") == "tool":
+            # Handle both regular tool responses and direct responses (like image generation)
+            if tool_response.get("role") in ["tool", "direct_response"]:
                 try:
-                    tool_content = tool_response.get("content", "")
+                    # Skip image generation responses - they are handled separately
+                    # Check multiple ways image generation might be identified
+                    tool_name = tool_response.get("tool_name")
+                    if tool_name == "generate_image":
+                        logging.debug(
+                            f"Skipping image generation response (tool_name={tool_name}) in tool context extraction"
+                        )
+                        continue
+
+                    # Additional check: if this is a direct response with image-related content, skip it
+                    if tool_response.get("role") == "direct_response":
+                        tool_content_raw = tool_response.get("content", "")
+                        # Check if content contains image generation indicators
+                        if isinstance(tool_content_raw, str) and any(
+                            keyword in tool_content_raw.lower()
+                            for keyword in [
+                                "image_data",
+                                "enhanced_prompt",
+                                "original_prompt",
+                                "cfg_scale",
+                                "dimensions",
+                            ]
+                        ):
+                            logging.debug("Skipping likely image generation response based on content analysis")
+                            continue
+
+                    # For direct responses, extract content from the tool result
+                    if tool_response.get("role") == "direct_response":
+                        tool_result = tool_response.get("tool_result")
+                        if tool_result and hasattr(tool_result, 'result'):
+                            tool_content = tool_result.result
+                        else:
+                            tool_content = tool_response.get("content", "")
+                    else:
+                        tool_content = tool_response.get("content", "")
+
                     logging.debug(f"Tool content type: {type(tool_content)}, length: {len(str(tool_content))}")
                     if isinstance(tool_content, str):
                         # Try to parse as JSON to extract formatted results
@@ -198,6 +235,20 @@ class StreamlitChatApp:
                         try:
                             tool_data = json.loads(tool_content)
                             if isinstance(tool_data, dict):
+                                # Additional safety check: skip if this looks like image generation data
+                                if any(
+                                    key in tool_data
+                                    for key in [
+                                        "image_data",
+                                        "enhanced_prompt",
+                                        "original_prompt",
+                                        "cfg_scale",
+                                        "dimensions",
+                                    ]
+                                ):
+                                    logging.debug("Skipping tool response that contains image generation data")
+                                    continue
+
                                 # Check for formatted_results first (preferred format)
                                 if "formatted_results" in tool_data:
                                     formatted_results = tool_data["formatted_results"]
@@ -282,6 +333,20 @@ class StreamlitChatApp:
                         try:
                             tool_data = json.loads(tool_content)
                             if isinstance(tool_data, dict):
+                                # Additional safety check: skip if this looks like image generation data
+                                if any(
+                                    key in tool_data
+                                    for key in [
+                                        "image_data",
+                                        "enhanced_prompt",
+                                        "original_prompt",
+                                        "cfg_scale",
+                                        "dimensions",
+                                    ]
+                                ):
+                                    logging.debug("Skipping tool response that contains image generation data")
+                                    continue
+
                                 # Check for formatted_results first (preferred format)
                                 if "formatted_results" in tool_data:
                                     formatted_results = tool_data["formatted_results"]
@@ -441,7 +506,8 @@ class StreamlitChatApp:
         """
         try:
             # Show spinner during the slow LLM API call
-            with st.spinner("🤖..."):
+            random_icon = ["🤖", "🧠", "🤔", "🤓", "⚡"]
+            with st.spinner(f"{random_icon[random.randint(0, len(random_icon) - 1)]}"):
                 # FIRST: Generate the LLM response to populate tool responses (without streaming yet)
                 logging.info("Main flow: Running LLM service to populate tool responses")
 
@@ -465,29 +531,37 @@ class StreamlitChatApp:
                 image_response = self._check_for_image_generation_response()
                 logging.debug(f"Main flow: image_response = {image_response}")
 
+                # Handle image generation response if present
                 if image_response:
                     logging.info("Main flow: Calling _display_image_generation_response")
-                    # Handle image generation response
                     self._display_image_generation_response(image_response, full_response="")
                     full_response = ""  # No text response to add to history for image generation
                     logging.info("Main flow: Finished _display_image_generation_response")
-                else:
-                    logging.info("Main flow: No image response, displaying collected text chunks")
-                    # Display the collected text response
-                    full_response = "".join(response_chunks)
-                    if full_response.strip():
-                        st.markdown(full_response)
 
-                    # Extract and display tool context from LLM service tool responses
-                    tool_context = self._extract_tool_context_from_llm_responses()
-                    if tool_context:
-                        # Display the context expander for immediate user verification
-                        self.display_tool_context_expander(tool_context)
-                        # Store tool context in session state for chat history display
-                        st.session_state.last_tool_context = tool_context
-                        logging.info("Displayed and stored tool context for verification")
-                    else:
-                        logging.debug("No tool context found to display")
+                # Display text response only if no image generation is present
+                text_response = "".join(response_chunks)
+                if text_response.strip() and not image_response:
+                    logging.info("Main flow: Displaying text response (no image generation)")
+                    st.markdown(text_response)
+                    full_response = text_response
+                elif text_response.strip() and image_response:
+                    logging.info("Main flow: Suppressing text response due to image generation")
+                    # Check if the text response contains non-image content that should be displayed
+                    if not self._is_image_generation_json(text_response):
+                        logging.info("Main flow: Text response contains non-image content, displaying it")
+                        st.markdown(text_response)
+
+                # ALWAYS extract and display tool context from LLM service tool responses
+                # This ensures other tools' results are shown even when image generation occurs
+                tool_context = self._extract_tool_context_from_llm_responses()
+                if tool_context:
+                    # Display the context expander for immediate user verification
+                    self.display_tool_context_expander(tool_context)
+                    # Store tool context in session state for chat history display
+                    st.session_state.last_tool_context = tool_context
+                    logging.info("Displayed and stored tool context for verification")
+                else:
+                    logging.debug("No tool context found to display")
 
             # Add the complete response to chat history (only if there's a text response)
             if full_response and full_response.strip():
@@ -506,6 +580,37 @@ class StreamlitChatApp:
             st.session_state.processing = False
             st.rerun()
 
+    def _is_image_generation_json(self, text: str) -> bool:
+        """
+        Check if the text response is image generation JSON that should be suppressed
+
+        Args:
+            text: The text response to check
+
+        Returns:
+            True if this appears to be image generation JSON, False otherwise
+        """
+        if not text or not isinstance(text, str):
+            return False
+
+        text_lower = text.strip().lower()
+
+        # Check if it looks like JSON
+        if not (text_lower.startswith('{') and text_lower.endswith('}')):
+            return False
+
+        # Check if it contains image generation indicators
+        image_keywords = [
+            "enhanced_prompt",
+            "original_prompt",
+            "cfg_scale",
+            "dimensions",
+            "successfully generated",
+            "image with cfg_scale",
+        ]
+
+        return any(keyword in text_lower for keyword in image_keywords)
+
     def _check_for_image_generation_response(self) -> Dict[str, Any]:
         """
         Check if the LLM service has image generation tool responses
@@ -513,10 +618,10 @@ class StreamlitChatApp:
         Returns:
             Dict containing image response data if found, empty dict otherwise
         """
-        logging.info("_check_for_image_generation_response: Starting check")
+        logging.debug("_check_for_image_generation_response: Starting check")
 
         if not hasattr(self.llm_service, 'last_tool_responses') or not self.llm_service.last_tool_responses:
-            logging.info("_check_for_image_generation_response: No tool responses found")
+            logging.debug("_check_for_image_generation_response: No tool responses found")
             return {}
 
         logging.info(
@@ -529,7 +634,7 @@ class StreamlitChatApp:
             )
 
             if tool_response.get("role") == "direct_response" and tool_response.get("tool_name") == "generate_image":
-                logging.info("_check_for_image_generation_response: Found image generation tool response")
+                logging.debug("_check_for_image_generation_response: Found image generation tool response")
                 try:
                     # Get the full tool result object directly (no need to parse JSON)
                     tool_result = tool_response.get("tool_result")
@@ -566,7 +671,7 @@ class StreamlitChatApp:
                     logging.error(f"Error extracting image generation tool response: {e}")
                     continue
 
-        logging.info("_check_for_image_generation_response: No image generation response found, returning empty dict")
+        logging.debug("_check_for_image_generation_response: No image generation response found, returning empty dict")
         return {}
 
     def _display_image_generation_response(self, image_response: Dict[str, Any], full_response: str = ""):
@@ -597,7 +702,7 @@ class StreamlitChatApp:
 
                 if generated_image:
                     # Display the generated image
-                    st.image(generated_image, caption=f"Generated image: {enhanced_prompt}", use_container_width=True)
+                    st.image(generated_image, caption=f"{enhanced_prompt}", use_container_width=True)
 
                     # Display information about prompt enhancement
                     # if enhanced_prompt != original_prompt and original_prompt:
@@ -635,7 +740,7 @@ class StreamlitChatApp:
                     # Add image metadata to chat history (no base64 data)
                     self._safe_add_message_to_history("assistant", history_message)
 
-                    logging.info(f"Successfully displayed generated image with enhanced prompt: {enhanced_prompt}")
+                    logging.debug(f"Successfully displayed generated image with enhanced prompt: {enhanced_prompt}")
                 else:
                     # Error converting image data
                     error_msg = "Generated image but failed to display it properly."

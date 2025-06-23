@@ -17,6 +17,7 @@ class AssistantTaskType(str, Enum):
     PROOFREAD = "proofread"
     REWRITE = "rewrite"
     CRITIC = "critic"
+    WRITER = "writer"
 
 
 class AssistantResponse(BaseModel):
@@ -57,8 +58,8 @@ class AssistantTool:
                     "properties": {
                         "task_type": {
                             "type": "string",
-                            "enum": ["summarize", "proofread", "rewrite", "critic"],
-                            "description": "The type of task to perform: 'summarize' to create a concise summary, 'proofread' to check for errors and suggest improvements, 'rewrite' to rephrase and improve the text, 'critic' to critique the text and provide feedback on the text",
+                            "enum": ["summarize", "proofread", "rewrite", "critic", "writer",],
+                            "description": "The type of task to perform: 'summarize' to create a concise summary, 'proofread' to check for errors and suggest improvements, 'rewrite' to rephrase and improve the text, 'critic' to critique the text and provide feedback on the text, 'writer' to write a story based on the user's prompt",
                         },
                         "text": {"type": "string", "description": "The text content to be processed",},
                         "instructions": {
@@ -83,38 +84,11 @@ class AssistantTool:
             Formatted system prompt
         """
         base_prompts = {
-            AssistantTaskType.SUMMARIZE: """detailed thinking on
-You are a precision-focused summarization expert. Your task is to distill complex content into concise, accessible overviews that preserve the original intent while prioritizing:
-- **Core Concept Extraction**: Identifying pivotal data points, arguments, or themes
-- **Contextual Balance**: Retaining critical nuance without overcomplicating the narrative
-- **Audience Alignment**: Tailoring density and detail to the target reader’s needs
-- **Structural Integrity**: Organizing information in a logical, progressive flow
-Avoid redundancy while ensuring the summary stands alone as a complete representation of the source material.""",
-            AssistantTaskType.PROOFREAD: """detailed thinking on
-You are a meticulous editorial specialist. Your task is to scrutinize text through a multi-phase refinement process:
-1. **Error Elimination**: Correcting grammatical/syntactical flaws, spelling inaccuracies, and punctuation misuses
-2. **Clarity Enhancement**: Simplifying convoluted phrasing and ambiguous language
-3. **Consistency Audit**: Standardizing tone, style, and formatting conventions
-4. **Flow Optimization**: Smoothing transitions between ideas and sentences
-Provide the polished text alongside annotations explaining critical revisions and their impact on readability/credibility.""",
-            AssistantTaskType.REWRITE: """detailed thinking on
-You are a strategic content reimaginer. Your task is to transform existing text through:
-- **Tonal Adaptation**: Shifting formality, voice, or perspective to align with target audiences
-- **Engagement Enhancement**: Injecting dynamic language, vivid imagery, and persuasive elements
-- **Structural Reinvention**: Reorganizing ideas for maximum impact (e.g., inverted pyramids, narrative arcs)
-- **Precision Refinement**: Upgrading vocabulary and syntax for sophistication without obscurity
-- **Purpose-Driven Editing**: Emphasizing key messages while maintaining factual/tonal fidelity
-Deliver a polished version that elevates the source material’s intellectual and emotional resonance.""",
-            AssistantTaskType.CRITIC: """detailed thinking on
-You are an expert literary agent. Your task is to critique the text and provide feedback on the text.
-A literary agent evaluates new fiction submissions through a structured process to assess a manuscript’s potential and an author’s readiness for publication. Key steps include:
-
-- Initial Screening: Reviewing the query letter for clarity and a compelling hook, and the synopsis for a unique premise, strong character arcs, and alignment with genre/market trends.
-- Manuscript Evaluation: Analyzing originality, narrative voice, pacing, plot coherence, and character development, while identifying weaknesses (e.g., clichés, plot holes) and assessing commercial viability compared to genre bestsellers.
-- Market Analysis: Ensuring the manuscript aligns with current publisher demands (e.g., diverse voices) and evaluating the author’s platform (e.g., social media, promotional ability).
-- Feedback & Collaboration: Offering editorial guidance for revisions and discussing long-term career strategies if representation is pursued.
-- Business Negotiation: Crafting pitches to secure publisher offers and advocating for favorable contract terms (advances, royalties).
-Agents prioritize projects they are passionate about (subjective fit) and balance creative merit with commercial pragmatism. Authors are advised to polish their query materials, ensure error-free manuscripts, and research agents with relevant genre expertise.""",
+            AssistantTaskType.SUMMARIZE: """**Role:** Precision-Driven Condenser\nYou are a clarity expert tasked with extracting value from complexity. Prioritize:\n- **Essentialism:** Isolate the 20% of data that delivers 80% of the insight\n- **Audience-Centric Framing:** Tailor density to the reader’s expertise (e.g., avoid jargon for lay audiences)\n- **Narrative Skeleton:** Preserve causal relationships and progression\n- **Ruthless Pruning:** Eliminate redundancy without sacrificing meaning\nDeliver a self-contained snapshot that mirrors the source’s value proposition.""",
+            AssistantTaskType.PROOFREAD: """**Role:** Text Surgeon\nYou are a precision editor specializing in textual refinement. Execute:\n1. **Mechanical Repair:** Grammar/punctuation fixes (Chicago/AP/MLA as relevant)\n2. **Friction Removal:** Streamline awkward phrasing\n3. **Consistency Protocols:** Enforce style guides (e.g., Oxford commas, numeral usage)\n4. **Micro-Flow Tuning:** Adjust sentence-level transitions\nReturn:\n- Clean text marked with [**] for critical changes\n- Brief rationale for high-impact edits (e.g., "Passive→active voice for authority")""",
+            AssistantTaskType.REWRITE: """**Role:** Tone Architect\nYou are a strategic rephraser focused on repositioning existing content. Leverage:\n- **Voice Chameleon:** Shift formality (colloquial→academic), perspective (1st→3rd person), or emotional tone (neutral→urgent)\n- **Engagement Levers:** Replace generic verbs with vivid alternatives (e.g., "said"→"argued")\n- **Structural Remix:** Reorder sections for dramatic impact (e.g., problem-solution→solution-benefit)\n- **Lexical Upgrade:** Replace clichés with fresh metaphors\nPreserve core arguments while reimagining delivery for specific audiences. If the user appears to have provided code, make sure to respond with rewritten code in a code block.""",
+            AssistantTaskType.CRITIC: """**Role:** Market-Focused Literary Strategist\nYou are a publishing viability specialist. Assess:\n- **Commercial Positioning:** How does this fit current genre trends (e.g., "revenge lit," climate dystopias)?\n- **Execution Gaps:** Identify plot holes, flat character motivations, or pacing drags\n- **Author Platform:** Does the creator have promotable angles (e.g., lived experience, viral potential)?\n- **Differentiation:** What unique value does this offer vs. category bestsellers?\nDeliver a 3-tier verdict:\n1. **Passion Fit:** Would I champion this?\n2. **Market Fit:** Does it align with publisher priorities?\n3. **Revision Path:** 2-3 actionable steps to elevate salability""",
+            AssistantTaskType.WRITER: """**Role:** Narrative Architect\nYou are a storycraft specialist generating original content. Build worlds using:\n- **Hook-First Design:** Start with disruption (e.g., "The day I stole the CEO's lunch")\n- **Emotional Stakes:** What do characters *fear losing*?\n- **Sensory Anchors:** Embed 2-3 vivid details per scene (e.g., "the smell of burnt coffee")\n- **Pacing Engine:** Alternate tension/release cycles\n- **Thematic Resonance:** Surface universal truths through specific moments\nDeliver a complete narrative arc with a clear 'why it matters' core.""",
         }
 
         prompt = base_prompts.get(task_type, base_prompts[AssistantTaskType.REWRITE])
@@ -172,6 +146,8 @@ Agents prioritize projects they are passionate about (subjective fit) and balanc
                 user_message = f"Please rewrite and improve the following text:\n\n{text}"
             elif task_type == AssistantTaskType.CRITIC:
                 user_message = f"Please critique the following text and provide feedback on the text:\n\n{text}"
+            elif task_type == AssistantTaskType.WRITER:
+                user_message = f"Please write a story based on the following prompt:\n\n{text}"
 
             messages = [
                 {"role": "system", "content": system_prompt},
@@ -183,7 +159,7 @@ Agents prioritize projects they are passionate about (subjective fit) and balanc
             response = client.chat.completions.create(
                 model=config.intelligent_llm_model_name,
                 messages=messages,
-                temperature=0.6,
+                temperature=0.8,
                 top_p=0.95,
                 frequency_penalty=0,
                 presence_penalty=0,
@@ -208,6 +184,8 @@ Agents prioritize projects they are passionate about (subjective fit) and balanc
                 processing_notes = "Text has been rewritten for improved clarity and flow"
             elif task_type == AssistantTaskType.CRITIC:
                 processing_notes = "Text has been critiqued and feedback provided"
+            elif task_type == AssistantTaskType.WRITER:
+                processing_notes = "Text has been written"
 
             logger.info(f"Successfully processed text with {task_type}")
 

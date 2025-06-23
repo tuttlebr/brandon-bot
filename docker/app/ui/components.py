@@ -63,9 +63,7 @@ class ChatHistoryComponent:
                                 # Convert base64 back to PIL Image for display
                                 image = base64_to_pil_image(image_data)
                                 if image:
-                                    st.image(
-                                        image, caption=f"Generated image: {enhanced_prompt}", use_container_width=True
-                                    )
+                                    st.image(image, caption=f"{enhanced_prompt}", use_container_width=True)
                                 else:
                                     logging.error(f"Failed to convert image data for image_id: {image_id}")
                                     st.info("🖼️ Image could not be displayed (conversion error)")

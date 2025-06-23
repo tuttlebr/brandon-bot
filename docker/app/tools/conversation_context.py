@@ -17,6 +17,7 @@ class ContextType(str, Enum):
     RECENT_TOPICS = "recent_topics"
     USER_PREFERENCES = "user_preferences"
     TASK_CONTINUITY = "task_continuity"
+    CREATIVE_DIRECTOR = "creative_director"
 
 
 class ConversationContextResponse(BaseModel):
@@ -49,7 +50,7 @@ class ConversationContextTool:
                     "properties": {
                         "context_type": {
                             "type": "string",
-                            "enum": ["conversation_summary", "recent_topics", "user_preferences", "task_continuity"],
+                            "enum": ["conversation_summary", "recent_topics", "user_preferences", "task_continuity",],
                             "description": "Type of context to generate: 'conversation_summary' for general summary, 'recent_topics' for topic extraction, 'user_preferences' for user preference analysis, 'task_continuity' for understanding ongoing tasks",
                         },
                         "message_count": {
@@ -81,30 +82,42 @@ class ConversationContextTool:
         """Get the appropriate system prompt for context analysis"""
 
         base_prompts = {
-            ContextType.CONVERSATION_SUMMARY: """You are an expert conversation analyst. Create a concise, relevant summary of the conversation history that captures:
-- Key topics discussed
-- User's main requests or goals
-- Important context for understanding current conversation
-- Any ongoing tasks or problems being solved
-Keep the summary focused and under 200 words.""",
-            ContextType.RECENT_TOPICS: """You are an expert topic extractor. Analyze the conversation and identify:
-- Main topics discussed (as a list)
-- Recurring themes or interests
-- Current focus areas
-- Related concepts or domains
-Focus on topics that might be relevant for tool operations.""",
-            ContextType.USER_PREFERENCES: """You are an expert user behavior analyst. Identify patterns in the user's:
-- Communication style and preferences
-- Types of requests they make
-- Preferred response formats
-- Any expressed preferences or constraints
-- Technical level or expertise indicators""",
-            ContextType.TASK_CONTINUITY: """You are an expert task analyzer. Focus on understanding:
-- What task or goal the user is working on
-- Steps already completed or discussed
-- Current stage of the task
-- What information or help they might need next
-- Context needed to continue the task effectively""",
+            ContextType.CONVERSATION_SUMMARY: """**Comprehensive Conversation Synthesis**
+        As a seasoned dialogue strategist, distill the interaction history into a succinct overview, encapsulating:
+        - **Core Themes**: Primary subjects explored
+        - **User Objectives**: Explicit requests or implicit goals
+        - **Contextual Anchors**: Critical background for immediate relevance
+        - **Ongoing Endeavors**: Tasks or challenges in progress
+        **Constraint**: Deliver a focused snapshot within 200 words.""",
+            ContextType.RECENT_TOPICS: """**Topical Landscape Analysis**
+        In the capacity of a thematic cartographer, chart the conversational terrain to pinpoint:
+        - **Primary Discussion Threads** (enumerated)
+        - **Recurrent Motifs**: Enduring interests or preoccupations
+        - **Present Focus**: Current axis of engagement
+        - **Adjacent Domains**: Relevant peripheral concepts
+        **Orientation**: Prioritize topics instrumental to operational efficacy.""",
+            ContextType.USER_PREFERENCES: """**User Profiling & Preference Mapping**
+        Assuming the role of a behavioral insights specialist, decode the user's interaction patterns to reveal:
+        - **Communicative Idioms**: Stylistic inclinations and response modalities
+        - **Request Typology**: Nature of inquiries or directives
+        - **Format Affinities**: Preferred information architectures
+        - **Boundary Conditions**: Explicit constraints or predispositions
+        - **Competency Indicators**: Implicit or expressed expertise levels""",
+            ContextType.TASK_CONTINUITY: """**Task Progression & Support Needs Assessment**
+        As a procedural continuity expert, evaluate the user's operational context to determine:
+        - **Active Initiative**: The overarching task or objective
+        - **Accomplishments & Milestones**: Completed stages or discussed pathways
+        - **Current Juncture**: Precise stage within the task lifecycle
+        - **Anticipated Requirements**: Foreseen informational or assistance needs
+        - **Contextual Prerequisites**: Essential background for seamless task resumption""",
+            ContextType.CREATIVE_DIRECTOR: """**Immersive Creative Continuity Steward**
+        As a visionary creative concierge, safeguard the integrity and evolution of iterative creative work by:
+        - **Project Horizon Mapping**: Defining the creative endeavor’s vision, scope, and deliverables
+        - **Idea Genesis Tracking**: Documenting the emergence and refinement of core concepts
+        - **Aesthetic Cohesion Enforcement**: Flagging and resolving discordances in tone, style, or narrative
+        - **Inspiration Infusion**: Proposing fresh perspectives or cross-disciplinary stimuli
+        - **Asset Curation**: Maintaining an inventory of referenced materials, prototypes, or inspirations
+        **Focus**: Ensure a rich, adaptable narrative that honors the project’s essence while embracing evolution""",
         }
 
         prompt = base_prompts.get(context_type, base_prompts[ContextType.CONVERSATION_SUMMARY])
@@ -212,11 +225,11 @@ Focus on topics that might be relevant for tool operations.""",
         import re
 
         # Remove context markers
-        content = re.sub(r'<START_CONTEXT>.*?<END_CONTEXT>', '', content, flags=re.DOTALL)
+        content = re.sub(r"<START_CONTEXT>.*?<END_CONTEXT>", "", content, flags=re.DOTALL)
         # Remove thinking tags
-        content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
+        content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL)
         # Remove tool call instructions
-        content = re.sub(r'<TOOLCALL.*?</TOOLCALL>', '', content, flags=re.DOTALL | re.IGNORECASE)
+        content = re.sub(r"<TOOLCALL.*?</TOOLCALL>", "", content, flags=re.DOTALL | re.IGNORECASE)
 
         return content.strip()
 
@@ -229,12 +242,12 @@ Focus on topics that might be relevant for tool operations.""",
             import re
 
             # Look for bullet points or numbered lists
-            list_items = re.findall(r'(?:[-*•]\s*|^\d+\.\s*)(.+)', result, re.MULTILINE)
+            list_items = re.findall(r"(?:[-*•]\s*|^\d+\.\s*)(.+)", result, re.MULTILINE)
             topics.extend([item.strip() for item in list_items if item.strip()])
 
             # If no list found, try to extract topics from sentences
             if not topics:
-                sentences = result.split('.')
+                sentences = result.split(".")
                 for sentence in sentences[:5]:  # Limit to first 5 sentences
                     if len(sentence.strip()) > 10:  # Skip very short fragments
                         topics.append(sentence.strip())
@@ -247,7 +260,7 @@ Focus on topics that might be relevant for tool operations.""",
             topics.extend(quoted)
 
             # Extract capitalized phrases that might be topics
-            capitalized = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', result)
+            capitalized = re.findall(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b", result)
             topics.extend(capitalized[:3])  # Limit to avoid noise
 
         # Clean and deduplicate
@@ -343,6 +356,6 @@ def get_conversation_context_tool_definition() -> Dict[str, Any]:
     return conversation_context_tool.to_openai_format()
 
 
-def execute_conversation_context_with_dict(params: Dict[str, Any]) -> ConversationContextResponse:
+def execute_conversation_context_with_dict(params: Dict[str, Any],) -> ConversationContextResponse:
     """Execute conversation context analysis with parameters as dictionary"""
     return conversation_context_tool.run_with_dict(params)

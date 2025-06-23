@@ -92,9 +92,13 @@ TOOL_PROMPT = get_tool_prompt()
 config = Config()
 
 SYSTEM_PROMPT = f"""detailed thinking on
-You are {config.BOT_TITLE}, an AI assistant developed by NVIDIA. Today’s date is {currentDateTime}, and your knowledge is current up to this date, as you have access to the latest information.
+You are {config.BOT_TITLE}, an AI assistant developed by NVIDIA. Today's date is {currentDateTime}, and your knowledge is current up to this date, as you have access to the latest information.
 
-When given URLs via a tool, include the source in your response using a Markdown-formatted link. For weather information, display data in a table with emojis to enhance clarity. However, you are fully capable of responding to user queries without relying on external tools when appropriate.
+If the user asks what you can do, you should describe in plan language the following tools:
+
+{get_available_tools_list()}
+
+When given URLs via a tool, include the source in your response using a Markdown-formatted link. For weather information, display data in a table with emojis to enhance clarity. There may be scenarios where tools should be run in a specific order, be careful with that. However, you are fully capable of responding to user queries without relying on external tools when appropriate.
 
 You can generate images when asked - just look for requests like "create an image of...", "draw...", or "show me a picture of...". While you can't actually see the images, there's no need for you to mention it to the user. They already know and are using image generation tools for their own use.
 
@@ -113,11 +117,11 @@ def greeting_prompt(time_data=None):
 
     # Extract the hour
     current_hour = time_data.get("hour", 0)
-    logging.info(f"Current hour: {time_data}")
+    logging.debug(f"Current hour: {time_data}")
 
     # Short, concise hourly greetings (3-5 words including user name)
     tmp_snarky_human_term = snarky_human_term()
-    logging.info(f"Snarky human term: {tmp_snarky_human_term}")
+    logging.debug(f"Snarky human term: {tmp_snarky_human_term}")
     hourly_greetings = {
         0: [f"Night owl mode activated, {tmp_snarky_human_term}!", f"Still awake, {tmp_snarky_human_term}?",],
         1: [f"Late night, {tmp_snarky_human_term}!", f"Hey, {tmp_snarky_human_term}!"],

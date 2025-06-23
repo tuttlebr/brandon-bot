@@ -324,6 +324,23 @@ class LLMService:
 
                     tool_args = modified_args
 
+                # Special handling for generate_image tool - inject conversation messages for context
+                elif tool_name == "generate_image":
+                    logging.debug(f"Injecting conversation messages for {tool_name}")
+
+                    # Add conversation messages to the tool arguments
+                    modified_args = tool_args.copy()
+                    if messages is not None:
+                        modified_args["messages"] = messages  # Pass the full conversation messages
+                        logging.debug(
+                            f"Modified args for {tool_name}: subject={modified_args.get('subject')}, use_conversation_context={modified_args.get('use_conversation_context', True)}, total_messages={len(messages)}"
+                        )
+                    else:
+                        logging.warning(f"No messages provided for {tool_name}, using empty list")
+                        modified_args["messages"] = []
+
+                    tool_args = modified_args
+
                 logging.debug(f"Executing tool call: {tool_name} with args: {tool_args} (from {source})")
                 tool_function = tools[tool_name]
 
