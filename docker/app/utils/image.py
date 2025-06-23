@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 # Constants
 DEFAULT_PROMPT = "A simple coffee shop interior"
 DEFAULT_MODE = "base"
-DEFAULT_CFG_SCALE = 3.5
+DEFAULT_CFG_SCALE = 2.5
 DEFAULT_WIDTH = 1024
 DEFAULT_HEIGHT = 1024
 DEFAULT_SEED = 42
@@ -26,17 +26,10 @@ DATA_URI_FORMAT = "data:{};base64,{}"
 BASE64_PREFIX_PATTERN = r"^data:image/.+;base64,"
 
 # Allowed values for width and height
-ALLOWED_DIMENSIONS = [
-    1024,
-    1088,
-    1152,
-    1216,
-    1280,
-    1344,
-]
+ALLOWED_DIMENSIONS = [1024, 1344]
 
 # Allowed modes for image generation
-ALLOWED_MODES = ["base", "lora"]
+ALLOWED_MODES = ["base"]
 
 # HTTP constants
 HTTP_HEADERS = {"Accept": "application/json", "Content-Type": "application/json"}

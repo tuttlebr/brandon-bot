@@ -66,6 +66,18 @@ class ImageGenerationTool:
                             "type": "string",
                             "description": "Additional details, lighting, colors, or specific elements to include",
                         },
+                        "width": {
+                            "type": "integer",
+                            "description": "Width of the image in pixels. Choose based on content requested by the user",
+                            "enum": [1024, 1344],
+                            "default": 1024,
+                        },
+                        "height": {
+                            "type": "integer",
+                            "description": "Height of the image in pixels. Choose based on content requested by the user",
+                            "enum": [1024, 1344],
+                            "default": 1024,
+                        },
                     },
                     "required": ["user_prompt", "subject"],
                 },
@@ -111,13 +123,17 @@ class ImageGenerationTool:
         logger.info(f"Enhanced prompt: '{user_prompt}' -> '{enhanced_prompt}'")
         return enhanced_prompt
 
-    def _generate_image_with_config(self, enhanced_prompt: str, config: ChatConfig) -> Optional[Image.Image]:
+    def _generate_image_with_config(
+        self, enhanced_prompt: str, config: ChatConfig, width: int = 1024, height: int = 1024
+    ) -> Optional[Image.Image]:
         """
         Generate image using the enhanced prompt and configuration
 
         Args:
             enhanced_prompt: Enhanced prompt for image generation
             config: Chat configuration containing image endpoint
+            width: Image width in pixels
+            height: Image height in pixels
 
         Returns:
             Generated PIL Image or None if failed
@@ -127,9 +143,14 @@ class ImageGenerationTool:
             return None
 
         try:
-            logger.info(f"Generating image with prompt: '{enhanced_prompt}'")
+            logger.info(f"Generating image with prompt: '{enhanced_prompt}', dimensions: {width}x{height}")
             generated_image = generate_image(
-                invoke_url=config.image_endpoint, prompt=enhanced_prompt, mode="base", return_bytes_io=False,
+                invoke_url=config.image_endpoint,
+                prompt=enhanced_prompt,
+                mode="base",
+                width=width,
+                height=height,
+                return_bytes_io=False,
             )
 
             if generated_image:
@@ -150,6 +171,8 @@ class ImageGenerationTool:
         style: str = "photorealistic",
         mood: str = "natural",
         details: str = "",
+        width: int = 1024,
+        height: int = 1024,
         config: ChatConfig = None,
     ) -> ImageGenerationResponse:
         """
@@ -161,6 +184,8 @@ class ImageGenerationTool:
             style: Artistic style
             mood: Mood/atmosphere
             details: Additional details
+            width: Image width in pixels (1024 or 1344)
+            height: Image height in pixels (1024 or 1344)
             config: Chat configuration
 
         Returns:
@@ -168,6 +193,15 @@ class ImageGenerationTool:
         """
         if config is None:
             config = ChatConfig.from_environment()
+
+        # Validate dimensions
+        allowed_dimensions = [1024, 1344]
+        if width not in allowed_dimensions:
+            logger.warning(f"Invalid width {width}, defaulting to 1024")
+            width = 1024
+        if height not in allowed_dimensions:
+            logger.warning(f"Invalid height {height}, defaulting to 1024")
+            height = 1024
 
         # Enhance the prompt
         enhanced_prompt = self._enhance_prompt(user_prompt, subject, style, mood, details)
@@ -186,7 +220,7 @@ class ImageGenerationTool:
             return ImageGenerationResponse(**response_dict, result=json.dumps(response_dict))
 
         # Generate the image
-        generated_image = self._generate_image_with_config(enhanced_prompt, config)
+        generated_image = self._generate_image_with_config(enhanced_prompt, config, width, height)
 
         if generated_image:
             # Handle the returned image data (it's already base64 string when return_bytes_io=False)
@@ -199,8 +233,9 @@ class ImageGenerationTool:
                     "success": True,
                     "original_prompt": user_prompt,
                     "enhanced_prompt": enhanced_prompt,
+                    "dimensions": f"{width}x{height}",
                     "direct_response": True,
-                    "message": f"Successfully generated image with enhanced prompt: {enhanced_prompt}",
+                    "message": f"Successfully generated {width}x{height} image with enhanced prompt: {enhanced_prompt}",
                 }
 
                 import json
@@ -243,7 +278,7 @@ class ImageGenerationTool:
 
         Args:
             params: Dictionary containing the required parameters
-                   Expected keys: 'user_prompt', 'subject', optionally 'style', 'mood', 'details'
+                   Expected keys: 'user_prompt', 'subject', optionally 'style', 'mood', 'details', 'width', 'height'
 
         Returns:
             ImageGenerationResponse: The image generation result
@@ -258,12 +293,16 @@ class ImageGenerationTool:
         style = params.get("style", "photorealistic")
         mood = params.get("mood", "natural")
         details = params.get("details", "")
+        width = params.get("width", 1024)
+        height = params.get("height", 1024)
 
-        logger.debug(f"run_with_dict called with user_prompt: '{user_prompt}', subject: '{subject}'")
+        logger.debug(
+            f"run_with_dict called with user_prompt: '{user_prompt}', subject: '{subject}', dimensions: {width}x{height}"
+        )
 
         # Create config from environment
         config = ChatConfig.from_environment()
-        return self.generate_image_from_prompt(user_prompt, subject, style, mood, details, config)
+        return self.generate_image_from_prompt(user_prompt, subject, style, mood, details, width, height, config)
 
 
 # Create a global instance and helper functions for easy access
@@ -281,7 +320,13 @@ def get_image_generation_tool_definition() -> Dict[str, Any]:
 
 
 def execute_image_generation(
-    user_prompt: str, subject: str, style: str = "photorealistic", mood: str = "natural", details: str = ""
+    user_prompt: str,
+    subject: str,
+    style: str = "photorealistic",
+    mood: str = "natural",
+    details: str = "",
+    width: int = 1024,
+    height: int = 1024,
 ) -> ImageGenerationResponse:
     """
     Execute image generation with the given parameters
@@ -292,12 +337,16 @@ def execute_image_generation(
         style: Artistic style
         mood: Mood/atmosphere
         details: Additional details
+        width: Image width in pixels (1024 or 1344)
+        height: Image height in pixels (1024 or 1344)
 
     Returns:
         ImageGenerationResponse: The image generation result
     """
     config = ChatConfig.from_environment()
-    return image_generation_tool.generate_image_from_prompt(user_prompt, subject, style, mood, details, config)
+    return image_generation_tool.generate_image_from_prompt(
+        user_prompt, subject, style, mood, details, width, height, config
+    )
 
 
 def execute_image_generation_with_dict(params: Dict[str, Any]) -> ImageGenerationResponse:
@@ -306,7 +355,7 @@ def execute_image_generation_with_dict(params: Dict[str, Any]) -> ImageGeneratio
 
     Args:
         params: Dictionary containing the required parameters
-               Expected keys: 'user_prompt', 'subject', optionally 'style', 'mood', 'details'
+               Expected keys: 'user_prompt', 'subject', optionally 'style', 'mood', 'details', 'width', 'height'
 
     Returns:
         ImageGenerationResponse: The image generation result
