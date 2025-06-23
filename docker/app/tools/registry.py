@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 
 from .assistant import get_assistant_tool_definition
 from .conversation_context import get_conversation_context_tool_definition
+from .image_gen import get_image_generation_tool_definition
 from .news import get_news_tool_definition
 from .retriever import get_retrieval_tool_definition
 from .tavily import get_tavily_tool_definition
@@ -18,6 +19,7 @@ def get_all_tool_definitions() -> List[Dict[str, Any]]:
     return [
         get_assistant_tool_definition(),
         get_conversation_context_tool_definition(),
+        get_image_generation_tool_definition(),
         get_news_tool_definition(),
         get_retrieval_tool_definition(),
         get_tavily_tool_definition(),

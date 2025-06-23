@@ -25,7 +25,7 @@ class ChatMessage:
         if isinstance(self.content, list):
             return self.content[0].get("text", "")
         elif isinstance(self.content, dict):
-            # Handle image messages
+            # Handle image messages with metadata
             if self.content.get("type") == "image":
                 return self.content.get("text", "")
             return self.content.get("text", "")
@@ -40,16 +40,20 @@ class ChatMessage:
         """
         return isinstance(self.content, dict) and self.content.get("type") == "image"
 
-    def get_image_data(self) -> tuple[str, str]:
+    def get_image_data(self) -> tuple[str, str, str]:
         """
-        Get image data and caption from the message
+        Get image data and metadata from the message
 
         Returns:
-            Tuple of (base64_image_data, caption)
+            Tuple of (image_id, enhanced_prompt, original_prompt)
         """
         if self.is_image_message():
-            return (self.content.get("image_data", ""), self.content.get("image_caption", ""))
-        return "", ""
+            return (
+                self.content.get("image_id", ""),
+                self.content.get("enhanced_prompt", ""),
+                self.content.get("original_prompt", ""),
+            )
+        return "", "", ""
 
     def to_dict(self) -> Dict[str, Any]:
         """

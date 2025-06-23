@@ -45,6 +45,36 @@ class StreamlitChatApp:
             st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
             st.session_state.current_page = 0
 
+            # Initialize image storage
+            if 'generated_images' not in st.session_state:
+                st.session_state.generated_images = {}
+
+        # Clean up old image data periodically
+        self._cleanup_old_images()
+
+    def _cleanup_old_images(self, max_images: int = 50):
+        """
+        Clean up old image data from session state to prevent memory issues
+
+        Args:
+            max_images: Maximum number of images to keep in session state
+        """
+        if hasattr(st.session_state, 'generated_images') and st.session_state.generated_images:
+            current_count = len(st.session_state.generated_images)
+
+            if current_count > max_images:
+                # Sort by image_id (which includes timestamp) and keep the most recent ones
+                sorted_images = sorted(st.session_state.generated_images.items(), key=lambda x: x[0], reverse=True)
+
+                # Keep only the most recent max_images
+                st.session_state.generated_images = dict(sorted_images[:max_images])
+
+                removed_count = current_count - max_images
+                logging.info(
+                    f"Cleaned up {removed_count} old images from session state. "
+                    f"Kept {max_images} most recent images."
+                )
+
     def display_chat_history(self):
         """Display the chat history using the chat history component"""
         self.chat_history_component.display_chat_history(st.session_state.messages)
@@ -128,11 +158,6 @@ class StreamlitChatApp:
 
         # Add user message to chat history using safe method
         self._safe_add_message_to_history("user", prompt)
-
-        # Check if this is an image generation request
-        if self.image_service.detect_image_generation_request(prompt):
-            self._handle_image_generation(prompt)
-            return
 
         try:
             prepared_messages = self.chat_service.prepare_messages_for_api(st.session_state.messages)
@@ -354,6 +379,59 @@ class StreamlitChatApp:
             yield "I apologize, but I encountered an error while generating a response."
             return "Error occurred during response generation"
 
+    def _run_async_streaming_response_with_image_check(
+        self, prepared_messages: list, model: str
+    ) -> Generator[str, None, str]:
+        """
+        Wrapper to run async streaming response that checks for image generation first
+
+        Args:
+            prepared_messages: Prepared messages for API call
+            model: Model name to use
+
+        Yields:
+            Filtered content chunks (empty if image generation detected)
+
+        Returns:
+            Complete filtered response
+        """
+        try:
+
+            async def collect_and_yield():
+                """Collect all chunks from async generator"""
+                chunks = []
+                async_gen = self.llm_service.generate_streaming_response(prepared_messages, model)
+                async for chunk in async_gen:
+                    chunks.append(chunk)
+                return chunks
+
+            # Run the async function to populate tool responses
+            chunks = asyncio.run(collect_and_yield())
+
+            # Check if this is an image generation response
+            image_response = self._check_for_image_generation_response()
+            if image_response:
+                # If it's image generation, don't yield any text chunks
+                logging.info("Detected image generation response, suppressing text output")
+                return ""
+
+            # For non-image responses, yield all chunks for streaming display
+            full_response = ""
+            for chunk in chunks:
+                full_response += chunk
+                yield chunk
+
+            return full_response
+
+        except Exception as e:
+            error_msg = f"Error in async streaming wrapper with image check: {e}"
+            logging.error(error_msg)
+            # Check if it's an image generation error before yielding error message
+            image_response = self._check_for_image_generation_response()
+            if not image_response:
+                yield "I apologize, but I encountered an error while generating a response."
+            return "Error occurred during response generation"
+
     def _generate_and_display_response(self, prepared_messages: list):
         """
         Generate and display streaming response from LLM
@@ -361,24 +439,44 @@ class StreamlitChatApp:
         Args:
             prepared_messages: Prepared messages for API call
         """
-        # Create a placeholder for the typing indicator
-        typing_indicator = st.empty()
-        typing_indicator.markdown(get_typing_indicator_html(), unsafe_allow_html=True)
-
         try:
-            # Clear the typing indicator once we're ready to stream
-            typing_indicator.empty()
+            # Show spinner during the slow LLM API call
+            with st.spinner("🤖..."):
+                # FIRST: Generate the LLM response to populate tool responses (without streaming yet)
+                logging.info("Main flow: Running LLM service to populate tool responses")
 
-            # Generate streaming response and display it in real-time
-            response_generator = self._run_async_streaming_response(
-                prepared_messages, st.session_state["fast_llm_model_name"]
-            )
+                async def collect_responses():
+                    """Collect responses to populate tool responses"""
+                    chunks = []
+                    async_gen = self.llm_service.generate_streaming_response(
+                        prepared_messages, st.session_state["fast_llm_model_name"]
+                    )
+                    async for chunk in async_gen:
+                        chunks.append(chunk)
+                    return chunks
 
-            # Create a chat message container for the assistant response
-            with st.spinner(""):
-                with st.chat_message("assistant", avatar=self.config.assistant_avatar):
-                    # Use st.write_stream to handle the streaming display
-                    full_response = st.write_stream(response_generator)
+                # Run the async function to populate tool responses
+                response_chunks = asyncio.run(collect_responses())
+                logging.info(f"Main flow: LLM service completed, got {len(response_chunks)} chunks")
+
+            # Create a chat message container for the assistant response (no spinner needed here)
+            with st.chat_message("assistant", avatar=self.config.assistant_avatar):
+                # NOW check if we have image generation tool responses
+                image_response = self._check_for_image_generation_response()
+                logging.debug(f"Main flow: image_response = {image_response}")
+
+                if image_response:
+                    logging.info("Main flow: Calling _display_image_generation_response")
+                    # Handle image generation response
+                    self._display_image_generation_response(image_response, full_response="")
+                    full_response = ""  # No text response to add to history for image generation
+                    logging.info("Main flow: Finished _display_image_generation_response")
+                else:
+                    logging.info("Main flow: No image response, displaying collected text chunks")
+                    # Display the collected text response
+                    full_response = "".join(response_chunks)
+                    if full_response.strip():
+                        st.markdown(full_response)
 
                     # Extract and display tool context from LLM service tool responses
                     tool_context = self._extract_tool_context_from_llm_responses()
@@ -391,8 +489,9 @@ class StreamlitChatApp:
                     else:
                         logging.debug("No tool context found to display")
 
-            # Add the complete response to chat history
-            self._update_chat_history(full_response, "assistant")
+            # Add the complete response to chat history (only if there's a text response)
+            if full_response and full_response.strip():
+                self._update_chat_history(full_response, "assistant")
 
             # Clear processing flag - no need to rerun since we've already displayed the response
             st.session_state.processing = False
@@ -407,60 +506,177 @@ class StreamlitChatApp:
             st.session_state.processing = False
             st.rerun()
 
-    def _handle_image_generation(self, prompt: str):
+    def _check_for_image_generation_response(self) -> Dict[str, Any]:
         """
-        Handle image generation requests from the user
+        Check if the LLM service has image generation tool responses
+
+        Returns:
+            Dict containing image response data if found, empty dict otherwise
+        """
+        logging.info("_check_for_image_generation_response: Starting check")
+
+        if not hasattr(self.llm_service, 'last_tool_responses') or not self.llm_service.last_tool_responses:
+            logging.info("_check_for_image_generation_response: No tool responses found")
+            return {}
+
+        logging.info(
+            f"_check_for_image_generation_response: Found {len(self.llm_service.last_tool_responses)} tool responses"
+        )
+
+        for tool_response in self.llm_service.last_tool_responses:
+            logging.info(
+                f"_check_for_image_generation_response: Checking tool response: role={tool_response.get('role')}, tool_name={tool_response.get('tool_name')}"
+            )
+
+            if tool_response.get("role") == "direct_response" and tool_response.get("tool_name") == "generate_image":
+                logging.info("_check_for_image_generation_response: Found image generation tool response")
+                try:
+                    # Get the full tool result object directly (no need to parse JSON)
+                    tool_result = tool_response.get("tool_result")
+                    logging.info(
+                        f"_check_for_image_generation_response: tool_result = {type(tool_result)}, has success attr: {hasattr(tool_result, 'success') if tool_result else False}"
+                    )
+
+                    if tool_result and hasattr(tool_result, 'success'):
+                        # Convert the tool result to a dict for easier handling
+                        response_data = {
+                            "success": tool_result.success,
+                            "image_data": getattr(tool_result, 'image_data', None),
+                            "original_prompt": getattr(tool_result, 'original_prompt', ''),
+                            "enhanced_prompt": getattr(tool_result, 'enhanced_prompt', ''),
+                            "error_message": getattr(tool_result, 'error_message', None),
+                        }
+
+                        logging.info(
+                            f"_check_for_image_generation_response: response_data success={response_data['success']}, has_image_data={bool(response_data['image_data'])}"
+                        )
+
+                        if response_data["success"] and response_data["image_data"]:
+                            logging.info(
+                                "_check_for_image_generation_response: Returning successful image generation response"
+                            )
+                            return response_data
+                        elif not response_data["success"]:
+                            logging.info(
+                                "_check_for_image_generation_response: Returning failed image generation response"
+                            )
+                            return response_data
+
+                except Exception as e:
+                    logging.error(f"Error extracting image generation tool response: {e}")
+                    continue
+
+        logging.info("_check_for_image_generation_response: No image generation response found, returning empty dict")
+        return {}
+
+    def _display_image_generation_response(self, image_response: Dict[str, Any], full_response: str = ""):
+        """
+        Display image generation response from tool calls
 
         Args:
-            prompt: The user's original prompt containing image generation request
+            image_response: Dict containing image response data
+            full_response: Any additional text response
         """
+        logging.info(f"Displaying image generation response...")
         try:
-            # Extract the image description from the prompt
-            image_prompt = self.image_service.extract_image_prompt(prompt)
+            # Debug the response structure
+            success = image_response.get("success")
+            image_data = image_response.get("image_data")
+            logging.info(f"Response success: {success}, has image_data: {bool(image_data)}")
 
-            # Generate image with loading indicator
-            with st.spinner("Generating image..."):
-                generated_image, confirmation_message = self.image_service.generate_image_response(image_prompt)
+            if success and image_data:
+                # Successful image generation
+                from utils.image import base64_to_pil_image
 
-            # Display the image response inline
-            with st.chat_message("assistant", avatar=self.config.assistant_avatar):
+                image_data = image_response["image_data"]
+                enhanced_prompt = image_response.get("enhanced_prompt", "Generated image")
+                original_prompt = image_response.get("original_prompt", "")
+
+                # Convert base64 to PIL Image for display (st.image needs PIL Image, not base64 string)
+                generated_image = base64_to_pil_image(image_data)
+
                 if generated_image:
                     # Display the generated image
-                    st.image(generated_image, caption=f"Generated image: {image_prompt}", use_container_width=True)
-                    # Display the confirmation message
-                    st.markdown(confirmation_message)
+                    st.image(generated_image, caption=f"Generated image: {enhanced_prompt}", use_container_width=True)
 
-                    # Create a special message format for storing images in chat history
-                    image_b64 = pil_image_to_base64(generated_image)
-                    image_message = {
-                        "type": "image",
-                        "image_data": image_b64,
-                        "image_caption": image_prompt,
-                        "text": confirmation_message,
+                    # Display information about prompt enhancement
+                    # if enhanced_prompt != original_prompt and original_prompt:
+                    # st.markdown(f"**Enhanced from:** {original_prompt}")
+                    # st.markdown(f"{enhanced_prompt}")
+
+                    # Initialize session state for storing image data if not exists
+                    if 'generated_images' not in st.session_state:
+                        st.session_state.generated_images = {}
+
+                    # Generate a unique ID for this image
+                    import time
+
+                    image_id = f"img_{int(time.time() * 1000)}"
+
+                    # Store image data in session state for visual persistence
+                    st.session_state.generated_images[image_id] = {
+                        'image_data': image_data,
+                        'enhanced_prompt': enhanced_prompt,
+                        'original_prompt': original_prompt,
                     }
-                    # Add image response to chat history using safe method
-                    self._safe_add_message_to_history("assistant", image_message)
-                else:
-                    # Display error message
-                    st.markdown(confirmation_message)
-                    # Add error message to chat history using safe method
-                    self._safe_add_message_to_history("assistant", confirmation_message)
 
-            # Clear processing flag - no need to rerun since we've already displayed the response
-            st.session_state.processing = False
+                    # Store lightweight image metadata in chat history (NOT the base64 data)
+                    history_message = {
+                        "type": "image",
+                        "image_id": image_id,
+                        "text": f"🎨 Generated image with prompt: **{enhanced_prompt}**",
+                        "enhanced_prompt": enhanced_prompt,
+                        "original_prompt": original_prompt,
+                    }
+
+                    if enhanced_prompt != original_prompt and original_prompt:
+                        history_message["text"] += f"\n\n*Enhanced from original request: \"{original_prompt}\"*"
+
+                    # Add image metadata to chat history (no base64 data)
+                    self._safe_add_message_to_history("assistant", history_message)
+
+                    logging.info(f"Successfully displayed generated image with enhanced prompt: {enhanced_prompt}")
+                else:
+                    # Error converting image data
+                    error_msg = "Generated image but failed to display it properly."
+                    logging.error(
+                        f"Failed to convert base64 to PIL image: {len(image_data) if image_data else 0} bytes"
+                    )
+                    st.markdown(error_msg)
+                    self._safe_add_message_to_history("assistant", error_msg)
+            else:
+                # Debug why the condition failed
+                logging.error(
+                    f"Image generation condition failed - success: {success}, image_data length: {len(image_data) if image_data else 0}"
+                )
+                if not success:
+                    # Failed image generation
+                    error_message = image_response.get("error_message", "Failed to generate image.")
+                    st.markdown(f"**Image Generation Error:** {error_message}")
+                    self._safe_add_message_to_history("assistant", f"Image generation failed: {error_message}")
+
+                    # Show the enhanced prompt that was attempted
+                    enhanced_prompt = image_response.get("enhanced_prompt", "")
+                    if enhanced_prompt:
+                        st.markdown(f"**Attempted prompt:** {enhanced_prompt}")
+                else:
+                    # success=True but no image_data
+                    logging.error("Image generation succeeded but no image data received")
+                    st.markdown("**Image Generation Error:** Image was generated but no data received.")
+                    self._safe_add_message_to_history("assistant", "Image generation failed: No image data received")
+
+            # Display any additional text response
+            if full_response and full_response.strip():
+                st.markdown(full_response)
 
         except Exception as e:
-            logging.error(f"Error handling image generation: {e}")
-            error_message = "I apologize, but I encountered an error while generating the image. Please try again."
+            logging.error(f"Error displaying image generation response: {e}")
+            error_msg = "I encountered an error while displaying the generated image."
+            st.markdown(error_msg)
+            self._safe_add_message_to_history("assistant", error_msg)
 
-            # Display error message inline
-            with st.chat_message("assistant", avatar=self.config.assistant_avatar):
-                st.markdown(error_message)
-
-            # Add error message to chat history using safe method
-            self._safe_add_message_to_history("assistant", error_message)
-            # Clear processing flag
-            st.session_state.processing = False
+        # Clear processing flag
+        st.session_state.processing = False
 
     def _contains_tool_call_instructions(self, content: str) -> bool:
         """

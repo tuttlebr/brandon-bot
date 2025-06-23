@@ -9,6 +9,7 @@ from openai import OpenAI
 from tools import (
     execute_assistant_with_dict,
     execute_conversation_context_with_dict,
+    execute_image_generation_with_dict,
     execute_news_with_dict,
     execute_retrieval_with_dict,
     execute_tavily_with_dict,
@@ -22,6 +23,7 @@ ALL_TOOLS = get_all_tool_definitions()
 tools = {
     "text_assistant": execute_assistant_with_dict,
     "conversation_context": execute_conversation_context_with_dict,
+    "generate_image": execute_image_generation_with_dict,
     "tavily_internet_search": execute_tavily_with_dict,
     "get_weather": execute_weather_with_dict,
     "retrieval_search": execute_retrieval_with_dict,
@@ -336,6 +338,7 @@ class LLMService:
                         "role": "direct_response",
                         "content": tool_result.result,
                         "tool_name": tool_name,
+                        "tool_result": tool_result,  # Store full response object for Streamlit access
                     }
                 else:
                     # Standard tool response

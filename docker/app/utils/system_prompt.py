@@ -61,12 +61,7 @@ def get_available_tools_list():
     except Exception as e:
         logging.warning(f"Could not auto-generate tools list: {e}")
         # Fallback to manual list
-        return """- text_assistant: Generates text-based responses to customer questions.
-- conversation_context: Reviews prior conversation history for context.
-- tavily_news_search: Searches news articles for relevant updates.
-- retrieval_search: Pulls information from internal databases.
-- tavily_internet_search: Conducts safe, real-time web searches.
-- get_weather: Provides current weather data for specific locations."""
+        return "- tools: External services which help you answer customer questions."
 
 
 def get_tool_prompt():

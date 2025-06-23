@@ -119,7 +119,7 @@ def generate_image(
     seed: int = DEFAULT_SEED,
     steps: int = DEFAULT_STEPS,
     disable_safety_checker: bool = True,
-    return_bytes_io: bool = False,
+    return_bytes_io: bool = True,
 ) -> Image.Image:
     """
     Send a request to an image generation API using the requests library and Pydantic model.
@@ -174,8 +174,10 @@ def generate_image(
 
         # Raise HTTP errors
         response.raise_for_status()
-
-        return base64_to_pil_image(response.json()["artifacts"][0]["base64"])
+        if return_bytes_io:
+            return base64_to_pil_image(response.json()["artifacts"][0]["base64"])
+        else:
+            return response.json()["artifacts"][0]["base64"]
 
     except requests.RequestException as e:
         logger.error(f"API request failed: {str(e)}")

@@ -45,16 +45,41 @@ class ChatHistoryComponent:
 
                 # Check if this is an image message
                 if chat_message.is_image_message():
-                    image_data, image_caption = chat_message.get_image_data()
-                    if image_data:
+                    image_id, enhanced_prompt, original_prompt = chat_message.get_image_data()
+
+                    # Try to retrieve image data from session state
+                    if (
+                        image_id
+                        and hasattr(st.session_state, 'generated_images')
+                        and image_id in st.session_state.generated_images
+                    ):
+
                         try:
-                            # Convert base64 back to PIL Image for display
-                            image = base64_to_pil_image(image_data)
-                            if image:
-                                st.image(image, caption=f"Generated image: {image_caption}", use_container_width=True)
+                            # Get image data from session state
+                            image_info = st.session_state.generated_images[image_id]
+                            image_data = image_info.get('image_data')
+
+                            if image_data:
+                                # Convert base64 back to PIL Image for display
+                                image = base64_to_pil_image(image_data)
+                                if image:
+                                    st.image(
+                                        image, caption=f"Generated image: {enhanced_prompt}", use_container_width=True
+                                    )
+                                else:
+                                    logging.error(f"Failed to convert image data for image_id: {image_id}")
+                                    st.info("🖼️ Image could not be displayed (conversion error)")
+                            else:
+                                logging.warning(f"No image data found for image_id: {image_id}")
+                                st.info("🖼️ Image data not available")
+
                         except Exception as e:
-                            logging.error(f"Error displaying image: {e}")
-                            st.error("Could not display image")
+                            logging.error(f"Error displaying image {image_id}: {e}")
+                            st.info("🖼️ Image could not be displayed")
+                    else:
+                        # Image data not available in session state
+                        logging.warning(f"Image data not found in session state for image_id: {image_id}")
+                        st.info("🖼️ Image not available (may have been cleared from session)")
 
                     # Display the text content
                     content = chat_message.get_display_content()
