@@ -1,1 +1,6 @@
 secrets.toml
+nginx/
+*.csr
+*.key
+*.pem
+.env

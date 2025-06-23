@@ -263,3 +263,4 @@ nginx/
 .python-version
 workspace/
 ignore.*
+rebuild.sh

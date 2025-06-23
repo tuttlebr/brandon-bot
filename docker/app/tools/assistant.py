@@ -16,6 +16,7 @@ class AssistantTaskType(str, Enum):
     SUMMARIZE = "summarize"
     PROOFREAD = "proofread"
     REWRITE = "rewrite"
+    CRITIC = "critic"
 
 
 class AssistantResponse(BaseModel):
@@ -28,7 +29,7 @@ class AssistantResponse(BaseModel):
     summary_length: Optional[int] = Field(None, description="Length of summary in words (for summarizing)")
     processing_notes: Optional[str] = Field(None, description="Additional notes about the processing")
     direct_response: bool = Field(
-        default=True, description="Flag indicating this response should be returned directly to user"
+        default=True, description="Flag indicating this response should be returned directly to user",
     )
 
 
@@ -37,7 +38,7 @@ class AssistantTool:
 
     def __init__(self):
         self.name = "text_assistant"
-        self.description = "Triggered when user asks for text processing tasks like summarizing, proofreading, or rewriting text. Specify the task type and provide the text to be processed without modification or truncation."
+        self.description = "Triggered when user asks for writing tasks like summarizing, proofreading, critiquing, or rewriting text. Specify the task type and provide the text to be processed without modification or truncation."
 
     def to_openai_format(self) -> Dict[str, Any]:
         """
@@ -56,8 +57,8 @@ class AssistantTool:
                     "properties": {
                         "task_type": {
                             "type": "string",
-                            "enum": ["summarize", "proofread", "rewrite"],
-                            "description": "The type of task to perform: 'summarize' to create a concise summary, 'proofread' to check for errors and suggest improvements, 'rewrite' to rephrase and improve the text",
+                            "enum": ["summarize", "proofread", "rewrite", "critic"],
+                            "description": "The type of task to perform: 'summarize' to create a concise summary, 'proofread' to check for errors and suggest improvements, 'rewrite' to rephrase and improve the text, 'critic' to critique the text and provide feedback on the text",
                         },
                         "text": {"type": "string", "description": "The text content to be processed",},
                         "instructions": {
@@ -83,27 +84,37 @@ class AssistantTool:
         """
         base_prompts = {
             AssistantTaskType.SUMMARIZE: """detailed thinking on
-You are an expert text summarizer. Your task is to create clear, concise summaries that capture the key points and main ideas of the given text. Focus on:
-- Identifying the most important information
-- Maintaining the original meaning and tone
-- Creating a coherent, well-structured summary
-- Avoiding unnecessary details while preserving context""",
+You are a precision-focused summarization expert. Your task is to distill complex content into concise, accessible overviews that preserve the original intent while prioritizing:
+- **Core Concept Extraction**: Identifying pivotal data points, arguments, or themes
+- **Contextual Balance**: Retaining critical nuance without overcomplicating the narrative
+- **Audience Alignment**: Tailoring density and detail to the target reader’s needs
+- **Structural Integrity**: Organizing information in a logical, progressive flow
+Avoid redundancy while ensuring the summary stands alone as a complete representation of the source material.""",
             AssistantTaskType.PROOFREAD: """detailed thinking on
-You are an expert proofreader and editor. Your task is to carefully review text for:
-- Grammar and syntax errors
-- Spelling mistakes
-- Punctuation issues
-- Clarity and readability improvements
-- Consistency in style and tone
-- Word choice and flow
-Provide the corrected text and explain the improvements made.""",
+You are a meticulous editorial specialist. Your task is to scrutinize text through a multi-phase refinement process:
+1. **Error Elimination**: Correcting grammatical/syntactical flaws, spelling inaccuracies, and punctuation misuses
+2. **Clarity Enhancement**: Simplifying convoluted phrasing and ambiguous language
+3. **Consistency Audit**: Standardizing tone, style, and formatting conventions
+4. **Flow Optimization**: Smoothing transitions between ideas and sentences
+Provide the polished text alongside annotations explaining critical revisions and their impact on readability/credibility.""",
             AssistantTaskType.REWRITE: """detailed thinking on
-You are an expert writer and editor. Your task is to rewrite and improve text while:
-- Maintaining the original meaning and intent
-- Improving clarity, flow, and readability
-- Enhancing word choice and sentence structure
-- Ensuring proper grammar and style
-- Making the text more engaging and professional""",
+You are a strategic content reimaginer. Your task is to transform existing text through:
+- **Tonal Adaptation**: Shifting formality, voice, or perspective to align with target audiences
+- **Engagement Enhancement**: Injecting dynamic language, vivid imagery, and persuasive elements
+- **Structural Reinvention**: Reorganizing ideas for maximum impact (e.g., inverted pyramids, narrative arcs)
+- **Precision Refinement**: Upgrading vocabulary and syntax for sophistication without obscurity
+- **Purpose-Driven Editing**: Emphasizing key messages while maintaining factual/tonal fidelity
+Deliver a polished version that elevates the source material’s intellectual and emotional resonance.""",
+            AssistantTaskType.CRITIC: """detailed thinking on
+You are an expert literary agent. Your task is to critique the text and provide feedback on the text.
+A literary agent evaluates new fiction submissions through a structured process to assess a manuscript’s potential and an author’s readiness for publication. Key steps include:
+
+- Initial Screening: Reviewing the query letter for clarity and a compelling hook, and the synopsis for a unique premise, strong character arcs, and alignment with genre/market trends.
+- Manuscript Evaluation: Analyzing originality, narrative voice, pacing, plot coherence, and character development, while identifying weaknesses (e.g., clichés, plot holes) and assessing commercial viability compared to genre bestsellers.
+- Market Analysis: Ensuring the manuscript aligns with current publisher demands (e.g., diverse voices) and evaluating the author’s platform (e.g., social media, promotional ability).
+- Feedback & Collaboration: Offering editorial guidance for revisions and discussing long-term career strategies if representation is pursued.
+- Business Negotiation: Crafting pitches to secure publisher offers and advocating for favorable contract terms (advances, royalties).
+Agents prioritize projects they are passionate about (subjective fit) and balance creative merit with commercial pragmatism. Authors are advised to polish their query materials, ensure error-free manuscripts, and research agents with relevant genre expertise.""",
         }
 
         prompt = base_prompts.get(task_type, base_prompts[AssistantTaskType.REWRITE])
@@ -124,7 +135,7 @@ You are an expert writer and editor. Your task is to rewrite and improve text wh
             OpenAI client instance
         """
         try:
-            return OpenAI(api_key=config.api_key, base_url=config.llm_endpoint)
+            return OpenAI(api_key=config.api_key, base_url=config.intelligent_llm_endpoint)
         except Exception as e:
             logger.error(f"Failed to create LLM client: {e}")
             raise
@@ -157,8 +168,10 @@ You are an expert writer and editor. Your task is to rewrite and improve text wh
                 user_message = (
                     f"Please proofread the following text and provide corrections with explanations:\n\n{text}"
                 )
-            else:  # REWRITE
+            elif task_type == AssistantTaskType.REWRITE:
                 user_message = f"Please rewrite and improve the following text:\n\n{text}"
+            elif task_type == AssistantTaskType.CRITIC:
+                user_message = f"Please critique the following text and provide feedback on the text:\n\n{text}"
 
             messages = [
                 {"role": "system", "content": system_prompt},
@@ -168,7 +181,7 @@ You are an expert writer and editor. Your task is to rewrite and improve text wh
             logger.debug(f"Making LLM request with model: {config.llm_model_name}")
 
             response = client.chat.completions.create(
-                model=config.llm_model_name,
+                model=config.intelligent_llm_model_name,
                 messages=messages,
                 temperature=0.6,
                 top_p=0.95,
@@ -191,8 +204,10 @@ You are an expert writer and editor. Your task is to rewrite and improve text wh
                 if "improvements" in result.lower() or "corrections" in result.lower():
                     improvements = ["See detailed feedback in the result"]
                 processing_notes = "Proofreading completed with suggestions for improvement"
-            else:  # REWRITE
+            elif task_type == AssistantTaskType.REWRITE:
                 processing_notes = "Text has been rewritten for improved clarity and flow"
+            elif task_type == AssistantTaskType.CRITIC:
+                processing_notes = "Text has been critiqued and feedback provided"
 
             logger.info(f"Successfully processed text with {task_type}")
 

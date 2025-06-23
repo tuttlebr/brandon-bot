@@ -150,17 +150,11 @@ class TavilyTool:
         default_params = {
             "query": query,
             "topic": "general",
-            "search_depth": "advanced",
-            "chunks_per_source": 5,
-            "max_results": 2,
-            "include_answer": False,
+            "auto_parameters": True,
+            "include_answer": "advanced",
             "include_raw_content": False,
-            "include_images": True,
-            "include_image_descriptions": False,
-            "time_range": "month",
-            "include_domains": [],
-            "exclude_domains": [],
-            "country": "united states",
+            "max_results": 10,
+            "exclude_domains": ["youtube.com", "facebook.com", "foxnews.com"],
         }
 
         # Update with any provided kwargs

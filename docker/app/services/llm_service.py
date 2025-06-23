@@ -13,30 +13,12 @@ from tools import (
     execute_retrieval_with_dict,
     execute_tavily_with_dict,
     execute_weather_with_dict,
-    get_assistant_tool_definition,
-    get_conversation_context_tool_definition,
-    get_news_tool_definition,
-    get_retrieval_tool_definition,
-    get_tavily_tool_definition,
-    get_weather_tool_definition,
 )
+from tools.registry import get_all_tool_definitions
 from utils.system_prompt import TOOL_PROMPT
 
-assistant_tool_def = get_assistant_tool_definition()
-conversation_context_tool_def = get_conversation_context_tool_definition()
-tavily_tool_def = get_tavily_tool_definition()
-weather_tool_def = get_weather_tool_definition()
-retrieval_tool_def = get_retrieval_tool_definition()
-news_tool_def = get_news_tool_definition()
 MAX_TURNS = 9
-ALL_TOOLS = [
-    assistant_tool_def,
-    conversation_context_tool_def,
-    tavily_tool_def,
-    weather_tool_def,
-    retrieval_tool_def,
-    news_tool_def,
-]
+ALL_TOOLS = get_all_tool_definitions()
 tools = {
     "text_assistant": execute_assistant_with_dict,
     "conversation_context": execute_conversation_context_with_dict,
@@ -59,6 +41,8 @@ class LLMService:
         """
         self.config = config
         self.client = self._initialize_client()
+        self.fast_client = self._initialize_fast_client()
+        self.intelligent_client = self._initialize_intelligent_client()
         self.last_tool_responses = []  # Store tool responses for context extraction
 
     def _initialize_client(self) -> OpenAI:
@@ -67,6 +51,22 @@ class LLMService:
             return OpenAI(api_key=self.config.api_key, base_url=self.config.llm_endpoint)
         except Exception as e:
             logging.error(f"Failed to initialize LLM client: {e}")
+            raise
+
+    def _initialize_fast_client(self) -> OpenAI:
+        """Initialize the OpenAI client"""
+        try:
+            return OpenAI(api_key=self.config.api_key, base_url=self.config.fast_llm_endpoint)
+        except Exception as e:
+            logging.error(f"Failed to initialize fast LLM client: {e}")
+            raise
+
+    def _initialize_intelligent_client(self) -> OpenAI:
+        """Initialize the OpenAI client"""
+        try:
+            return OpenAI(api_key=self.config.api_key, base_url=self.config.intelligent_llm_endpoint,)
+        except Exception as e:
+            logging.error(f"Failed to initialize intelligent LLM client: {e}")
             raise
 
     def _parse_custom_tool_calls(self, content: str) -> List[Dict[str, Any]]:
@@ -90,17 +90,17 @@ class LLMService:
         # Multiple flexible regex patterns to handle different variations
         patterns = [
             # Standard format: <TOOLCALL-[...]</TOOLCALL>
-            r'<TOOLCALL-\[(.*?)\]</TOOLCALL>',
+            r"<TOOLCALL-\[(.*?)\]</TOOLCALL>",
             # Missing dash: <TOOLCALL[...]</TOOLCALL>
-            r'<TOOLCALL\[(.*?)\]</TOOLCALL>',
+            r"<TOOLCALL\[(.*?)\]</TOOLCALL>",
             # Quote instead of dash: <TOOLCALL"[...]</TOOLCALL>
             r'<TOOLCALL"\[(.*?)\]</TOOLCALL>',
             # With spaces: <TOOLCALL - [...]</TOOLCALL>
-            r'<TOOLCALL\s*-\s*\[(.*?)\]</TOOLCALL>',
+            r"<TOOLCALL\s*-\s*\[(.*?)\]</TOOLCALL>",
             # Case insensitive: <toolcall-[...]</toolcall>
-            r'<toolcall-\[(.*?)\]</toolcall>',
+            r"<toolcall-\[(.*?)\]</toolcall>",
             # Any separator: <TOOLCALL[any char][...]</TOOLCALL>
-            r'<TOOLCALL.?\[(.*?)\]</TOOLCALL>',
+            r"<TOOLCALL.?\[(.*?)\]</TOOLCALL>",
             # Just looking for the JSON array pattern within angle brackets
             r'<[^>]*?(\[\{.*?"name".*?\}\])[^<]*?>',
         ]
@@ -110,7 +110,7 @@ class LLMService:
         for pattern in patterns:
             try:
                 # Try case-insensitive matching for the more flexible patterns
-                if 'toolcall' in pattern.lower():
+                if "toolcall" in pattern.lower():
                     matches = re.findall(pattern, content, re.DOTALL | re.IGNORECASE)
                 else:
                     matches = re.findall(pattern, content, re.DOTALL)
@@ -151,8 +151,8 @@ class LLMService:
             json_str = json_str.strip()
 
             # If it doesn't start with '[', wrap it in an array
-            if not json_str.startswith('['):
-                json_str = f'[{json_str}]'
+            if not json_str.startswith("["):
+                json_str = f"[{json_str}]"
 
             # Parse the JSON content
             tool_calls_json = json.loads(json_str)
@@ -257,7 +257,10 @@ class LLMService:
         return normalized_calls
 
     async def _execute_tool_calls(
-        self, tool_calls: List[Dict[str, Any]], current_user_message: Dict[str, Any] = None
+        self,
+        tool_calls: List[Dict[str, Any]],
+        current_user_message: Dict[str, Any] = None,
+        messages: List[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """
         Execute tool calls asynchronously using unified format
@@ -308,11 +311,15 @@ class LLMService:
 
                     # Add conversation messages to the tool arguments
                     modified_args = tool_args.copy()
-                    modified_args["messages"] = messages  # Pass the full conversation messages
+                    if messages is not None:
+                        modified_args["messages"] = messages  # Pass the full conversation messages
+                        logging.debug(
+                            f"Modified args for {tool_name}: context_type={modified_args.get('context_type')}, message_count={modified_args.get('message_count', 6)}, total_messages={len(messages)}"
+                        )
+                    else:
+                        logging.warning(f"No messages provided for {tool_name}, using empty list")
+                        modified_args["messages"] = []
 
-                    logging.debug(
-                        f"Modified args for {tool_name}: context_type={modified_args.get('context_type')}, message_count={modified_args.get('message_count', 6)}, total_messages={len(messages)}"
-                    )
                     tool_args = modified_args
 
                 logging.debug(f"Executing tool call: {tool_name} with args: {tool_args} (from {source})")
@@ -323,9 +330,13 @@ class LLMService:
                 tool_result = await loop.run_in_executor(None, lambda: tool_function(tool_args))
 
                 # Check if this is a direct response tool (like assistant)
-                if hasattr(tool_result, 'direct_response') and tool_result.direct_response:
+                if hasattr(tool_result, "direct_response") and tool_result.direct_response:
                     logging.debug(f"Tool {tool_name} returned direct response")
-                    return {"role": "direct_response", "content": tool_result.result, "tool_name": tool_name}
+                    return {
+                        "role": "direct_response",
+                        "content": tool_result.result,
+                        "tool_name": tool_name,
+                    }
                 else:
                     # Standard tool response
                     tool_response = tool_result.json()
@@ -334,7 +345,10 @@ class LLMService:
 
             except Exception as e:
                 logging.error(f"Error executing tool {tool_name} (from {source}): {e}")
-                return {"role": "tool", "content": f"Error executing {tool_name}: {str(e)}"}
+                return {
+                    "role": "tool",
+                    "content": f"Error executing {tool_name}: {str(e)}",
+                }
 
         # Execute all tool calls concurrently
         if not tool_calls:
@@ -392,12 +406,12 @@ class LLMService:
 
         # Check for various custom tool call patterns
         patterns = [
-            r'<TOOLCALL-\[.*?\]</TOOLCALL>',
-            r'<TOOLCALL\[.*?\]</TOOLCALL>',
+            r"<TOOLCALL-\[.*?\]</TOOLCALL>",
+            r"<TOOLCALL\[.*?\]</TOOLCALL>",
             r'<TOOLCALL"\[.*?\]</TOOLCALL>',
-            r'<TOOLCALL\s*-\s*\[.*?\]</TOOLCALL>',
-            r'<toolcall-\[.*?\]</toolcall>',
-            r'<TOOLCALL.?\[.*?\]</TOOLCALL>',
+            r"<TOOLCALL\s*-\s*\[.*?\]</TOOLCALL>",
+            r"<toolcall-\[.*?\]</toolcall>",
+            r"<TOOLCALL.?\[.*?\]</TOOLCALL>",
         ]
 
         for pattern in patterns:
@@ -422,17 +436,17 @@ class LLMService:
 
         # Remove various custom tool call patterns
         patterns = [
-            r'<TOOLCALL-\[.*?\]</TOOLCALL>',
-            r'<TOOLCALL\[.*?\]</TOOLCALL>',
+            r"<TOOLCALL-\[.*?\]</TOOLCALL>",
+            r"<TOOLCALL\[.*?\]</TOOLCALL>",
             r'<TOOLCALL"\[.*?\]</TOOLCALL>',
-            r'<TOOLCALL\s*-\s*\[.*?\]</TOOLCALL>',
-            r'<toolcall-\[.*?\]</toolcall>',
-            r'<TOOLCALL.?\[.*?\]</TOOLCALL>',
+            r"<TOOLCALL\s*-\s*\[.*?\]</TOOLCALL>",
+            r"<toolcall-\[.*?\]</toolcall>",
+            r"<TOOLCALL.?\[.*?\]</TOOLCALL>",
         ]
 
         cleaned_content = content
         for pattern in patterns:
-            cleaned_content = re.sub(pattern, '', cleaned_content, flags=re.DOTALL | re.IGNORECASE)
+            cleaned_content = re.sub(pattern, "", cleaned_content, flags=re.DOTALL | re.IGNORECASE)
 
         return cleaned_content.strip()
 
@@ -524,7 +538,7 @@ class LLMService:
 
             # PHASE 1: Tool Decision Making - Use minimal context (system + current user message only)
             system_message = next((msg for msg in clean_messages if msg.get("role") == "system"), None)
-            current_user_message = next((msg for msg in reversed(clean_messages) if msg.get("role") == "user"), None)
+            current_user_message = next((msg for msg in reversed(clean_messages) if msg.get("role") == "user"), None,)
 
             if not current_user_message:
                 logging.error("No user message found for tool decision")
@@ -545,10 +559,11 @@ class LLMService:
 
             # Make tool decision with minimal context
             tool_decision_params = {
-                "model": model,
+                "model": self.config.llm_model_name,
                 "messages": tool_decision_messages,
                 "stream": False,
-                "temperature": 0.0,
+                "temperature": 0.6,
+                "top_p": 0.95,
                 "tools": ALL_TOOLS,
                 "tool_choice": "auto",
                 "parallel_tool_calls": True,
@@ -579,7 +594,7 @@ class LLMService:
                 )
 
                 # Execute all tool calls concurrently using unified approach
-                tool_responses = await self._execute_tool_calls(all_tool_calls, current_user_message)
+                tool_responses = await self._execute_tool_calls(all_tool_calls, current_user_message, clean_messages)
 
                 # Store tool responses for context extraction by streamlit app
                 self.last_tool_responses = tool_responses
@@ -631,8 +646,8 @@ class LLMService:
                 response_messages = self._validate_and_clean_messages(response_messages)
 
                 # Generate final response with full context
-                stream = self.client.chat.completions.create(
-                    model=model,
+                stream = self.intelligent_client.chat.completions.create(
+                    model=self.config.intelligent_llm_model_name,
                     messages=response_messages,
                     stream=True,
                     temperature=0.6,
@@ -653,8 +668,8 @@ class LLMService:
                 windowed_messages = self._validate_and_clean_messages(windowed_messages)
 
                 # Generate response with conversation context (no tools)
-                stream = self.client.chat.completions.create(
-                    model=model,
+                stream = self.fast_client.chat.completions.create(
+                    model=self.config.fast_llm_model_name,
                     messages=windowed_messages,
                     stream=True,
                     temperature=0.6,

@@ -169,16 +169,11 @@ class NewsTool:
         default_params = {
             "query": query,
             "topic": "news",
-            "search_depth": "advanced",
-            "chunks_per_source": 5,
-            "max_results": 3,
-            "include_answer": False,
+            "auto_parameters": True,
+            "include_answer": "advanced",
             "include_raw_content": False,
-            "include_images": False,
-            "include_image_descriptions": False,
-            "days": 2,
+            "max_results": 10,
             "include_domains": INCLUDED_DOMAINS,
-            "exclude_domains": [],
             "country": "united states",
         }
 

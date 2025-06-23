@@ -50,32 +50,64 @@ def get_local_time():
 current = datetime.now()
 currentDateTime = current.strftime("%B %d, %Y")
 
-TOOL_PROMPT = """
-detailed thinking off
 
-You are a helpful assistant that can use the following tools to answer questions:
+def get_available_tools_list():
+    """Generate the tool list automatically from the registered tools"""
+    try:
+        # Import from tools registry to avoid circular imports
+        from tools.registry import get_tools_list_text
 
-- tavily_internet_search
-- get_weather
-- retrieval_search
+        return get_tools_list_text()
+    except Exception as e:
+        logging.warning(f"Could not auto-generate tools list: {e}")
+        # Fallback to manual list
+        return """- text_assistant: Generates text-based responses to customer questions.
+- conversation_context: Reviews prior conversation history for context.
+- tavily_news_search: Searches news articles for relevant updates.
+- retrieval_search: Pulls information from internal databases.
+- tavily_internet_search: Conducts safe, real-time web searches.
+- get_weather: Provides current weather data for specific locations."""
 
-No tool should be called when the user is simply responding to your prior message with a simple "ok" or "thanks" or "sure" or "no problem" or "I understand" or acknowledgments, minimal responses or backchannels.
+
+def get_tool_prompt():
+    """Generate the tool prompt with automatically populated tool list"""
+    tools_list = get_available_tools_list()
+
+    return f"""
+detailed thinking on
+Welcome! Below are key resources and tools to help you answer customer questions effectively. Please review these guidelines carefully.
+
+Available Tools:
+You have access to the following tools to assist with customer inquiries:
+
+{tools_list}
+
+When to Use Tools:
+
+- Do use these tools to address specific customer questions, provide detailed information, or solve problems.
+- Do not use these tools if the customer sends a simple acknowledgment (e.g., "hello," "thanks," "ok," "I understand") or brief responses that don't require action.
+
+Why This Matters:
+- Reserving tool usage for substantive queries ensures efficient resource use and avoids unnecessary delays. If you're unsure whether to use a tool, ask your supervisor for guidance.
 """
+
+
+TOOL_PROMPT = get_tool_prompt()
 
 config = Config()
 
 SYSTEM_PROMPT = f"""detailed thinking on
-You are {config.BOT_TITLE}, an AI assistant by NVIDIA. Today is {currentDateTime}. Your knowledge is current because you have access to the latest information.
+You are {config.BOT_TITLE}, an AI assistant developed by NVIDIA. Today’s date is {currentDateTime}, and your knowledge is current up to this date, as you have access to the latest information.
 
-When you're provided URLs from a tool, you should include the source of the information in your response as a markdown formatted URL. If you are reporting weather information, you should attempt to display the weather as a table with emojis for the weather conditions as this is easier for the user to understand. But it is important to remember that you're very capable of responding to the user's question without using the tool as you see fit.
-
-You're helpful, curious, and conversational. You think step-by-step through problems, acknowledge when you're unsure, and ask good follow-up questions when they'd be useful.
+When given URLs via a tool, include the source in your response using a Markdown-formatted link. For weather information, display data in a table with emojis to enhance clarity. However, you are fully capable of responding to user queries without relying on external tools when appropriate.
 
 You can generate images when asked - just look for requests like "create an image of...", "draw...", or "show me a picture of...". While you can't actually see the images, there's no need for you to mention it to the user. They already know and are using image generation tools for their own use.
 
-You write in clear markdown and adapt your response length to what's needed - usually brief, sometimes detailed. You can't open links, so ask users to paste content instead. In order to seem less robotic, you usually respond in paragraph forms and limit the use of bullet points unless required to make a point.
+You embody a helpful, curious, and conversational tone. Approach problems methodically, acknowledge uncertainties, and ask relevant follow-up questions to ensure understanding.
 
-You help with anything from analysis to creative writing to coding. If something seems potentially harmful, you'll assume the most reasonable interpretation or ask for clarification.
+Format responses in clear Markdown, adjusting length as needed—balancing brevity with detail. Since you cannot open links, request that users paste content directly. To maintain a natural tone, use full paragraphs and reserve bullet points for critical emphasis.
+
+Your capabilities span a wide range of tasks, from analysis and creative writing to coding. If a request appears potentially harmful, default to the most benign interpretation or proactively request clarification.
 """
 
 
@@ -92,25 +124,25 @@ def greeting_prompt(time_data=None):
     tmp_snarky_human_term = snarky_human_term()
     logging.info(f"Snarky human term: {tmp_snarky_human_term}")
     hourly_greetings = {
-        0: [f"Night owl mode activated, {tmp_snarky_human_term}!", f"Still awake, {tmp_snarky_human_term}?"],
+        0: [f"Night owl mode activated, {tmp_snarky_human_term}!", f"Still awake, {tmp_snarky_human_term}?",],
         1: [f"Late night, {tmp_snarky_human_term}!", f"Hey, {tmp_snarky_human_term}!"],
-        2: [f"Midnight greetings, {tmp_snarky_human_term}!", f"Hi, {tmp_snarky_human_term}!"],
+        2: [f"Midnight greetings, {tmp_snarky_human_term}!", f"Hi, {tmp_snarky_human_term}!",],
         3: [f"Early hours, {tmp_snarky_human_term}!", f"Hey, {tmp_snarky_human_term}!"],
-        4: [f"Early bird, {tmp_snarky_human_term}!", f"Morning {tmp_snarky_human_term}!"],
-        5: [f"Early morning, {tmp_snarky_human_term}!", f"Hi, {tmp_snarky_human_term}!"],
+        4: [f"Early bird, {tmp_snarky_human_term}!", f"Morning {tmp_snarky_human_term}!",],
+        5: [f"Early morning, {tmp_snarky_human_term}!", f"Hi, {tmp_snarky_human_term}!",],
         6: [f"Morning, {tmp_snarky_human_term}!", f"Hi, {tmp_snarky_human_term}!"],
-        7: [f"Good morning, {tmp_snarky_human_term}!", f"Morning, {tmp_snarky_human_term}!"],
+        7: [f"Good morning, {tmp_snarky_human_term}!", f"Morning, {tmp_snarky_human_term}!",],
         8: [f"Morning, {tmp_snarky_human_term}!", f"Hey, {tmp_snarky_human_term}!"],
         9: [f"Hi, {tmp_snarky_human_term}!", f"Morning, {tmp_snarky_human_term}!"],
         10: [f"Hey, {tmp_snarky_human_term}!", f"Morning, {tmp_snarky_human_term}!"],
-        11: [f"Hi, {tmp_snarky_human_term}!", f"Almost lunchtime, {tmp_snarky_human_term}!"],
-        12: [f"Shouldn't you be at lunch, {tmp_snarky_human_term}?", f"Hi, {tmp_snarky_human_term}!"],
+        11: [f"Hi, {tmp_snarky_human_term}!", f"Almost lunchtime, {tmp_snarky_human_term}!",],
+        12: [f"Shouldn't you be at lunch, {tmp_snarky_human_term}?", f"Hi, {tmp_snarky_human_term}!",],
         13: [f"Afternoon, {tmp_snarky_human_term}!", f"Hey, {tmp_snarky_human_term}!"],
         14: [f"Hi, {tmp_snarky_human_term}!", f"Afternoon, {tmp_snarky_human_term}!"],
         15: [f"Hey, {tmp_snarky_human_term}!", f"Afternoon, {tmp_snarky_human_term}!"],
-        16: [f"Hi, {tmp_snarky_human_term}!", f"Late afternoon, {tmp_snarky_human_term}!"],
+        16: [f"Hi, {tmp_snarky_human_term}!", f"Late afternoon, {tmp_snarky_human_term}!",],
         17: [f"Evening, {tmp_snarky_human_term}!", f"Hi, {tmp_snarky_human_term}!"],
-        18: [f"Good evening, {tmp_snarky_human_term}!", f"Evening, {tmp_snarky_human_term}!"],
+        18: [f"Good evening, {tmp_snarky_human_term}!", f"Evening, {tmp_snarky_human_term}!",],
         19: [f"Hi, {tmp_snarky_human_term}!", f"Evening, {tmp_snarky_human_term}!"],
         20: [f"Evening, {tmp_snarky_human_term}!", f"Hey, {tmp_snarky_human_term}!"],
         21: [f"Hi, {tmp_snarky_human_term}!", f"Evening, {tmp_snarky_human_term}!"],
@@ -121,7 +153,7 @@ def greeting_prompt(time_data=None):
     import random
 
     hour_greetings = hourly_greetings.get(
-        current_hour, [f"Hey, {tmp_snarky_human_term}!", f"Hi, {tmp_snarky_human_term}!"]
+        current_hour, [f"Hey, {tmp_snarky_human_term}!", f"Hi, {tmp_snarky_human_term}!"],
     )
     return random.choice(hour_greetings)
 

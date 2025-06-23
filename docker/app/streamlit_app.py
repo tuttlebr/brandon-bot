@@ -39,7 +39,9 @@ class StreamlitChatApp:
         """Initialize Streamlit session state with default values"""
         if not hasattr(st.session_state, "initialized"):
             st.session_state.initialized = True
-            st.session_state.openai_model = self.config.llm_model_name
+            st.session_state.fast_llm_model_name = self.config.fast_llm_model_name
+            st.session_state.llm_model_name = self.config.llm_model_name
+            st.session_state.intelligent_llm_model_name = self.config.intelligent_llm_model_name
             st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
             st.session_state.current_page = 0
 
@@ -369,7 +371,7 @@ class StreamlitChatApp:
 
             # Generate streaming response and display it in real-time
             response_generator = self._run_async_streaming_response(
-                prepared_messages, st.session_state["openai_model"]
+                prepared_messages, st.session_state["fast_llm_model_name"]
             )
 
             # Create a chat message container for the assistant response

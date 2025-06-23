@@ -26,8 +26,12 @@ class Config:
         self.AUTH_KEY = os.getenv("AUTH_KEY", "Brandon")
 
         # Model configuration
+        self.FAST_LLM_MODEL_NAME = os.getenv("FAST_LLM_MODEL_NAME")
+        self.FAST_LLM_ENDPOINT = os.getenv("FAST_LLM_ENDPOINT")
         self.LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME")
         self.LLM_ENDPOINT = os.getenv("LLM_ENDPOINT")
+        self.INTELLIGENT_LLM_ENDPOINT = os.getenv("INTELLIGENT_LLM_ENDPOINT")
+        self.INTELLIGENT_LLM_MODEL_NAME = os.getenv("INTELLIGENT_LLM_MODEL_NAME")
 
         # API configuration
         self.NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "None")

@@ -10,6 +10,7 @@ from .conversation_context import (
     get_conversation_context_tool_definition,
 )
 from .news import NewsTool, execute_news_search, execute_news_with_dict, get_news_tool_definition
+from .registry import get_all_tool_definitions, get_tools_list_text
 from .retriever import (
     RetrievalTool,
     execute_retrieval_search,
@@ -45,4 +46,6 @@ __all__ = [
     "get_news_tool_definition",
     "execute_news_search",
     "execute_news_with_dict",
+    "get_all_tool_definitions",
+    "get_tools_list_text",
 ]

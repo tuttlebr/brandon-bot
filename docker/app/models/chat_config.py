@@ -14,8 +14,12 @@ class ChatConfig:
     user_avatar: str
 
     # Model configuration
+    fast_llm_model_name: str
+    fast_llm_endpoint: str
     llm_model_name: str
     llm_endpoint: str
+    intelligent_llm_model_name: str
+    intelligent_llm_endpoint: str
     embedding_endpoint: str
     api_key: str
     embedding_model: str
@@ -42,9 +46,13 @@ class ChatConfig:
             bot_title=config.BOT_TITLE,
             assistant_avatar=config.ASSISTANT_AVATAR,
             user_avatar=config.USER_AVATAR,
+            fast_llm_model_name=config.FAST_LLM_MODEL_NAME,
+            fast_llm_endpoint=config.FAST_LLM_ENDPOINT,
             llm_model_name=config.LLM_MODEL_NAME,
             llm_endpoint=config.LLM_ENDPOINT,
             embedding_endpoint=config.EMBEDDING_ENDPOINT,
+            intelligent_llm_model_name=config.INTELLIGENT_LLM_MODEL_NAME,
+            intelligent_llm_endpoint=config.INTELLIGENT_LLM_ENDPOINT,
             api_key=config.NVIDIA_API_KEY,
             embedding_model=config.EMBEDDING_MODEL,
             collection_name=config.COLLECTION_NAME,
