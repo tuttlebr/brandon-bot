@@ -1,15 +1,43 @@
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from models.chat_config import ChatConfig
 from openai import OpenAI
 from PIL import Image
 from pydantic import BaseModel, Field
 from tools.conversation_context import execute_conversation_context_with_dict
-from utils.image import generate_image
+from utils.image import ALLOWED_DIMENSIONS, generate_image
 
 # Configure logger
 logger = logging.getLogger(__name__)
+
+# Aspect ratio mappings to dimensions
+ASPECT_RATIO_MAPPINGS = {
+    "square": (1024, 1024),  # 1:1 ratio
+    "portrait": (768, 1024),  # 3:4 ratio (vertical)
+    "landscape": (1024, 768),  # 4:3 ratio (horizontal)
+}
+
+ALLOWED_ASPECT_RATIOS = list(ASPECT_RATIO_MAPPINGS.keys())
+
+
+def get_dimensions_from_aspect_ratio(aspect_ratio: str) -> Tuple[int, int]:
+    """
+    Get width and height dimensions from aspect ratio string
+
+    Args:
+        aspect_ratio: One of "square", "portrait", or "landscape"
+
+    Returns:
+        Tuple of (width, height)
+
+    Raises:
+        ValueError: If aspect_ratio is not recognized
+    """
+    if aspect_ratio not in ASPECT_RATIO_MAPPINGS:
+        raise ValueError(f"Invalid aspect ratio '{aspect_ratio}'. Must be one of: {', '.join(ALLOWED_ASPECT_RATIOS)}")
+
+    return ASPECT_RATIO_MAPPINGS[aspect_ratio]
 
 
 class ImageGenerationResponse(BaseModel):
@@ -68,17 +96,11 @@ class ImageGenerationTool:
                             "type": "string",
                             "description": "Additional details, lighting, colors, or specific elements to include",
                         },
-                        "width": {
-                            "type": "integer",
-                            "description": "Width of the image in pixels. Choose based on what will be the best aspect ratio representation of the content requested by the user",
-                            "enum": [1024, 1344],
-                            "default": 1024,
-                        },
-                        "height": {
-                            "type": "integer",
-                            "description": "Height of the image in pixels. Choose based on what will be the best aspect ratio representation of the content requested by the user",
-                            "enum": [1024, 1344],
-                            "default": 1344,
+                        "aspect_ratio": {
+                            "type": "string",
+                            "description": "Aspect ratio for the image. Choose based on the content: 'square' for balanced compositions, social media posts, or general purpose images; 'portrait' for vertical subjects like people, tall buildings, or phone wallpapers; 'landscape' for wide scenes, natural vistas, or desktop wallpapers.",
+                            "enum": ALLOWED_ASPECT_RATIOS,
+                            "default": "square",
                         },
                         "cfg_scale": {
                             "type": "number",
@@ -196,7 +218,7 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
 - **Fantasy:** Integrate magical phenomena, ethereal luminosity, and mythopoeic motifs while maintaining visual coherence.
 - **Minimalist:** Emphasize austere composition, strategic negative space, and the strategic deployment of simple, potent visual elements.
 
-**OUTPUT PARAMETERS:** Deliver the refined prompt ONLY, ensuring adherence to the aforementioned standards. Do not include any other text or comments regarding what you did to improved the prompt."""
+**OUTPUT PARAMETERS:** Deliver the refined prompt ONLY as sentences, no lists, no markdown, ensuring adherence to the aforementioned standards. Do not include any other text or comments regarding what you did to improved the prompt."""
 
             user_message = f"""**Original Request:** "{user_prompt}"
 **Subject Matter:** {subject}
@@ -307,7 +329,7 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
         return enhanced_prompt
 
     def _generate_image_with_config(
-        self, enhanced_prompt: str, config: ChatConfig, width: int = 1024, height: int = 1344, cfg_scale: float = 3.5,
+        self, enhanced_prompt: str, config: ChatConfig, width: int = 512, height: int = 512, cfg_scale: float = 3.5,
     ) -> Optional[Image.Image]:
         """
         Generate image using the enhanced prompt and configuration
@@ -358,8 +380,7 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
         style: str = "photorealistic",
         mood: str = "natural",
         details: str = "",
-        width: int = 1024,
-        height: int = 1024,
+        aspect_ratio: str = "square",
         cfg_scale: float = 3.5,
         use_conversation_context: bool = True,
         config: ChatConfig = None,
@@ -374,8 +395,7 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
             style: Artistic style
             mood: Mood/atmosphere
             details: Additional details
-            width: Image width in pixels (1024 or 1344)
-            height: Image height in pixels (1024 or 1344)
+            aspect_ratio: Aspect ratio for the image ("square", "portrait", or "landscape")
             cfg_scale: Guidance scale for image generation (1.5-4.5)
             use_conversation_context: Whether to use conversation context
             config: Chat configuration
@@ -387,14 +407,13 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
         if config is None:
             config = ChatConfig.from_environment()
 
-        # Validate dimensions
-        allowed_dimensions = [1024, 1344]
-        if width not in allowed_dimensions:
-            logger.warning(f"Invalid width {width}, defaulting to 1024")
-            width = 1024
-        if height not in allowed_dimensions:
-            logger.warning(f"Invalid height {height}, defaulting to 1024")
-            height = 1024
+        # Validate and convert aspect ratio to dimensions
+        try:
+            width, height = get_dimensions_from_aspect_ratio(aspect_ratio)
+        except ValueError as e:
+            logger.warning(f"Invalid aspect ratio '{aspect_ratio}', defaulting to 'square': {e}")
+            width, height = get_dimensions_from_aspect_ratio("square")
+            aspect_ratio = "square"
 
         # Validate cfg_scale
         if not (1.5 <= cfg_scale <= 4.5):
@@ -438,10 +457,11 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
                     "success": True,
                     "original_prompt": user_prompt,
                     "enhanced_prompt": enhanced_prompt,
+                    "aspect_ratio": aspect_ratio,
                     "dimensions": f"{width}x{height}",
                     "cfg_scale": cfg_scale,
                     "direct_response": True,
-                    "message": f"Successfully generated {width}x{height} image with cfg_scale {cfg_scale} and enhanced prompt: {enhanced_prompt}",
+                    "message": f"Successfully generated {aspect_ratio} ({width}x{height}) image with cfg_scale {cfg_scale} and enhanced prompt: {enhanced_prompt}",
                 }
 
                 # Add context info if used
@@ -492,7 +512,7 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
 
         Args:
             params: Dictionary containing the required parameters
-                   Expected keys: 'user_prompt', 'subject', optionally 'style', 'mood', 'details', 'width', 'height', 'cfg_scale', 'use_conversation_context', 'messages'
+                   Expected keys: 'user_prompt', 'subject', optionally 'style', 'mood', 'details', 'aspect_ratio', 'cfg_scale', 'use_conversation_context', 'messages'
 
         Returns:
             ImageGenerationResponse: The image generation result
@@ -507,14 +527,13 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
         style = params.get("style", "photorealistic")
         mood = params.get("mood", "natural")
         details = params.get("details", "")
-        width = params.get("width", 1024)
-        height = params.get("height", 1024)
+        aspect_ratio = params.get("aspect_ratio", "square")
         cfg_scale = params.get("cfg_scale", 3.5)
         use_conversation_context = params.get("use_conversation_context", True)
         messages = params.get("messages", None)
 
         logger.debug(
-            f"run_with_dict called with user_prompt: '{user_prompt}', subject: '{subject}', dimensions: {width}x{height}, cfg_scale: {cfg_scale}, use_context: {use_conversation_context}"
+            f"run_with_dict called with user_prompt: '{user_prompt}', subject: '{subject}', aspect_ratio: {aspect_ratio}, cfg_scale: {cfg_scale}, use_context: {use_conversation_context}"
         )
 
         # Create config from environment
@@ -525,8 +544,7 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
             style,
             mood,
             details,
-            width,
-            height,
+            aspect_ratio,
             cfg_scale,
             use_conversation_context,
             config,
@@ -554,8 +572,7 @@ def execute_image_generation(
     style: str = "photorealistic",
     mood: str = "natural",
     details: str = "",
-    width: int = 1024,
-    height: int = 1024,
+    aspect_ratio: str = "square",
     cfg_scale: float = 3.5,
     use_conversation_context: bool = True,
     messages: List[Dict[str, Any]] = None,
@@ -569,8 +586,7 @@ def execute_image_generation(
         style: Artistic style
         mood: Mood/atmosphere
         details: Additional details
-        width: Image width in pixels (1024 or 1344)
-        height: Image height in pixels (1024 or 1344)
+        aspect_ratio: Aspect ratio for the image ("square", "portrait", or "landscape")
         cfg_scale: Guidance scale for image generation (1.5-4.5)
         use_conversation_context: Whether to use conversation context
         messages: Optional conversation messages for context
@@ -585,8 +601,7 @@ def execute_image_generation(
         style,
         mood,
         details,
-        width,
-        height,
+        aspect_ratio,
         cfg_scale,
         use_conversation_context,
         config,
@@ -600,7 +615,7 @@ def execute_image_generation_with_dict(params: Dict[str, Any],) -> ImageGenerati
 
     Args:
         params: Dictionary containing the required parameters
-               Expected keys: 'user_prompt', 'subject', optionally 'style', 'mood', 'details', 'width', 'height', 'cfg_scale'
+               Expected keys: 'user_prompt', 'subject', optionally 'style', 'mood', 'details', 'aspect_ratio', 'cfg_scale'
 
     Returns:
         ImageGenerationResponse: The image generation result

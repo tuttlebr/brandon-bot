@@ -624,12 +624,12 @@ class StreamlitChatApp:
             logging.debug("_check_for_image_generation_response: No tool responses found")
             return {}
 
-        logging.info(
+        logging.debug(
             f"_check_for_image_generation_response: Found {len(self.llm_service.last_tool_responses)} tool responses"
         )
 
         for tool_response in self.llm_service.last_tool_responses:
-            logging.info(
+            logging.debug(
                 f"_check_for_image_generation_response: Checking tool response: role={tool_response.get('role')}, tool_name={tool_response.get('tool_name')}"
             )
 
@@ -638,7 +638,7 @@ class StreamlitChatApp:
                 try:
                     # Get the full tool result object directly (no need to parse JSON)
                     tool_result = tool_response.get("tool_result")
-                    logging.info(
+                    logging.debug(
                         f"_check_for_image_generation_response: tool_result = {type(tool_result)}, has success attr: {hasattr(tool_result, 'success') if tool_result else False}"
                     )
 
@@ -652,17 +652,17 @@ class StreamlitChatApp:
                             "error_message": getattr(tool_result, 'error_message', None),
                         }
 
-                        logging.info(
+                        logging.debug(
                             f"_check_for_image_generation_response: response_data success={response_data['success']}, has_image_data={bool(response_data['image_data'])}"
                         )
 
                         if response_data["success"] and response_data["image_data"]:
-                            logging.info(
+                            logging.debug(
                                 "_check_for_image_generation_response: Returning successful image generation response"
                             )
                             return response_data
                         elif not response_data["success"]:
-                            logging.info(
+                            logging.debug(
                                 "_check_for_image_generation_response: Returning failed image generation response"
                             )
                             return response_data

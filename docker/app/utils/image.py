@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 DEFAULT_PROMPT = "A simple coffee shop interior"
 DEFAULT_MODE = "base"
 DEFAULT_CFG_SCALE = 3.0
-DEFAULT_WIDTH = 1024
-DEFAULT_HEIGHT = 1344
+DEFAULT_WIDTH = 512
+DEFAULT_HEIGHT = 512
 DEFAULT_SEED = 42
 DEFAULT_STEPS = 50
 DEFAULT_FORMAT = "PNG"
@@ -26,7 +26,7 @@ DATA_URI_FORMAT = "data:{};base64,{}"
 BASE64_PREFIX_PATTERN = r"^data:image/.+;base64,"
 
 # Allowed values for width and height
-ALLOWED_DIMENSIONS = [1024, 1344]
+ALLOWED_DIMENSIONS = [512, 576, 640, 704, 768, 832, 896, 960, 1024, 1088, 1152, 1216, 1280, 1344]
 
 # Allowed modes for image generation
 ALLOWED_MODES = ["base"]
