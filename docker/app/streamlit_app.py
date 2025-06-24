@@ -1,14 +1,19 @@
 import asyncio
+import json
 import logging
+import os
 import random
+import tempfile
 from typing import Any, Dict, Generator, List
 
+import requests
 import streamlit as st
 from models import ChatConfig
 from services import ChatService, ImageService, LLMService
-from ui import ChatHistoryComponent, apply_custom_styles, get_typing_indicator_html
-from utils.image import pil_image_to_base64
-from utils.system_prompt import SYSTEM_PROMPT, TOOL_PROMPT, greeting_prompt
+from ui import ChatHistoryComponent, apply_custom_styles
+from utils.system_prompt import SYSTEM_PROMPT, greeting_prompt
+
+NVINGEST_ENDPOINT = os.getenv('NVINGEST_ENDPOINT')
 
 
 class StreamlitChatApp:
@@ -132,43 +137,166 @@ class StreamlitChatApp:
         # Clean the prompt
         prompt = prompt.strip()
 
-        # Clear any previous tool context when processing a new user message
-        if hasattr(st.session_state, 'last_tool_context'):
-            st.session_state.last_tool_context = None
-
-        # Clear previous tool responses from LLM service
-        if hasattr(self.llm_service, 'last_tool_responses'):
-            self.llm_service.last_tool_responses = []
-
-        # Validate that the prompt doesn't contain tool call instructions (shouldn't happen from user input)
-        if self._contains_tool_call_instructions(prompt):
-            logging.error("User prompt contains tool call instructions - this should not happen")
-            st.error("Invalid input detected. Please try again with a different message.")
-            st.session_state.processing = False
-            return
-
-        # Clean existing chat history of any tool call instructions
-        self._clean_chat_history_of_tool_calls()
-
-        # Clean previous chat history from context
-        st.session_state.messages = self.chat_service.clean_chat_history_context(st.session_state.messages)
-
-        # Display user message immediately in the UI
+        # Display user message immediately
         with st.chat_message("user", avatar=self.config.user_avatar):
             st.markdown(prompt[:2048] + "..." if len(prompt) > 2048 else prompt)
 
-        # Add user message to chat history using safe method
-        self._safe_add_message_to_history("user", prompt)
+        # Show spinner IMMEDIATELY after user message for maximum responsiveness
+        random_icon = ["🤖", "🧠", "🤔", "🤓", "⚡"]
+        with st.spinner(f"{random_icon[random.randint(0, len(random_icon) - 1)]}"):
+            try:
+                # Clear any previous tool context when processing a new user message
+                if hasattr(st.session_state, 'last_tool_context'):
+                    st.session_state.last_tool_context = None
 
+                # Clear previous tool responses from LLM service
+                if hasattr(self.llm_service, 'last_tool_responses'):
+                    self.llm_service.last_tool_responses = []
+
+                # Validate that the prompt doesn't contain tool call instructions (moved inside spinner)
+                if self._contains_tool_call_instructions(prompt):
+                    logging.error("User prompt contains tool call instructions - this should not happen")
+                    st.error("Invalid input detected. Please try again with a different message.")
+                    st.session_state.processing = False
+                    return
+
+                # Clean existing chat history of any tool call instructions
+                self._clean_chat_history_of_tool_calls()
+
+                # Clean previous chat history from context
+                st.session_state.messages = self.chat_service.clean_chat_history_context(st.session_state.messages)
+
+                # Add user message to chat history using safe method
+                self._safe_add_message_to_history("user", prompt)
+
+                # Prepare messages for API
+                prepared_messages = self.chat_service.prepare_messages_for_api(st.session_state.messages)
+
+                # Generate and display response (already inside spinner, so use no-spinner version)
+                self._generate_and_display_response_no_spinner(prepared_messages)
+
+            except Exception as e:
+                logging.error(f"Error processing prompt: {e}")
+                st.error("An error occurred while processing your request. Please try again.")
+                st.session_state.processing = False
+
+    def process_pdf_upload(self, uploaded_file):
+        """
+        Process uploaded PDF file and extract text content
+
+        Args:
+            uploaded_file: Streamlit uploaded file object
+        """
         try:
-            prepared_messages = self.chat_service.prepare_messages_for_api(st.session_state.messages)
+            # Display user action in chat
+            with st.chat_message("user", avatar=self.config.user_avatar):
+                st.markdown(f"📄 **Uploaded PDF:** {uploaded_file.name}")
 
-            # Generate and display response
-            self._generate_and_display_response(prepared_messages)
+            # Add user action to chat history
+            self._safe_add_message_to_history("user", f"📄 Uploaded PDF: {uploaded_file.name}")
+
+            # Show processing indicator
+            with st.spinner("🔍 Processing PDF..."):
+                # Create temporary file
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+                    temp_file.write(uploaded_file.read())
+                    temp_file_path = temp_file.name
+
+                try:
+                    # Make request to PDF processing server
+                    with open(temp_file_path, 'rb') as pdf_file:
+                        files = {'file': pdf_file}
+                        response = requests.post(NVINGEST_ENDPOINT, files=files, timeout=60)
+
+                    # Check if request was successful
+                    response.raise_for_status()
+
+                    # Parse JSON response
+                    pdf_data = response.json()
+
+                    # Validate response structure
+                    if not isinstance(pdf_data, dict) or 'pages' not in pdf_data:
+                        raise ValueError("Invalid response format from PDF processing server")
+
+                    pages = pdf_data.get('pages', [])
+                    if not pages:
+                        raise ValueError("No pages found in PDF response")
+
+                    # Display processing results
+                    with st.chat_message("assistant", avatar=self.config.assistant_avatar):
+                        st.success(f"✅ Successfully processed PDF: **{uploaded_file.name}**")
+                        st.info(f"📊 Extracted text from **{len(pages)} pages**")
+                        st.markdown("📝 I can now answer questions about this document when you ask me about it!")
+
+                    # Create tool response for chat history (stores PDF data for later retrieval)
+                    tool_response = {
+                        "role": "tool",
+                        "content": json.dumps(
+                            {
+                                "tool_name": "process_pdf_document",
+                                "filename": uploaded_file.name,
+                                "total_pages": len(pages),
+                                "pages": pages,
+                                "status": "success",
+                            }
+                        ),
+                    }
+
+                    # Add tool response to chat history (this stores the PDF data for the retrieval tool)
+                    st.session_state.messages.append(tool_response)
+
+                    # Add assistant confirmation message
+                    confirmation_msg = f"I've successfully processed your PDF document **{uploaded_file.name}** and extracted text from {len(pages)} pages. I can now answer questions about the document content when you ask me about it. What would you like to know?"
+
+                    self._safe_add_message_to_history("assistant", confirmation_msg)
+
+                    logging.info(f"Successfully processed PDF: {uploaded_file.name} ({len(pages)} pages)")
+
+                finally:
+                    # Clean up temporary file
+                    try:
+                        os.unlink(temp_file_path)
+                    except OSError:
+                        pass
+
+        except requests.exceptions.RequestException as e:
+            error_msg = f"❌ **PDF Processing Error:** Unable to connect to the PDF processing server. Please ensure the server is running at {NVINGEST_ENDPOINT}"
+            logging.error(f"PDF processing request error: {e}")
+
+            with st.chat_message("assistant", avatar=self.config.assistant_avatar):
+                st.error(error_msg)
+
+            self._safe_add_message_to_history("assistant", error_msg)
+
+        except requests.exceptions.Timeout:
+            error_msg = f"⏱️ **PDF Processing Timeout:** The PDF processing took too long. Please try with a smaller document or try again later."
+            logging.error("PDF processing timeout")
+
+            with st.chat_message("assistant", avatar=self.config.assistant_avatar):
+                st.error(error_msg)
+
+            self._safe_add_message_to_history("assistant", error_msg)
+
+        except ValueError as e:
+            error_msg = f"❌ **PDF Processing Error:** {str(e)}"
+            logging.error(f"PDF processing validation error: {e}")
+
+            with st.chat_message("assistant", avatar=self.config.assistant_avatar):
+                st.error(error_msg)
+
+            self._safe_add_message_to_history("assistant", error_msg)
 
         except Exception as e:
-            logging.error(f"Error processing prompt: {e}")
-            st.error("An error occurred while processing your request. Please try again.")
+            error_msg = f"❌ **PDF Processing Error:** An unexpected error occurred while processing your PDF. Please try again."
+            logging.error(f"Unexpected PDF processing error: {e}")
+
+            with st.chat_message("assistant", avatar=self.config.assistant_avatar):
+                st.error(error_msg)
+
+            self._safe_add_message_to_history("assistant", error_msg)
+
+        finally:
+            # Clear processing flag
             st.session_state.processing = False
 
     def _extract_tool_context_from_llm_responses(self) -> str:
@@ -274,6 +402,53 @@ class StreamlitChatApp:
                                     tool_contexts.append(f"**Weather data for {location}** (Current: {temp}°F)")
                                     logging.info(f"Found weather tool response for {location}")
 
+                                # Handle PDF processing tool response format (backward compatibility)
+                                elif "tool_name" in tool_data and tool_data["tool_name"] == "process_pdf_document":
+                                    filename = tool_data.get("filename", "Unknown PDF")
+                                    total_pages = tool_data.get("total_pages", 0)
+                                    # Don't show full content for process_pdf_document - this is just storage
+                                    tool_contexts.append(
+                                        f"**PDF Document Available:** {filename} ({total_pages} pages)"
+                                    )
+                                    logging.info(f"Found PDF storage tool response for {filename}")
+
+                                # Handle PDF content retrieval tool response format
+                                elif (
+                                    "filename" in tool_data
+                                    and "content" in tool_data
+                                    and isinstance(tool_data.get("content"), list)
+                                ):
+                                    filename = tool_data.get("filename", "Unknown PDF")
+                                    content = tool_data.get("content", [])
+                                    pages_requested = tool_data.get("pages_requested", [])
+
+                                    if content:
+                                        context_parts = [f"**PDF Content Retrieved from:** {filename}"]
+                                        if pages_requested:
+                                            context_parts.append(f"**Pages:** {', '.join(map(str, pages_requested))}")
+
+                                        # Show retrieved content (truncated for readability)
+                                        for page_content in content[:3]:  # Show max 3 pages in context
+                                            page_num = page_content.get("page_number", 1)
+                                            page_text = page_content.get("text", "")
+                                            if page_text:
+                                                # Truncate long text but show meaningful preview
+                                                preview_text = page_text[:500] + (
+                                                    "..." if len(page_text) > 500 else ""
+                                                )
+                                                context_parts.append(f"**Page {page_num}:**\n{preview_text}")
+
+                                        if len(content) > 3:
+                                            context_parts.append(f"... and {len(content) - 3} more pages")
+
+                                        tool_contexts.append("\n\n".join(context_parts))
+                                        logging.info(f"Found PDF content retrieval tool response for {filename}")
+                                    else:
+                                        tool_contexts.append(
+                                            f"**PDF Query Result:** {tool_data.get('message', 'No content found')}"
+                                        )
+                                        logging.info(f"Found PDF query tool response (no content) for {filename}")
+
                                 # Generic fallback for other structured data
                                 else:
                                     # Try to create a summary of the tool response
@@ -371,6 +546,53 @@ class StreamlitChatApp:
                                     temp = current.get("temperature", "N/A")
                                     tool_contexts.append(f"**Weather data for {location}** (Current: {temp}°F)")
                                     logging.info(f"Found weather tool response for {location}")
+
+                                # Handle PDF processing tool response format (backward compatibility)
+                                elif "tool_name" in tool_data and tool_data["tool_name"] == "process_pdf_document":
+                                    filename = tool_data.get("filename", "Unknown PDF")
+                                    total_pages = tool_data.get("total_pages", 0)
+                                    # Don't show full content for process_pdf_document - this is just storage
+                                    tool_contexts.append(
+                                        f"**PDF Document Available:** {filename} ({total_pages} pages)"
+                                    )
+                                    logging.info(f"Found PDF storage tool response for {filename}")
+
+                                # Handle PDF content retrieval tool response format
+                                elif (
+                                    "filename" in tool_data
+                                    and "content" in tool_data
+                                    and isinstance(tool_data.get("content"), list)
+                                ):
+                                    filename = tool_data.get("filename", "Unknown PDF")
+                                    content = tool_data.get("content", [])
+                                    pages_requested = tool_data.get("pages_requested", [])
+
+                                    if content:
+                                        context_parts = [f"**PDF Content Retrieved from:** {filename}"]
+                                        if pages_requested:
+                                            context_parts.append(f"**Pages:** {', '.join(map(str, pages_requested))}")
+
+                                        # Show retrieved content (truncated for readability)
+                                        for page_content in content[:3]:  # Show max 3 pages in context
+                                            page_num = page_content.get("page_number", 1)
+                                            page_text = page_content.get("text", "")
+                                            if page_text:
+                                                # Truncate long text but show meaningful preview
+                                                preview_text = page_text[:500] + (
+                                                    "..." if len(page_text) > 500 else ""
+                                                )
+                                                context_parts.append(f"**Page {page_num}:**\n{preview_text}")
+
+                                        if len(content) > 3:
+                                            context_parts.append(f"... and {len(content) - 3} more pages")
+
+                                        tool_contexts.append("\n\n".join(context_parts))
+                                        logging.info(f"Found PDF content retrieval tool response for {filename}")
+                                    else:
+                                        tool_contexts.append(
+                                            f"**PDF Query Result:** {tool_data.get('message', 'No content found')}"
+                                        )
+                                        logging.info(f"Found PDF query tool response (no content) for {filename}")
 
                                 # Generic fallback for other structured data
                                 else:
@@ -524,6 +746,86 @@ class StreamlitChatApp:
                 # Run the async function to populate tool responses
                 response_chunks = asyncio.run(collect_responses())
                 logging.info(f"Main flow: LLM service completed, got {len(response_chunks)} chunks")
+
+            # Create a chat message container for the assistant response (no spinner needed here)
+            with st.chat_message("assistant", avatar=self.config.assistant_avatar):
+                # NOW check if we have image generation tool responses
+                image_response = self._check_for_image_generation_response()
+                logging.debug(f"Main flow: image_response = {image_response}")
+
+                # Handle image generation response if present
+                if image_response:
+                    logging.info("Main flow: Calling _display_image_generation_response")
+                    self._display_image_generation_response(image_response, full_response="")
+                    full_response = ""  # No text response to add to history for image generation
+                    logging.info("Main flow: Finished _display_image_generation_response")
+
+                # Display text response only if no image generation is present
+                text_response = "".join(response_chunks)
+                if text_response.strip() and not image_response:
+                    logging.info("Main flow: Displaying text response (no image generation)")
+                    st.markdown(text_response)
+                    full_response = text_response
+                elif text_response.strip() and image_response:
+                    logging.info("Main flow: Suppressing text response due to image generation")
+                    # Check if the text response contains non-image content that should be displayed
+                    if not self._is_image_generation_json(text_response):
+                        logging.info("Main flow: Text response contains non-image content, displaying it")
+                        st.markdown(text_response)
+
+                # ALWAYS extract and display tool context from LLM service tool responses
+                # This ensures other tools' results are shown even when image generation occurs
+                tool_context = self._extract_tool_context_from_llm_responses()
+                if tool_context:
+                    # Display the context expander for immediate user verification
+                    self.display_tool_context_expander(tool_context)
+                    # Store tool context in session state for chat history display
+                    st.session_state.last_tool_context = tool_context
+                    logging.info("Displayed and stored tool context for verification")
+                else:
+                    logging.debug("No tool context found to display")
+
+            # Add the complete response to chat history (only if there's a text response)
+            if full_response and full_response.strip():
+                self._update_chat_history(full_response, "assistant")
+
+            # Clear processing flag - no need to rerun since we've already displayed the response
+            st.session_state.processing = False
+
+        except Exception as e:
+            error_msg = f"Error generating response: {e}"
+            logging.error(error_msg)
+            self._update_chat_history(
+                "I apologize, but I encountered an error while generating a response.", "assistant"
+            )
+            # Clear processing flag even on error
+            st.session_state.processing = False
+            st.rerun()
+
+    def _generate_and_display_response_no_spinner(self, prepared_messages: list):
+        """
+        Generate and display streaming response from LLM without spinner (spinner handled elsewhere)
+
+        Args:
+            prepared_messages: Prepared messages for API call
+        """
+        try:
+            # FIRST: Generate the LLM response to populate tool responses (without streaming yet)
+            logging.info("Main flow: Running LLM service to populate tool responses")
+
+            async def collect_responses():
+                """Collect responses to populate tool responses"""
+                chunks = []
+                async_gen = self.llm_service.generate_streaming_response(
+                    prepared_messages, st.session_state["fast_llm_model_name"]
+                )
+                async for chunk in async_gen:
+                    chunks.append(chunk)
+                return chunks
+
+            # Run the async function to populate tool responses
+            response_chunks = asyncio.run(collect_responses())
+            logging.info(f"Main flow: LLM service completed, got {len(response_chunks)} chunks")
 
             # Create a chat message container for the assistant response (no spinner needed here)
             with st.chat_message("assistant", avatar=self.config.assistant_avatar):
@@ -785,7 +1087,7 @@ class StreamlitChatApp:
 
     def _contains_tool_call_instructions(self, content: str) -> bool:
         """
-        Check if content contains custom tool call instructions
+        Check if content contains custom tool call instructions (optimized for speed)
 
         Args:
             content: The content to check
@@ -796,23 +1098,18 @@ class StreamlitChatApp:
         if not isinstance(content, str):
             return False
 
-        # Check for various custom tool call patterns
+        # Quick string check first - if no '<TOOLCALL' found, return early
+        if '<TOOLCALL' not in content.upper():
+            return False
+
+        # Only do regex if the quick check passes
         import re
 
-        patterns = [
-            r'<TOOLCALL-\[.*?\]</TOOLCALL>',
-            r'<TOOLCALL\[.*?\]</TOOLCALL>',
-            r'<TOOLCALL"\[.*?\]</TOOLCALL>',
-            r'<TOOLCALL\s*-\s*\[.*?\]</TOOLCALL>',
-            r'<toolcall-\[.*?\]</toolcall>',
-            r'<TOOLCALL.?\[.*?\]</TOOLCALL>',
-        ]
+        # Use a single compiled pattern for better performance
+        if not hasattr(self, '_toolcall_pattern'):
+            self._toolcall_pattern = re.compile(r'<TOOLCALL(?:[-"\s])*\[.*?\]</TOOLCALL>', re.DOTALL | re.IGNORECASE)
 
-        for pattern in patterns:
-            if re.search(pattern, content, re.DOTALL | re.IGNORECASE):
-                return True
-
-        return False
+        return bool(self._toolcall_pattern.search(content))
 
     def _safe_add_message_to_history(self, role: str, content: Any):
         """
@@ -876,11 +1173,32 @@ class StreamlitChatApp:
             st.info("Processing your message, please wait...")
             return
 
-        # Handle user input - let Streamlit's natural refresh cycle with smooth transitions handle updates
+        # Handle user input - primary chat input at the top
         if prompt := st.chat_input("Hello, how are you?"):
             # Set processing flag to prevent concurrent requests
             st.session_state.processing = True
             self.process_prompt(prompt)
+
+        # PDF Upload component below the chat input
+        uploaded_file = st.file_uploader(
+            "📄 Upload PDF Document",
+            type=['pdf'],
+            accept_multiple_files=False,
+            help="Upload a PDF document to analyze and discuss its content",
+            key="pdf_uploader",
+        )
+
+        # Process uploaded PDF if one is provided
+        if uploaded_file is not None:
+            # Check if this is a new upload (different from last processed)
+            if (
+                not hasattr(st.session_state, 'last_uploaded_pdf')
+                or st.session_state.last_uploaded_pdf != uploaded_file.name
+            ):
+                st.session_state.processing = True
+                st.session_state.last_uploaded_pdf = uploaded_file.name
+                self.process_pdf_upload(uploaded_file)
+                st.rerun()
 
 
 def main():

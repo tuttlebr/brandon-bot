@@ -6,6 +6,7 @@ showErrorDetails = true
 
 [server]
 runOnSave = true
+maxUploadSize = 16
 
 [theme]
 base = "dark"

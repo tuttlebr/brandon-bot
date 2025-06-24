@@ -11,6 +11,7 @@ from tools import (
     execute_conversation_context_with_dict,
     execute_image_generation_with_dict,
     execute_news_with_dict,
+    execute_pdf_parse_with_dict,
     execute_retrieval_with_dict,
     execute_tavily_with_dict,
     execute_weather_with_dict,
@@ -28,6 +29,7 @@ tools = {
     "get_weather": execute_weather_with_dict,
     "retrieval_search": execute_retrieval_with_dict,
     "tavily_news_search": execute_news_with_dict,
+    "retrieve_pdf_content": execute_pdf_parse_with_dict,
 }
 
 
@@ -341,7 +343,24 @@ class LLMService:
 
                     tool_args = modified_args
 
-                logging.debug(f"Executing tool call: {tool_name} with args: {tool_args} (from {source})")
+                # Special handling for retrieve_pdf_content tool - inject conversation messages
+                elif tool_name == "retrieve_pdf_content":
+                    logging.debug(f"Injecting conversation messages for {tool_name}")
+
+                    # Add conversation messages to the tool arguments
+                    modified_args = tool_args.copy()
+                    if messages is not None:
+                        modified_args["messages"] = messages  # Pass the full conversation messages
+                        logging.debug(
+                            f"Modified args for {tool_name}: query_type={modified_args.get('query_type')}, total_messages={len(messages)}"
+                        )
+                    else:
+                        logging.warning(f"No messages provided for {tool_name}, using empty list")
+                        modified_args["messages"] = []
+
+                    tool_args = modified_args
+
+                logging.info(f"Executing tool call: {tool_name} from {source}")
                 tool_function = tools[tool_name]
 
                 # Run the tool function in a thread pool to avoid blocking
@@ -586,7 +605,7 @@ class LLMService:
                 "top_p": 0.95,
                 "tools": ALL_TOOLS,
                 "tool_choice": "auto",
-                "parallel_tool_calls": True,
+                "parallel_tool_calls": False,
             }
             logging.debug(f"Tool decision params: {tool_decision_params}")
             initial_response = self.client.chat.completions.create(**tool_decision_params)
@@ -614,7 +633,8 @@ class LLMService:
                 )
 
                 # Execute all tool calls concurrently using unified approach
-                tool_responses = await self._execute_tool_calls(all_tool_calls, current_user_message, clean_messages)
+                # CRITICAL FIX: Pass original messages (not filtered clean_messages) so PDF parser can find tool data
+                tool_responses = await self._execute_tool_calls(all_tool_calls, current_user_message, messages)
 
                 # Store tool responses for context extraction by streamlit app
                 self.last_tool_responses = tool_responses

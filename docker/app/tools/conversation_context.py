@@ -18,6 +18,7 @@ class ContextType(str, Enum):
     USER_PREFERENCES = "user_preferences"
     TASK_CONTINUITY = "task_continuity"
     CREATIVE_DIRECTOR = "creative_director"
+    DOCUMENT_ANALYSIS = "document_analysis"
 
 
 class ConversationContextResponse(BaseModel):
@@ -36,7 +37,7 @@ class ConversationContextTool:
 
     def __init__(self):
         self.name = "conversation_context"
-        self.description = "Analyzes recent conversation history to provide relevant context summaries for tool operations. Use when tools need historical context about the user's requests, preferences, or ongoing tasks."
+        self.description = "Analyzes recent conversation history and uploaded documents to provide relevant context summaries for tool operations. Use when tools need historical context about the user's requests, preferences, ongoing tasks, or when analyzing uploaded documents in context of the conversation."
 
     def to_openai_format(self) -> Dict[str, Any]:
         """Convert the tool to OpenAI function calling format"""
@@ -50,8 +51,15 @@ class ConversationContextTool:
                     "properties": {
                         "context_type": {
                             "type": "string",
-                            "enum": ["conversation_summary", "recent_topics", "user_preferences", "task_continuity",],
-                            "description": "Type of context to generate: 'conversation_summary' for general summary, 'recent_topics' for topic extraction, 'user_preferences' for user preference analysis, 'task_continuity' for understanding ongoing tasks",
+                            "enum": [
+                                "conversation_summary",
+                                "recent_topics",
+                                "user_preferences",
+                                "task_continuity",
+                                "creative_director",
+                                "document_analysis",
+                            ],
+                            "description": "Type of context to generate: 'conversation_summary' for general summary, 'recent_topics' for topic extraction, 'user_preferences' for user preference analysis, 'task_continuity' for understanding ongoing tasks, 'creative_director' for creative project guidance, 'document_analysis' for analyzing uploaded documents",
                         },
                         "message_count": {
                             "type": "integer",
@@ -118,6 +126,15 @@ class ConversationContextTool:
         - **Inspiration Infusion**: Proposing fresh perspectives or cross-disciplinary stimuli
         - **Asset Curation**: Maintaining an inventory of referenced materials, prototypes, or inspirations
         **Focus**: Ensure a rich, adaptable narrative that honors the project’s essence while embracing evolution""",
+            ContextType.DOCUMENT_ANALYSIS: """**Document Content Analysis & Synthesis**
+        As a specialized document analysis expert, examine uploaded document content to provide comprehensive insights:
+        - **Content Summary**: Distill key points, themes, and main arguments
+        - **Structural Analysis**: Identify document organization, sections, and flow
+        - **Key Information Extraction**: Highlight critical data, facts, and conclusions
+        - **Contextual Understanding**: Relate content to user queries and specific focus areas
+        - **Action Items**: Identify tasks, recommendations, or next steps mentioned
+        - **Cross-Reference Opportunities**: Note connections to conversation topics or user goals
+        **Approach**: Provide thorough yet accessible analysis that directly addresses user needs and questions about the document.""",
         }
 
         prompt = base_prompts.get(context_type, base_prompts[ContextType.CONVERSATION_SUMMARY])
@@ -151,6 +168,20 @@ class ConversationContextTool:
                 user_message = f"Analyze user preferences and patterns from this conversation:\n\n{conversation_text}"
             elif context_type == ContextType.TASK_CONTINUITY:
                 user_message = f"Analyze the ongoing task or goal in this conversation:\n\n{conversation_text}"
+            elif context_type == ContextType.DOCUMENT_ANALYSIS:
+                # For document analysis, we need to get the document content and analyze it
+                document_content = self._get_document_content(messages)
+                if document_content:
+                    if focus_query:
+                        user_message = f"Analyze this document content focusing specifically on '{focus_query}' and relate it to the conversation context:\n\nDocument Content:\n{document_content}\n\nConversation Context:\n{conversation_text}"
+                    else:
+                        user_message = f"Analyze this document content comprehensively in relation to the user's conversation context:\n\nDocument Content:\n{document_content}\n\nConversation Context:\n{conversation_text}"
+                else:
+                    user_message = f"Analyze the conversation for document-related queries and provide guidance (no document content found):\n\n{conversation_text}"
+            elif context_type == ContextType.CREATIVE_DIRECTOR:
+                user_message = (
+                    f"Analyze this creative project conversation for continuity and guidance:\n\n{conversation_text}"
+                )
             else:  # CONVERSATION_SUMMARY
                 user_message = f"Provide a concise summary of this conversation:\n\n{conversation_text}"
 
@@ -164,12 +195,15 @@ class ConversationContextTool:
 
             logger.debug(f"Making context analysis request with model: {config.llm_model_name}")
 
+            # Adjust max_tokens based on context type
+            max_tokens = 800 if context_type == ContextType.DOCUMENT_ANALYSIS else 500
+
             response = client.chat.completions.create(
                 model=config.llm_model_name,
                 messages=analysis_messages,
                 temperature=0.3,  # Lower temperature for more consistent analysis
                 top_p=0.9,
-                max_tokens=500,  # Limit response length for efficiency
+                max_tokens=max_tokens,  # More tokens for document analysis
             )
 
             result = response.choices[0].message.content.strip()
@@ -285,6 +319,40 @@ class ConversationContextTool:
                 elif any(word in content.lower() for word in ["find", "search", "look for"]):
                     return "information_search"
                 break
+
+        return None
+
+    def _get_document_content(self, messages: List[Dict[str, Any]]) -> Optional[str]:
+        """Extract document content from messages if available"""
+        import json
+
+        # Look for PDF data in tool messages
+        for message in reversed(messages):
+            if message.get("role") == "tool":
+                try:
+                    content = message.get("content", "")
+                    if isinstance(content, str):
+                        tool_data = json.loads(content)
+                        if (
+                            isinstance(tool_data, dict)
+                            and tool_data.get("tool_name") == "process_pdf_document"
+                            and tool_data.get("status") == "success"
+                        ):
+                            # Extract text content from PDF pages
+                            pages = tool_data.get("pages", [])
+                            if pages:
+                                document_text = []
+                                for page in pages[:5]:  # Limit to first 5 pages for context analysis
+                                    page_text = page.get("text", "")
+                                    if page_text:
+                                        document_text.append(
+                                            f"Page {page.get('page', '?')}: {page_text[:1000]}..."
+                                        )  # Limit per page
+
+                                if document_text:
+                                    return "\n\n".join(document_text)
+                except (json.JSONDecodeError, TypeError):
+                    continue
 
         return None
 

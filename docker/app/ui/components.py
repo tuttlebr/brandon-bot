@@ -29,8 +29,8 @@ class ChatHistoryComponent:
         """
         current_page = st.session_state.get("current_page", 0)
 
-        # Filter out system messages for display
-        display_messages = [m for m in messages if m["role"] != "system"]
+        # Filter out system and tool messages for display (keep user and assistant messages only)
+        display_messages = [m for m in messages if m["role"] not in ["system", "tool"]]
         total_pages = max(1, len(display_messages) // messages_per_page + 1)
 
         start_idx = current_page * messages_per_page

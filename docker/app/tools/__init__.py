@@ -16,6 +16,7 @@ from .image_gen import (
     get_image_generation_tool_definition,
 )
 from .news import NewsTool, execute_news_search, execute_news_with_dict, get_news_tool_definition
+from .pdf_parser import PDFParserTool, execute_pdf_parse_with_dict, get_pdf_parser_tool_definition
 from .registry import get_all_tool_definitions, get_tools_list_text
 from .retriever import (
     RetrievalTool,
@@ -39,6 +40,9 @@ __all__ = [
     "get_image_generation_tool_definition",
     "execute_image_generation",
     "execute_image_generation_with_dict",
+    "PDFParserTool",
+    "get_pdf_parser_tool_definition",
+    "execute_pdf_parse_with_dict",
     "TavilyTool",
     "get_tavily_tool_definition",
     "execute_tavily_search",
