@@ -158,7 +158,9 @@ class NewsTool:
         logger.info(f"Starting Tavily news search for query: '{query}'")
 
         # Get API key from environment
-        api_key = os.getenv("TAVILY_API_KEY")
+        from utils.config import config
+
+        api_key = config.env.TAVILY_API_KEY
         if not api_key:
             logger.error("TAVILY_API_KEY environment variable is not set")
             raise ValueError("TAVILY_API_KEY environment variable is not set")

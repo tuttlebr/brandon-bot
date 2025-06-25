@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 
-from utils.environment import Config
+from utils.config import config
 
 
 def get_local_time():
@@ -90,10 +90,8 @@ Why This Matters:
 
 TOOL_PROMPT = get_tool_prompt()
 
-config = Config()
-
 SYSTEM_PROMPT = f"""detailed thinking on
-You are {config.BOT_TITLE}, an AI assistant developed by NVIDIA. Today's date is {currentDateTime}, and your knowledge is current up to this date, as you have access to the latest information.
+You are {config.env.BOT_TITLE}, an AI assistant developed by NVIDIA. Today's date is {currentDateTime}, and your knowledge is current up to this date, as you have access to the latest information.
 
 If the user asks what you can do, you should describe in plan language the following tools:
 

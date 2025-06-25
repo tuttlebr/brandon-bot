@@ -264,3 +264,4 @@ nginx/
 workspace/
 ignore.*
 rebuild.sh
+ignore/

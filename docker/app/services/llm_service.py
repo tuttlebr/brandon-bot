@@ -17,9 +17,9 @@ from tools import (
     execute_weather_with_dict,
 )
 from tools.registry import get_all_tool_definitions
+from utils.config import config
 from utils.system_prompt import TOOL_PROMPT
 
-MAX_TURNS = 9
 ALL_TOOLS = get_all_tool_definitions()
 tools = {
     "text_assistant": execute_assistant_with_dict,
@@ -442,17 +442,19 @@ class LLMService:
         tool_responses = await asyncio.gather(*[execute_single_tool(tool_call) for tool_call in tool_calls])
         return tool_responses
 
-    def _apply_sliding_window(self, messages: List[Dict[str, Any]], max_turns: int = 3) -> List[Dict[str, Any]]:
+    def _apply_sliding_window(self, messages: List[Dict[str, Any]], max_turns: int = None) -> List[Dict[str, Any]]:
         """
         Apply sliding window to limit conversation history and prevent bias in tool decisions
 
         Args:
             messages: List of all messages
-            max_turns: Maximum number of conversation turns to keep (default: 3)
+            max_turns: Maximum number of conversation turns to keep (uses config default if None)
 
         Returns:
             Filtered messages with sliding window applied
         """
+        if max_turns is None:
+            max_turns = config.llm.SLIDING_WINDOW_MAX_TURNS
         if not messages:
             return messages
 
@@ -641,13 +643,12 @@ class LLMService:
 
             logging.info(f"Tool decision context: {len(tool_decision_messages)} messages (system + current user)")
 
-            # Make tool decision with minimal context
+            # Make tool decision with minimal context using centralized configuration
             tool_decision_params = {
                 "model": self.config.llm_model_name,
                 "messages": tool_decision_messages,
                 "stream": False,
-                "temperature": 0.6,
-                "top_p": 0.95,
+                **config.get_llm_parameters(),
                 "tools": ALL_TOOLS,
                 "tool_choice": "auto",
                 "parallel_tool_calls": False,
@@ -722,7 +723,9 @@ class LLMService:
                 )
 
                 # Apply sliding window to conversation history for response generation
-                windowed_messages = self._apply_sliding_window(clean_messages, max_turns=MAX_TURNS)
+                windowed_messages = self._apply_sliding_window(
+                    clean_messages, max_turns=config.llm.SLIDING_WINDOW_MAX_TURNS
+                )
 
                 # Create full context: windowed conversation + tool results
                 response_messages = windowed_messages + tool_responses
@@ -730,15 +733,12 @@ class LLMService:
                 # Final validation before API call
                 response_messages = self._validate_and_clean_messages(response_messages)
 
-                # Generate final response with full context
+                # Generate final response with full context using centralized configuration
                 stream = self.intelligent_client.chat.completions.create(
                     model=self.config.intelligent_llm_model_name,
                     messages=response_messages,
                     stream=True,
-                    temperature=0.6,
-                    top_p=0.95,
-                    frequency_penalty=0,
-                    presence_penalty=0,
+                    **config.get_llm_parameters(),
                 )
                 async for chunk in self._process_streaming_response(stream):
                     yield chunk
@@ -747,20 +747,19 @@ class LLMService:
                 logging.info("No tools needed, generating response with conversation context")
 
                 # Apply sliding window for response generation
-                windowed_messages = self._apply_sliding_window(clean_messages, max_turns=MAX_TURNS)
+                windowed_messages = self._apply_sliding_window(
+                    clean_messages, max_turns=config.llm.SLIDING_WINDOW_MAX_TURNS
+                )
 
                 # Final validation before API call
                 windowed_messages = self._validate_and_clean_messages(windowed_messages)
 
-                # Generate response with conversation context (no tools)
+                # Generate response with conversation context (no tools) using centralized configuration
                 stream = self.fast_client.chat.completions.create(
                     model=self.config.fast_llm_model_name,
                     messages=windowed_messages,
                     stream=True,
-                    temperature=0.6,
-                    top_p=0.95,
-                    frequency_penalty=0,
-                    presence_penalty=0,
+                    **config.get_llm_parameters(),
                 )
                 async for chunk in self._process_streaming_response(stream):
                     yield chunk

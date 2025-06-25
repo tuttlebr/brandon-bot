@@ -27,7 +27,7 @@ EXPOSE 8501
 HEALTHCHECK  --interval=10s --timeout=5s --retries=3 \
     CMD ["python", "-c", "import requests; requests.get('http://0.0.0.0:8501/_stcore/health').raise_for_status()"]
 
-ENTRYPOINT ["streamlit", "run", "streamlit_app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+ENTRYPOINT ["streamlit", "run", "main.py", "--server.port=8501", "--server.address=0.0.0.0"]
 
 FROM app AS jupyterlab
 
