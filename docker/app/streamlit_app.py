@@ -143,7 +143,7 @@ class StreamlitChatApp:
 
         # Show spinner IMMEDIATELY after user message for maximum responsiveness
         random_icon = ["🤖", "🧠", "🤔", "🤓", "⚡"]
-        with st.spinner(f"{random_icon[random.randint(0, len(random_icon) - 1)]}"):
+        with st.spinner(f"{random_icon[random.randint(0, len(random_icon) - 1)]} _Typing..._"):
             try:
                 # Clear any previous tool context when processing a new user message
                 if hasattr(st.session_state, 'last_tool_context'):

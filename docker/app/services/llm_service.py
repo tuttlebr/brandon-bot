@@ -260,6 +260,50 @@ class LLMService:
 
         return normalized_calls
 
+    def _apply_pdf_parser_restriction(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Apply PDF parser tool restriction: when PDF parser is requested,
+        only conversation_context tool is allowed alongside it.
+
+        Args:
+            tool_calls: List of normalized tool call dictionaries
+
+        Returns:
+            Filtered list of tool calls with restriction applied
+        """
+        if not tool_calls:
+            return tool_calls
+
+        # Check if PDF parser tool is among the requested tools
+        pdf_parser_requested = any(tool_call.get("name") == "retrieve_pdf_content" for tool_call in tool_calls)
+
+        if not pdf_parser_requested:
+            # No PDF parser requested, return all tools unchanged
+            return tool_calls
+
+        # PDF parser is requested - only allow PDF parser and conversation context
+        allowed_tools = {"retrieve_pdf_content", "conversation_context"}
+
+        original_count = len(tool_calls)
+        filtered_tool_calls = [tool_call for tool_call in tool_calls if tool_call.get("name") in allowed_tools]
+
+        # Log what was filtered out
+        if len(filtered_tool_calls) < original_count:
+            filtered_out = [
+                tool_call.get("name") for tool_call in tool_calls if tool_call.get("name") not in allowed_tools
+            ]
+            logging.warning(
+                f"PDF parser restriction applied: filtered out {len(filtered_out)} tools: {filtered_out}. "
+                f"Only PDF parser and conversation context are allowed when PDF parser is requested."
+            )
+        else:
+            logging.info(
+                f"PDF parser restriction applied: {len(filtered_tool_calls)} allowed tools retained. "
+                f"Tools: {[tool_call.get('name') for tool_call in filtered_tool_calls]}"
+            )
+
+        return filtered_tool_calls
+
     async def _execute_tool_calls(
         self,
         tool_calls: List[Dict[str, Any]],
@@ -276,6 +320,9 @@ class LLMService:
         Returns:
             List of tool response messages
         """
+
+        # Apply PDF parser tool restriction
+        tool_calls = self._apply_pdf_parser_restriction(tool_calls)
 
         async def execute_single_tool(tool_call: Dict[str, Any]) -> Dict[str, Any]:
             """Execute a single tool call"""
@@ -351,9 +398,7 @@ class LLMService:
                     modified_args = tool_args.copy()
                     if messages is not None:
                         modified_args["messages"] = messages  # Pass the full conversation messages
-                        logging.debug(
-                            f"Modified args for {tool_name}: query_type={modified_args.get('query_type')}, total_messages={len(messages)}"
-                        )
+                        logging.debug(f"Modified args for {tool_name}: total_messages={len(messages)}")
                     else:
                         logging.warning(f"No messages provided for {tool_name}, using empty list")
                         modified_args["messages"] = []
