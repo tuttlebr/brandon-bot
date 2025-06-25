@@ -195,15 +195,11 @@ class ConversationContextTool:
 
             logger.debug(f"Making context analysis request with model: {config.llm_model_name}")
 
-            # Adjust max_tokens based on context type
-            max_tokens = 800 if context_type == ContextType.DOCUMENT_ANALYSIS else 500
-
             response = client.chat.completions.create(
                 model=config.llm_model_name,
                 messages=analysis_messages,
                 temperature=0.3,  # Lower temperature for more consistent analysis
                 top_p=0.9,
-                max_tokens=max_tokens,  # More tokens for document analysis
             )
 
             result = response.choices[0].message.content.strip()
