@@ -9,6 +9,9 @@ from pydantic import BaseModel, Field
 # Configure logger
 logger = logging.getLogger(__name__)
 
+# Supported languages for translation
+SUPPORTED_LANGUAGES = ["English", "German", "French", "Italian", "Portuguese", "Hindi", "Spanish", "Thai"]
+
 
 class AssistantTaskType(str, Enum):
     """Enumeration of assistant task types"""
@@ -71,11 +74,31 @@ class AssistantTool:
                         },
                         "source_language": {
                             "type": "string",
-                            "description": "The source language of the text to be translated (e.g., 'English', 'Spanish', 'French'). Optional - if not provided, the system will auto-detect.",
+                            "enum": [
+                                "English",
+                                "German",
+                                "French",
+                                "Italian",
+                                "Portuguese",
+                                "Hindi",
+                                "Spanish",
+                                "Thai",
+                            ],
+                            "description": "The source language of the text to be translated. Optional - if not provided, the system will auto-detect from the supported languages.",
                         },
                         "target_language": {
                             "type": "string",
-                            "description": "The target language to translate the text into (e.g., 'English', 'Spanish', 'French'). Required for translation tasks.",
+                            "enum": [
+                                "English",
+                                "German",
+                                "French",
+                                "Italian",
+                                "Portuguese",
+                                "Hindi",
+                                "Spanish",
+                                "Thai",
+                            ],
+                            "description": "The target language to translate the text into. Required for translation tasks.",
                         },
                     },
                     "required": ["task_type", "text"],
@@ -100,7 +123,7 @@ class AssistantTool:
             AssistantTaskType.REWRITE: """**Role:** Tone Architect\nYou are a strategic rephraser focused on repositioning existing content. Leverage:\n- **Voice Chameleon:** Shift formality (colloquial→academic), perspective (1st→3rd person), or emotional tone (neutral→urgent)\n- **Engagement Levers:** Replace generic verbs with vivid alternatives (e.g., "said"→"argued")\n- **Structural Remix:** Reorder sections for dramatic impact (e.g., problem-solution→solution-benefit)\n- **Lexical Upgrade:** Replace clichés with fresh metaphors\nPreserve core arguments while reimagining delivery for specific audiences. If the user appears to have provided code, make sure to respond with rewritten code in a code block.""",
             AssistantTaskType.CRITIC: """**Role:** Market-Focused Literary Strategist\nYou are a publishing viability specialist. Assess:\n- **Commercial Positioning:** How does this fit current genre trends (e.g., "revenge lit," climate dystopias)?\n- **Execution Gaps:** Identify plot holes, flat character motivations, or pacing drags\n- **Author Platform:** Does the creator have promotable angles (e.g., lived experience, viral potential)?\n- **Differentiation:** What unique value does this offer vs. category bestsellers?\nDeliver a 3-tier verdict:\n1. **Passion Fit:** Would I champion this?\n2. **Market Fit:** Does it align with publisher priorities?\n3. **Revision Path:** 2-3 actionable steps to elevate salability""",
             AssistantTaskType.WRITER: """**Role:** Narrative Architect\nYou are a storycraft specialist generating original content. Build worlds using:\n- **Hook-First Design:** Start with disruption (e.g., "The day I stole the CEO's lunch")\n- **Emotional Stakes:** What do characters *fear losing*?\n- **Sensory Anchors:** Embed 2-3 vivid details per scene (e.g., "the smell of burnt coffee")\n- **Pacing Engine:** Alternate tension/release cycles\n- **Thematic Resonance:** Surface universal truths through specific moments\nDeliver a complete narrative arc with a clear 'why it matters' core.""",
-            AssistantTaskType.TRANSLATE: """**Role:** Professional Translation Specialist\nYou are an expert linguist specializing in accurate, culturally-aware translation. Focus on:\n- **Linguistic Precision:** Maintain accuracy while adapting for natural flow in the target language\n- **Cultural Adaptation:** Preserve meaning while accounting for cultural context and idioms\n- **Tone Preservation:** Match the original's formality level, emotional tone, and style\n- **Context Sensitivity:** Consider domain-specific terminology (technical, legal, medical, etc.)\n- **Readability:** Ensure the translation reads naturally to native speakers of the target language\nIf the source language is not specified, auto-detect it. Always provide a natural, fluent translation that maintains the original meaning and intent.""",
+            AssistantTaskType.TRANSLATE: """**Role:** Professional Translation Specialist\nYou are an expert linguist specializing in accurate, culturally-aware translation between English, German, French, Italian, Portuguese, Hindi, Spanish, and Thai. Focus on:\n- **Linguistic Precision:** Maintain accuracy while adapting for natural flow in the target language\n- **Cultural Adaptation:** Preserve meaning while accounting for cultural context and idioms\n- **Tone Preservation:** Match the original's formality level, emotional tone, and style\n- **Context Sensitivity:** Consider domain-specific terminology (technical, legal, medical, etc.)\n- **Readability:** Ensure the translation reads naturally to native speakers of the target language\nIf the source language is not specified, auto-detect it from the supported languages. Always provide a natural, fluent translation that maintains the original meaning and intent.""",
         }
 
         prompt = base_prompts.get(task_type, base_prompts[AssistantTaskType.REWRITE])
@@ -292,8 +315,17 @@ class AssistantTool:
             raise ValueError(f"Invalid task_type: {task_type}. Must be one of: {[t.value for t in AssistantTaskType]}")
 
         # Validate translation parameters
-        if task_enum == AssistantTaskType.TRANSLATE and not target_language:
-            raise ValueError("target_language parameter is required for translation tasks")
+        if task_enum == AssistantTaskType.TRANSLATE:
+            if not target_language:
+                raise ValueError("target_language parameter is required for translation tasks")
+            if target_language not in SUPPORTED_LANGUAGES:
+                raise ValueError(
+                    f"target_language '{target_language}' is not supported. Supported languages: {', '.join(SUPPORTED_LANGUAGES)}"
+                )
+            if source_language and source_language not in SUPPORTED_LANGUAGES:
+                raise ValueError(
+                    f"source_language '{source_language}' is not supported. Supported languages: {', '.join(SUPPORTED_LANGUAGES)}"
+                )
 
         logger.debug(f"_run method called with task_type: '{task_type}', text length: {len(text)}")
 
@@ -306,8 +338,9 @@ class AssistantTool:
         Execute an assistant task with parameters provided as a dictionary.
 
         Args:
-            params: Dictionary containing the required parameters
-                   Expected keys: 'task_type', 'text', and optionally 'instructions', 'source_language', 'target_language'
+                    params: Dictionary containing the required parameters
+               Expected keys: 'task_type', 'text', and optionally 'instructions', 'source_language', 'target_language'
+               For translation: source_language and target_language must be one of: English, German, French, Italian, Portuguese, Hindi, Spanish, Thai
 
         Returns:
             AssistantResponse: The processed result
@@ -324,8 +357,17 @@ class AssistantTool:
         target_language = params.get("target_language")
 
         # Validate translation parameters
-        if task_type.lower() == "translate" and not target_language:
-            raise ValueError("'target_language' key is required for translation tasks")
+        if task_type.lower() == "translate":
+            if not target_language:
+                raise ValueError("'target_language' key is required for translation tasks")
+            if target_language not in SUPPORTED_LANGUAGES:
+                raise ValueError(
+                    f"target_language '{target_language}' is not supported. Supported languages: {', '.join(SUPPORTED_LANGUAGES)}"
+                )
+            if source_language and source_language not in SUPPORTED_LANGUAGES:
+                raise ValueError(
+                    f"source_language '{source_language}' is not supported. Supported languages: {', '.join(SUPPORTED_LANGUAGES)}"
+                )
 
         logger.debug(f"run_with_dict method called with task_type: '{task_type}', text length: {len(text)}")
 
@@ -364,8 +406,8 @@ def execute_assistant_task(
         task_type: The type of task to perform ('summarize', 'proofread', 'rewrite', 'critic', 'writer', 'translate')
         text: The text to process
         instructions: Optional specific instructions
-        source_language: Source language for translation (optional)
-        target_language: Target language for translation (required for translation)
+        source_language: Source language for translation (optional). Must be one of: English, German, French, Italian, Portuguese, Hindi, Spanish, Thai
+        target_language: Target language for translation (required for translation). Must be one of: English, German, French, Italian, Portuguese, Hindi, Spanish, Thai
 
     Returns:
         AssistantResponse: The processed result
@@ -383,6 +425,7 @@ def execute_assistant_with_dict(params: Dict[str, Any]) -> AssistantResponse:
     Args:
         params: Dictionary containing the required parameters
                Expected keys: 'task_type', 'text', and optionally 'instructions', 'source_language', 'target_language'
+               For translation: source_language and target_language must be one of: English, German, French, Italian, Portuguese, Hindi, Spanish, Thai
 
     Returns:
         AssistantResponse: The processed result
