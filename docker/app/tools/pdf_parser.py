@@ -121,8 +121,6 @@ This tool retrieves the full text content from all pages of PDF documents that h
             formatted_parts.append("-" * 30)
             # Limit content length for readability
             text = page_content.text
-            if len(text) > 2000:
-                text = text[:2000] + "\n... [Content truncated for readability] ..."
             formatted_parts.append(text)
 
         return "\n".join(formatted_parts)
