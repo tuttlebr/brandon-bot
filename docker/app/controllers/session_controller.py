@@ -21,8 +21,18 @@ class SessionController:
 
     def initialize_session_state(self):
         """Initialize Streamlit session state with default values"""
-        if not hasattr(st.session_state, "initialized"):
+        # Use atomic check-and-set to prevent race conditions in concurrent sessions
+        if not getattr(st.session_state, "initialized", False):
+            # Set initialization flag first to prevent multiple initializations
             st.session_state.initialized = True
+
+            # Conditionally create a unique session ID if it doesn't exist
+            if not hasattr(st.session_state, 'session_id') or not st.session_state.session_id:
+                import random
+                import time
+
+                st.session_state.session_id = f"session_{int(time.time() * 1000)}_{random.randint(1000, 9999)}"
+
             st.session_state.fast_llm_model_name = self.config_obj.fast_llm_model_name
             st.session_state.llm_model_name = self.config_obj.llm_model_name
             st.session_state.intelligent_llm_model_name = self.config_obj.intelligent_llm_model_name
@@ -30,11 +40,13 @@ class SessionController:
             st.session_state.current_page = config.ui.CURRENT_PAGE_DEFAULT
             st.session_state.processing = False
 
-            # Initialize image storage
-            if 'generated_images' not in st.session_state:
+            # Initialize image storage with atomic check
+            if not hasattr(st.session_state, 'generated_images'):
                 st.session_state.generated_images = {}
 
-        # Clean up old data periodically
+            logging.info(f"Initialized new session state for session: {st.session_state.session_id}")
+
+        # Clean up old data periodically (only for already initialized sessions)
         self.cleanup_old_images()
 
     def cleanup_old_images(self, max_images: int = None):
@@ -69,6 +81,9 @@ class SessionController:
         Args:
             processing: Whether the app is currently processing
         """
+        # Ensure session state is initialized before setting processing state
+        if not getattr(st.session_state, "initialized", False):
+            self.initialize_session_state()
         st.session_state.processing = processing
 
     def is_processing(self) -> bool:
@@ -78,6 +93,9 @@ class SessionController:
         Returns:
             True if processing, False otherwise
         """
+        # Ensure session state is initialized before checking processing state
+        if not getattr(st.session_state, "initialized", False):
+            self.initialize_session_state()
         return st.session_state.get("processing", False)
 
     def store_tool_context(self, context: str):
@@ -123,3 +141,80 @@ class SessionController:
         }
 
         return image_id
+
+    def get_model_name(self, model_type: str = "fast") -> str:
+        """
+        Safely get model name from session state with fallback to config
+
+        Args:
+            model_type: Type of model ('fast', 'llm', or 'intelligent')
+
+        Returns:
+            Model name string
+        """
+        # Ensure session state is initialized
+        if not getattr(st.session_state, "initialized", False):
+            self.initialize_session_state()
+
+        # Map model types to session state keys and config fallbacks
+        model_mapping = {
+            "fast": ("fast_llm_model_name", self.config_obj.fast_llm_model_name),
+            "llm": ("llm_model_name", self.config_obj.llm_model_name),
+            "intelligent": ("intelligent_llm_model_name", self.config_obj.intelligent_llm_model_name),
+        }
+
+        if model_type not in model_mapping:
+            logging.warning(f"Unknown model type '{model_type}', defaulting to fast model")
+            model_type = "fast"
+
+        session_key, config_fallback = model_mapping[model_type]
+        model_name = st.session_state.get(session_key, config_fallback)
+
+        if not model_name:
+            logging.warning(f"No {model_type} model name found, using config fallback")
+            model_name = config_fallback
+
+        return model_name
+
+    def get_messages(self):
+        """
+        Safely get messages from session state with initialization check
+
+        Returns:
+            List of messages from session state
+        """
+        # Ensure session state is initialized
+        if not getattr(st.session_state, "initialized", False):
+            self.initialize_session_state()
+
+        return getattr(st.session_state, "messages", [])
+
+    def add_message(self, role: str, content: any):
+        """
+        Safely add a message to session state
+
+        Args:
+            role: Message role (user, assistant, system)
+            content: Message content
+        """
+        # Ensure session state is initialized
+        if not getattr(st.session_state, "initialized", False):
+            self.initialize_session_state()
+
+        if not hasattr(st.session_state, "messages"):
+            st.session_state.messages = []
+
+        st.session_state.messages.append({"role": role, "content": content})
+
+    def set_messages(self, messages: list):
+        """
+        Safely set messages in session state
+
+        Args:
+            messages: List of messages to set
+        """
+        # Ensure session state is initialized
+        if not getattr(st.session_state, "initialized", False):
+            self.initialize_session_state()
+
+        st.session_state.messages = messages

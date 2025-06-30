@@ -512,7 +512,7 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
 
         Args:
             params: Dictionary containing the required parameters
-                   Expected keys: 'user_prompt', 'subject', optionally 'style', 'mood', 'details', 'aspect_ratio', 'cfg_scale', 'use_conversation_context', 'messages'
+                   Expected keys: 'user_prompt', 'subject', optionally 'style', 'mood', 'details', 'aspect_ratio', 'cfg_scale', 'use_conversation_context', 'messages', 'chain_context'
 
         Returns:
             ImageGenerationResponse: The image generation result

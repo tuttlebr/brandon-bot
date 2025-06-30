@@ -11,16 +11,18 @@ from utils.config import config
 class MessageController:
     """Controller for handling message processing and validation"""
 
-    def __init__(self, config_obj: ChatConfig, chat_service: ChatService):
+    def __init__(self, config_obj: ChatConfig, chat_service: ChatService, session_controller=None):
         """
         Initialize the message controller
 
         Args:
             config_obj: Application configuration
             chat_service: Chat service for message operations
+            session_controller: Session controller for safe state management (optional)
         """
         self.config_obj = config_obj
         self.chat_service = chat_service
+        self.session_controller = session_controller
         # Compile pattern once for performance
         self._toolcall_pattern = re.compile(r'<TOOLCALL(?:[-"\s])*\[.*?\]</TOOLCALL>', re.DOTALL | re.IGNORECASE)
 
@@ -135,8 +137,14 @@ class MessageController:
                 logging.warning(f"Attempted to add empty {role} message to chat history, skipping")
                 return False
 
-        # Add the validated message to history
-        st.session_state.messages.append({"role": role, "content": content})
+        # Add the validated message to history using session controller if available
+        if hasattr(self, 'session_controller'):
+            self.session_controller.add_message(role, content)
+        else:
+            # Fallback to direct access with safety check
+            if not hasattr(st.session_state, "messages"):
+                st.session_state.messages = []
+            st.session_state.messages.append({"role": role, "content": content})
         logging.debug(f"Added {role} message to chat history")
         return True
 
@@ -148,8 +156,15 @@ class MessageController:
             text: The response text
             role: The role of the message sender
         """
-        # Clean up message format before saving
-        st.session_state.messages = self.chat_service.drop_verbose_messages_context(st.session_state.messages)
+        # Clean up message format before saving using session controller if available
+        if hasattr(self, 'session_controller') and self.session_controller:
+            messages = self.session_controller.get_messages()
+            cleaned_messages = self.chat_service.drop_verbose_messages_context(messages)
+            self.session_controller.set_messages(cleaned_messages)
+        else:
+            # Fallback to direct access
+            if hasattr(st.session_state, "messages"):
+                st.session_state.messages = self.chat_service.drop_verbose_messages_context(st.session_state.messages)
 
         # Use the safe method to add the message
         self.safe_add_message_to_history(role, text)

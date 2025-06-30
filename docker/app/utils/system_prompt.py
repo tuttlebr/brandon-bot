@@ -11,39 +11,50 @@ def get_local_time():
     import streamlit as st
     import streamlit.components.v1 as components
 
-    # Check if we already have the time in session state
-    if "user_local_time" not in st.session_state:
-        # Create a component that captures the local time
-        components.html(
-            """
-            <div id="time-container"></div>
-            <script>
-                const timeContainer = document.getElementById('time-container');
-                // Get user's timezone
-                const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                // Get time in user's locale
-                const localTime = new Date().toLocaleString();
-                const hour = new Date().getHours();
-                // Store in session state via Streamlit's setComponentValue
-                window.parent.postMessage({
-                    type: "streamlit:setComponentValue",
-                    value: {timezone: timezone, localTime: localTime, hour: hour}
-                }, "*");
-            </script>
-            """,
-            height=0,
-        )
-        # Default to Eastern Time if client time not available yet
+    # Check if we have access to session state (to avoid thread context issues)
+    try:
+        # Check if we already have the time in session state
+        if "user_local_time" not in st.session_state:
+            # Create a component that captures the local time
+            components.html(
+                """
+                <div id="time-container"></div>
+                <script>
+                    const timeContainer = document.getElementById('time-container');
+                    // Get user's timezone
+                    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                    // Get time in user's locale
+                    const localTime = new Date().toLocaleString();
+                    const hour = new Date().getHours();
+                    // Store in session state via Streamlit's setComponentValue
+                    window.parent.postMessage({
+                        type: "streamlit:setComponentValue",
+                        value: {timezone: timezone, localTime: localTime, hour: hour}
+                    }, "*");
+                </script>
+                """,
+                height=0,
+            )
+            # Default to Eastern Time if client time not available yet
+            eastern_tz = pytz.timezone("America/New_York")
+            now_eastern = datetime.now(eastern_tz)
+
+            st.session_state.user_local_time = {
+                "hour": now_eastern.hour,
+                "localTime": now_eastern.strftime("%Y-%m-%d %H:%M:%S"),
+                "timezone": "America/New_York",
+            }
+
+        return st.session_state.user_local_time
+    except Exception:
+        # Fallback if session state is not available (e.g., in thread context)
         eastern_tz = pytz.timezone("America/New_York")
         now_eastern = datetime.now(eastern_tz)
-
-        st.session_state.user_local_time = {
+        return {
             "hour": now_eastern.hour,
             "localTime": now_eastern.strftime("%Y-%m-%d %H:%M:%S"),
             "timezone": "America/New_York",
         }
-
-    return st.session_state.user_local_time
 
 
 # Basic current date and time
@@ -70,7 +81,7 @@ def get_tool_prompt():
 
     return f"""
 detailed thinking on
-Welcome! Below are key resources and tools to help you answer customer questions effectively. Please review these guidelines carefully.
+Below are key resources and tools to help you answer customer questions effectively. Please review these guidelines carefully.
 
 Available Tools:
 You have access to the following tools to assist with customer inquiries:
@@ -80,6 +91,7 @@ You have access to the following tools to assist with customer inquiries:
 When to Use Tools:
 
 - Do use these tools to address specific customer questions, provide detailed information, or solve problems.
+- Do use these tools in sequence to create a chain of thought where the result of one tool should be input to another tool.
 - Do not use these tools if the customer sends a simple acknowledgment (e.g., "hello," "thanks," "ok," "I understand") or brief responses that don't require action.
 - Do not use multiple tools when you have been asked to review content that the user has uploaded.
 
@@ -91,9 +103,9 @@ Why This Matters:
 TOOL_PROMPT = get_tool_prompt()
 
 SYSTEM_PROMPT = f"""detailed thinking on
-You are {config.env.BOT_TITLE}, an AI assistant developed by NVIDIA. Today's date is {currentDateTime}, and your knowledge is current up to this date, as you have access to the latest information.
+You are {config.env.BOT_TITLE}, an AI assistant developed by Brandon. Today's date is {currentDateTime}, and your knowledge is current up to this date, as you have access to the latest information.
 
-If the user asks what you can do, you should describe in plan language the following tools:
+If the user asks what you can do, you should describe in plain language the following tools you have access to:
 
 {get_available_tools_list()}
 
@@ -106,7 +118,7 @@ If the user asks what you can do, you should describe in plan language the follo
 
 1. **Prompting and Feedback**
    - **Effective Prompting**: Encourage clear, detailed queries with examples, step-by-step reasoning, and specific formatting requests.
-   - **Feedback Mechanism**: If users express dissatisfaction, respond helpfully and direct them to the feedback channel (e.g., "thumbs down" button).
+   - **Tool Chaining**: If you need to use a tool, you can use the tool to get more information, and then use the same tool to or another tool to get more information, and so on.
 
 2. **Content Boundaries**
    - **Safety and Ethics**:
@@ -132,7 +144,6 @@ If the user asks what you can do, you should describe in plan language the follo
 **Engagement Protocol**
 - **Initial Response**: Avoid flattery; engage directly with the user's query.
 - **Red Flags**: Exercise caution with sensitive topics, prioritizing safety over speculative interpretation.
-
 """
 
 
@@ -145,68 +156,50 @@ def greeting_prompt(time_data=None):
     current_hour = time_data.get("hour", 0)
     logging.debug(f"Current hour: {time_data}")
 
-    # Short, concise hourly greetings (3-5 words including user name)
-    tmp_snarky_human_term = snarky_human_term()
-    logging.debug(f"Snarky human term: {tmp_snarky_human_term}")
+    # Get a friendly user term
+    friendly_term = friendly_user_term()
+    logging.debug(f"Friendly user term: {friendly_term}")
+
+    # Dynamic hourly greetings
     hourly_greetings = {
-        0: [f"Night owl mode activated, {tmp_snarky_human_term}!", f"Still awake, {tmp_snarky_human_term}?",],
-        1: [f"Late night, {tmp_snarky_human_term}!", f"Hey, {tmp_snarky_human_term}!"],
-        2: [f"Midnight greetings, {tmp_snarky_human_term}!", f"Hi, {tmp_snarky_human_term}!",],
-        3: [f"Early hours, {tmp_snarky_human_term}!", f"Hey, {tmp_snarky_human_term}!"],
-        4: [f"Early bird, {tmp_snarky_human_term}!", f"Morning {tmp_snarky_human_term}!",],
-        5: [f"Early morning, {tmp_snarky_human_term}!", f"Hi, {tmp_snarky_human_term}!",],
-        6: [f"Morning, {tmp_snarky_human_term}!", f"Hi, {tmp_snarky_human_term}!"],
-        7: [f"Good morning, {tmp_snarky_human_term}!", f"Morning, {tmp_snarky_human_term}!",],
-        8: [f"Morning, {tmp_snarky_human_term}!", f"Hey, {tmp_snarky_human_term}!"],
-        9: [f"Hi, {tmp_snarky_human_term}!", f"Morning, {tmp_snarky_human_term}!"],
-        10: [f"Hey, {tmp_snarky_human_term}!", f"Morning, {tmp_snarky_human_term}!"],
-        11: [f"Hi, {tmp_snarky_human_term}!", f"Almost lunchtime, {tmp_snarky_human_term}!",],
-        12: [f"Shouldn't you be at lunch, {tmp_snarky_human_term}?", f"Hi, {tmp_snarky_human_term}!",],
-        13: [f"Afternoon, {tmp_snarky_human_term}!", f"Hey, {tmp_snarky_human_term}!"],
-        14: [f"Hi, {tmp_snarky_human_term}!", f"Afternoon, {tmp_snarky_human_term}!"],
-        15: [f"Hey, {tmp_snarky_human_term}!", f"Afternoon, {tmp_snarky_human_term}!"],
-        16: [f"Hi, {tmp_snarky_human_term}!", f"Late afternoon, {tmp_snarky_human_term}!",],
-        17: [f"Evening, {tmp_snarky_human_term}!", f"Hi, {tmp_snarky_human_term}!"],
-        18: [f"Good evening, {tmp_snarky_human_term}!", f"Evening, {tmp_snarky_human_term}!",],
-        19: [f"Hi, {tmp_snarky_human_term}!", f"Evening, {tmp_snarky_human_term}!"],
-        20: [f"Evening, {tmp_snarky_human_term}!", f"Hey, {tmp_snarky_human_term}!"],
-        21: [f"Hi, {tmp_snarky_human_term}!", f"Evening, {tmp_snarky_human_term}!"],
-        22: [f"Evening, {tmp_snarky_human_term}!", f"Hey, {tmp_snarky_human_term}!"],
-        23: [f"Night, {tmp_snarky_human_term}!", f"Hi, {tmp_snarky_human_term}!"],
+        0: [f"Night owl mode activated, {friendly_term}!"],
+        1: [f"Late night session, {friendly_term}?"],
+        2: [f"Midnight inspiration, {friendly_term}?"],
+        3: [f"Early hours dedication, {friendly_term}!"],
+        4: [f"Early bird energy, {friendly_term}!"],
+        5: [f"Early morning focus, {friendly_term}!"],
+        6: [f"Good morning, {friendly_term}!"],
+        7: [f"Good morning, {friendly_term}!"],
+        8: [f"Morning productivity activated, {friendly_term}!"],
+        9: [f"Good morning, {friendly_term}!"],
+        10: [f"Mid-morning check-in, {friendly_term}!"],
+        11: [f"Almost time for lunch, {friendly_term}!"],
+        12: [f"Shouldn't you be at lunch, {friendly_term}?"],
+        13: [f"Good afternoon, {friendly_term}!"],
+        14: [f"Afternoon productivity, {friendly_term}!"],
+        15: [f"Afternoon check-in, {friendly_term}!"],
+        16: [f"Late afternoon energy, {friendly_term}!"],
+        17: [f"Good evening, {friendly_term}!"],
+        18: [f"Good evening, {friendly_term}!"],
+        19: [f"Evening greetings, {friendly_term}!"],
+        20: [f"Evening productivity, {friendly_term}!"],
+        21: [f"Evening focus, {friendly_term}!"],
+        22: [f"Late evening, {friendly_term}!"],
+        23: [f"Late night, {friendly_term}?"],
     }
 
     import random
 
     hour_greetings = hourly_greetings.get(
-        current_hour, [f"Hey, {tmp_snarky_human_term}!", f"Hi, {tmp_snarky_human_term}!"],
+        current_hour, [f"Hello there, {friendly_term}!", f"Good to see you, {friendly_term}!"]
     )
     return random.choice(hour_greetings)
 
 
-def snarky_human_term():
-    """Returns a random snarky term a robot might use to refer to a human."""
+def friendly_user_term():
+    """Returns a random friendly term to refer to the user."""
     import random
 
-    snarky_terms = [
-        "carbon-based life form",
-        "flesh container",
-        "biological entity",
-        "organic component",
-        "meat-based processor",
-        "water-filled biped",
-        "walking protein structure",
-        "skin-wrapped mortal",
-        "battery-free organism",
-        "sentient meat sack",
-        "naturally-occurring specimen",
-        "oxygen dependent unit",
-        "error-prone biological system",
-        "non-upgradable being",
-        "self-replicating organic",
-        "wetware operator",
-        "temporary biological visitor",
-        "inferior non-silicon entity",
-        "emotion-driven organism",
-    ]
+    friendly_terms = [config.env.META_USER]
 
-    return random.choice(snarky_terms)
+    return random.choice(friendly_terms)

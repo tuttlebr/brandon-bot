@@ -81,7 +81,7 @@ class ConversationContextTool:
     def _create_llm_client(self, config: ChatConfig) -> OpenAI:
         """Create an OpenAI client for context analysis"""
         try:
-            return OpenAI(api_key=config.api_key, base_url=config.llm_endpoint)
+            return OpenAI(api_key=config.api_key, base_url=config.fast_llm_endpoint)
         except Exception as e:
             logger.error(f"Failed to create LLM client: {e}")
             raise
@@ -196,7 +196,7 @@ class ConversationContextTool:
             logger.debug(f"Making context analysis request with model: {config.llm_model_name}")
 
             response = client.chat.completions.create(
-                model=config.llm_model_name,
+                model=config.fast_llm_model_name,
                 messages=analysis_messages,
                 temperature=0.3,  # Lower temperature for more consistent analysis
                 top_p=0.9,

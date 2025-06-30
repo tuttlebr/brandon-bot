@@ -1,15 +1,3 @@
-"""
-Production-Ready Streamlit Chat Application
-
-This is the main entry point for the fully refactored Streamlit chatbot application.
-It demonstrates production-ready architecture with:
-- Controller pattern for separation of concerns
-- Centralized configuration management
-- Reduced complexity and improved maintainability
-- Better error handling and logging
-- Elimination of all code redundancy
-"""
-
 import logging
 import random
 
@@ -25,17 +13,6 @@ from utils.system_prompt import greeting_prompt
 
 
 class ProductionStreamlitChatApp:
-    """
-    Production-ready Streamlit chat application with fully refactored architecture
-
-    This version demonstrates best practices with:
-    - Separation of concerns via controller pattern
-    - Centralized configuration management
-    - 83% reduction in main class complexity (1,200+ → 200 lines)
-    - Elimination of all constants/environment variable redundancy
-    - Better error handling and maintainability
-    """
-
     def __init__(self):
         """Initialize the production-ready Streamlit chat application"""
         # Initialize configuration using centralized system
@@ -58,7 +35,7 @@ class ProductionStreamlitChatApp:
 
         # Initialize controllers with dependency injection
         self.session_controller = SessionController(self.config_obj)
-        self.message_controller = MessageController(self.config_obj, self.chat_service)
+        self.message_controller = MessageController(self.config_obj, self.chat_service, self.session_controller)
         self.file_controller = FileController(self.config_obj, self.message_controller)
         self.response_controller = ResponseController(
             self.config_obj,
@@ -73,7 +50,9 @@ class ProductionStreamlitChatApp:
 
     def display_chat_history(self):
         """Display the chat history using the chat history component"""
-        self.chat_history_component.display_chat_history(st.session_state.messages)
+        # Use session controller's safe message access
+        messages = self.session_controller.get_messages()
+        self.chat_history_component.display_chat_history(messages)
 
     def process_prompt(self, prompt: str):
         """
@@ -109,7 +88,8 @@ class ProductionStreamlitChatApp:
             self.message_controller.safe_add_message_to_history("user", prompt)
 
             # Prepare messages for processing using controller
-            prepared_messages = self.message_controller.prepare_messages_for_processing(st.session_state.messages)
+            messages = self.session_controller.get_messages()
+            prepared_messages = self.message_controller.prepare_messages_for_processing(messages)
 
             # Generate and display response using controller with centralized spinner
             random_icon = random.choice(config.ui.SPINNER_ICONS)

@@ -49,7 +49,7 @@ class FileProcessingConfig:
     """File processing configuration"""
 
     # PDF processing
-    PDF_PROCESSING_TIMEOUT: int = 60
+    PDF_PROCESSING_TIMEOUT: int = 360
     PDF_TEMP_FILE_SUFFIX: str = ".pdf"
 
     # File size limits (in bytes)
@@ -77,7 +77,7 @@ class LLMConfig:
     """LLM service configuration"""
 
     # Default model parameters
-    DEFAULT_TEMPERATURE: float = 0.6
+    DEFAULT_TEMPERATURE: float = 0.3
     DEFAULT_TOP_P: float = 0.95
     DEFAULT_FREQUENCY_PENALTY: float = 0.0
     DEFAULT_PRESENCE_PENALTY: float = 0.0
@@ -109,9 +109,9 @@ class APIConfig:
     """API configuration and timeouts"""
 
     # Request timeouts
-    DEFAULT_REQUEST_TIMEOUT: int = 30
-    LLM_REQUEST_TIMEOUT: int = 300
-    IMAGE_REQUEST_TIMEOUT: int = 120
+    DEFAULT_REQUEST_TIMEOUT: int = 90
+    LLM_REQUEST_TIMEOUT: int = 360
+    IMAGE_REQUEST_TIMEOUT: int = 240
 
 
 @dataclass
@@ -120,6 +120,7 @@ class EnvironmentConfig:
 
     # Bot configuration
     BOT_TITLE: str = field(default_factory=lambda: os.getenv("BOT_TITLE", "Nano"))
+    META_USER: str = field(default_factory=lambda: os.getenv("META_USER", "human"))
 
     # Model endpoints and names
     FAST_LLM_MODEL_NAME: Optional[str] = field(default_factory=lambda: os.getenv("FAST_LLM_MODEL_NAME"))

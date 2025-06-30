@@ -81,50 +81,158 @@ class ResponseController:
 
     def _generate_response_chunks(self, prepared_messages: List[Dict[str, Any]]):
         """
-        Generate response chunks from LLM service
+        Generate response chunks from LLM service and display them in real-time
 
         Args:
             prepared_messages: Prepared messages for API call
         """
-        logging.info("Generating LLM response chunks")
+        logging.info("Generating LLM response chunks with real-time streaming")
 
-        async def collect_responses():
-            """Collect responses to populate tool responses"""
-            chunks = []
-            async_gen = self.llm_service.generate_streaming_response(
-                prepared_messages, st.session_state["fast_llm_model_name"]
-            )
-            async for chunk in async_gen:
-                chunks.append(chunk)
-            return chunks
+        # Extract model name
+        model_name = self.session_controller.get_model_name("fast")
 
-        # Run the async function to populate tool responses
-        response_chunks = asyncio.run(collect_responses())
+        # Initialize response tracking
+        response_chunks = []
+        full_response = ""
 
-        # Store chunks for display
-        self._response_chunks = response_chunks
-        logging.info(f"Generated {len(response_chunks)} response chunks")
-
-    def _display_response(self):
-        """Display the generated response with proper handling for different response types"""
+        # Create the chat message container for streaming
         with st.chat_message("assistant", avatar=self.config_obj.assistant_avatar):
-            # Check for image generation response
+            # Create a placeholder for the streaming text
+            message_placeholder = st.empty()
+
+            # Simple approach: collect chunks and update UI progressively
+            try:
+                # Use a simpler approach with asyncio.run
+                import asyncio
+                import concurrent.futures
+                import queue
+                import threading
+                import time
+
+                # Create a queue to pass chunks from async thread to main thread
+                chunk_queue = queue.Queue()
+                finished_event = threading.Event()
+
+                def async_worker():
+                    """Worker function to run async generator in separate thread"""
+                    try:
+
+                        async def collect_chunks():
+                            async_gen = self.llm_service.generate_streaming_response(prepared_messages, model_name)
+                            async for chunk in async_gen:
+                                chunk_queue.put(chunk)
+                            chunk_queue.put(None)  # Signal completion
+
+                        # Run in new event loop
+                        new_loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(new_loop)
+                        try:
+                            new_loop.run_until_complete(collect_chunks())
+                        finally:
+                            new_loop.close()
+                    except Exception as e:
+                        logging.error(f"Error in async worker: {e}")
+                        chunk_queue.put(None)  # Signal completion even on error
+                    finally:
+                        finished_event.set()
+
+                # Start the async worker thread
+                worker_thread = threading.Thread(target=async_worker)
+                worker_thread.start()
+
+                # Process chunks as they arrive
+                while True:
+                    try:
+                        # Get chunk from queue with timeout
+                        chunk = chunk_queue.get(timeout=0.1)
+                        if chunk is None:  # Completion signal
+                            break
+
+                        # Update response
+                        response_chunks.append(chunk)
+                        full_response += chunk
+
+                        # Update UI with accumulated response
+                        if full_response.strip():
+                            message_placeholder.markdown(full_response)
+
+                        # Small delay for visual effect
+                        time.sleep(0.02)
+
+                    except queue.Empty:
+                        # No chunk available, check if worker is done
+                        if finished_event.is_set():
+                            # Worker is done, get any remaining chunks
+                            while not chunk_queue.empty():
+                                chunk = chunk_queue.get_nowait()
+                                if chunk is not None:
+                                    response_chunks.append(chunk)
+                                    full_response += chunk
+                            if full_response.strip():
+                                message_placeholder.markdown(full_response)
+                            break
+                        continue
+
+                # Wait for worker thread to complete
+                worker_thread.join(timeout=30)  # 30 second timeout
+
+            except Exception as e:
+                logging.error(f"Error in streaming: {e}")
+                # Fallback to collecting all at once
+                try:
+                    import concurrent.futures
+
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(self._fallback_generate_response, prepared_messages, model_name)
+                        fallback_response = future.result()
+                        response_chunks = [fallback_response]
+                        full_response = fallback_response
+                        if full_response.strip():
+                            message_placeholder.markdown(full_response)
+                except Exception as fallback_error:
+                    logging.error(f"Fallback also failed: {fallback_error}")
+                    response_chunks = ["I apologize, but I encountered an error generating the response."]
+                    full_response = response_chunks[0]
+                    message_placeholder.markdown(full_response)
+
+            # After streaming is complete, check for image generation response
             image_response = self._check_for_image_generation_response()
 
             if image_response:
+                # Clear the text placeholder and display image instead
+                message_placeholder.empty()
                 self._display_image_generation_response(image_response)
+                self._handle_tool_context()
                 full_response = ""  # No text response to add to history for image generation
             else:
-                # Display text response
-                text_response = "".join(self._response_chunks)
-                if text_response.strip():
-                    st.markdown(text_response)
-                    full_response = text_response
-                else:
-                    full_response = ""
+                # Handle tool context for text response
+                self._handle_tool_context()
 
-            # Always extract and display tool context
-            self._handle_tool_context()
+        # Store chunks and full response for further processing
+        self._response_chunks = response_chunks
+        self._full_response = full_response
+        logging.info(f"Streamed {len(response_chunks)} response chunks in real-time")
+
+    def _fallback_generate_response(self, prepared_messages: List[Dict[str, Any]], model_name: str) -> str:
+        """Fallback method for generating response when streaming fails"""
+        import asyncio
+
+        async def generate_full_response():
+            chunks = []
+            async_gen = self.llm_service.generate_streaming_response(prepared_messages, model_name)
+            async for chunk in async_gen:
+                chunks.append(chunk)
+            return "".join(chunks)
+
+        return asyncio.run(generate_full_response())
+
+    def _display_response(self):
+        """Handle post-streaming tasks like adding to chat history and cleanup"""
+        # The streaming display is now handled in _generate_response_chunks
+        # This method handles post-streaming tasks
+
+        # Get the full response that was streamed
+        full_response = getattr(self, '_full_response', "")
 
         # Add response to chat history if there's text content
         if full_response and full_response.strip():

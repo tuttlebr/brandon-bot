@@ -14,9 +14,6 @@ from utils.config import config
 class FileController:
     """Controller for handling file operations, primarily PDF processing"""
 
-    # Constants
-    PDF_PROCESSING_TIMEOUT = 60
-
     def __init__(self, config_obj: ChatConfig, message_controller: MessageController):
         """
         Initialize the file controller
@@ -173,6 +170,9 @@ class FileController:
         }
 
         # Add tool response to chat history (this stores the PDF data for the retrieval tool)
+        # Use safe access with fallback
+        if not hasattr(st.session_state, "messages"):
+            st.session_state.messages = []
         st.session_state.messages.append(tool_response)
 
         # Add assistant confirmation message

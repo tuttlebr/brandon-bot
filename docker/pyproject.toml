@@ -15,7 +15,7 @@ dependencies = [
     "pillow-heif==0.22.0",
     "pymilvus==2.5.7",
     "pytz==2025.2",
-    "streamlit==1.45.1",
+    "streamlit==1.46.1",
 ]
 
 [project.optional-dependencies]

@@ -26,10 +26,9 @@ class ChatMessage:
             return self.content[0].get("text", "")
         elif isinstance(self.content, dict):
             # Handle image messages with metadata
-            if self.content.get("type") == "image":
-                return self.content.get("text", "")
             return self.content.get("text", "")
-        return self.content
+        else:
+            return self.content
 
     def is_image_message(self) -> bool:
         """

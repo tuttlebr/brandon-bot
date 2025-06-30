@@ -9,6 +9,7 @@ from openai import OpenAI
 from tools import (
     execute_assistant_with_dict,
     execute_conversation_context_with_dict,
+    execute_default_fallback_with_dict,
     execute_image_generation_with_dict,
     execute_news_with_dict,
     execute_pdf_parse_with_dict,
@@ -24,12 +25,14 @@ ALL_TOOLS = get_all_tool_definitions()
 tools = {
     "text_assistant": execute_assistant_with_dict,
     "conversation_context": execute_conversation_context_with_dict,
+    "default_fallback": execute_default_fallback_with_dict,
     "generate_image": execute_image_generation_with_dict,
     "tavily_internet_search": execute_tavily_with_dict,
     "get_weather": execute_weather_with_dict,
     "retrieval_search": execute_retrieval_with_dict,
     "tavily_news_search": execute_news_with_dict,
     "retrieve_pdf_content": execute_pdf_parse_with_dict,
+    "default_tool": execute_default_fallback_with_dict,
 }
 
 
@@ -282,7 +285,7 @@ class LLMService:
             return tool_calls
 
         # PDF parser is requested - only allow PDF parser and conversation context
-        allowed_tools = {"retrieve_pdf_content", "conversation_context"}
+        allowed_tools = {"retrieve_pdf_content", "conversation_context", "text_assistant", "retrieval_search"}
 
         original_count = len(tool_calls)
         filtered_tool_calls = [tool_call for tool_call in tool_calls if tool_call.get("name") in allowed_tools]
@@ -311,18 +314,17 @@ class LLMService:
         messages: List[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
         """
-        Execute tool calls asynchronously using unified format
+        Execute tool calls in parallel using unified format (for non-sequential execution)
 
         Args:
-            tool_calls: List of normalized tool call dictionaries
+            tool_calls: List of normalized tool call dictionaries (already processed for restrictions)
             current_user_message: Original user message for tools that need unmodified input
+            messages: Full conversation messages
 
         Returns:
             List of tool response messages
         """
-
-        # Apply PDF parser tool restriction
-        tool_calls = self._apply_pdf_parser_restriction(tool_calls)
+        # Note: PDF parser restriction should be applied before calling this method
 
         async def execute_single_tool(tool_call: Dict[str, Any]) -> Dict[str, Any]:
             """Execute a single tool call"""
@@ -340,106 +342,55 @@ class LLMService:
                 return {"role": "tool", "content": f"Error: Unknown tool '{tool_name}'"}
 
             try:
-                # Special handling for text_assistant tool - use original user text
-                if tool_name == "text_assistant" and current_user_message:
-                    logging.debug(f"Using original user text for {tool_name} instead of LLM-generated parameters")
+                # Apply tool-specific argument modifications using shared method
+                modified_args = await self._apply_tool_specific_modifications(
+                    tool_name, tool_args, current_user_message, messages
+                )
 
-                    # Extract original user content
-                    original_text = current_user_message.get("content", "")
-
-                    # Keep the task_type and instructions from LLM decision, but use original text
-                    modified_args = tool_args.copy()
-                    modified_args["text"] = original_text
-
-                    logging.debug(
-                        f"Modified args for {tool_name}: task_type={modified_args.get('task_type')}, original_text_length={len(original_text)}"
-                    )
-                    tool_args = modified_args
-
-                # Special handling for conversation_context tool - inject conversation messages
-                elif tool_name == "conversation_context":
-                    logging.debug(f"Injecting conversation messages for {tool_name}")
-
-                    # Add conversation messages to the tool arguments
-                    modified_args = tool_args.copy()
-                    if messages is not None:
-                        modified_args["messages"] = messages  # Pass the full conversation messages
-                        logging.debug(
-                            f"Modified args for {tool_name}: context_type={modified_args.get('context_type')}, message_count={modified_args.get('message_count', 6)}, total_messages={len(messages)}"
-                        )
-                    else:
-                        logging.warning(f"No messages provided for {tool_name}, using empty list")
-                        modified_args["messages"] = []
-
-                    tool_args = modified_args
-
-                # Special handling for generate_image tool - inject conversation messages for context
-                elif tool_name == "generate_image":
-                    logging.debug(f"Injecting conversation messages for {tool_name}")
-
-                    # Add conversation messages to the tool arguments
-                    modified_args = tool_args.copy()
-                    if messages is not None:
-                        modified_args["messages"] = messages  # Pass the full conversation messages
-                        logging.debug(
-                            f"Modified args for {tool_name}: subject={modified_args.get('subject')}, use_conversation_context={modified_args.get('use_conversation_context', True)}, total_messages={len(messages)}"
-                        )
-                    else:
-                        logging.warning(f"No messages provided for {tool_name}, using empty list")
-                        modified_args["messages"] = []
-
-                    tool_args = modified_args
-
-                # Special handling for retrieve_pdf_content tool - inject conversation messages
-                elif tool_name == "retrieve_pdf_content":
-                    logging.debug(f"Injecting conversation messages for {tool_name}")
-
-                    # Add conversation messages to the tool arguments
-                    modified_args = tool_args.copy()
-                    if messages is not None:
-                        modified_args["messages"] = messages  # Pass the full conversation messages
-                        logging.debug(f"Modified args for {tool_name}: total_messages={len(messages)}")
-                    else:
-                        logging.warning(f"No messages provided for {tool_name}, using empty list")
-                        modified_args["messages"] = []
-
-                    tool_args = modified_args
-
-                logging.info(f"Executing tool call: {tool_name} from {source}")
+                logging.info(f"Executing tool call: {tool_name} from {source} (parallel)")
                 tool_function = tools[tool_name]
 
                 # Run the tool function in a thread pool to avoid blocking
                 loop = asyncio.get_event_loop()
-                tool_result = await loop.run_in_executor(None, lambda: tool_function(tool_args))
+                tool_result = await loop.run_in_executor(None, lambda: tool_function(modified_args))
 
                 # Check if this is a direct response tool (like assistant)
                 if hasattr(tool_result, "direct_response") and tool_result.direct_response:
-                    logging.debug(f"Tool {tool_name} returned direct response")
+                    logging.debug(f"Tool {tool_name} returned direct response (parallel)")
                     return {
                         "role": "direct_response",
                         "content": tool_result.result,
                         "tool_name": tool_name,
                         "tool_result": tool_result,  # Store full response object for Streamlit access
+                        "execution_order": 0,  # Parallel execution doesn't have meaningful order
                     }
                 else:
                     # Standard tool response
                     tool_response = tool_result.json()
-                    logging.debug(f"Tool {tool_name} executed successfully (from {source})")
-                    return {"role": "tool", "content": tool_response}
+                    logging.debug(f"Tool {tool_name} executed successfully (parallel, from {source})")
+                    return {
+                        "role": "tool",
+                        "content": tool_response,
+                        "tool_name": tool_name,
+                        "execution_order": 0,  # Parallel execution doesn't have meaningful order
+                    }
 
             except Exception as e:
-                logging.error(f"Error executing tool {tool_name} (from {source}): {e}")
+                logging.error(f"Error executing tool {tool_name} (parallel, from {source}): {e}")
                 return {
                     "role": "tool",
                     "content": f"Error executing {tool_name}: {str(e)}",
+                    "tool_name": tool_name,
+                    "execution_order": 0,  # Parallel execution doesn't have meaningful order
                 }
 
         # Execute all tool calls concurrently
         if not tool_calls:
             return []
 
-        logging.info(f"Executing {len(tool_calls)} tool calls concurrently")
+        logging.info(f"Executing {len(tool_calls)} tool calls in parallel")
         tool_responses = await asyncio.gather(*[execute_single_tool(tool_call) for tool_call in tool_calls])
+        logging.info(f"Parallel execution completed: {len(tool_responses)} responses")
         return tool_responses
 
     def _apply_sliding_window(self, messages: List[Dict[str, Any]], max_turns: int = None) -> List[Dict[str, Any]]:
@@ -622,7 +573,7 @@ class LLMService:
             # Validate clean messages again after filtering
             clean_messages = self._validate_and_clean_messages(clean_messages)
 
-            # PHASE 1: Tool Decision Making - Use minimal context (system + current user message only)
+            # PHASE 1: Enhanced Tool Decision Making with Context-Aware Routing
             system_message = next((msg for msg in clean_messages if msg.get("role") == "system"), None)
             current_user_message = next((msg for msg in reversed(clean_messages) if msg.get("role") == "user"), None,)
 
@@ -632,32 +583,31 @@ class LLMService:
                     yield chunk
                 return
 
-            # Create minimal context for tool decision
+            # Use minimal context for tool routing decisions
             tool_decision_messages = []
             if system_message:
                 tool_decision_messages.append({"role": "system", "content": TOOL_PROMPT})
             tool_decision_messages.append(current_user_message)
+            logging.info(f"Tool routing: {len(tool_decision_messages)} messages (system + current user)")
 
             # Final validation of tool decision messages
             tool_decision_messages = self._validate_and_clean_messages(tool_decision_messages)
 
-            logging.info(f"Tool decision context: {len(tool_decision_messages)} messages (system + current user)")
-
-            # Make tool decision with minimal context using centralized configuration
+            # Make tool decision with appropriate context using centralized configuration
             tool_decision_params = {
-                "model": self.config.llm_model_name,
+                "model": self.config.fast_llm_model_name,
                 "messages": tool_decision_messages,
                 "stream": False,
                 **config.get_llm_parameters(),
                 "tools": ALL_TOOLS,
-                "tool_choice": "auto",
-                "parallel_tool_calls": False,
+                "tool_choice": "required",
+                "parallel_tool_calls": True,
             }
             logging.debug(f"Tool decision params: {tool_decision_params}")
-            initial_response = self.client.chat.completions.create(**tool_decision_params)
+            initial_response = self.fast_client.chat.completions.create(**tool_decision_params)
 
-            # PHASE 2: Tool Detection and Execution (unified approach)
-            tool_responses = []
+            # PHASE 2: Tool Detection and Execution
+            all_tool_responses = []
 
             # Check for both standard OpenAI tool calls and custom tool call format
             openai_tool_calls = initial_response.choices[0].message.tool_calls
@@ -665,46 +615,65 @@ class LLMService:
             custom_tool_calls = self._parse_custom_tool_calls(response_content) if response_content else []
 
             # Normalize all tool calls to unified format
-            all_tool_calls = self._normalize_tool_calls(
+            tool_calls = self._normalize_tool_calls(
                 openai_tool_calls=openai_tool_calls, custom_tool_calls=custom_tool_calls
             )
 
-            if all_tool_calls:
-                tool_count = len(all_tool_calls)
+            if tool_calls:
+                tool_count = len(tool_calls)
                 openai_count = len(openai_tool_calls) if openai_tool_calls else 0
                 custom_count = len(custom_tool_calls)
 
                 logging.info(
-                    f"Found {tool_count} total tool calls: {openai_count} standard OpenAI, {custom_count} custom format"
+                    f"Found {tool_count} tool calls: {openai_count} standard OpenAI, {custom_count} custom format"
                 )
 
-                # Execute all tool calls concurrently using unified approach
-                # CRITICAL FIX: Pass original messages (not filtered clean_messages) so PDF parser can find tool data
-                tool_responses = await self._execute_tool_calls(all_tool_calls, current_user_message, messages)
+                # Apply PDF parser restriction
+                tool_calls = self._apply_pdf_parser_restriction(tool_calls)
+
+                # Determine execution strategy (sequential vs parallel)
+                execution_strategy = self._determine_tool_execution_strategy(tool_calls)
+
+                # Execute tools with appropriate strategy
+                if execution_strategy == 'sequential':
+                    tool_responses = await self._execute_tool_calls_sequential(
+                        tool_calls, current_user_message, messages
+                    )
+                else:
+                    # Use existing parallel execution method
+                    tool_responses = await self._execute_tool_calls(tool_calls, current_user_message, messages)
+
+                logging.info(f"Tool execution completed with {len(tool_responses)} responses")
+                all_tool_responses.extend(tool_responses)
 
                 # Store tool responses for context extraction by streamlit app
-                self.last_tool_responses = tool_responses
-                logging.debug(f"Stored {len(tool_responses)} tool responses for context extraction")
+                self.last_tool_responses = all_tool_responses
+                logging.debug(f"Stored {len(all_tool_responses)} tool responses for context extraction")
 
                 # Add to original messages for context extraction
-                messages.extend(tool_responses)
+                messages.extend(all_tool_responses)
             else:
                 logging.info("No tool calls detected in response")
                 # Clear previous tool responses if no tools were used
                 self.last_tool_responses = []
+                all_tool_responses = []
 
-            # PHASE 3: Response Generation with Full Context
-            if tool_responses:
+            # PHASE 3: Response Generation with Tool Results
+            if all_tool_responses:
                 # Check if any tool responses are direct responses (like assistant tool)
-                direct_responses = [resp for resp in tool_responses if resp.get("role") == "direct_response"]
+                direct_responses = [resp for resp in all_tool_responses if resp.get("role") == "direct_response"]
 
                 if direct_responses:
                     # If we have direct responses, process them through the response handler
-                    logging.info(f"Found {len(direct_responses)} direct response(s), processing and returning")
-                    direct_content = direct_responses[0]["content"]
+                    # Use the latest direct response
+                    latest_direct = sorted(direct_responses, key=lambda x: x.get("execution_order", 0))[-1]
+                    logging.info(
+                        f"Found {len(direct_responses)} direct response(s), using latest from execution order {latest_direct.get('execution_order', 'unknown')}"
+                    )
+                    direct_content = latest_direct["content"]
 
-                    # Store the direct response for context extraction
-                    self.last_tool_responses = tool_responses
+                    # Store all tool responses for context extraction
+                    self.last_tool_responses = all_tool_responses
 
                     # Ensure we have content to return
                     if direct_content and direct_content.strip():
@@ -718,9 +687,7 @@ class LLMService:
                             yield chunk
                     return
 
-                logging.debug(
-                    f"Generating response with tool results ({len(tool_responses)} tool responses from {len(all_tool_calls)} tool calls)"
-                )
+                logging.debug(f"Generating response with tool results ({len(all_tool_responses)} total responses)")
 
                 # Apply sliding window to conversation history for response generation
                 windowed_messages = self._apply_sliding_window(
@@ -728,7 +695,7 @@ class LLMService:
                 )
 
                 # Create full context: windowed conversation + tool results
-                response_messages = windowed_messages + tool_responses
+                response_messages = windowed_messages + all_tool_responses
 
                 # Final validation before API call
                 response_messages = self._validate_and_clean_messages(response_messages)
@@ -1008,3 +975,231 @@ class LLMService:
             Filtered content without think tags
         """
         return re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL).strip()
+
+    def _determine_tool_execution_strategy(self, tool_calls: List[Dict[str, Any]]) -> str:
+        """
+        Determine the execution strategy for tool calls based on their types and relationships
+
+        Args:
+            tool_calls: List of normalized tool calls
+
+        Returns:
+            Execution strategy: 'sequential', 'parallel', or 'mixed'
+        """
+        if not tool_calls:
+            return 'parallel'
+
+        tool_names = [call.get("name") for call in tool_calls]
+
+        # Tools that require context from previous tools
+        context_dependent_tools = {
+            "conversation_context",
+            "text_assistant",
+            "generate_image",
+            "retrieve_pdf_content",
+            "default_fallback",
+        }
+
+        # Tools that can provide context to other tools
+        context_providing_tools = {
+            "tavily_internet_search",
+            "retrieval_search",
+            "tavily_news_search",
+            "conversation_context",
+            "retrieve_pdf_content",
+        }
+
+        has_context_dependent = any(tool in context_dependent_tools for tool in tool_names)
+        has_context_providing = any(tool in context_providing_tools for tool in tool_names)
+
+        # If we have both context providers and consumers, use sequential
+        if has_context_providing and has_context_dependent and len(tool_calls) > 1:
+            logging.info("Using sequential execution: context-dependent workflow detected")
+            return 'sequential'
+
+        # If multiple tools but no clear dependencies, use parallel
+        if len(tool_calls) > 1:
+            logging.info("Using parallel execution: independent tools detected")
+            return 'parallel'
+
+        # Single tool, doesn't matter
+        return 'parallel'
+
+    async def _execute_tool_calls_sequential(
+        self,
+        tool_calls: List[Dict[str, Any]],
+        current_user_message: Dict[str, Any] = None,
+        messages: List[Dict[str, Any]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Execute tool calls sequentially with context accumulation
+
+        Args:
+            tool_calls: List of normalized tool call dictionaries
+            current_user_message: Original user message for tools that need unmodified input
+            messages: Full conversation messages
+
+        Returns:
+            List of tool response messages with accumulated context
+        """
+        if not tool_calls:
+            return []
+
+        tool_responses = []
+        accumulated_context = []
+
+        logging.info(f"Executing {len(tool_calls)} tool calls sequentially with context accumulation")
+
+        for i, tool_call in enumerate(tool_calls):
+            tool_name = tool_call.get("name")
+            tool_args = tool_call.get("arguments", {})
+            source = tool_call.get("source", "unknown")
+
+            logging.debug(f"Sequential execution [{i+1}/{len(tool_calls)}]: {tool_name}")
+
+            # Handle pre-existing errors from normalization
+            if "error" in tool_call:
+                logging.error(f"Tool call error from {source}: {tool_call['error']}")
+                error_response = {"role": "tool", "content": f"Error: {tool_call['error']}"}
+                tool_responses.append(error_response)
+                accumulated_context.append(error_response)
+                continue
+
+            if tool_name not in tools:
+                logging.error(f"Unknown tool: {tool_name} (from {source})")
+                error_response = {"role": "tool", "content": f"Error: Unknown tool '{tool_name}'"}
+                tool_responses.append(error_response)
+                accumulated_context.append(error_response)
+                continue
+
+            try:
+                # Inject accumulated context into tool arguments
+                modified_args = tool_args.copy()
+                if accumulated_context:
+                    modified_args["accumulated_context"] = accumulated_context
+                    logging.debug(f"Injected {len(accumulated_context)} accumulated context items into {tool_name}")
+
+                # Apply existing tool-specific argument modifications
+                modified_args = await self._apply_tool_specific_modifications(
+                    tool_name, modified_args, current_user_message, messages
+                )
+
+                logging.info(f"Executing tool call: {tool_name} from {source} (sequential {i+1}/{len(tool_calls)})")
+                tool_function = tools[tool_name]
+
+                # Run the tool function in a thread pool to avoid blocking
+                loop = asyncio.get_event_loop()
+                tool_result = await loop.run_in_executor(None, lambda: tool_function(modified_args))
+
+                # Process tool result
+                if hasattr(tool_result, "direct_response") and tool_result.direct_response:
+                    logging.debug(f"Tool {tool_name} returned direct response")
+                    response = {
+                        "role": "direct_response",
+                        "content": tool_result.result,
+                        "tool_name": tool_name,
+                        "tool_result": tool_result,
+                        "execution_order": i + 1,
+                    }
+                else:
+                    # Standard tool response
+                    tool_response = tool_result.json()
+                    response = {
+                        "role": "tool",
+                        "content": tool_response,
+                        "tool_name": tool_name,
+                        "execution_order": i + 1,
+                    }
+                    logging.debug(f"Tool {tool_name} executed successfully (sequential {i+1}/{len(tool_calls)})")
+
+                tool_responses.append(response)
+                accumulated_context.append(response)
+
+                # Log context accumulation
+                logging.debug(f"Context accumulated: {len(accumulated_context)} items after {tool_name}")
+
+            except Exception as e:
+                logging.error(f"Error executing tool {tool_name} (from {source}): {e}")
+                error_response = {
+                    "role": "tool",
+                    "content": f"Error executing {tool_name}: {str(e)}",
+                    "tool_name": tool_name,
+                    "execution_order": i + 1,
+                }
+                tool_responses.append(error_response)
+                accumulated_context.append(error_response)
+
+        logging.info(f"Sequential execution completed: {len(tool_responses)} responses with accumulated context")
+        return tool_responses
+
+    async def _apply_tool_specific_modifications(
+        self,
+        tool_name: str,
+        tool_args: Dict[str, Any],
+        current_user_message: Dict[str, Any] = None,
+        messages: List[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Apply tool-specific argument modifications (extracted from original execute_single_tool)
+
+        Args:
+            tool_name: Name of the tool
+            tool_args: Tool arguments to modify
+            current_user_message: Original user message
+            messages: Full conversation messages
+
+        Returns:
+            Modified tool arguments
+        """
+        modified_args = tool_args.copy()
+
+        # Special handling for text_assistant tool - use original user text
+        if tool_name == "text_assistant" and current_user_message:
+            logging.debug(f"Using original user text for {tool_name} instead of LLM-generated parameters")
+            original_text = current_user_message.get("content", "")
+            modified_args["text"] = original_text
+            logging.debug(
+                f"Modified args for {tool_name}: task_type={modified_args.get('task_type')}, original_text_length={len(original_text)}"
+            )
+
+        # Special handling for conversation_context tool - inject conversation messages
+        elif tool_name == "conversation_context":
+            logging.debug(f"Injecting conversation messages for {tool_name}")
+            if messages is not None:
+                modified_args["messages"] = messages
+                logging.debug(
+                    f"Modified args for {tool_name}: context_type={modified_args.get('context_type')}, message_count={modified_args.get('message_count', 6)}, total_messages={len(messages)}"
+                )
+            else:
+                logging.warning(f"No messages provided for {tool_name}, using empty list")
+                modified_args["messages"] = []
+
+        # Special handling for generate_image tool - inject conversation messages for context
+        elif tool_name == "generate_image":
+            logging.debug(f"Injecting conversation messages for {tool_name}")
+            if messages is not None:
+                modified_args["messages"] = messages
+                logging.debug(
+                    f"Modified args for {tool_name}: subject={modified_args.get('subject')}, use_conversation_context={modified_args.get('use_conversation_context', True)}, total_messages={len(messages)}"
+                )
+            else:
+                logging.warning(f"No messages provided for {tool_name}, using empty list")
+                modified_args["messages"] = []
+
+        # Special handling for retrieve_pdf_content tool - inject conversation messages
+        elif tool_name == "retrieve_pdf_content":
+            logging.debug(f"Injecting conversation messages for {tool_name}")
+            if messages is not None:
+                modified_args["messages"] = messages
+                logging.debug(f"Modified args for {tool_name}: total_messages={len(messages)}")
+            else:
+                logging.warning(f"No messages provided for {tool_name}, using empty list")
+                modified_args["messages"] = []
+
+        # Special handling for default_fallback tool - inject config for Fast LLM access
+        elif tool_name == "default_fallback":
+            logging.debug(f"Injecting config for {tool_name}")
+            modified_args["config"] = self.config
+            logging.debug(f"Modified args for {tool_name}: query={modified_args.get('query', '')[:50]}...")
+
+        return modified_args

@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 
 from .assistant import get_assistant_tool_definition
 from .conversation_context import get_conversation_context_tool_definition
+from .default_fallback import get_default_fallback_tool_definition
 from .image_gen import get_image_generation_tool_definition
 from .news import get_news_tool_definition
 from .pdf_parser import get_pdf_parser_tool_definition
@@ -20,6 +21,7 @@ def get_all_tool_definitions() -> List[Dict[str, Any]]:
     return [
         get_assistant_tool_definition(),
         get_conversation_context_tool_definition(),
+        get_default_fallback_tool_definition(),
         get_image_generation_tool_definition(),
         get_news_tool_definition(),
         get_pdf_parser_tool_definition(),

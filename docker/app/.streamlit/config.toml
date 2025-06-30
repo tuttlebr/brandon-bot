@@ -7,6 +7,12 @@ showErrorDetails = true
 [server]
 runOnSave = true
 maxUploadSize = 16
+enableCORS = false
+enableXsrfProtection = false
+maxMessageSize = 50
+
+# Improve concurrent session handling
+enableWebsocketCompression = false
 
 [theme]
 base = "dark"
