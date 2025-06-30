@@ -4,3 +4,4 @@ nginx/
 *.key
 *.pem
 .env
+tmp/

@@ -1,3 +1,4 @@
+import json
 import logging
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -5,6 +6,8 @@ from typing import Any, Dict, List, Optional
 from models.chat_config import ChatConfig
 from openai import OpenAI
 from pydantic import BaseModel, Field
+from tools.base import BaseTool, BaseToolResponse
+from utils.config import config as app_config
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -24,7 +27,7 @@ class AssistantTaskType(str, Enum):
     TRANSLATE = "translate"
 
 
-class AssistantResponse(BaseModel):
+class AssistantResponse(BaseToolResponse):
     """Response from the assistant tool"""
 
     original_text: str = Field(description="The original input text")
@@ -40,12 +43,13 @@ class AssistantResponse(BaseModel):
     )
 
 
-class AssistantTool:
+class AssistantTool(BaseTool):
     """Tool for text processing tasks including summarizing, proofreading, rewriting, and translation"""
 
     def __init__(self):
+        super().__init__()
         self.name = "text_assistant"
-        self.description = "Triggered when user asks for writing tasks like summarizing, proofreading, critiquing, rewriting text, or translating text between languages. Specify the task type and provide the text to be processed without modification or truncation."
+        self.description = "Use this tool ONLY when the user provides raw text (not PDF content) and explicitly requests one of these operations: (1) SUMMARIZE - create a summary from provided text; (2) PROOFREAD - fix grammar/spelling in provided text; (3) REWRITE - rephrase provided text with different tone/style; (4) CRITIC - provide literary feedback on provided text; (5) WRITER - create new creative content from a prompt; (6) TRANSLATE - translate provided text between supported languages. Do NOT use this for PDF operations - use PDF-specific tools instead."
 
     def to_openai_format(self) -> Dict[str, Any]:
         """
@@ -67,7 +71,10 @@ class AssistantTool:
                             "enum": ["summarize", "proofread", "rewrite", "critic", "writer", "translate"],
                             "description": "The type of task to perform: 'summarize' to create a concise summary, 'proofread' to check for errors and suggest improvements, 'rewrite' to rephrase and improve the text, 'critic' to critique the text and provide feedback on the text, 'writer' to write a story based on the user's prompt, 'translate' to translate text from one language to another",
                         },
-                        "text": {"type": "string", "description": "The text content to be processed",},
+                        "text": {
+                            "type": "string",
+                            "description": "The text content to be processed. Can be 'the PDF' or 'the document' to process uploaded PDF content, or specific text to process.",
+                        },
                         "instructions": {
                             "type": "string",
                             "description": "Optional specific instructions for the task (e.g., 'make it more formal', 'bullet points only', 'fix grammar only')",
@@ -87,6 +94,10 @@ class AssistantTool:
                 },
             },
         }
+
+    def get_definition(self) -> Dict[str, Any]:
+        """Get tool definition for BaseTool interface"""
+        return self.to_openai_format()
 
     def _get_system_prompt(self, task_type: AssistantTaskType, instructions: Optional[str] = None) -> str:
         """
@@ -194,12 +205,12 @@ class AssistantTool:
             response = client.chat.completions.create(
                 model=config.intelligent_llm_model_name,
                 messages=messages,
-                temperature=0.3
+                temperature=app_config.llm.DEFAULT_TEMPERATURE
                 if task_type == AssistantTaskType.TRANSLATE
                 else 0.8,  # Lower temperature for translation accuracy
-                top_p=0.95,
-                frequency_penalty=0,
-                presence_penalty=0,
+                top_p=app_config.llm.DEFAULT_TOP_P,
+                frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
+                presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,
             )
 
             result = response.choices[0].message.content.strip()
@@ -315,6 +326,52 @@ class AssistantTool:
         config = ChatConfig.from_environment()
         return self._process_text(task_enum, text, config, instructions, source_language, target_language)
 
+    def _get_pdf_content_from_messages(self, messages: List[Dict[str, Any]]) -> Optional[str]:
+        """
+        Extract PDF content from messages when available
+
+        Args:
+            messages: List of conversation messages
+
+        Returns:
+            Extracted PDF text content or None
+        """
+        if not messages:
+            return None
+
+        # Look for injected PDF data in system messages
+        for message in messages:
+            if message.get("role") == "system":
+                try:
+                    content = message.get("content", "")
+                    if isinstance(content, str):
+                        data = json.loads(content)
+                        if (
+                            isinstance(data, dict)
+                            and data.get("type") == "pdf_data"
+                            and data.get("tool_name") == "process_pdf_document"
+                        ):
+                            # Found injected PDF data
+                            pages = data.get("pages", [])
+                            filename = data.get("filename", "Unknown")
+
+                            if pages:
+                                # Extract all text from PDF pages
+                                document_text = []
+                                for page in pages:
+                                    page_text = page.get("text", "")
+                                    if page_text:
+                                        document_text.append(f"[Page {page.get('page', '?')}]\n{page_text}")
+
+                                if document_text:
+                                    full_text = "\n\n".join(document_text)
+                                    logger.info(f"Extracted PDF content from '{filename}' with {len(pages)} pages")
+                                    return full_text
+                except (json.JSONDecodeError, TypeError):
+                    continue
+
+        return None
+
     def run_with_dict(self, params: Dict[str, Any]) -> AssistantResponse:
         """
         Execute an assistant task with parameters provided as a dictionary.
@@ -337,6 +394,25 @@ class AssistantTool:
         instructions = params.get("instructions")
         source_language = params.get("source_language")
         target_language = params.get("target_language")
+        messages = params.get("messages", [])
+
+        # Check if we need to extract PDF content
+        # This happens when:
+        # 1. Text is empty or very short
+        # 2. Text mentions "pdf" or "document"
+        # 3. Messages contain PDF data
+        text_lower = text.lower() if text else ""
+        if messages and (not text or len(text) < 50 or 'pdf' in text_lower or 'document' in text_lower):
+            pdf_content = self._get_pdf_content_from_messages(messages)
+            if pdf_content:
+                # If text was asking about the PDF, replace it with the PDF content
+                # Otherwise, append the PDF content to the existing text
+                if not text or 'pdf' in text_lower or 'document' in text_lower:
+                    logger.info(f"Using PDF content as text for {task_type} task")
+                    text = pdf_content
+                else:
+                    # Append PDF content to existing text
+                    text = f"{text}\n\n{pdf_content}"
 
         # Validate translation parameters
         if task_type.lower() == "translate":
@@ -358,6 +434,18 @@ class AssistantTool:
         return self._process_text(
             AssistantTaskType(task_type.lower()), text, config, instructions, source_language, target_language
         )
+
+    def execute(self, params: Dict[str, Any]) -> AssistantResponse:
+        """
+        Execute the assistant tool with given parameters
+
+        Args:
+            params: Dictionary containing the required parameters
+
+        Returns:
+            AssistantResponse with the processed result
+        """
+        return self.run_with_dict(params)
 
 
 # Create a global instance and helper functions for easy access

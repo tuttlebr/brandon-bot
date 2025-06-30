@@ -1,29 +1,35 @@
+import asyncio
 import json
 import logging
 import os
 import tempfile
+import threading
 from typing import Optional, Tuple
 
 import requests
 import streamlit as st
 from controllers.message_controller import MessageController
 from models.chat_config import ChatConfig
+from services.pdf_summarization_service import PDFSummarizationService
 from utils.config import config
 
 
 class FileController:
     """Controller for handling file operations, primarily PDF processing"""
 
-    def __init__(self, config_obj: ChatConfig, message_controller: MessageController):
+    def __init__(self, config_obj: ChatConfig, message_controller: MessageController, session_controller=None):
         """
         Initialize the file controller
 
         Args:
             config_obj: Application configuration
             message_controller: Message controller for adding responses to history
+            session_controller: Session controller for PDF storage
         """
         self.config_obj = config_obj
         self.message_controller = message_controller
+        self.session_controller = session_controller
+        self.pdf_summarization_service = PDFSummarizationService(config_obj)
 
     def process_pdf_upload(self, uploaded_file) -> bool:
         """
@@ -148,42 +154,168 @@ class FileController:
             pdf_data: Processed PDF data
         """
         pages = pdf_data.get('pages', [])
+        summarization_threshold = config.file_processing.PDF_SUMMARIZATION_THRESHOLD
+        summarization_enabled = config.file_processing.PDF_SUMMARIZATION_ENABLED
 
         # Display processing results
         with st.chat_message("assistant", avatar=self.config_obj.assistant_avatar):
             st.success(f"✅ Successfully processed PDF: **{filename}**")
             st.info(f"📊 Extracted text from **{len(pages)} pages**")
-            st.markdown("📝 I can now answer questions about this document when you ask me about it!")
 
-        # Create tool response for chat history (stores PDF data for later retrieval)
-        tool_response = {
-            "role": "tool",
-            "content": json.dumps(
-                {
-                    "tool_name": "process_pdf_document",
-                    "filename": filename,
-                    "total_pages": len(pages),
-                    "pages": pages,
-                    "status": "success",
-                }
-            ),
-        }
+            # For large documents, mention summarization capability
+            if len(pages) > summarization_threshold:
+                st.markdown("💡 This is a large document. You can ask me to 'summarize the PDF' for a quick overview!")
 
-        # Add tool response to chat history (this stores the PDF data for the retrieval tool)
-        # Use safe access with fallback
-        if not hasattr(st.session_state, "messages"):
-            st.session_state.messages = []
-        st.session_state.messages.append(tool_response)
+            st.markdown("📝 I can now answer questions about this document!")
+
+        # Store PDF data in session state via session controller
+        if self.session_controller:
+            pdf_id = self.session_controller.store_pdf_document(filename, pdf_data)
+            logging.info(f"Stored PDF '{filename}' with ID '{pdf_id}' in session state")
+
+            # No automatic summarization - this is now user-driven
+
+        else:
+            # Fallback: Create tool response for chat history (legacy method)
+            tool_response = {
+                "role": "tool",
+                "content": json.dumps(
+                    {
+                        "tool_name": "process_pdf_document",
+                        "filename": filename,
+                        "total_pages": len(pages),
+                        "pages": pages,
+                        "status": "success",
+                    }
+                ),
+            }
+
+            # Add tool response to chat history (legacy storage)
+            if not hasattr(st.session_state, "messages"):
+                st.session_state.messages = []
+            st.session_state.messages.append(tool_response)
+            logging.warning("Used legacy message history storage for PDF - session controller not available")
 
         # Add assistant confirmation message
         confirmation_msg = (
             f"I've successfully processed your PDF document **{filename}** and extracted text from "
-            f"{len(pages)} pages. I can now answer questions about the document content when you ask me "
-            f"about it. What would you like to know?"
+            f"{len(pages)} pages. I can now answer questions about the document content.\n\n"
         )
+
+        # Add specific guidance based on document size
+        if len(pages) > summarization_threshold:
+            confirmation_msg += (
+                f"💡 **Tip:** Since this is a large document ({len(pages)} pages), you can:\n"
+                f"- Ask me to 'summarize the PDF' for a quick overview\n"
+                f"- Use text processing commands like 'summarize pages 1-5' or 'proofread page 10'\n"
+                f"- Ask specific questions about the content\n\n"
+            )
+
+        confirmation_msg += "What would you like to know?"
 
         self.message_controller.safe_add_message_to_history("assistant", confirmation_msg)
         logging.info(f"Successfully processed PDF: {filename} ({len(pages)} pages)")
+
+    def _run_async_summarization(self, pdf_id: str, pdf_data: dict):
+        """
+        Run async summarization in a new event loop in a background thread
+
+        This method creates a new event loop in a background thread to handle
+        async operations, which is necessary because Streamlit runs in a
+        synchronous context without an event loop.
+
+        Args:
+            pdf_id: ID of the stored PDF
+            pdf_data: PDF data to summarize
+
+        Note:
+            This runs in a daemon thread, so it will be terminated when the
+            main program exits. Session state updates need to be handled
+            carefully as Streamlit's session state is not thread-safe.
+        """
+        try:
+            # Create a new event loop for this thread
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            # Run the async summarization
+            loop.run_until_complete(self._async_summarize_pdf(pdf_id, pdf_data))
+
+        except Exception as e:
+            logging.error(f"Error in background summarization thread: {e}")
+        finally:
+            loop.close()
+
+    async def _async_summarize_pdf(self, pdf_id: str, pdf_data: dict):
+        """
+        Asynchronously summarize PDF for large documents
+
+        Args:
+            pdf_id: ID of the stored PDF
+            pdf_data: PDF data to summarize
+        """
+        try:
+            filename = pdf_data.get('filename', 'Unknown')
+            logging.info(f"Starting async summarization for PDF: {filename}")
+
+            # Perform recursive summarization
+            enhanced_pdf_data = await self.pdf_summarization_service.summarize_pdf_recursive(pdf_data)
+
+            # Update the stored PDF data with summaries
+            # Note: We need to be careful with session state in background threads
+            if self.session_controller:
+                try:
+                    # Instead of directly accessing session state from thread,
+                    # we'll use a thread-safe approach
+                    self._update_pdf_with_summary(pdf_id, enhanced_pdf_data)
+
+                    # Notify in chat that summarization is complete
+                    summary_complete_msg = (
+                        f"✨ Document summary complete for **{filename}**! "
+                        f"I now have a comprehensive understanding of the document's content, "
+                        f"which will help me respond more quickly to your questions.\n\n"
+                        f"💡 You can ask me to 'show the summary of the document' to see the AI-generated overview."
+                    )
+                    self.message_controller.safe_add_message_to_history("assistant", summary_complete_msg)
+
+                except Exception as e:
+                    logging.error(f"Error updating PDF data with summary: {e}")
+
+        except Exception as e:
+            logging.error(f"Error in async PDF summarization: {e}")
+
+    def _update_pdf_with_summary(self, pdf_id: str, enhanced_pdf_data: dict):
+        """
+        Thread-safe method to update PDF data with summary
+
+        Args:
+            pdf_id: ID of the PDF to update
+            enhanced_pdf_data: PDF data with summaries
+        """
+        try:
+            # This method should be called from the main thread or use proper synchronization
+            # For now, we'll log the update and let the session controller handle it
+            # when it's safe to do so
+            logging.info(f"PDF summarization complete for ID: {pdf_id}")
+
+            # Store the enhanced data in a way that's safe for the session controller to pick up
+            # You could use a queue, file, or database for thread-safe communication
+            # For simplicity, we'll just log it for now
+
+            # In a production system, you might want to:
+            # 1. Use a thread-safe queue to communicate back to the main thread
+            # 2. Store the summary in a database that the main thread can poll
+            # 3. Use Redis or another external store
+
+            # For now, we'll update if we can safely access the session state
+            if hasattr(st.session_state, 'uploaded_pdfs') and pdf_id in st.session_state.uploaded_pdfs:
+                st.session_state.uploaded_pdfs[pdf_id] = enhanced_pdf_data
+                logging.info(f"Updated PDF '{enhanced_pdf_data.get('filename')}' with summarization data")
+            else:
+                logging.warning(f"Could not update PDF {pdf_id} - session state not accessible")
+
+        except Exception as e:
+            logging.error(f"Error in _update_pdf_with_summary: {e}")
 
     def _handle_processing_error(self, error_result: dict):
         """

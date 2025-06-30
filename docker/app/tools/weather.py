@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional
 
 import requests
 from pydantic import BaseModel, Field
+from tools.base import BaseTool, BaseToolResponse
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -33,7 +34,7 @@ class HourlyWeather(BaseModel):
     )
 
 
-class WeatherResponse(BaseModel):
+class WeatherResponse(BaseToolResponse):
     """Complete weather response from Open-Meteo API"""
 
     location: str = Field(description="Location name")
@@ -55,12 +56,13 @@ class LocationResult(BaseModel):
     admin1: Optional[str] = None  # State/region
 
 
-class WeatherTool:
+class WeatherTool(BaseTool):
     """Tool for getting weather information using Open-Meteo API"""
 
     def __init__(self):
+        super().__init__()
         self.name = "get_weather"
-        self.description = "Triggered when asks for weather or forecast related information. Data are provided by [Open-Meteo](https://open-meteo.com/). Input should be a location string of 'City' or 'ZIP code'. If input is in 'City, ST' format, only the city name will be used."
+        self.description = "Use this tool ONLY when the user asks about: (1) Current weather conditions; (2) Weather forecast; (3) Temperature, rain, wind, or other weather metrics. Requires a location (city name or ZIP code). Do NOT use for: climate data, historical weather, or non-weather queries."
         self.geocoding_url = "https://geocoding-api.open-meteo.com/v1/search"
         self.weather_url = "https://api.open-meteo.com/v1/forecast"
         self.source = "[Open-Meteo](https://open-meteo.com/)"
@@ -82,13 +84,21 @@ class WeatherTool:
                     "properties": {
                         "location": {
                             "type": "string",
-                            "description": "City name or ZIP code. If provided as 'City, ST', only the city name will be used for weather lookup.",
+                            "description": "City name or ZIP code. If provided as 'City, ST', only the city name may be used for weather lookup.",
                         }
                     },
                     "required": ["location"],
                 },
             },
         }
+
+    def get_definition(self) -> Dict[str, Any]:
+        """Get tool definition for BaseTool interface"""
+        return self.to_openai_format()
+
+    def execute(self, params: Dict[str, Any]):
+        """Execute the tool with given parameters"""
+        return self.run_with_dict(params)
 
     def _celcius_to_fahrenheit(self, temperature: float) -> float:
         """

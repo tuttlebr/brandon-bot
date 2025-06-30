@@ -6,31 +6,71 @@ from utils.config import config
 
 @dataclass
 class ChatConfig:
-    """Configuration for chat application"""
+    """Configuration wrapper for chat application - uses centralized config"""
 
-    # Bot configuration
-    bot_title: str
-    assistant_avatar: str
-    user_avatar: str
+    @property
+    def bot_title(self) -> str:
+        return config.env.BOT_TITLE
 
-    # Model configuration
-    fast_llm_model_name: str
-    fast_llm_endpoint: str
-    llm_model_name: str
-    llm_endpoint: str
-    intelligent_llm_model_name: str
-    intelligent_llm_endpoint: str
-    embedding_endpoint: str
-    api_key: str
-    embedding_model: str
+    @property
+    def assistant_avatar(self) -> str:
+        return config.ui.ASSISTANT_AVATAR_PATH
 
-    # Database configuration
-    collection_name: str
-    database_url: str
-    default_db: str
+    @property
+    def user_avatar(self) -> str:
+        return config.ui.USER_AVATAR_PATH
 
-    # Image generation configuration
-    image_endpoint: str
+    @property
+    def fast_llm_model_name(self) -> str:
+        return config.env.FAST_LLM_MODEL_NAME
+
+    @property
+    def fast_llm_endpoint(self) -> str:
+        return config.env.FAST_LLM_ENDPOINT
+
+    @property
+    def llm_model_name(self) -> str:
+        return config.env.LLM_MODEL_NAME
+
+    @property
+    def llm_endpoint(self) -> str:
+        return config.env.LLM_ENDPOINT
+
+    @property
+    def intelligent_llm_model_name(self) -> str:
+        return config.env.INTELLIGENT_LLM_MODEL_NAME
+
+    @property
+    def intelligent_llm_endpoint(self) -> str:
+        return config.env.INTELLIGENT_LLM_ENDPOINT
+
+    @property
+    def embedding_endpoint(self) -> str:
+        return config.env.EMBEDDING_ENDPOINT
+
+    @property
+    def api_key(self) -> str:
+        return config.env.NVIDIA_API_KEY
+
+    @property
+    def embedding_model(self) -> str:
+        return config.env.EMBEDDING_MODEL
+
+    @property
+    def collection_name(self) -> str:
+        return config.env.COLLECTION_NAME
+
+    @property
+    def database_url(self) -> str:
+        return config.env.DATABASE_URL
+
+    @property
+    def default_db(self) -> str:
+        return config.env.DEFAULT_DB
+
+    @property
+    def image_endpoint(self) -> str:
+        return config.env.IMAGE_ENDPOINT
 
     @classmethod
     def from_environment(cls) -> "ChatConfig":
@@ -38,24 +78,6 @@ class ChatConfig:
         st.set_page_config(
             page_title=config.env.BOT_TITLE,
             page_icon=config.ui.ASSISTANT_AVATAR_PATH,
-            # layout="wide",
             initial_sidebar_state="expanded",
         )
-        return cls(
-            bot_title=config.env.BOT_TITLE,
-            assistant_avatar=config.ui.ASSISTANT_AVATAR_PATH,
-            user_avatar=config.ui.USER_AVATAR_PATH,
-            fast_llm_model_name=config.env.FAST_LLM_MODEL_NAME,
-            fast_llm_endpoint=config.env.FAST_LLM_ENDPOINT,
-            llm_model_name=config.env.LLM_MODEL_NAME,
-            llm_endpoint=config.env.LLM_ENDPOINT,
-            embedding_endpoint=config.env.EMBEDDING_ENDPOINT,
-            intelligent_llm_model_name=config.env.INTELLIGENT_LLM_MODEL_NAME,
-            intelligent_llm_endpoint=config.env.INTELLIGENT_LLM_ENDPOINT,
-            api_key=config.env.NVIDIA_API_KEY,
-            embedding_model=config.env.EMBEDDING_MODEL,
-            collection_name=config.env.COLLECTION_NAME,
-            database_url=config.env.DATABASE_URL,
-            default_db=config.env.DEFAULT_DB,
-            image_endpoint=config.env.IMAGE_ENDPOINT,
-        )
+        return cls()

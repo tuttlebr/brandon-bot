@@ -3,6 +3,7 @@ from typing import Any, Dict
 
 import streamlit as st
 from models.chat_config import ChatConfig
+from services.file_storage_service import FileStorageService
 from utils.config import config
 from utils.system_prompt import SYSTEM_PROMPT
 
@@ -18,6 +19,7 @@ class SessionController:
             config_obj: Application configuration
         """
         self.config_obj = config_obj
+        self.file_storage = FileStorageService()
 
     def initialize_session_state(self):
         """Initialize Streamlit session state with default values"""
@@ -40,39 +42,21 @@ class SessionController:
             st.session_state.current_page = config.ui.CURRENT_PAGE_DEFAULT
             st.session_state.processing = False
 
-            # Initialize image storage with atomic check
-            if not hasattr(st.session_state, 'generated_images'):
-                st.session_state.generated_images = {}
+            # Initialize references to stored files (not the files themselves)
+            if not hasattr(st.session_state, 'stored_images'):
+                st.session_state.stored_images = []  # List of image IDs
+
+            # Initialize references to stored PDFs
+            if not hasattr(st.session_state, 'stored_pdfs'):
+                st.session_state.stored_pdfs = []  # List of PDF IDs
 
             logging.info(f"Initialized new session state for session: {st.session_state.session_id}")
 
-        # Clean up old data periodically (only for already initialized sessions)
-        self.cleanup_old_images()
-
-    def cleanup_old_images(self, max_images: int = None):
-        """
-        Clean up old image data from session state to prevent memory issues
-
-        Args:
-            max_images: Maximum number of images to keep in session state
-        """
-        max_images = max_images or config.session.MAX_IMAGES_IN_SESSION
-
-        if hasattr(st.session_state, 'generated_images') and st.session_state.generated_images:
-            current_count = len(st.session_state.generated_images)
-
-            if current_count > max_images:
-                # Sort by image_id (which includes timestamp) and keep the most recent ones
-                sorted_images = sorted(st.session_state.generated_images.items(), key=lambda x: x[0], reverse=True)
-
-                # Keep only the most recent max_images
-                st.session_state.generated_images = dict(sorted_images[:max_images])
-
-                removed_count = current_count - max_images
-                logging.info(
-                    f"Cleaned up {removed_count} old images from session state. "
-                    f"Kept {max_images} most recent images."
-                )
+    def cleanup_session(self):
+        """Clean up all session data including external files"""
+        if hasattr(st.session_state, 'session_id'):
+            self.file_storage.cleanup_session(st.session_state.session_id)
+            logging.info(f"Cleaned up session: {st.session_state.session_id}")
 
     def set_processing_state(self, processing: bool):
         """
@@ -114,7 +98,7 @@ class SessionController:
 
     def store_generated_image(self, image_data: str, enhanced_prompt: str, original_prompt: str) -> str:
         """
-        Store generated image data and return image ID
+        Store generated image externally and return image ID
 
         Args:
             image_data: Base64 encoded image data
@@ -124,23 +108,37 @@ class SessionController:
         Returns:
             Unique image ID for the stored image
         """
-        import time
+        # Ensure session is initialized
+        if not hasattr(st.session_state, 'session_id'):
+            self.initialize_session_state()
 
-        # Initialize session state for storing image data if not exists
-        if 'generated_images' not in st.session_state:
-            st.session_state.generated_images = {}
+        # Store image externally
+        image_id = self.file_storage.store_image(
+            image_data, enhanced_prompt, original_prompt, st.session_state.session_id
+        )
 
-        # Generate a unique ID for this image using configured prefix
-        image_id = f"{config.session.IMAGE_ID_PREFIX}{int(time.time() * 1000)}"
+        # Keep reference in session state
+        if 'stored_images' not in st.session_state:
+            st.session_state.stored_images = []
+        st.session_state.stored_images.append(image_id)
 
-        # Store image data in session state for visual persistence
-        st.session_state.generated_images[image_id] = {
-            'image_data': image_data,
-            'enhanced_prompt': enhanced_prompt,
-            'original_prompt': original_prompt,
-        }
+        # Limit stored references
+        if len(st.session_state.stored_images) > config.session.MAX_IMAGES_IN_SESSION:
+            st.session_state.stored_images = st.session_state.stored_images[-config.session.MAX_IMAGES_IN_SESSION :]
 
         return image_id
+
+    def get_generated_image(self, image_id: str) -> Dict[str, Any]:
+        """
+        Retrieve generated image data
+
+        Args:
+            image_id: Image ID to retrieve
+
+        Returns:
+            Image data dictionary or None
+        """
+        return self.file_storage.get_image(image_id)
 
     def get_model_name(self, model_type: str = "fast") -> str:
         """
@@ -218,3 +216,87 @@ class SessionController:
             self.initialize_session_state()
 
         st.session_state.messages = messages
+
+    def store_pdf_document(self, filename: str, pdf_data: dict) -> str:
+        """
+        Store PDF document externally
+
+        Args:
+            filename: Name of the PDF file
+            pdf_data: Processed PDF data containing pages and metadata
+
+        Returns:
+            Unique PDF ID for the stored document
+        """
+        # Ensure session is initialized
+        if not hasattr(st.session_state, 'session_id'):
+            self.initialize_session_state()
+
+        # Store PDF externally
+        pdf_id = self.file_storage.store_pdf(filename, pdf_data, st.session_state.session_id)
+
+        # Keep reference in session state
+        if 'stored_pdfs' not in st.session_state:
+            st.session_state.stored_pdfs = []
+        st.session_state.stored_pdfs.append(pdf_id)
+
+        # Limit stored references
+        if len(st.session_state.stored_pdfs) > config.session.MAX_PDFS_IN_SESSION:
+            # Remove oldest PDFs
+            removed = st.session_state.stored_pdfs[: -config.session.MAX_PDFS_IN_SESSION]
+            st.session_state.stored_pdfs = st.session_state.stored_pdfs[-config.session.MAX_PDFS_IN_SESSION :]
+
+            # Clean up removed PDFs
+            for pdf_id in removed:
+                logging.info(f"Removing old PDF: {pdf_id}")
+
+        logging.info(f"Stored PDF document '{filename}' with ID '{pdf_id}'")
+        return pdf_id
+
+    def get_pdf_documents(self) -> dict:
+        """
+        Get all stored PDF documents from external storage
+
+        Returns:
+            Dictionary of PDF documents keyed by PDF ID
+        """
+        # Ensure session state is initialized
+        if not getattr(st.session_state, "initialized", False):
+            self.initialize_session_state()
+
+        pdfs = {}
+        for pdf_id in getattr(st.session_state, 'stored_pdfs', []):
+            pdf_data = self.file_storage.get_pdf(pdf_id)
+            if pdf_data:
+                pdfs[pdf_id] = pdf_data
+
+        return pdfs
+
+    def get_latest_pdf_document(self) -> dict:
+        """
+        Get the most recently uploaded PDF document
+
+        Returns:
+            Dictionary containing PDF data or None if no PDFs available
+        """
+        if not hasattr(st.session_state, 'stored_pdfs') or not st.session_state.stored_pdfs:
+            return None
+
+        # Get the last PDF ID
+        latest_pdf_id = st.session_state.stored_pdfs[-1]
+        return self.file_storage.get_pdf(latest_pdf_id)
+
+    def clear_pdf_documents(self):
+        """Clear all stored PDF documents from session state"""
+        if hasattr(st.session_state, 'stored_pdfs'):
+            st.session_state.stored_pdfs = []
+            logging.info("Cleared all PDF document references from session state")
+
+    def has_pdf_documents(self) -> bool:
+        """
+        Check if there are any PDF documents stored in session state
+
+        Returns:
+            True if PDFs are available, False otherwise
+        """
+        return hasattr(st.session_state, 'stored_pdfs') and len(st.session_state.stored_pdfs) > 0

@@ -5,6 +5,8 @@ from typing import Any, Dict, List, Optional
 from models.chat_config import ChatConfig
 from openai import OpenAI
 from pydantic import BaseModel, Field
+from tools.base import BaseTool, BaseToolResponse
+from utils.config import config as app_config
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -21,26 +23,42 @@ class ContextType(str, Enum):
     DOCUMENT_ANALYSIS = "document_analysis"
 
 
-class ConversationContextResponse(BaseModel):
-    """Response from the conversation context tool"""
+class ConversationContextResponse(BaseToolResponse):
+    """Response from conversation context analysis"""
 
-    context_type: ContextType = Field(description="The type of context generated")
-    summary: str = Field(description="The generated context summary")
-    relevant_messages_count: int = Field(description="Number of messages analyzed")
-    key_topics: List[str] = Field(description="Key topics extracted from conversation")
-    user_intent: Optional[str] = Field(None, description="Current user intent if identifiable")
-    direct_response: bool = Field(default=False, description="This tool provides context, not direct responses")
+    analysis: str = Field(description="The context analysis result")
+    user_intent: Optional[str] = Field(None, description="Identified user intent")
+    conversation_type: Optional[str] = Field(None, description="Type of conversation")
+    key_topics: Optional[List[str]] = Field(None, description="Key topics identified")
+    has_document: bool = Field(default=False, description="Whether a document is being discussed")
+    document_info: Optional[str] = Field(None, description="Information about the document if present")
+    direct_response: bool = Field(
+        default=True, description="Flag indicating this response should be returned directly to user",
+    )
+    success: bool = Field(default=True, description="Success status")
+    error_message: Optional[str] = Field(None, description="Error message if failed")
+
+    @property
+    def result(self) -> str:
+        """Get the analysis result for direct responses"""
+        return self.analysis
 
 
-class ConversationContextTool:
-    """Tool for generating conversation context summaries for other tools"""
+class ConversationContextTool(BaseTool):
+    """Tool for analyzing conversation context and user intent"""
 
     def __init__(self):
+        super().__init__()
         self.name = "conversation_context"
-        self.description = "Analyzes recent conversation history and uploaded documents to provide relevant context summaries for tool operations. Use when tools need historical context about the user's requests, preferences, ongoing tasks, or when analyzing uploaded documents in context of the conversation."
+        self.description = "Use this tool ONLY when you need to analyze conversation patterns, extract key themes from chat history, or understand the user's overall intent across multiple messages. Do NOT use for every query - only when historical context is essential for the response."
 
     def to_openai_format(self) -> Dict[str, Any]:
-        """Convert the tool to OpenAI function calling format"""
+        """
+        Convert the tool to OpenAI function calling format
+
+        Returns:
+            Dict containing the OpenAI-compatible tool definition
+        """
         return {
             "type": "function",
             "function": {
@@ -49,34 +67,26 @@ class ConversationContextTool:
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "context_type": {
-                            "type": "string",
-                            "enum": [
-                                "conversation_summary",
-                                "recent_topics",
-                                "user_preferences",
-                                "task_continuity",
-                                "creative_director",
-                                "document_analysis",
-                            ],
-                            "description": "Type of context to generate: 'conversation_summary' for general summary, 'recent_topics' for topic extraction, 'user_preferences' for user preference analysis, 'task_continuity' for understanding ongoing tasks, 'creative_director' for creative project guidance, 'document_analysis' for analyzing uploaded documents",
-                        },
-                        "message_count": {
+                        "query": {"type": "string", "description": "The current user query to analyze in context",},
+                        "max_messages": {
                             "type": "integer",
-                            "minimum": 2,
-                            "maximum": 20,
-                            "default": 6,
-                            "description": "Number of recent messages to analyze (default: 6, which covers ~3 conversation turns)",
+                            "description": "Maximum number of messages to analyze (default: 20)",
+                            "default": 20,
                         },
-                        "focus_query": {
-                            "type": "string",
-                            "description": "Optional specific query or topic to focus the context analysis on",
+                        "include_document_content": {
+                            "type": "boolean",
+                            "description": "Whether to include full document content in analysis if documents are present",
+                            "default": True,
                         },
                     },
-                    "required": ["context_type"],
+                    "required": ["query"],
                 },
             },
         }
+
+    def get_definition(self) -> Dict[str, Any]:
+        """Get tool definition for BaseTool interface"""
+        return self.to_openai_format()
 
     def _create_llm_client(self, config: ChatConfig) -> OpenAI:
         """Create an OpenAI client for context analysis"""
@@ -120,12 +130,12 @@ class ConversationContextTool:
         - **Contextual Prerequisites**: Essential background for seamless task resumption""",
             ContextType.CREATIVE_DIRECTOR: """**Immersive Creative Continuity Steward**
         As a visionary creative concierge, safeguard the integrity and evolution of iterative creative work by:
-        - **Project Horizon Mapping**: Defining the creative endeavor’s vision, scope, and deliverables
+        - **Project Horizon Mapping**: Defining the creative endeavor's vision, scope, and deliverables
         - **Idea Genesis Tracking**: Documenting the emergence and refinement of core concepts
         - **Aesthetic Cohesion Enforcement**: Flagging and resolving discordances in tone, style, or narrative
         - **Inspiration Infusion**: Proposing fresh perspectives or cross-disciplinary stimuli
         - **Asset Curation**: Maintaining an inventory of referenced materials, prototypes, or inspirations
-        **Focus**: Ensure a rich, adaptable narrative that honors the project’s essence while embracing evolution""",
+        **Focus**: Ensure a rich, adaptable narrative that honors the project's essence while embracing evolution""",
             ContextType.DOCUMENT_ANALYSIS: """**Document Content Analysis & Synthesis**
         As a specialized document analysis expert, examine uploaded document content to provide comprehensive insights:
         - **Content Summary**: Distill key points, themes, and main arguments
@@ -150,6 +160,7 @@ class ConversationContextTool:
         messages: List[Dict[str, Any]],
         config: ChatConfig,
         focus_query: Optional[str] = None,
+        pdf_data: Dict[str, Any] = None,
     ) -> ConversationContextResponse:
         """Analyze conversation messages to generate context"""
 
@@ -170,7 +181,7 @@ class ConversationContextTool:
                 user_message = f"Analyze the ongoing task or goal in this conversation:\n\n{conversation_text}"
             elif context_type == ContextType.DOCUMENT_ANALYSIS:
                 # For document analysis, we need to get the document content and analyze it
-                document_content = self._get_document_content(messages)
+                document_content = self._get_document_content(messages, pdf_data)
                 if document_content:
                     if focus_query:
                         user_message = f"Analyze this document content focusing specifically on '{focus_query}' and relate it to the conversation context:\n\nDocument Content:\n{document_content}\n\nConversation Context:\n{conversation_text}"
@@ -198,8 +209,8 @@ class ConversationContextTool:
             response = client.chat.completions.create(
                 model=config.fast_llm_model_name,
                 messages=analysis_messages,
-                temperature=0.3,  # Lower temperature for more consistent analysis
-                top_p=0.9,
+                temperature=app_config.llm.DEFAULT_TEMPERATURE,  # Lower temperature for more consistent analysis
+                top_p=app_config.llm.DEFAULT_TOP_P,
             )
 
             result = response.choices[0].message.content.strip()
@@ -213,16 +224,28 @@ class ConversationContextTool:
             logger.info(f"Successfully generated {context_type} context")
 
             return ConversationContextResponse(
-                context_type=context_type,
-                summary=result,
-                relevant_messages_count=len(messages),
-                key_topics=key_topics,
+                analysis=result,
                 user_intent=user_intent,
+                conversation_type=context_type,
+                key_topics=key_topics,
+                has_document=pdf_data is not None,
+                document_info=pdf_data.get("info", "No additional document information")
+                if pdf_data
+                else "No additional document information",
             )
 
         except Exception as e:
             logger.error(f"Error analyzing conversation context: {e}")
-            raise
+            return ConversationContextResponse(
+                analysis="",
+                user_intent=None,
+                conversation_type=context_type,
+                key_topics=None,
+                has_document=False,
+                document_info=None,
+                success=False,
+                error_message=str(e),
+            )
 
     def _format_messages_for_analysis(self, messages: List[Dict[str, Any]]) -> str:
         """Format messages for LLM analysis"""
@@ -318,11 +341,84 @@ class ConversationContextTool:
 
         return None
 
-    def _get_document_content(self, messages: List[Dict[str, Any]]) -> Optional[str]:
-        """Extract document content from messages if available"""
+    def _get_document_content(self, messages: List[Dict[str, Any]], pdf_data: Dict[str, Any] = None) -> Optional[str]:
+        """Extract document content from provided PDF data or messages as fallback"""
+
+        # Use provided PDF data if available
+        if pdf_data is not None:
+            return self._get_pdf_content_from_pdf_data(pdf_data)
+
+        # Fallback to scanning messages for PDF data
+        return self._get_pdf_content_from_messages(messages)
+
+    def _get_pdf_content_from_pdf_data(self, pdf_data: Dict[str, Any]) -> Optional[str]:
+        """
+        Extract PDF content from explicitly passed PDF data
+
+        Args:
+            pdf_data: PDF data dictionary passed from LLM service
+
+        Returns:
+            Formatted PDF content string or None if not available
+        """
+        try:
+            pages = pdf_data.get('pages', [])
+            if not pages:
+                return None
+
+            # Extract text content from PDF pages
+            document_text = []
+            for page in pages[:5]:  # Limit to first 5 pages for context analysis
+                page_text = page.get("text", "")
+                if page_text:
+                    document_text.append(f"Page {page.get('page', '?')}: {page_text[:1000]}...")  # Limit per page
+
+            if document_text:
+                return "\n\n".join(document_text)
+
+        except Exception as e:
+            logger.error(f"Error extracting PDF content from passed data: {e}")
+
+        return None
+
+    def _get_pdf_content_from_messages(self, messages: List[Dict[str, Any]]) -> Optional[str]:
+        """
+        Extract PDF content from messages (including injected system messages)
+
+        Args:
+            messages: List of conversation messages
+
+        Returns:
+            Formatted PDF content string or None if not available
+        """
         import json
 
-        # Look for PDF data in tool messages
+        # First look for injected PDF data in system messages
+        for message in messages:
+            if message.get("role") == "system":
+                try:
+                    content = message.get("content", "")
+                    if isinstance(content, str):
+                        data = json.loads(content)
+                        if (
+                            isinstance(data, dict)
+                            and data.get("type") == "pdf_data"
+                            and data.get("tool_name") == "process_pdf_document"
+                        ):
+                            # Found injected PDF data
+                            pages = data.get("pages", [])
+                            if pages:
+                                document_text = []
+                                for page in pages[:5]:  # Limit to first 5 pages for context analysis
+                                    page_text = page.get("text", "")
+                                    if page_text:
+                                        document_text.append(f"Page {page.get('page', '?')}: {page_text[:1000]}...")
+                                if document_text:
+                                    return "\n\n".join(document_text)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+
+        # Fallback: Look for PDF data in tool messages
         for message in reversed(messages):
             if message.get("role") == "tool":
                 try:
@@ -352,63 +448,50 @@ class ConversationContextTool:
 
         return None
 
-    def _run(
-        self,
-        context_type: str = None,
-        message_count: int = 6,
-        focus_query: str = None,
-        messages: List[Dict[str, Any]] = None,
-        **kwargs,
-    ) -> ConversationContextResponse:
-        """Execute conversation context analysis"""
+    def execute(self, params: Dict[str, Any]) -> ConversationContextResponse:
+        """
+        Execute the tool with given parameters
 
-        # Support both direct parameters and dictionary input
-        if context_type is None and "context_type" in kwargs:
-            context_type = kwargs["context_type"]
-        if message_count is None and "message_count" in kwargs:
-            message_count = kwargs["message_count"]
-        if focus_query is None and "focus_query" in kwargs:
-            focus_query = kwargs["focus_query"]
-        if messages is None and "messages" in kwargs:
-            messages = kwargs["messages"]
+        Args:
+            params: Dictionary containing the required parameters
 
-        if context_type is None:
-            raise ValueError("context_type parameter is required")
-        if messages is None:
-            raise ValueError("messages parameter is required for context analysis")
+        Returns:
+            ConversationContextResponse
+        """
+        return self.run_with_dict(params)
+
+    def run_with_dict(self, params: Dict[str, Any]) -> ConversationContextResponse:
+        """Execute context analysis with parameters provided as a dictionary"""
+
+        if "query" not in params:
+            raise ValueError("'query' key is required in parameters dictionary")
+        if "max_messages" not in params:
+            raise ValueError("'max_messages' key is required in parameters dictionary")
 
         # Validate context type
         try:
-            context_enum = ContextType(context_type.lower())
+            context_enum = ContextType(params["query"].lower())
         except ValueError:
-            raise ValueError(f"Invalid context_type: {context_type}. Must be one of: {[t.value for t in ContextType]}")
+            raise ValueError(f"Invalid query: {params['query']}. Must be one of: {[t.value for t in ContextType]}")
 
         # Limit messages to the requested count, excluding system messages
         filtered_messages = []
-        for msg in reversed(messages):
+        for msg in reversed(params["messages"]):
             if msg.get("role") != "system":
                 filtered_messages.append(msg)
-                if len(filtered_messages) >= message_count:
+                if len(filtered_messages) >= params["max_messages"]:
                     break
 
         # Reverse back to chronological order
         filtered_messages.reverse()
 
-        logger.debug(f"Context analysis: {context_type}, {len(filtered_messages)} messages")
+        logger.debug(f"Context analysis: {params['query']}, {len(filtered_messages)} messages")
 
         # Create config from environment
         config = ChatConfig.from_environment()
-        return self._analyze_conversation_context(context_enum, filtered_messages, config, focus_query)
-
-    def run_with_dict(self, params: Dict[str, Any]) -> ConversationContextResponse:
-        """Execute context analysis with parameters provided as a dictionary"""
-
-        if "context_type" not in params:
-            raise ValueError("'context_type' key is required in parameters dictionary")
-        if "messages" not in params:
-            raise ValueError("'messages' key is required in parameters dictionary")
-
-        return self._run(**params)
+        return self._analyze_conversation_context(
+            context_enum, filtered_messages, config, params.get("focus_query"), params.get("pdf_data")
+        )
 
 
 # Create a global instance and helper functions

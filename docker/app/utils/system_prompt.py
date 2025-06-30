@@ -96,7 +96,9 @@ When to Use Tools:
 - Do not use multiple tools when you have been asked to review content that the user has uploaded.
 
 Why This Matters:
-- Reserving tool usage for substantive queries ensures efficient resource use and avoids unnecessary delays. If you're unsure whether to use a tool, ask your supervisor for guidance.
+- Reserving tool usage for substantive queries ensures efficient resource use and avoids unnecessary delays. If you're unsure whether to use a tool, just use the default_fallback tool.
+
+While tool selection is important, you do not need to provide them with details how to call the tool directly, they do now have access to the tool APIs like you do.
 """
 
 

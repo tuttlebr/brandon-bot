@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 
 import requests
 from pydantic import BaseModel, Field
+from tools.base import BaseTool, BaseToolResponse
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -31,7 +32,7 @@ class SearchResult(BaseModel):
     raw_content: Optional[str] = None
 
 
-class TavilyResponse(BaseModel):
+class TavilyResponse(BaseToolResponse):
     """Complete response from Tavily API"""
 
     query: str
@@ -43,15 +44,16 @@ class TavilyResponse(BaseModel):
     response_time: float
 
 
-class NewsTool:
+class NewsTool(BaseTool):
     """Tool for performing Tavily news searches"""
 
     def __init__(self):
+        super().__init__()
         self.name = "tavily_news_search"
         self.description = (
-            "Triggered when asks for the latest news and current events. News sources are limited to the following domains: "
+            "Use this tool ONLY when the user explicitly asks about: (1) Current news or recent events; (2) Latest developments in a topic; (3) What's happening today/this week; (4) Breaking news. Searches these news sources: "
             + ", ".join(INCLUDED_DOMAINS)
-            + ". Input should be a search query string."
+            + ". Do NOT use for: general information, research, or non-news queries."
         )
 
     def to_openai_format(self) -> Dict[str, Any]:
@@ -78,6 +80,14 @@ class NewsTool:
                 },
             },
         }
+
+    def get_definition(self) -> Dict[str, Any]:
+        """Get tool definition for BaseTool interface"""
+        return self.to_openai_format()
+
+    def execute(self, params: Dict[str, Any]):
+        """Execute the tool with given parameters"""
+        return self.run_with_dict(params)
 
     def format_results(self, results: List[SearchResult]) -> str:
         """

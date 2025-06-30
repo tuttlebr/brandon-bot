@@ -40,6 +40,9 @@ class SessionConfig:
     # Image storage limits
     MAX_IMAGES_IN_SESSION: int = 50
 
+    # PDF storage limits
+    MAX_PDFS_IN_SESSION: int = 3
+
     # Image ID generation
     IMAGE_ID_PREFIX: str = "img_"
 
@@ -57,6 +60,13 @@ class FileProcessingConfig:
 
     # Supported file types
     SUPPORTED_PDF_TYPES: List[str] = field(default_factory=lambda: ['pdf'])
+
+    # PDF Summarization settings
+    PDF_SUMMARIZATION_THRESHOLD: int = 10  # Number of pages to trigger summarization
+    PDF_SUMMARIZATION_BATCH_SIZE: int = 5  # Pages per batch for summarization
+    PDF_SUMMARY_MAX_LENGTH: int = 500  # Max words per page summary
+    PDF_SUMMARIZATION_ENABLED: bool = False  # Disabled - summarization should be user-driven
+    PDF_SUMMARIZATION_USE_ASYNC: bool = True  # Use async (True) or sync (False) processing
 
 
 @dataclass
@@ -77,7 +87,7 @@ class LLMConfig:
     """LLM service configuration"""
 
     # Default model parameters
-    DEFAULT_TEMPERATURE: float = 0.3
+    DEFAULT_TEMPERATURE: float = 0.6
     DEFAULT_TOP_P: float = 0.95
     DEFAULT_FREQUENCY_PENALTY: float = 0.0
     DEFAULT_PRESENCE_PENALTY: float = 0.0
@@ -109,9 +119,9 @@ class APIConfig:
     """API configuration and timeouts"""
 
     # Request timeouts
-    DEFAULT_REQUEST_TIMEOUT: int = 90
-    LLM_REQUEST_TIMEOUT: int = 360
-    IMAGE_REQUEST_TIMEOUT: int = 240
+    DEFAULT_REQUEST_TIMEOUT: int = 3600
+    LLM_REQUEST_TIMEOUT: int = 3600
+    IMAGE_REQUEST_TIMEOUT: int = 3600
 
 
 @dataclass

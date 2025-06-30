@@ -5,7 +5,9 @@ from models.chat_config import ChatConfig
 from openai import OpenAI
 from PIL import Image
 from pydantic import BaseModel, Field
+from tools.base import BaseTool, BaseToolResponse
 from tools.conversation_context import execute_conversation_context_with_dict
+from utils.config import config as app_config
 from utils.image import ALLOWED_DIMENSIONS, generate_image
 
 # Configure logger
@@ -40,7 +42,7 @@ def get_dimensions_from_aspect_ratio(aspect_ratio: str) -> Tuple[int, int]:
     return ASPECT_RATIO_MAPPINGS[aspect_ratio]
 
 
-class ImageGenerationResponse(BaseModel):
+class ImageGenerationResponse(BaseToolResponse):
     """Response from image generation tool"""
 
     success: bool = Field(description="Whether the image was generated successfully")
@@ -52,12 +54,13 @@ class ImageGenerationResponse(BaseModel):
     result: Optional[str] = Field(None, description="JSON string representation of the response")
 
 
-class ImageGenerationTool:
-    """Tool for generating images with prompt enhancement"""
+class ImageGenerationTool(BaseTool):
+    """Tool for generating images with AI"""
 
     def __init__(self):
+        super().__init__()
         self.name = "generate_image"
-        self.description = "Visual Generation Catalyst - Activate this tool when users express a need for visual content through explicit requests (e.g., 'design an image', 'craft a visual', 'illustrate', 'produce a graphic', 'display a scene', 'envision a portrait', 'generate art') or implicit cues (e.g., 'I need a visual for...', 'Can you show...', 'Visualize...')."
+        self.description = "Use this tool ONLY when the user explicitly requests visual content creation. Trigger words include: 'create/generate/make/design/draw/paint/illustrate an image/picture/visual/graphic/artwork/illustration'. Do NOT use for: explaining what something looks like, describing images, or any non-generation requests."
 
     def to_openai_format(self) -> Dict[str, Any]:
         """
@@ -138,14 +141,16 @@ class ImageGenerationTool:
 
             # Get high-level context summary focused on visual elements
             context_params = {
-                "context_type": "conversation_summary",
-                "message_count": 8,  # Look at more messages for richer context
+                "query": "conversation_summary",
+                "max_messages": 8,  # Look at more messages for richer context
                 "focus_query": "visual elements, story details, characters, settings, artistic themes, and descriptive elements that could be visualized",
                 "messages": messages,
             }
 
             context_response = execute_conversation_context_with_dict(context_params)
-            summary = context_response.summary if context_response else None
+            summary = None
+            if context_response and context_response.success:
+                summary = context_response.analysis
 
             logger.info(f"Retrieved context - summary: {len(summary) if summary else 0} chars")
 
@@ -235,7 +240,7 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
                     {"role": "system", "content": enhancement_system_prompt},
                     {"role": "user", "content": user_message},
                 ],
-                temperature=0.3,  # Some creativity but controlled
+                temperature=app_config.llm.DEFAULT_TEMPERATURE,  # Some creativity but controlled
                 max_tokens=200,  # Keep prompts reasonable length
                 stream=False,
             )
@@ -550,6 +555,14 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
             config,
             messages,
         )
+
+    def get_definition(self) -> Dict[str, Any]:
+        """Get tool definition for BaseTool interface"""
+        return self.to_openai_format()
+
+    def execute(self, params: Dict[str, Any]) -> ImageGenerationResponse:
+        """Execute the tool with given parameters"""
+        return self.run_with_dict(params)
 
 
 # Create a global instance and helper functions for easy access

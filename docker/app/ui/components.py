@@ -3,6 +3,7 @@ import logging
 import streamlit as st
 from models.chat_config import ChatConfig
 from models.chat_message import ChatMessage
+from services.file_storage_service import FileStorageService
 from utils.image import base64_to_pil_image
 from utils.split_context import extract_context_regex
 
@@ -18,6 +19,7 @@ class ChatHistoryComponent:
             config: Configuration for avatars and display settings
         """
         self.config = config
+        self.file_storage = FileStorageService()
 
     def display_chat_history(self, messages: list, messages_per_page: int = 25):
         """
@@ -47,19 +49,15 @@ class ChatHistoryComponent:
                 if chat_message.is_image_message():
                     image_id, enhanced_prompt, original_prompt = chat_message.get_image_data()
 
-                    # Try to retrieve image data from session state
-                    if (
-                        image_id
-                        and hasattr(st.session_state, 'generated_images')
-                        and image_id in st.session_state.generated_images
-                    ):
-
+                    # Retrieve image from file storage
+                    if image_id:
                         try:
-                            # Get image data from session state
-                            image_info = st.session_state.generated_images[image_id]
-                            image_data = image_info.get('image_data')
+                            # Get image data from file storage
+                            image_info = self.file_storage.get_image(image_id)
 
-                            if image_data:
+                            if image_info and 'image_data' in image_info:
+                                image_data = image_info['image_data']
+
                                 # Convert base64 back to PIL Image for display
                                 image = base64_to_pil_image(image_data)
                                 if image:
@@ -68,16 +66,16 @@ class ChatHistoryComponent:
                                     logging.error(f"Failed to convert image data for image_id: {image_id}")
                                     st.info("🖼️ Image could not be displayed (conversion error)")
                             else:
-                                logging.warning(f"No image data found for image_id: {image_id}")
-                                st.info("🖼️ Image data not available")
+                                logging.warning(f"Image not found in storage: {image_id}")
+                                st.info("🖼️ Image not available (may have been removed)")
 
                         except Exception as e:
                             logging.error(f"Error displaying image {image_id}: {e}")
                             st.info("🖼️ Image could not be displayed")
                     else:
-                        # Image data not available in session state
-                        logging.warning(f"Image data not found in session state for image_id: {image_id}")
-                        st.info("🖼️ Image not available (may have been cleared from session)")
+                        # No image ID available
+                        logging.warning("Image message without image_id")
+                        st.info("🖼️ Image reference not available")
 
                     # Display the text content
                     content = chat_message.get_display_content()

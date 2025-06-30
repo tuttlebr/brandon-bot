@@ -7,6 +7,7 @@ import requests
 from openai import OpenAI
 from pydantic import BaseModel, Field
 from pymilvus import MilvusClient
+from tools.base import BaseTool, BaseToolResponse
 from utils.config import config
 
 # Configure logger
@@ -399,7 +400,7 @@ class SearchResult(BaseModel):
     index: Optional[int] = Field(None, description="Original index in search results")
 
 
-class RetrievalResponse(BaseModel):
+class RetrievalResponse(BaseToolResponse):
     """Complete response from retrieval search"""
 
     query: str = Field(description="The original search query")
@@ -409,12 +410,13 @@ class RetrievalResponse(BaseModel):
     formatted_results: str = Field(default="", description="Formatted results for display")
 
 
-class RetrievalTool:
+class RetrieverTool(BaseTool):
     """Tool for performing vector similarity search with optional reranking"""
 
     def __init__(self):
+        super().__init__()
         self.name = "retrieval_search"
-        self.description = "Triggered when asks for the latest information found in a document collection containing a knowledge base of NVIDIA and Mental Health information. Input should be a search query string."
+        self.description = "Use this tool ONLY when the user asks about: (1) NVIDIA products, technologies, or company information; (2) Mental health topics, conditions, or treatments; (3) Information that requires searching a specialized knowledge base. This searches a curated collection of NVIDIA and mental health documents. Do NOT use for: general web searches, news, weather, or PDF queries."
 
         # Initialize embedding creator and similarity search using centralized config
         self.embedding_creator = EmbeddingCreator(
@@ -449,6 +451,14 @@ class RetrievalTool:
                 },
             },
         }
+
+    def get_definition(self) -> Dict[str, Any]:
+        """Get tool definition for BaseTool interface"""
+        return self.to_openai_format()
+
+    def execute(self, params: Dict[str, Any]):
+        """Execute the tool with given parameters"""
+        return self.run_with_dict(params)
 
     def search_documents(self, query: str, use_reranker: bool = True, max_results: int = 10) -> RetrievalResponse:
         """
@@ -582,7 +592,7 @@ class RetrievalTool:
 
 
 # Create a global instance and helper functions for easy access
-retrieval_tool = RetrievalTool()
+retrieval_tool = RetrieverTool()
 
 
 def get_retrieval_tool_definition() -> Dict[str, Any]:

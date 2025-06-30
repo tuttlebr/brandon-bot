@@ -265,3 +265,4 @@ workspace/
 ignore.*
 rebuild.sh
 ignore/
+tmp/

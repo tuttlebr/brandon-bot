@@ -4,12 +4,14 @@ from typing import Any, Dict, Optional
 from models.chat_config import ChatConfig
 from openai import OpenAI
 from pydantic import BaseModel, Field
+from tools.base import BaseTool, BaseToolResponse
+from utils.config import config as app_config
 
 # Configure logger
 logger = logging.getLogger(__name__)
 
 
-class DefaultFallbackResponse(BaseModel):
+class DefaultFallbackResponse(BaseToolResponse):
     """Response from default fallback tool"""
 
     response: str = Field(description="The LLM response to the user's query")
@@ -25,12 +27,13 @@ class DefaultFallbackResponse(BaseModel):
         return self.response
 
 
-class DefaultFallbackTool:
-    """Default fallback tool for handling general queries using Fast LLM"""
+class DefaultFallbackTool(BaseTool):
+    """Default fallback tool when no other tool matches"""
 
     def __init__(self):
+        super().__init__()
         self.name = "default_fallback"
-        self.description = "Fallback tool for general conversational queries and questions that don't require specialized tools. Uses the Fast LLM service to provide quick, helpful responses to everyday questions, casual conversation, explanations, and general assistance."
+        self.description = "Use this tool ONLY for: (1) Social interactions - greetings, thanks, goodbyes; (2) General knowledge questions that don't require real-time data; (3) Explanations of concepts or ideas; (4) Advice or opinions; (5) Any query that doesn't match other tools. Do NOT use for: weather, news, web searches, PDFs, image generation, or text processing tasks."
 
     def to_openai_format(self) -> Dict[str, Any]:
         """
@@ -49,17 +52,21 @@ class DefaultFallbackTool:
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "The user's question or query that needs a general response",
+                            "description": "The user's original query that couldn't be matched to a specific tool",
                         },
                         "context": {
                             "type": "string",
-                            "description": "Optional context or additional information to help provide a better response",
+                            "description": "Optional context about why no specific tool was matched",
                         },
                     },
                     "required": ["query"],
                 },
             },
         }
+
+    def get_definition(self) -> Dict[str, Any]:
+        """Get tool definition for BaseTool interface"""
+        return self.to_openai_format()
 
     def _create_fast_llm_client(self, config: ChatConfig) -> OpenAI:
         """Create a Fast LLM client for generating responses"""
@@ -93,10 +100,8 @@ class DefaultFallbackTool:
             # Create Fast LLM client
             fast_client = self._create_fast_llm_client(config)
 
-            # Prepare the system prompt for general assistance
-            system_prompt = """You are a helpful AI assistant. Provide clear, accurate, and concise responses to user questions.
-Be friendly and conversational while being informative. If you're unsure about something, say so honestly.
-Keep responses focused and avoid unnecessary verbosity unless the user specifically asks for detailed information."""
+            # Import SYSTEM_PROMPT lazily to avoid circular imports
+            from utils.system_prompt import SYSTEM_PROMPT
 
             # Prepare the user message
             user_message = query
@@ -106,13 +111,19 @@ Keep responses focused and avoid unnecessary verbosity unless the user specifica
             # Generate response using Fast LLM
             response = fast_client.chat.completions.create(
                 model=config.fast_llm_model_name,
-                messages=[{"role": "system", "content": system_prompt}, {"role": "user", "content": user_message}],
-                temperature=0.3,
+                messages=[{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user_message}],
+                temperature=app_config.llm.DEFAULT_TEMPERATURE,
                 max_tokens=500,  # Reasonable limit for general responses
-                stream=False,
+                stream=True,  # Enable streaming for better UX
             )
 
-            generated_response = response.choices[0].message.content.strip()
+            # Handle streaming response
+            generated_response = ""
+            for chunk in response:
+                if chunk.choices[0].delta.content is not None:
+                    generated_response += chunk.choices[0].delta.content
+
+            generated_response = generated_response.strip()
 
             if not generated_response:
                 logger.warning("Fast LLM returned empty response")
@@ -149,8 +160,8 @@ Keep responses focused and avoid unnecessary verbosity unless the user specifica
             # Generate response using Fast LLM
             response_text = self._generate_response(query, context, config)
 
-            # Return as a direct response
-            result = DefaultFallbackResponse(response=response_text, direct_response=False)
+            # Return as a direct response so it streams back to the UI
+            result = DefaultFallbackResponse(response=response_text, direct_response=True)
 
             logger.debug(f"Default fallback completed successfully")
             return result
@@ -159,8 +170,20 @@ Keep responses focused and avoid unnecessary verbosity unless the user specifica
             logger.error(f"Error in default fallback tool: {e}")
             # Return error as direct response
             return DefaultFallbackResponse(
-                response=f"I apologize, but I encountered an error: {str(e)}", direct_response=False
+                response=f"I apologize, but I encountered an error: {str(e)}", direct_response=True
             )
+
+    def execute(self, params: Dict[str, Any]) -> DefaultFallbackResponse:
+        """
+        Execute the tool with given parameters
+
+        Args:
+            params: Dictionary containing the required parameters
+
+        Returns:
+            DefaultFallbackResponse
+        """
+        return self.run_with_dict(params)
 
 
 # Create a global instance and helper functions for easy access
