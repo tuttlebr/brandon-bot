@@ -5,6 +5,7 @@ A production-ready conversational AI application built with Streamlit, featuring
 ## Overview
 
 This application provides a sophisticated chat interface powered by NVIDIA's language models, with support for:
+
 - Real-time streaming responses with tool calling capabilities
 - Intelligent PDF document analysis with progress tracking
 - AI-powered image generation
@@ -69,28 +70,36 @@ Progress is tracked in real-time with estimated completion times.
 ## Core Services
 
 ### LLM Service
+
 Manages interactions with language models, including:
+
 - Model selection (fast, standard, intelligent)
 - Streaming response generation
 - Tool call orchestration
 - Context window management
 
 ### PDF Analysis Service
+
 Provides intelligent document analysis with:
+
 - Query-aware page selection
 - Multi-level processing strategies
 - Progress tracking and status updates
 - Automatic fallback mechanisms
 
 ### Tool Execution Service
+
 Orchestrates tool execution with:
+
 - Parallel execution strategies
 - Error handling and retries
 - Result aggregation
 - Direct response routing
 
 ### File Storage Service
+
 Manages external file storage to prevent memory issues:
+
 - Session-based file isolation
 - Automatic cleanup
 - Storage limit enforcement
@@ -201,37 +210,22 @@ class NewService:
         # Return results
 ```
 
-## Testing
-
-### Unit Tests
-```bash
-pytest tests/unit/
-```
-
-### Integration Tests
-```bash
-pytest tests/integration/
-```
-
-### Configuration Validation
-```python
-from utils.config import config
-config.validate_environment()  # Validates all required environment variables
-```
-
 ## Production Considerations
 
 ### Performance
+
 - Implements streaming responses for better user experience
 - Uses parallel tool execution to minimize latency
 - Employs intelligent document analysis to handle large PDFs efficiently
 
 ### Reliability
+
 - Comprehensive error handling at all layers
 - Automatic fallback mechanisms for tool failures
 - Session isolation prevents cross-user data leakage
 
 ### Scalability
+
 - Stateless design allows horizontal scaling
 - External file storage prevents memory exhaustion
 - Configurable model selection for cost optimization
