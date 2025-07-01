@@ -4,7 +4,7 @@ import logging
 import os
 import tempfile
 import threading
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import requests
 import streamlit as st
@@ -173,47 +173,16 @@ class FileController:
             pdf_id = self.session_controller.store_pdf_document(filename, pdf_data)
             logging.info(f"Stored PDF '{filename}' with ID '{pdf_id}' in session state")
 
+            # Add PDF content directly to message history as a tool response
+            self._add_pdf_content_to_history(filename, pdf_data)
+
             # No automatic summarization - this is now user-driven
 
         else:
-            # Fallback: Create tool response for chat history (legacy method)
-            tool_response = {
-                "role": "tool",
-                "content": json.dumps(
-                    {
-                        "tool_name": "process_pdf_document",
-                        "filename": filename,
-                        "total_pages": len(pages),
-                        "pages": pages,
-                        "status": "success",
-                    }
-                ),
-            }
+            # Log warning but don't add complex tool responses
+            logging.warning("Session controller not available for PDF storage")
 
-            # Add tool response to chat history (legacy storage)
-            if not hasattr(st.session_state, "messages"):
-                st.session_state.messages = []
-            st.session_state.messages.append(tool_response)
-            logging.warning("Used legacy message history storage for PDF - session controller not available")
-
-        # Add assistant confirmation message
-        confirmation_msg = (
-            f"I've successfully processed your PDF document **{filename}** and extracted text from "
-            f"{len(pages)} pages. I can now answer questions about the document content.\n\n"
-        )
-
-        # Add specific guidance based on document size
-        if len(pages) > summarization_threshold:
-            confirmation_msg += (
-                f"💡 **Tip:** Since this is a large document ({len(pages)} pages), you can:\n"
-                f"- Ask me to 'summarize the PDF' for a quick overview\n"
-                f"- Use text processing commands like 'summarize pages 1-5' or 'proofread page 10'\n"
-                f"- Ask specific questions about the content\n\n"
-            )
-
-        confirmation_msg += "What would you like to know?"
-
-        self.message_controller.safe_add_message_to_history("assistant", confirmation_msg)
+        # The detailed confirmation is now handled by _add_pdf_content_to_history
         logging.info(f"Successfully processed PDF: {filename} ({len(pages)} pages)")
 
     def _run_async_summarization(self, pdf_id: str, pdf_data: dict):
@@ -380,3 +349,34 @@ class FileController:
             File size limit in MB
         """
         return config.file_processing.MAX_PDF_SIZE // (1024 * 1024)
+
+    def _add_pdf_content_to_history(self, filename: str, pdf_data: dict):
+        """
+        Add a simple confirmation message to history
+
+        Args:
+            filename: Name of the PDF file
+            pdf_data: Processed PDF data
+        """
+        pages = pdf_data.get('pages', [])
+
+        # Just add a confirmation message - the actual PDF content will be injected automatically
+        confirmation_msg = (
+            f"✅ I've successfully loaded your PDF document **{filename}** ({len(pages)} pages). "
+            f"The full document content is now available for me to reference when answering your questions.\n\n"
+        )
+
+        # Add tips for large documents
+        if len(pages) > 10:
+            confirmation_msg += (
+                f"💡 **Tips for working with this document:**\n"
+                f"- Ask me to 'summarize the document' for a quick overview\n"
+                f"- Request specific information like 'What does the document say about X?'\n"
+                f"- Ask about specific pages or sections\n"
+                f"- I can translate, proofread, or rewrite sections\n\n"
+            )
+
+        confirmation_msg += "What would you like to know about this document?"
+
+        self.message_controller.safe_add_message_to_history("assistant", confirmation_msg)
+        logging.info(f"PDF '{filename}' is now available for automatic context injection")

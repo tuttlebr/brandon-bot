@@ -14,6 +14,7 @@ from typing import Dict, List, Optional, Tuple
 from models.chat_config import ChatConfig
 from tools import execute_assistant_with_dict
 from utils.config import config
+from utils.streamlit_context import run_with_streamlit_context
 
 logger = logging.getLogger(__name__)
 
@@ -113,9 +114,11 @@ class PDFSummarizationService:
                     "instructions": f"Create a concise summary of these {len(batch_pages)} pages from a PDF document. Focus on key information, main topics, and important details. Maximum {self.max_summary_length} words.",
                 }
 
-                # Execute summarization using assistant tool in thread pool
+                # Execute summarization using assistant tool in thread pool with context preserved
                 loop = asyncio.get_event_loop()
-                summary_result = await loop.run_in_executor(self.executor, execute_assistant_with_dict, summary_params)
+                summary_result = await loop.run_in_executor(
+                    self.executor, run_with_streamlit_context, execute_assistant_with_dict, summary_params
+                )
 
                 page_summaries.append(
                     {
@@ -169,7 +172,9 @@ class PDFSummarizationService:
                 }
 
                 loop = asyncio.get_event_loop()
-                summary_result = await loop.run_in_executor(self.executor, execute_assistant_with_dict, summary_params)
+                summary_result = await loop.run_in_executor(
+                    self.executor, run_with_streamlit_context, execute_assistant_with_dict, summary_params
+                )
 
                 intermediate_summaries.append(
                     {"sections_covered": [s['page_range'] for s in batch_summaries], "summary": summary_result.result}
@@ -208,7 +213,9 @@ class PDFSummarizationService:
             }
 
             loop = asyncio.get_event_loop()
-            summary_result = await loop.run_in_executor(self.executor, execute_assistant_with_dict, summary_params)
+            summary_result = await loop.run_in_executor(
+                self.executor, run_with_streamlit_context, execute_assistant_with_dict, summary_params
+            )
 
             return summary_result.result
 

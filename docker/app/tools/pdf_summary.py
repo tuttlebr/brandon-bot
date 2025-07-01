@@ -91,27 +91,48 @@ class PDFSummaryTool(BaseTool):
         filename = params.get("filename", None)
         summary_type = params.get("summary_type", "document")
 
-        # Initialize session controller to access PDFs
-        try:
-            from controllers.session_controller import SessionController
-            from models.chat_config import ChatConfig
+        # First check if PDF data was passed directly
+        pdf_data_param = params.get("pdf_data", None)
 
-            config = ChatConfig.from_environment()
-            session_controller = SessionController(config)
+        if pdf_data_param:
+            logger.info("Using PDF data passed directly in parameters")
+            pdf_documents = {"direct": pdf_data_param}
+            pdf_data = pdf_data_param
+            pdf_id = "direct"
+            actual_filename = pdf_data.get("filename", "Unknown")
+        else:
+            # Try to get PDF from session using PDFContextService
+            try:
+                from services.pdf_context_service import PDFContextService
 
-            # Get PDF documents from session
-            pdf_documents = session_controller.get_pdf_documents()
+                config = ChatConfig.from_environment()
+                pdf_context_service = PDFContextService(config)
 
-            if not pdf_documents:
-                return PDFSummaryResponse(
-                    success=False,
-                    filename=filename or "Unknown",
-                    summary_type=summary_type,
-                    message="No PDF documents found. Please upload a PDF first.",
-                    direct_response=True,
-                )
+                # Get the latest PDF data
+                pdf_data = pdf_context_service.get_latest_pdf_data()
+                logger.info(f"Retrieved PDF data from context service: {pdf_data is not None}")
 
-            # Find the PDF to summarize
+                pdf_documents = {}
+                if pdf_data:
+                    # Create a simple dictionary with one PDF
+                    pdf_id = "latest"
+                    pdf_documents[pdf_id] = pdf_data
+            except Exception as e:
+                logger.error(f"Error accessing PDF context service: {e}")
+                pdf_documents = {}
+                pdf_data = None
+
+        if not pdf_documents:
+            return PDFSummaryResponse(
+                success=False,
+                filename=filename or "Unknown",
+                summary_type=summary_type,
+                message="No PDF documents found. Please upload a PDF first.",
+                direct_response=True,
+            )
+
+        # Find the PDF to summarize
+        if not pdf_data:
             pdf_data = None
             pdf_id = None
 
@@ -138,17 +159,7 @@ class PDFSummaryTool(BaseTool):
                     direct_response=True,
                 )
 
-            actual_filename = pdf_data.get("filename", "Unknown")
-
-        except Exception as e:
-            logger.error(f"Error accessing session controller: {e}")
-            return PDFSummaryResponse(
-                success=False,
-                filename=filename or "Unknown",
-                summary_type=summary_type,
-                message=f"Error accessing PDF documents: {str(e)}",
-                direct_response=True,
-            )
+        actual_filename = pdf_data.get("filename", "Unknown")
 
         # Check if summarization is complete
         if not pdf_data.get("summarization_complete", False):
@@ -173,23 +184,27 @@ class PDFSummaryTool(BaseTool):
                     config = ChatConfig.from_environment()
                     self.summarization_service = PDFSummarizationService(config)
 
-                # Show progress message
-                import streamlit as st
+                # Log progress message (UI operations should be handled by the caller)
+                logger.info(f"Generating summary for {actual_filename} ({total_pages} pages)...")
 
-                with st.spinner(f"📝 Generating summary for **{actual_filename}** ({total_pages} pages)..."):
-                    # Perform synchronous summarization for immediate results
-                    enhanced_pdf_data = self.summarization_service.summarize_pdf_sync(pdf_data)
+                # Perform synchronous summarization for immediate results
+                enhanced_pdf_data = self.summarization_service.summarize_pdf_sync(pdf_data)
 
-                # Update the PDF data in storage
-                from services.file_storage_service import FileStorageService
+                # Update the PDF data in storage only if it came from storage
+                if pdf_id != "direct":
+                    from services.file_storage_service import FileStorageService
 
-                file_storage = FileStorageService()
+                    file_storage = FileStorageService()
 
-                if file_storage.update_pdf(pdf_id, enhanced_pdf_data):
-                    logger.info(f"Updated PDF '{actual_filename}' with summarization data")
-                    pdf_data = enhanced_pdf_data
+                    if file_storage.update_pdf(pdf_id, enhanced_pdf_data):
+                        logger.info(f"Updated PDF '{actual_filename}' with summarization data")
+                        pdf_data = enhanced_pdf_data
+                    else:
+                        logger.error(f"Failed to update PDF '{actual_filename}' in storage")
                 else:
-                    logger.error(f"Failed to update PDF '{actual_filename}' in storage")
+                    # For directly passed PDFs, just update the local copy
+                    logger.info(f"Updated directly passed PDF '{actual_filename}' with summarization data")
+                    pdf_data = enhanced_pdf_data
 
             except Exception as e:
                 logger.error(f"Error generating summary: {e}")

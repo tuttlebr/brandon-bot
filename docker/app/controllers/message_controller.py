@@ -7,6 +7,7 @@ import streamlit as st
 from models.chat_config import ChatConfig
 from services import ChatService
 from utils.config import config
+from utils.text_processing import strip_think_tags
 
 
 class MessageController:
@@ -119,14 +120,15 @@ class MessageController:
                 logging.warning(f"Attempted to add empty {role} message to chat history, skipping")
                 return False
 
-            # Check for tool call instructions
-            if self.contains_tool_call_instructions(content):
+            # Check for tool call instructions (but allow tool responses)
+            if role != "tool" and self.contains_tool_call_instructions(content):
                 logging.warning(
                     f"Attempted to add {role} message with tool call instructions to chat history, skipping"
                 )
                 return False
 
-            content = content.strip()
+            # Strip think tags before adding to history
+            content = strip_think_tags(content).strip()
         elif isinstance(content, dict):
             # Dict content (like image messages) - ensure it has meaningful data
             if not content:
@@ -139,7 +141,7 @@ class MessageController:
                 return False
 
         # Add the validated message to history using session controller if available
-        if hasattr(self, 'session_controller'):
+        if hasattr(self, 'session_controller') and self.session_controller:
             self.session_controller.add_message(role, content)
         else:
             # Fallback to direct access with safety check
@@ -202,51 +204,5 @@ class MessageController:
         # Clean previous chat history from context
         cleaned_messages = self.chat_service.clean_chat_history_context(cleaned_messages)
 
-        # Inject PDF data from session state if available
-        cleaned_messages = self._inject_pdf_data_if_available(cleaned_messages)
-
         # Prepare messages for API
         return self.chat_service.prepare_messages_for_api(cleaned_messages)
-
-    def _inject_pdf_data_if_available(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """
-        Inject PDF data from session state into messages for tool access
-
-        Args:
-            messages: List of messages
-
-        Returns:
-            Messages with PDF data injected if available
-        """
-        try:
-            if self.session_controller and self.session_controller.has_pdf_documents():
-                # Get the latest PDF from session state
-                pdf_data = self.session_controller.get_latest_pdf_document()
-                if pdf_data:
-                    # Prepare PDF data for injection
-                    injection_data = {
-                        "type": "pdf_data",
-                        "tool_name": "process_pdf_document",
-                        "filename": pdf_data.get('filename', 'Unknown'),
-                        "total_pages": pdf_data.get('total_pages', 0),
-                        "pages": pdf_data.get('pages', []),
-                        "status": pdf_data.get('status', 'success'),
-                    }
-
-                    # Include summarization data if available
-                    if pdf_data.get('summarization_complete', False):
-                        injection_data['summarization_complete'] = True
-                        injection_data['document_summary'] = pdf_data.get('document_summary', '')
-                        injection_data['page_summaries'] = pdf_data.get('page_summaries', [])
-                        logging.info(f"Including document summary for: {pdf_data.get('filename', 'Unknown')}")
-
-                    # Add a special system message with PDF data for tools to access
-                    pdf_message = {"role": "system", "content": json.dumps(injection_data)}
-                    # Insert after the main system message
-                    result = messages[:1] + [pdf_message] + messages[1:]
-                    logging.info(f"Injected PDF data for: {pdf_data.get('filename', 'Unknown')}")
-                    return result
-        except Exception as e:
-            logging.error(f"Error injecting PDF data: {e}")
-
-        return messages

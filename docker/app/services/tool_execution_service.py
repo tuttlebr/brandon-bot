@@ -14,6 +14,7 @@ import streamlit as st
 from models.chat_config import ChatConfig
 from tools.registry import tool_registry
 from utils.exceptions import ToolExecutionError
+from utils.streamlit_context import run_with_streamlit_context
 
 logger = logging.getLogger(__name__)
 
@@ -145,30 +146,27 @@ class ToolExecutionService:
         # Apply tool-specific modifications
         modified_args = await self._apply_tool_modifications(tool_name, tool_args, current_user_message, messages)
 
-        # Execute tool through registry with Streamlit context
+        # Execute tool through registry with Streamlit context preserved
         loop = asyncio.get_event_loop()
 
-        # Get the current Streamlit context (if available)
-        try:
-            # Try to get the context - this might fail if not in a Streamlit app
-            ctx = st.runtime.scriptrunner.add_script_run_ctx
-
-            # Execute with context
-            result = await loop.run_in_executor(
-                self.executor,
-                lambda: self._execute_with_context(lambda: tool_registry.execute_tool(tool_name, modified_args), ctx),
-            )
-        except (AttributeError, ImportError):
-            # Fallback if not in Streamlit or context not available
-            result = await loop.run_in_executor(
-                self.executor, lambda: tool_registry.execute_tool(tool_name, modified_args)
-            )
+        # Execute in thread pool with context preservation
+        result = await loop.run_in_executor(
+            self.executor, run_with_streamlit_context, tool_registry.execute_tool, tool_name, modified_args
+        )
 
         # Format response
         if hasattr(result, "direct_response") and result.direct_response:
+            # Get the content from the appropriate field
+            if hasattr(result, "message"):
+                content = result.message
+            elif hasattr(result, "result"):
+                content = result.result
+            else:
+                content = str(result)
+
             return {
                 "role": "direct_response",
-                "content": result.result if hasattr(result, "result") else str(result),
+                "content": content,
                 "tool_name": tool_name,
                 "tool_result": result,
             }
@@ -178,18 +176,6 @@ class ToolExecutionService:
                 "content": result.json() if hasattr(result, "json") else str(result),
                 "tool_name": tool_name,
             }
-
-    def _execute_with_context(self, func, ctx):
-        """Execute function with Streamlit context if available"""
-        try:
-            # Try to add the script run context
-            if ctx and hasattr(st.runtime.scriptrunner, 'add_script_run_ctx'):
-                return ctx(func)()
-            else:
-                return func()
-        except:
-            # Fallback to direct execution
-            return func()
 
     async def _apply_tool_modifications(
         self,
@@ -206,10 +192,25 @@ class ToolExecutionService:
         if tool_name in context_tools and messages:
             modified_args["messages"] = messages
 
-        # Add messages for PDF tools that need to access PDF data
-        pdf_tools = ["retrieve_pdf_summary", "process_pdf_text", "pdf_parser", "retrieve_pdf_full_text"]
-        if tool_name in pdf_tools and messages:
-            modified_args["messages"] = messages
+        # Add messages and PDF data for PDF tools
+        pdf_tools = ["retrieve_pdf_summary", "process_pdf_text"]
+        if tool_name in pdf_tools:
+            if messages:
+                modified_args["messages"] = messages
+
+            # Also try to get PDF data directly
+            try:
+                from models.chat_config import ChatConfig
+                from services.pdf_context_service import PDFContextService
+
+                config = ChatConfig.from_environment()
+                pdf_service = PDFContextService(config)
+                pdf_data = pdf_service.get_latest_pdf_data()
+                if pdf_data:
+                    modified_args["pdf_data"] = pdf_data
+                    logger.debug(f"Added PDF data to {tool_name} arguments")
+            except Exception as e:
+                logger.debug(f"Could not add PDF data to tool: {e}")
 
         # Add original prompt for assistant tool
         if tool_name == "text_assistant" and current_user_message:
@@ -225,22 +226,8 @@ class ToolExecutionService:
 
     def _apply_tool_restrictions(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Apply tool-specific restrictions"""
-        # Check if PDF parser is requested
-        pdf_parser_requested = any(tc.get("name") == "retrieve_pdf_content" for tc in tool_calls)
-
-        if not pdf_parser_requested:
-            return tool_calls
-
-        # When PDF parser is requested, only allow specific tools
-        allowed_tools = {"retrieve_pdf_content", "conversation_context", "text_assistant", "retrieval_search"}
-
-        filtered = [tc for tc in tool_calls if tc.get("name") in allowed_tools]
-
-        if len(filtered) < len(tool_calls):
-            filtered_out = [tc.get("name") for tc in tool_calls if tc.get("name") not in allowed_tools]
-            logger.warning(f"PDF parser restriction: filtered out {filtered_out}")
-
-        return filtered
+        # With automatic PDF injection, we no longer need special PDF tool restrictions
+        return tool_calls
 
     def determine_execution_strategy(self, tool_calls: List[Dict[str, Any]]) -> str:
         """

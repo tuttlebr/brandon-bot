@@ -6,7 +6,8 @@ ensuring consistent implementation and behavior across all tools.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
+
 from pydantic import BaseModel
 
 
@@ -34,6 +35,10 @@ class BaseTool(ABC):
     def __init__(self):
         self.name: str = ""
         self.description: str = ""
+        # LLM type configuration - which LLM this tool should use
+        # Options: "fast", "llm", "intelligent"
+        # Default to "fast" for efficiency, tools can override
+        self.llm_type: Literal["fast", "llm", "intelligent"] = "fast"
 
     @abstractmethod
     def get_definition(self) -> Dict[str, Any]:
@@ -72,3 +77,12 @@ class BaseTool(ABC):
         missing = [param for param in required if param not in params]
         if missing:
             raise ValueError(f"Missing required parameters: {', '.join(missing)}")
+
+    def get_llm_type(self) -> str:
+        """
+        Get the LLM type this tool should use
+
+        Returns:
+            The LLM type: "fast", "llm", or "intelligent"
+        """
+        return self.llm_type

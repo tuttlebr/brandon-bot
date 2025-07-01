@@ -31,8 +31,16 @@ class ChatHistoryComponent:
         """
         current_page = st.session_state.get("current_page", 0)
 
-        # Filter out system and tool messages for display (keep user and assistant messages only)
-        display_messages = [m for m in messages if m["role"] not in ["system", "tool"]]
+        # Filter out system messages and tool messages (PDF content is now automatically injected)
+        display_messages = []
+        for m in messages:
+            if m["role"] == "system":
+                continue
+            if m["role"] == "tool":
+                # Skip tool messages - they're no longer needed for display
+                continue
+            else:
+                display_messages.append(m)
         total_pages = max(1, len(display_messages) // messages_per_page + 1)
 
         start_idx = current_page * messages_per_page

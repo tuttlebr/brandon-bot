@@ -5,8 +5,10 @@ from typing import Any, Dict, List, Optional
 from models.chat_config import ChatConfig
 from openai import OpenAI
 from pydantic import BaseModel, Field
+from services.llm_client_service import llm_client_service
 from tools.base import BaseTool, BaseToolResponse
 from utils.config import config as app_config
+from utils.text_processing import strip_think_tags
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -51,6 +53,8 @@ class ConversationContextTool(BaseTool):
         super().__init__()
         self.name = "conversation_context"
         self.description = "Use this tool ONLY when you need to analyze conversation patterns, extract key themes from chat history, or understand the user's overall intent across multiple messages. Do NOT use for every query - only when historical context is essential for the response."
+        # Use fast model for quick context analysis
+        self.llm_type = "fast"
 
     def to_openai_format(self) -> Dict[str, Any]:
         """
@@ -87,14 +91,6 @@ class ConversationContextTool(BaseTool):
     def get_definition(self) -> Dict[str, Any]:
         """Get tool definition for BaseTool interface"""
         return self.to_openai_format()
-
-    def _create_llm_client(self, config: ChatConfig) -> OpenAI:
-        """Create an OpenAI client for context analysis"""
-        try:
-            return OpenAI(api_key=config.api_key, base_url=config.fast_llm_endpoint)
-        except Exception as e:
-            logger.error(f"Failed to create LLM client: {e}")
-            raise
 
     def _get_system_prompt(self, context_type: ContextType, focus_query: Optional[str] = None) -> str:
         """Get the appropriate system prompt for context analysis"""
@@ -167,7 +163,9 @@ class ConversationContextTool(BaseTool):
         logger.info(f"Analyzing {len(messages)} messages for context type: {context_type}")
 
         try:
-            client = self._create_llm_client(config)
+            # Get the appropriate client and model based on this tool's LLM type
+            client = llm_client_service.get_client(self.llm_type)
+            model_name = llm_client_service.get_model_name(self.llm_type)
             system_prompt = self._get_system_prompt(context_type, focus_query)
 
             # Prepare conversation history for analysis
@@ -204,10 +202,10 @@ class ConversationContextTool(BaseTool):
                 {"role": "user", "content": user_message},
             ]
 
-            logger.debug(f"Making context analysis request with model: {config.llm_model_name}")
+            logger.debug(f"Making context analysis request with model: {model_name} (type: {self.llm_type})")
 
             response = client.chat.completions.create(
-                model=config.fast_llm_model_name,
+                model=model_name,
                 messages=analysis_messages,
                 temperature=app_config.llm.DEFAULT_TEMPERATURE,  # Lower temperature for more consistent analysis
                 top_p=app_config.llm.DEFAULT_TOP_P,
@@ -280,7 +278,7 @@ class ConversationContextTool(BaseTool):
         # Remove context markers
         content = re.sub(r"<START_CONTEXT>.*?<END_CONTEXT>", "", content, flags=re.DOTALL)
         # Remove thinking tags
-        content = re.sub(r"<think>.*?</think>", "", content, flags=re.DOTALL)
+        content = strip_think_tags(content)
         # Remove tool call instructions
         content = re.sub(r"<TOOLCALL.*?</TOOLCALL>", "", content, flags=re.DOTALL | re.IGNORECASE)
 

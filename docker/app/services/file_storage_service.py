@@ -164,7 +164,9 @@ class FileStorageService:
 
             # Save PDF data
             pdf_path = self.pdfs_dir / f"{pdf_id}.json"
+            logger.debug(f"Storing PDF at: {pdf_path}")
             pdf_path.write_text(json.dumps(pdf_data, indent=2))
+            logger.debug(f"PDF stored successfully at: {pdf_path}, exists: {pdf_path.exists()}")
 
             # Save metadata
             metadata = {
@@ -198,7 +200,12 @@ class FileStorageService:
         """
         try:
             pdf_path = self.pdfs_dir / f"{pdf_id}.json"
+            logger.debug(f"Looking for PDF at: {pdf_path}")
             if not pdf_path.exists():
+                logger.warning(f"PDF file not found: {pdf_path}")
+                # List available PDFs for debugging
+                available_pdfs = list(self.pdfs_dir.glob("*.json"))
+                logger.debug(f"Available PDFs in storage: {[p.name for p in available_pdfs]}")
                 return None
 
             pdf_data = json.loads(pdf_path.read_text())
@@ -208,10 +215,23 @@ class FileStorageService:
             if metadata_path.exists():
                 metadata = json.loads(metadata_path.read_text())
                 # Add filename from metadata to pdf_data
-                pdf_data['filename'] = metadata.get('filename', 'Unknown')
+                filename = metadata.get('filename', '')
+                if not filename:
+                    # If no filename in metadata, try to derive from PDF data or use a default
+                    filename = pdf_data.get('filename', f'{pdf_id}.pdf')
+                    logger.warning(f"No filename in metadata for {pdf_id}, using: {filename}")
+
+                pdf_data['filename'] = filename
                 # Optionally add other metadata fields if needed
                 pdf_data['pdf_id'] = metadata.get('pdf_id', pdf_id)
+            else:
+                # If no metadata, ensure we still have a filename
+                if 'filename' not in pdf_data or not pdf_data['filename']:
+                    pdf_data['filename'] = f'{pdf_id}.pdf'
+                    logger.warning(f"No metadata found for {pdf_id}, using filename: {pdf_data['filename']}")
+                pdf_data['pdf_id'] = pdf_id
 
+            logger.debug(f"Retrieved PDF {pdf_id} with filename: {pdf_data.get('filename')}")
             return pdf_data
 
         except Exception as e:

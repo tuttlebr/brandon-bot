@@ -11,6 +11,7 @@ from models.chat_config import ChatConfig
 from services import LLMService
 from ui import ChatHistoryComponent
 from utils.config import config
+from utils.text_processing import strip_think_tags
 
 
 class ResponseController:
@@ -86,10 +87,16 @@ class ResponseController:
         Args:
             prepared_messages: Prepared messages for API call
         """
-        logging.info("Generating LLM response with simplified streaming")
+        # Get the default model type from configuration
+        from tools.tool_llm_config import DEFAULT_LLM_TYPE
 
-        # Extract model name
-        model_name = self.session_controller.get_model_name("fast")
+        # Extract model name based on the default LLM type
+        model_type = DEFAULT_LLM_TYPE
+        model_name = self.session_controller.get_model_name(model_type)
+
+        logging.info(
+            f"Generating LLM response with simplified streaming (model_type: {model_type}, model: {model_name})"
+        )
 
         # Initialize response tracking
         response_chunks = []
@@ -102,7 +109,9 @@ class ResponseController:
             try:
                 # Use asyncio.run for simpler async handling
                 full_response = asyncio.run(
-                    self._async_stream_response(prepared_messages, model_name, message_placeholder, response_chunks)
+                    self._async_stream_response(
+                        prepared_messages, model_name, model_type, message_placeholder, response_chunks
+                    )
                 )
 
             except Exception as e:
@@ -129,7 +138,12 @@ class ResponseController:
         self._response_chunks = response_chunks
 
     async def _async_stream_response(
-        self, prepared_messages: List[Dict[str, Any]], model_name: str, message_placeholder, response_chunks: List[str]
+        self,
+        prepared_messages: List[Dict[str, Any]],
+        model_name: str,
+        model_type: str,
+        message_placeholder,
+        response_chunks: List[str],
     ) -> str:
         """
         Async helper to stream response
@@ -137,6 +151,7 @@ class ResponseController:
         Args:
             prepared_messages: Messages to send
             model_name: Model to use
+            model_type: Type of model (fast, llm, intelligent)
             message_placeholder: Streamlit placeholder
             response_chunks: List to collect chunks
 
@@ -146,14 +161,16 @@ class ResponseController:
         full_response = ""
 
         try:
-            # Stream response from LLM service
-            async for chunk in self.llm_service.generate_streaming_response(prepared_messages, model_name):
+            # Stream response from LLM service with consistent model type
+            async for chunk in self.llm_service.generate_streaming_response(prepared_messages, model_name, model_type):
                 response_chunks.append(chunk)
                 full_response += chunk
 
                 # Update UI with accumulated response
                 if full_response.strip():
-                    message_placeholder.markdown(full_response)
+                    # Strip think tags before displaying
+                    display_response = strip_think_tags(full_response)
+                    message_placeholder.markdown(display_response)
 
                 # Small delay for visual effect
                 await asyncio.sleep(0.01)
@@ -407,12 +424,6 @@ class ResponseController:
             current = tool_data.get("current", {})
             temp = current.get("temperature", "N/A")
             return f"**Weather data for {location}** (Current: {temp}°F)"
-
-        # Handle PDF processing responses
-        if "tool_name" in tool_data and tool_data["tool_name"] == "process_pdf_document":
-            filename = tool_data.get("filename", "Unknown PDF")
-            total_pages = tool_data.get("total_pages", 0)
-            return f"**PDF Document Available:** {filename} ({total_pages} pages)"
 
         # Handle PDF content retrieval
         if "filename" in tool_data and "content" in tool_data and isinstance(tool_data.get("content"), list):

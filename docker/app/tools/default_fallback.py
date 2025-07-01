@@ -4,6 +4,7 @@ from typing import Any, Dict, Optional
 from models.chat_config import ChatConfig
 from openai import OpenAI
 from pydantic import BaseModel, Field
+from services.llm_client_service import llm_client_service
 from tools.base import BaseTool, BaseToolResponse
 from utils.config import config as app_config
 
@@ -34,6 +35,8 @@ class DefaultFallbackTool(BaseTool):
         super().__init__()
         self.name = "default_fallback"
         self.description = "Use this tool ONLY for: (1) Social interactions - greetings, thanks, goodbyes; (2) General knowledge questions that don't require real-time data; (3) Explanations of concepts or ideas; (4) Advice or opinions; (5) Any query that doesn't match other tools. Do NOT use for: weather, news, web searches, PDFs, image generation, or text processing tasks."
+        # Use fast model for quick responses
+        self.llm_type = "fast"
 
     def to_openai_format(self) -> Dict[str, Any]:
         """
@@ -68,14 +71,6 @@ class DefaultFallbackTool(BaseTool):
         """Get tool definition for BaseTool interface"""
         return self.to_openai_format()
 
-    def _create_fast_llm_client(self, config: ChatConfig) -> OpenAI:
-        """Create a Fast LLM client for generating responses"""
-        try:
-            return OpenAI(api_key=config.api_key, base_url=config.fast_llm_endpoint)
-        except Exception as e:
-            logger.error(f"Failed to create Fast LLM client: {e}")
-            raise
-
     def _generate_response(
         self, query: str, context: Optional[str] = None, config: Optional[ChatConfig] = None
     ) -> str:
@@ -93,12 +88,10 @@ class DefaultFallbackTool(BaseTool):
         Raises:
             Exception: If response generation fails
         """
-        if not config:
-            raise ValueError("ChatConfig is required for LLM access")
-
         try:
-            # Create Fast LLM client
-            fast_client = self._create_fast_llm_client(config)
+            # Get the appropriate client and model based on this tool's LLM type
+            fast_client = llm_client_service.get_client(self.llm_type)
+            model_name = llm_client_service.get_model_name(self.llm_type)
 
             # Import SYSTEM_PROMPT lazily to avoid circular imports
             from utils.system_prompt import SYSTEM_PROMPT
@@ -108,9 +101,11 @@ class DefaultFallbackTool(BaseTool):
             if context:
                 user_message = f"Context: {context}\n\nQuery: {query}"
 
+            logger.debug(f"Making LLM request with model: {model_name} (type: {self.llm_type})")
+
             # Generate response using Fast LLM
             response = fast_client.chat.completions.create(
-                model=config.fast_llm_model_name,
+                model=model_name,
                 messages=[{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": user_message}],
                 temperature=app_config.llm.DEFAULT_TEMPERATURE,
                 max_tokens=500,  # Reasonable limit for general responses

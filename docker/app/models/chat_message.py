@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, Union
+from utils.text_processing import strip_think_tags
 
 
 class ChatMessage:
@@ -22,13 +23,18 @@ class ChatMessage:
         Returns:
             The text content that should be displayed in the UI
         """
+        # Extract the raw content first
+        raw_content = ""
         if isinstance(self.content, list):
-            return self.content[0].get("text", "")
+            raw_content = self.content[0].get("text", "")
         elif isinstance(self.content, dict):
             # Handle image messages with metadata
-            return self.content.get("text", "")
+            raw_content = self.content.get("text", "")
         else:
-            return self.content
+            raw_content = self.content
+
+        # Strip think tags before returning
+        return strip_think_tags(raw_content)
 
     def is_image_message(self) -> bool:
         """

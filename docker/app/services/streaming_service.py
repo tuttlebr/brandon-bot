@@ -93,6 +93,8 @@ class StreamingService:
         """
         client = self.get_client(model_type, async_client=True)
 
+        logger.debug(f"Streaming with model_type: {model_type}, model: {model}")
+
         try:
             # Prepare API parameters
             api_params = {
@@ -105,7 +107,7 @@ class StreamingService:
 
             if tools:
                 api_params["tools"] = tools
-                api_params["tool_choice"] = "required"
+                api_params["tool_choice"] = "auto"
 
             # Create streaming response
             response = await client.chat.completions.create(**api_params)
@@ -142,6 +144,8 @@ class StreamingService:
         """
         client = self.get_client(model_type, async_client=False)
 
+        logger.debug(f"Sync completion with model_type: {model_type}, model: {model}")
+
         try:
             # Prepare API parameters
             api_params = {
@@ -154,7 +158,7 @@ class StreamingService:
 
             if tools:
                 api_params["tools"] = tools
-                api_params["tool_choice"] = "required"
+                api_params["tool_choice"] = "auto"
 
             return client.chat.completions.create(**api_params)
 

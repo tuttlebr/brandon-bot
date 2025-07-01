@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 from models.chat_config import ChatConfig
 from openai import OpenAI
 from pydantic import BaseModel, Field
+from services.llm_client_service import llm_client_service
 from tools.base import BaseTool, BaseToolResponse
 from utils.config import config as app_config
 
@@ -50,6 +51,8 @@ class AssistantTool(BaseTool):
         super().__init__()
         self.name = "text_assistant"
         self.description = "Use this tool ONLY when the user provides raw text (not PDF content) and explicitly requests one of these operations: (1) SUMMARIZE - create a summary from provided text; (2) PROOFREAD - fix grammar/spelling in provided text; (3) REWRITE - rephrase provided text with different tone/style; (4) CRITIC - provide literary feedback on provided text; (5) WRITER - create new creative content from a prompt; (6) TRANSLATE - translate provided text between supported languages. Do NOT use this for PDF operations - use PDF-specific tools instead."
+        # Use intelligent model for high-quality text processing
+        self.llm_type = "intelligent"
 
     def to_openai_format(self) -> Dict[str, Any]:
         """
@@ -126,22 +129,6 @@ class AssistantTool(BaseTool):
 
         return prompt
 
-    def _create_llm_client(self, config: ChatConfig) -> OpenAI:
-        """
-        Create an OpenAI client for text processing using the chat configuration
-
-        Args:
-            config: ChatConfig instance with LLM configuration
-
-        Returns:
-            OpenAI client instance
-        """
-        try:
-            return OpenAI(api_key=config.api_key, base_url=config.intelligent_llm_endpoint)
-        except Exception as e:
-            logger.error(f"Failed to create LLM client: {e}")
-            raise
-
     def _process_text(
         self,
         task_type: AssistantTaskType,
@@ -168,7 +155,9 @@ class AssistantTool(BaseTool):
         logger.info(f"Processing text with task type: {task_type}")
 
         try:
-            client = self._create_llm_client(config)
+            # Get the appropriate client based on this tool's LLM type
+            client = llm_client_service.get_client(self.llm_type)
+            model_name = llm_client_service.get_model_name(self.llm_type)
             system_prompt = self._get_system_prompt(task_type, instructions)
 
             # Prepare the user message based on task type
@@ -200,10 +189,10 @@ class AssistantTool(BaseTool):
                 {"role": "user", "content": user_message},
             ]
 
-            logger.debug(f"Making LLM request with model: {config.llm_model_name}")
+            logger.debug(f"Making LLM request with model: {model_name} (type: {self.llm_type})")
 
             response = client.chat.completions.create(
-                model=config.intelligent_llm_model_name,
+                model=model_name,
                 messages=messages,
                 temperature=app_config.llm.DEFAULT_TEMPERATURE
                 if task_type == AssistantTaskType.TRANSLATE

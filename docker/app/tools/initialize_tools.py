@@ -17,7 +17,14 @@ def initialize_all_tools():
         # Get the tool registry instance
         tool_registry = ToolRegistry.get_instance()
 
-        # Clear any existing tools
+        # Check if tools are already initialized to prevent re-registration
+        if len(tool_registry._tools) > 0:
+            logger.debug(
+                f"Tools already initialized ({len(tool_registry._tools)} tools found), skipping re-initialization"
+            )
+            return
+
+        # Clear any existing tools (shouldn't be any if check above works)
         tool_registry._tools.clear()
 
         # Assistant Tool
@@ -49,18 +56,6 @@ def initialize_all_tools():
 
         news = NewsTool()
         tool_registry.register(news)
-
-        # PDF Parser Tool
-        from tools.pdf_parser import PDFParserTool
-
-        pdf_parser = PDFParserTool()
-        tool_registry.register(pdf_parser)
-
-        # PDF Full Text Tool
-        from tools.pdf_full_text import PDFFullTextTool
-
-        pdf_full_text = PDFFullTextTool()
-        tool_registry.register(pdf_full_text)
 
         # PDF Summary Tool
         from tools.pdf_summary import PDFSummaryTool

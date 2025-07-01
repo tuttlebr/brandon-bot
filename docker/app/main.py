@@ -7,6 +7,7 @@ import streamlit as st
 from controllers import FileController, MessageController, ResponseController, SessionController
 from models import ChatConfig
 from services import ChatService, ImageService, LLMService
+from services.pdf_context_service import PDFContextService
 from tools.initialize_tools import initialize_all_tools
 from ui import ChatHistoryComponent, apply_custom_styles
 from utils.config import config
@@ -18,11 +19,16 @@ class ProductionStreamlitChatApp:
     def __init__(self):
         """Initialize the production-ready Streamlit chat application"""
         try:
-            # Initialize tools first
-            initialize_all_tools()
-
             # Initialize configuration using centralized system
             self.config_obj = ChatConfig.from_environment()
+
+            # Tools and LLM client service are already initialized in startup.initialize_app()
+            # Just verify they're available
+            from tools.registry import tool_registry
+
+            if len(tool_registry._tools) == 0:
+                logging.warning("No tools found, attempting initialization")
+                initialize_all_tools()
 
             # Apply custom styling using centralized configuration
             apply_custom_styles()
@@ -35,6 +41,7 @@ class ProductionStreamlitChatApp:
             self.chat_service = ChatService(self.config_obj)
             self.image_service = ImageService(self.config_obj)
             self.llm_service = LLMService(self.config_obj)
+            self.pdf_context_service = PDFContextService(self.config_obj)
 
             # Initialize UI components
             self.chat_history_component = ChatHistoryComponent(self.config_obj)
@@ -61,6 +68,12 @@ class ProductionStreamlitChatApp:
     def display_chat_history(self):
         """Display the chat history using the chat history component"""
         try:
+            # Show PDF info if available
+            if hasattr(self, 'pdf_context_service'):
+                pdf_info = self.pdf_context_service.get_pdf_info_for_display()
+                if pdf_info:
+                    st.info(pdf_info)
+
             # Use session controller's safe message access
             messages = self.session_controller.get_messages()
             self.chat_history_component.display_chat_history(messages)
@@ -104,6 +117,9 @@ class ProductionStreamlitChatApp:
             # Prepare messages for processing using controller
             messages = self.session_controller.get_messages()
             prepared_messages = self.message_controller.prepare_messages_for_processing(messages)
+
+            # Inject PDF context if available
+            prepared_messages = self.pdf_context_service.inject_pdf_context(prepared_messages, prompt)
 
             # Generate and display response using controller with centralized spinner
             random_icon = random.choice(config.ui.SPINNER_ICONS)
@@ -186,6 +202,11 @@ def main():
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[logging.StreamHandler(), logging.FileHandler('/tmp/chatbot.log', mode='a')],
     )
+
+    # Initialize app startup settings (including warning suppression)
+    from utils.startup import initialize_app
+
+    initialize_app()
 
     # Validate environment configuration on startup
     try:

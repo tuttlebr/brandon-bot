@@ -332,27 +332,21 @@ class PDFTextProcessorTool(BaseTool):
         return descriptions.get(task_type, "Processed Text")
 
     def _get_pdf_data_from_messages(self, messages: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-        """Get PDF data from messages"""
-        if not messages:
+        """Get PDF data from session (simplified with automatic injection)"""
+        # With automatic PDF injection, we can get PDF data directly from session
+        try:
+            from controllers.session_controller import SessionController
+            from models.chat_config import ChatConfig
+
+            config = ChatConfig.from_environment()
+            session_controller = SessionController(config)
+
+            # Get the latest PDF from session
+            pdf_data = session_controller.get_latest_pdf_document()
+            return pdf_data
+        except Exception as e:
+            logger.error(f"Error getting PDF data: {e}")
             return None
-
-        # Look for injected PDF data in system messages
-        for message in messages:
-            if message.get("role") == "system":
-                try:
-                    content = message.get("content", "")
-                    if isinstance(content, str):
-                        data = json.loads(content)
-                        if (
-                            isinstance(data, dict)
-                            and data.get("type") == "pdf_data"
-                            and data.get("tool_name") == "process_pdf_document"
-                        ):
-                            return data
-                except (json.JSONDecodeError, TypeError):
-                    continue
-
-        return None
 
 
 # Create global instance

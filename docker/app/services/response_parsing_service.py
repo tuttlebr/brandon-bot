@@ -11,6 +11,7 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from utils.exceptions import LLMServiceError
+from utils.text_processing import strip_think_tags
 
 logger = logging.getLogger(__name__)
 
@@ -138,11 +139,4 @@ class ResponseParsingService:
 
     def filter_think_tags(self, content: str) -> str:
         """Remove think tags from content"""
-        if not content:
-            return content
-
-        # Remove <think>...</think> tags
-        pattern = r'<think>.*?</think>'
-        filtered = re.sub(pattern, '', content, flags=re.DOTALL)
-
-        return filtered.strip()
+        return strip_think_tags(content)

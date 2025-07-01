@@ -94,6 +94,7 @@ class LLMConfig:
 
     # Context and token limits
     SLIDING_WINDOW_MAX_TURNS: int = 6
+    MAX_CONTEXT_LENGTH: int = 60000  # Maximum context length for LLM (chars)
 
 
 @dataclass
@@ -122,6 +123,17 @@ class APIConfig:
     DEFAULT_REQUEST_TIMEOUT: int = 3600
     LLM_REQUEST_TIMEOUT: int = 3600
     IMAGE_REQUEST_TIMEOUT: int = 3600
+
+
+@dataclass
+class SystemConfig:
+    """System-level configuration"""
+
+    # Logging configuration
+    LOG_LEVEL: str = field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
+    SUPPRESS_STREAMLIT_WARNINGS: bool = field(
+        default_factory=lambda: os.getenv("SUPPRESS_STREAMLIT_WARNINGS", "true").lower() == "true"
+    )
 
 
 @dataclass
@@ -202,6 +214,7 @@ class AppConfig:
         self.llm = LLMConfig()
         self.image_generation = ImageGenerationConfig()
         self.api = APIConfig()
+        self.system = SystemConfig()
         self.env = EnvironmentConfig()
 
         # Validate environment variables
@@ -266,7 +279,7 @@ config = AppConfig()
 
 # Configure logging with centralized format
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, config.system.LOG_LEVEL.upper()),
     format="%(asctime)s %(levelname)s %(filename)s:%(lineno)d %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
