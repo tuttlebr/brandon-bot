@@ -108,10 +108,14 @@ class ToolRegistry:
         Returns:
             Formatted string of available tools
         """
+        logger.debug(f"Generating tools list text. Registry has {len(self._tools)} tools registered.")
         tools_text = []
         for name, tool in self._tools.items():
+            logger.debug(f"Adding tool to list: {name} - {tool.description}")
             tools_text.append(f"- {name}: {tool.description}")
-        return "\n".join(tools_text)
+        result = "\n".join(tools_text)
+        logger.debug(f"Generated tools list text: {result}")
+        return result
 
     def clear(self) -> None:
         """Clear all registered tools (mainly for testing)"""

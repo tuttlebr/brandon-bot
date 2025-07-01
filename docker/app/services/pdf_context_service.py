@@ -5,14 +5,12 @@ This service handles automatic injection of PDF content into LLM context.
 It ensures PDF content is ALWAYS available when users ask questions about documents.
 """
 
-import json
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import streamlit as st
 from models.chat_config import ChatConfig
 from utils.config import config
-from utils.text_processing import strip_think_tags
 
 logger = logging.getLogger(__name__)
 

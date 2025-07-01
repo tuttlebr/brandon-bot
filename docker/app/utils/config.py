@@ -20,7 +20,7 @@ class UIConfig:
     SPINNER_ICONS: List[str] = field(default_factory=lambda: ["🤖", "🧠", "🤔", "🤓", "⚡"])
 
     # Display limits and formatting
-    MAX_PROMPT_DISPLAY_LENGTH: int = 2048
+    MAX_PROMPT_DISPLAY_LENGTH: int = 4096
 
     # Pagination and display
     CURRENT_PAGE_DEFAULT: int = 0
@@ -52,7 +52,7 @@ class FileProcessingConfig:
     """File processing configuration"""
 
     # PDF processing
-    PDF_PROCESSING_TIMEOUT: int = 360
+    PDF_PROCESSING_TIMEOUT: int = 6000
     PDF_TEMP_FILE_SUFFIX: str = ".pdf"
 
     # File size limits (in bytes)
@@ -93,7 +93,7 @@ class LLMConfig:
     DEFAULT_PRESENCE_PENALTY: float = 0.0
 
     # Context and token limits
-    SLIDING_WINDOW_MAX_TURNS: int = 6
+    SLIDING_WINDOW_MAX_TURNS: int = 20  # Increased from 6 to prevent context loss
     MAX_CONTEXT_LENGTH: int = 60000  # Maximum context length for LLM (chars)
 
 

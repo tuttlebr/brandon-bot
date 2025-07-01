@@ -4,11 +4,11 @@ from typing import Any, Dict, List, Optional, Tuple
 from models.chat_config import ChatConfig
 from openai import OpenAI
 from PIL import Image
-from pydantic import BaseModel, Field
+from pydantic import Field
 from tools.base import BaseTool, BaseToolResponse
 from tools.conversation_context import execute_conversation_context_with_dict
 from utils.config import config as app_config
-from utils.image import ALLOWED_DIMENSIONS, generate_image
+from utils.image import generate_image
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -241,6 +241,9 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
                     {"role": "user", "content": user_message},
                 ],
                 temperature=app_config.llm.DEFAULT_TEMPERATURE,  # Some creativity but controlled
+                top_p=app_config.llm.DEFAULT_TOP_P,
+                presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,
+                frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
                 max_tokens=200,  # Keep prompts reasonable length
                 stream=False,
             )

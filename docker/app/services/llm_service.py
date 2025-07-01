@@ -13,9 +13,8 @@ from services.response_parsing_service import ResponseParsingService
 from services.streaming_service import StreamingService
 from services.tool_execution_service import ToolExecutionService
 from tools.registry import tool_registry
-from tools.tool_llm_config import DEFAULT_LLM_TYPE
+from tools.tool_llm_config import DEFAULT_LLM_TYPE, get_tool_llm_type
 from utils.config import config
-from utils.exceptions import LLMServiceError
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +36,23 @@ class LLMService:
 
         # For backward compatibility
         self.last_tool_responses = []
+
+    def _get_model_for_type(self, model_type: str) -> str:
+        """
+        Get the appropriate model name for a given model type
+
+        Args:
+            model_type: The model type ("fast", "llm", or "intelligent")
+
+        Returns:
+            The model name from configuration
+        """
+        if model_type == "fast":
+            return self.config.fast_llm_model_name
+        elif model_type == "intelligent":
+            return self.config.intelligent_llm_model_name
+        else:  # "llm" or any other value defaults to regular model
+            return self.config.llm_model_name
 
     async def generate_streaming_response(
         self, messages: List[Dict[str, Any]], model: str, model_type: str = DEFAULT_LLM_TYPE
@@ -60,20 +76,22 @@ class LLMService:
             tools = tool_registry.get_all_definitions()
 
             # First, get non-streaming response to check for tool calls
-            # ALWAYS use intelligent model for tool selection
-            intelligent_model = self.config.intelligent_llm_model_name
+            tool_selection_model_type = get_tool_llm_type("tool_selection")
+            tool_selection_model = self._get_model_for_type(tool_selection_model_type)
             response = self.streaming_service.sync_completion(
-                windowed_messages, intelligent_model, "intelligent", tools=tools
+                windowed_messages, tool_selection_model, tool_selection_model_type, tools=tools
             )
 
             # Parse response for content and tool calls
             content, tool_calls = self.parsing_service.parse_response(response)
+            logging.info(f"Tool calls: {tool_calls}")
+            logging.info(f"Content: {content}")
 
             # If there are tool calls, execute them
             if tool_calls:
                 # Log which tools were selected
                 tool_names = [tc.get("name", "unknown") for tc in tool_calls]
-                logger.info(f"Tool selection (intelligent model): {', '.join(tool_names)}")
+                logger.info(f"Tool selection ({tool_selection_model_type} model): {', '.join(tool_names)}")
                 yield await self._handle_tool_calls(tool_calls, windowed_messages, model, model_type)
             elif content:
                 # Stream the content
@@ -146,9 +164,23 @@ class LLMService:
         tool_messages = [msg for msg in messages if msg.get("role") == "tool"]
         conversation_messages = [msg for msg in messages if msg.get("role") not in ["system", "tool"]]
 
-        # Apply window to conversation messages only
-        if len(conversation_messages) > max_turns * 2:
-            conversation_messages = conversation_messages[-(max_turns * 2) :]
+        # CRITICAL FIX: Only apply sliding window for very long conversations
+        # For typical conversations (< 50 messages), keep full context
+        # This prevents context loss in normal usage
+        if len(conversation_messages) <= 50:  # ~25 turns of conversation
+            logger.debug(f"Keeping full conversation context ({len(conversation_messages)} messages)")
+            return system_messages + tool_messages + conversation_messages
+
+        # For longer conversations, keep more context than before
+        # Increase window size to at least 20 turns (40 messages) to maintain context
+        effective_max_turns = max(max_turns, 20)
+        window_size = effective_max_turns * 2
+
+        if len(conversation_messages) > window_size:
+            logger.info(
+                f"Applying sliding window: keeping last {window_size} messages out of {len(conversation_messages)}"
+            )
+            conversation_messages = conversation_messages[-window_size:]
 
         # Return with system and tool messages preserved
         return system_messages + tool_messages + conversation_messages

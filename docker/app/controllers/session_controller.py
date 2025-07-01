@@ -5,7 +5,7 @@ import streamlit as st
 from models.chat_config import ChatConfig
 from services.file_storage_service import FileStorageService
 from utils.config import config
-from utils.system_prompt import SYSTEM_PROMPT
+from utils.system_prompt import get_system_prompt
 
 
 class SessionController:
@@ -38,7 +38,7 @@ class SessionController:
             st.session_state.fast_llm_model_name = self.config_obj.fast_llm_model_name
             st.session_state.llm_model_name = self.config_obj.llm_model_name
             st.session_state.intelligent_llm_model_name = self.config_obj.intelligent_llm_model_name
-            st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+            st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
             st.session_state.current_page = config.ui.CURRENT_PAGE_DEFAULT
             st.session_state.processing = False
 

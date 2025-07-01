@@ -19,7 +19,7 @@ class BaseToolResponse(BaseModel):
         error_message: Error message if the tool failed
         direct_response: When True, the tool's response will be returned directly to the user
                         without being wrapped in tool response formatting. This is useful for
-                        conversational tools (like default_fallback) that generate natural
+                        conversational tools (like text_assistant) that generate natural
                         language responses. When False (default), the response will be
                         formatted as a tool response for the LLM to process.
     """

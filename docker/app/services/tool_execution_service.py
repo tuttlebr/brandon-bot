@@ -10,7 +10,6 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 
-import streamlit as st
 from models.chat_config import ChatConfig
 from tools.registry import tool_registry
 from utils.exceptions import ToolExecutionError
@@ -217,10 +216,6 @@ class ToolExecutionService:
             user_content = current_user_message.get("content", "")
             if user_content and "text" not in modified_args:
                 modified_args["text"] = user_content
-
-        # Add config for default_fallback tool
-        if tool_name == "default_fallback":
-            modified_args["config"] = self.config
 
         return modified_args
 

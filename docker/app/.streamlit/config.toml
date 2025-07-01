@@ -9,8 +9,9 @@ runOnSave = true
 maxUploadSize = 16
 enableCORS = false
 enableXsrfProtection = false
-maxMessageSize = 50
+maxMessageSize = 200
 enableWebsocketCompression = false
+disconnectedSessionTTL = 3600
 
 [theme]
 base = "dark"
@@ -20,3 +21,9 @@ secondaryBackgroundColor="#403e41"
 
 [ui]
 hideTopBar = true
+
+[runner]
+fastReruns = false
+
+[logger]
+level = "error"

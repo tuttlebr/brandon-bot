@@ -3,8 +3,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from models.chat_config import ChatConfig
-from openai import OpenAI
-from pydantic import BaseModel, Field
+from pydantic import Field
 from services.llm_client_service import llm_client_service
 from tools.base import BaseTool, BaseToolResponse
 from utils.config import config as app_config
@@ -207,8 +206,10 @@ class ConversationContextTool(BaseTool):
             response = client.chat.completions.create(
                 model=model_name,
                 messages=analysis_messages,
-                temperature=app_config.llm.DEFAULT_TEMPERATURE,  # Lower temperature for more consistent analysis
+                temperature=app_config.llm.DEFAULT_TEMPERATURE,
                 top_p=app_config.llm.DEFAULT_TOP_P,
+                presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,
+                frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
             )
 
             result = response.choices[0].message.content.strip()

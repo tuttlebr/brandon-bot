@@ -39,12 +39,6 @@ def initialize_all_tools():
         context = ConversationContextTool()
         tool_registry.register(context)
 
-        # Default Fallback Tool
-        from tools.default_fallback import DefaultFallbackTool
-
-        fallback = DefaultFallbackTool()
-        tool_registry.register(fallback)
-
         # Image Generation Tool
         from tools.image_gen import ImageGenerationTool
 

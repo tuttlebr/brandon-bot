@@ -9,11 +9,6 @@ from .conversation_context import (
     execute_conversation_context_with_dict,
     get_conversation_context_tool_definition,
 )
-from .default_fallback import (
-    DefaultFallbackTool,
-    execute_default_fallback_with_dict,
-    get_default_fallback_tool_definition,
-)
 from .image_gen import (
     ImageGenerationTool,
     execute_image_generation,
@@ -47,9 +42,6 @@ __all__ = [
     "ConversationContextTool",
     "get_conversation_context_tool_definition",
     "execute_conversation_context_with_dict",
-    "DefaultFallbackTool",
-    "get_default_fallback_tool_definition",
-    "execute_default_fallback_with_dict",
     "ImageGenerationTool",
     "get_image_generation_tool_definition",
     "execute_image_generation",

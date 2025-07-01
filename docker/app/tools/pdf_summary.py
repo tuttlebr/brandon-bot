@@ -5,7 +5,6 @@ This tool generates or retrieves document summaries for uploaded PDFs.
 It will create summaries on-demand if they don't already exist.
 """
 
-import json
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -90,37 +89,42 @@ class PDFSummaryTool(BaseTool):
         """
         filename = params.get("filename", None)
         summary_type = params.get("summary_type", "document")
+        messages = params.get("messages", [])
 
-        # First check if PDF data was passed directly
+        # Try to get PDF data from multiple sources in order of preference
+        pdf_data = None
+        pdf_id = None
+
+        # 1. First check if PDF data was passed directly in params
         pdf_data_param = params.get("pdf_data", None)
-
         if pdf_data_param:
             logger.info("Using PDF data passed directly in parameters")
-            pdf_documents = {"direct": pdf_data_param}
             pdf_data = pdf_data_param
             pdf_id = "direct"
-            actual_filename = pdf_data.get("filename", "Unknown")
-        else:
-            # Try to get PDF from session using PDFContextService
+
+        # 2. Try to extract from messages (works in thread context)
+        if not pdf_data and messages:
+            pdf_data = self._get_pdf_data_from_messages(messages)
+            if pdf_data:
+                logger.info("Extracted PDF data from system messages")
+                pdf_id = "from_messages"
+
+        # 3. Last resort: try PDFContextService (may fail in thread context)
+        if not pdf_data:
             try:
                 from services.pdf_context_service import PDFContextService
 
                 config = ChatConfig.from_environment()
                 pdf_context_service = PDFContextService(config)
-
-                # Get the latest PDF data
                 pdf_data = pdf_context_service.get_latest_pdf_data()
-                logger.info(f"Retrieved PDF data from context service: {pdf_data is not None}")
-
-                pdf_documents = {}
                 if pdf_data:
-                    # Create a simple dictionary with one PDF
+                    logger.info("Retrieved PDF data from context service")
                     pdf_id = "latest"
-                    pdf_documents[pdf_id] = pdf_data
             except Exception as e:
-                logger.error(f"Error accessing PDF context service: {e}")
-                pdf_documents = {}
-                pdf_data = None
+                logger.debug(f"Could not access PDF context service (expected in thread context): {e}")
+
+        # Create pdf_documents dict for compatibility
+        pdf_documents = {pdf_id: pdf_data} if pdf_data else {}
 
         if not pdf_documents:
             return PDFSummaryResponse(
@@ -301,6 +305,68 @@ class PDFSummaryTool(BaseTool):
             formatted.append(f"**Pages {page_range}:**\n{summary_text}\n")
 
         return "\n".join(formatted)
+
+    def _get_pdf_data_from_messages(self, messages: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """Extract PDF data from injected system messages"""
+        if not messages:
+            logger.debug("No messages provided to extract PDF data from")
+            return None
+
+        # Look for PDF content in system messages
+        for message in messages:
+            if message.get("role") == "system":
+                content = message.get("content", "")
+                if isinstance(content, str) and "## PDF Document Context" in content:
+                    # This is an injected PDF context message
+                    # Extract the PDF data from the content
+                    try:
+                        # Parse the PDF content from the system message
+                        lines = content.split('\n')
+                        filename = None
+                        pages = []
+                        in_pdf_content = False
+                        current_page = None
+                        current_page_text = []
+
+                        for line in lines:
+                            if "The user has uploaded a PDF document:" in line:
+                                # Extract filename
+                                import re
+
+                                match = re.search(r"'([^']+)'", line)
+                                if match:
+                                    filename = match.group(1)
+                            elif line.strip() == "---BEGIN PDF CONTENT---":
+                                in_pdf_content = True
+                            elif line.strip() == "---END PDF CONTENT---":
+                                in_pdf_content = False
+                                # Save last page if any
+                                if current_page is not None and current_page_text:
+                                    pages.append({"page": current_page, "text": '\n'.join(current_page_text).strip()})
+                            elif in_pdf_content:
+                                if line.startswith("### Page "):
+                                    # Save previous page if any
+                                    if current_page is not None and current_page_text:
+                                        pages.append(
+                                            {"page": current_page, "text": '\n'.join(current_page_text).strip()}
+                                        )
+                                    # Start new page
+                                    try:
+                                        current_page = int(line.replace("### Page ", "").strip())
+                                        current_page_text = []
+                                    except ValueError:
+                                        pass
+                                elif current_page is not None:
+                                    current_page_text.append(line)
+
+                        if pages:
+                            logger.info(f"Extracted PDF data from system message: {filename} with {len(pages)} pages")
+                            return {"filename": filename or "Unknown", "pages": pages}
+                    except Exception as e:
+                        logger.error(f"Error parsing PDF data from system message: {e}")
+
+        logger.debug("No PDF data found in system messages")
+        return None
 
 
 # Create global instance

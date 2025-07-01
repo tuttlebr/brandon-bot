@@ -1,6 +1,5 @@
 import logging
-import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from models.chat_config import ChatConfig
 from models.chat_message import ChatMessage

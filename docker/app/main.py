@@ -1,5 +1,7 @@
+import json
 import logging
 import random
+import time
 
 import streamlit as st
 
@@ -69,7 +71,7 @@ class ProductionStreamlitChatApp:
         """Display the chat history using the chat history component"""
         try:
             # Show PDF info if available
-            if hasattr(self, 'pdf_context_service'):
+            if hasattr(self, "pdf_context_service"):
                 pdf_info = self.pdf_context_service.get_pdf_info_for_display()
                 if pdf_info:
                     st.info(pdf_info)
@@ -108,7 +110,7 @@ class ProductionStreamlitChatApp:
 
             # Clear previous context and tool responses using controllers
             self.session_controller.clear_tool_context()
-            if hasattr(self.llm_service, 'last_tool_responses'):
+            if hasattr(self.llm_service, "last_tool_responses"):
                 self.llm_service.last_tool_responses = []
 
             # Add user message to chat history using safe controller method
@@ -123,7 +125,7 @@ class ProductionStreamlitChatApp:
 
             # Generate and display response using controller with centralized spinner
             random_icon = random.choice(config.ui.SPINNER_ICONS)
-            with st.spinner(f"{random_icon} _Typing..._"):
+            with st.spinner(f"{random_icon} _Typing..._", show_time=True):
                 self.response_controller.generate_and_display_response_no_spinner(prepared_messages)
 
         except ChatbotException as e:
@@ -135,29 +137,133 @@ class ProductionStreamlitChatApp:
         finally:
             self.session_controller.set_processing_state(False)
 
-    def process_pdf_upload(self, uploaded_file):
+    @st.fragment(run_every=2)
+    def pdf_processing_fragment(self):
         """
-        Process uploaded PDF file using production-ready controller
-
-        Args:
-            uploaded_file: Streamlit uploaded file object
+        Self-contained PDF processing fragment that runs independently
+        Uses st.fragment to poll every 2 seconds and update status
         """
-        try:
-            self.session_controller.set_processing_state(True)
+        st.subheader("📄 PDF Document Upload")
 
-            # Use file controller with centralized configuration and error handling
-            success = self.file_controller.process_pdf_upload(uploaded_file)
-            if success:
-                self.file_controller.mark_file_as_processed(uploaded_file.name)
+        # Get current processing status
+        processing_status = getattr(st.session_state, 'pdf_processing_status', None)
 
-        except ChatbotException as e:
-            logging.error(f"Chatbot error processing PDF: {e}")
-            st.error(f"PDF Error: {str(e)}")
-        except Exception as e:
-            logging.error(f"Unexpected error processing PDF: {e}")
-            st.error("An unexpected error occurred while processing the PDF.")
-        finally:
-            self.session_controller.set_processing_state(False)
+        if processing_status == "processing":
+            # Show processing status
+            processing_file = getattr(st.session_state, 'pdf_processing_file', 'Unknown')
+            processing_start = getattr(st.session_state, 'pdf_processing_start_time', time.time())
+            elapsed = int(time.time() - processing_start)
+
+            st.info(f"🔄 Processing: {processing_file}")
+            st.caption(f"Processing time: {elapsed}s")
+
+            # Show progress bar (indeterminate)
+            progress_bar = st.progress(0)
+            for i in range(100):
+                progress_bar.progress((i + elapsed * 10) % 100 + 1)
+
+            st.info("Please wait while your PDF is being processed...")
+
+        elif processing_status == "completed":
+            # Show completion message
+            message = getattr(st.session_state, 'pdf_processing_message', '✅ Processing completed')
+            st.success(message)
+
+            # Clear processing status after brief display
+            if not hasattr(st.session_state, 'completion_shown') or not st.session_state.completion_shown:
+                st.session_state.completion_shown = True
+                time.sleep(1)
+            else:
+                # Reset after showing completion
+                st.session_state.pdf_processing_status = None
+                st.session_state.pdf_processing_file = None
+                st.session_state.pdf_processing_message = None
+                st.session_state.completion_shown = False
+
+        elif processing_status == "error":
+            # Show error message
+            message = getattr(st.session_state, 'pdf_processing_message', '❌ Processing failed')
+            st.error(message)
+
+            # Clear error status after brief display
+            if not hasattr(st.session_state, 'error_shown') or not st.session_state.error_shown:
+                st.session_state.error_shown = True
+                time.sleep(1)
+            else:
+                # Reset after showing error
+                st.session_state.pdf_processing_status = None
+                st.session_state.pdf_processing_file = None
+                st.session_state.pdf_processing_message = None
+                st.session_state.error_shown = False
+
+        else:
+            # Normal state - show file uploader
+            uploaded_file = st.file_uploader(
+                "Choose PDF file",
+                type=self.file_controller.get_supported_file_types(),
+                accept_multiple_files=False,
+                help=f"Upload a PDF document to analyze and discuss its content (Max size: {self.file_controller.get_file_size_limit_mb()}MB)",
+                key="pdf_uploader",
+            )
+
+            # Handle new uploads - process synchronously within fragment
+            if uploaded_file is not None and not self.session_controller.is_processing():
+                if self.file_controller.is_new_upload(uploaded_file):
+                    # Mark as processing immediately
+                    st.session_state.pdf_processing_status = "processing"
+                    st.session_state.pdf_processing_start_time = time.time()
+                    st.session_state.pdf_processing_file = uploaded_file.name
+
+                    # Process PDF synchronously with spinner
+                    with st.spinner(f"🔄 Processing PDF: {uploaded_file.name}..."):
+                        try:
+                            logging.info(f"Starting synchronous PDF processing for: {uploaded_file.name}")
+
+                            # Use file controller for processing - this is blocking
+                            success = self.file_controller.process_pdf_upload(uploaded_file)
+
+                            if success:
+                                self.file_controller.mark_file_as_processed(uploaded_file.name)
+                                st.session_state.pdf_processing_status = "completed"
+                                st.session_state.pdf_processing_message = (
+                                    f"✅ Successfully processed PDF: {uploaded_file.name}"
+                                )
+                                logging.info(f"Synchronous PDF processing completed for: {uploaded_file.name}")
+                            else:
+                                st.session_state.pdf_processing_status = "error"
+                                st.session_state.pdf_processing_message = (
+                                    f"❌ Failed to process PDF: {uploaded_file.name}"
+                                )
+                                logging.error(f"Synchronous PDF processing failed for: {uploaded_file.name}")
+
+                        except Exception as e:
+                            logging.error(f"Synchronous PDF processing error: {e}")
+                            st.session_state.pdf_processing_status = "error"
+                            st.session_state.pdf_processing_message = f"❌ PDF processing error: {str(e)}"
+
+            # Show current PDF status if available
+            if self.session_controller.has_pdf_documents():
+                latest_pdf = self.session_controller.get_latest_pdf_document()
+                if latest_pdf:
+                    filename = latest_pdf.get('filename', 'Unknown')
+                    pages = len(latest_pdf.get('pages', []))
+                    st.success(f"✅ Current PDF: {filename} ({pages} pages)")
+
+                    if st.button("🗑️ Remove Current PDF", help="Remove the current PDF from session"):
+                        self.session_controller.clear_pdf_documents()
+                        st.rerun()
+
+        # Debug info (can be removed in production)
+        # with st.expander("Debug Info", expanded=False):
+        #     debug_info = {
+        #         "processing_status": processing_status,
+        #         "is_processing": self.session_controller.is_processing(),
+        #         "has_pdfs": self.session_controller.has_pdf_documents(),
+        #         "stored_pdfs": getattr(st.session_state, 'stored_pdfs', []),
+        #         "currently_processing_pdf": getattr(st.session_state, 'currently_processing_pdf', None),
+        #         "last_uploaded_pdf": getattr(st.session_state, 'last_uploaded_pdf', None),
+        #     }
+        #     st.json(debug_info)
 
     def run(self):
         """Run the production-ready application using controller pattern"""
@@ -165,29 +271,13 @@ class ProductionStreamlitChatApp:
             # Display chat history
             self.display_chat_history()
 
-            # Check processing state using controller
-            if self.session_controller.is_processing():
-                st.info("Processing your message, please wait...")
-                return
-
             # Handle user input with centralized configuration
-            if prompt := st.chat_input("Hello, how are you?"):
+            if prompt := st.chat_input():
                 self.process_prompt(prompt)
 
-            # Handle PDF upload with centralized configuration and validation
-            uploaded_file = st.file_uploader(
-                "📄 Upload PDF Document",
-                type=self.file_controller.get_supported_file_types(),
-                accept_multiple_files=False,
-                help=f"Upload a PDF document to analyze and discuss its content (Max size: {self.file_controller.get_file_size_limit_mb()}MB)",
-                key="pdf_uploader",
-            )
-
-            if uploaded_file is not None:
-                # Check if this is a new upload using controller
-                if self.file_controller.is_new_upload(uploaded_file):
-                    self.process_pdf_upload(uploaded_file)
-                    st.rerun()
+            # Handle PDF upload and processing via fragment
+            with st.sidebar:
+                self.pdf_processing_fragment()
 
         except Exception as e:
             logging.error(f"Error in application run loop: {e}")
@@ -199,8 +289,8 @@ def main():
     # Configure logging for production
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[logging.StreamHandler(), logging.FileHandler('/tmp/chatbot.log', mode='a')],
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=[logging.StreamHandler(), logging.FileHandler("/tmp/chatbot.log", mode="a"),],
     )
 
     # Initialize app startup settings (including warning suppression)

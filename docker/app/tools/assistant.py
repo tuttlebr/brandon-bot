@@ -4,8 +4,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from models.chat_config import ChatConfig
-from openai import OpenAI
-from pydantic import BaseModel, Field
+from pydantic import Field
 from services.llm_client_service import llm_client_service
 from tools.base import BaseTool, BaseToolResponse
 from utils.config import config as app_config
@@ -50,7 +49,7 @@ class AssistantTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "text_assistant"
-        self.description = "Use this tool ONLY when the user provides raw text (not PDF content) and explicitly requests one of these operations: (1) SUMMARIZE - create a summary from provided text; (2) PROOFREAD - fix grammar/spelling in provided text; (3) REWRITE - rephrase provided text with different tone/style; (4) CRITIC - provide literary feedback on provided text; (5) WRITER - create new creative content from a prompt; (6) TRANSLATE - translate provided text between supported languages. Do NOT use this for PDF operations - use PDF-specific tools instead."
+        self.description = "Text processing tool for SPECIFIC user requests ONLY. ONLY use when user EXPLICITLY asks to: SUMMARIZE ('summarize this...', 'give me a summary'), PROOFREAD ('check grammar', 'fix spelling'), REWRITE ('rewrite this', 'make it more formal'), CRITIC ('critique this', 'give feedback on'), WRITER ('write a story about', 'create content'), or TRANSLATE ('translate to Spanish', 'convert to French'). User MUST provide substantial text AND explicitly request one of these operations. Never use for PDF content - use PDF tools instead."
         # Use intelligent model for high-quality text processing
         self.llm_type = "intelligent"
 
@@ -196,7 +195,7 @@ class AssistantTool(BaseTool):
                 messages=messages,
                 temperature=app_config.llm.DEFAULT_TEMPERATURE
                 if task_type == AssistantTaskType.TRANSLATE
-                else 0.8,  # Lower temperature for translation accuracy
+                else 0.3,  # Lower temperature for translation accuracy
                 top_p=app_config.llm.DEFAULT_TOP_P,
                 frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
                 presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,

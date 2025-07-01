@@ -5,13 +5,11 @@ This tool enables text processing tasks (summarize, proofread, rewrite, etc.)
 on PDF content with automatic chunking for large documents.
 """
 
-import json
 import logging
 from typing import Any, Dict, List, Optional
 
-from models.chat_config import ChatConfig
-from pydantic import BaseModel, Field
-from tools.assistant import AssistantTaskType, assistant_tool
+from pydantic import Field
+from tools.assistant import assistant_tool
 from tools.base import BaseTool, BaseToolResponse
 
 # Configure logger
@@ -332,21 +330,66 @@ class PDFTextProcessorTool(BaseTool):
         return descriptions.get(task_type, "Processed Text")
 
     def _get_pdf_data_from_messages(self, messages: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-        """Get PDF data from session (simplified with automatic injection)"""
-        # With automatic PDF injection, we can get PDF data directly from session
-        try:
-            from controllers.session_controller import SessionController
-            from models.chat_config import ChatConfig
-
-            config = ChatConfig.from_environment()
-            session_controller = SessionController(config)
-
-            # Get the latest PDF from session
-            pdf_data = session_controller.get_latest_pdf_document()
-            return pdf_data
-        except Exception as e:
-            logger.error(f"Error getting PDF data: {e}")
+        """Extract PDF data from injected system messages"""
+        if not messages:
+            logger.debug("No messages provided to extract PDF data from")
             return None
+
+        # Look for PDF content in system messages
+        for message in messages:
+            if message.get("role") == "system":
+                content = message.get("content", "")
+                if isinstance(content, str) and "## PDF Document Context" in content:
+                    # This is an injected PDF context message
+                    # Extract the PDF data from the content
+                    try:
+                        # Parse the PDF content from the system message
+                        lines = content.split('\n')
+                        filename = None
+                        pages = []
+                        in_pdf_content = False
+                        current_page = None
+                        current_page_text = []
+
+                        for line in lines:
+                            if "The user has uploaded a PDF document:" in line:
+                                # Extract filename
+                                import re
+
+                                match = re.search(r"'([^']+)'", line)
+                                if match:
+                                    filename = match.group(1)
+                            elif line.strip() == "---BEGIN PDF CONTENT---":
+                                in_pdf_content = True
+                            elif line.strip() == "---END PDF CONTENT---":
+                                in_pdf_content = False
+                                # Save last page if any
+                                if current_page is not None and current_page_text:
+                                    pages.append({"page": current_page, "text": '\n'.join(current_page_text).strip()})
+                            elif in_pdf_content:
+                                if line.startswith("### Page "):
+                                    # Save previous page if any
+                                    if current_page is not None and current_page_text:
+                                        pages.append(
+                                            {"page": current_page, "text": '\n'.join(current_page_text).strip()}
+                                        )
+                                    # Start new page
+                                    try:
+                                        current_page = int(line.replace("### Page ", "").strip())
+                                        current_page_text = []
+                                    except ValueError:
+                                        pass
+                                elif current_page is not None:
+                                    current_page_text.append(line)
+
+                        if pages:
+                            logger.info(f"Extracted PDF data from system message: {filename} with {len(pages)} pages")
+                            return {"filename": filename or "Unknown", "pages": pages}
+                    except Exception as e:
+                        logger.error(f"Error parsing PDF data from system message: {e}")
+
+        logger.debug("No PDF data found in system messages")
+        return None
 
 
 # Create global instance

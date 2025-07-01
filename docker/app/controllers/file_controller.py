@@ -1,10 +1,9 @@
 import asyncio
-import json
 import logging
 import os
 import tempfile
-import threading
-from typing import List, Optional, Tuple
+import time
+from typing import Tuple
 
 import requests
 import streamlit as st
@@ -17,7 +16,9 @@ from utils.config import config
 class FileController:
     """Controller for handling file operations, primarily PDF processing"""
 
-    def __init__(self, config_obj: ChatConfig, message_controller: MessageController, session_controller=None):
+    def __init__(
+        self, config_obj: ChatConfig, message_controller: MessageController, session_controller=None,
+    ):
         """
         Initialize the file controller
 
@@ -42,15 +43,17 @@ class FileController:
             True if processing was successful, False otherwise
         """
         try:
+            # Mark file as being processed immediately to prevent duplicates
+            self.mark_file_as_processing(uploaded_file.name)
+
             # Display user action in chat
-            self._display_upload_message(uploaded_file.name)
+            # self._display_upload_message(uploaded_file.name)
 
             # Add user action to chat history
             self.message_controller.safe_add_message_to_history("user", f"📄 Uploaded PDF: {uploaded_file.name}")
 
             # Process the PDF file
-            with st.spinner("🔍 Processing PDF..."):
-                success, result = self._process_pdf_file(uploaded_file)
+            success, result = self._process_pdf_file(uploaded_file)
 
             if success:
                 self._handle_successful_processing(uploaded_file.name, result)
@@ -64,11 +67,9 @@ class FileController:
             logging.error(f"Unexpected PDF processing error: {e}")
             self._display_error_message(error_msg)
             return False
-
-    def _display_upload_message(self, filename: str):
-        """Display upload message in chat UI"""
-        with st.chat_message("user", avatar=self.config_obj.user_avatar):
-            st.markdown(f"📄 **Uploaded PDF:** {filename}")
+        finally:
+            # Always clear the processing marker when done
+            self.clear_processing_file()
 
     def _process_pdf_file(self, uploaded_file) -> Tuple[bool, dict]:
         """
@@ -103,34 +104,48 @@ class FileController:
             if not nvingest_endpoint:
                 return False, {"error": "PDF processing service not configured (NVINGEST_ENDPOINT not set)"}
 
-            with open(temp_file_path, 'rb') as pdf_file:
-                files = {'file': pdf_file}
-                response = requests.post(nvingest_endpoint, files=files, timeout=config.get_api_timeout("pdf"))
+            with open(temp_file_path, "rb") as pdf_file:
+                files = {"file": pdf_file}
 
-            # Check if request was successful
-            response.raise_for_status()
+                # Use resilient request
+                response = self._make_resilient_request(
+                    nvingest_endpoint, files, base_timeout=config.get_api_timeout("pdf")
+                )
 
             # Parse JSON response
             pdf_data = response.json()
 
             # Validate response structure
-            if not isinstance(pdf_data, dict) or 'pages' not in pdf_data:
+            if not isinstance(pdf_data, dict) or "pages" not in pdf_data:
                 return False, {"error": "Invalid response format from PDF processing server"}
 
-            pages = pdf_data.get('pages', [])
+            pages = pdf_data.get("pages", [])
             if not pages:
                 return False, {"error": "No pages found in PDF response"}
 
             return True, pdf_data
 
-        except requests.exceptions.RequestException as e:
-            error_msg = f"Unable to connect to the PDF processing server. Please ensure the server is running at {config.env.NVINGEST_ENDPOINT}"
-            logging.error(f"PDF processing request error: {e}")
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            if "Connection refused" in str(e):
+                error_msg = f"Unable to connect to the PDF processing server. Please ensure the server is running at {config.env.NVINGEST_ENDPOINT}"
+            else:
+                error_msg = f"The PDF processing service is temporarily unavailable or the document is too large. Please try again in a few moments."
+            logging.error(f"PDF processing network error: {e}")
             return False, {"error": error_msg}
 
-        except requests.exceptions.Timeout:
-            error_msg = f"The PDF processing took too long (timeout: {config.file_processing.PDF_PROCESSING_TIMEOUT}s). Please try with a smaller document."
-            logging.error("PDF processing timeout")
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code >= 500:
+                error_msg = "The PDF processing server encountered an internal error. Please try again later."
+            elif e.response.status_code == 413:
+                error_msg = "The PDF file is too large for the processing server."
+            else:
+                error_msg = f"PDF processing failed with server error: {e.response.status_code}"
+            logging.error(f"PDF processing HTTP error: {e}")
+            return False, {"error": error_msg}
+
+        except requests.exceptions.RequestException as e:
+            error_msg = f"PDF processing failed due to a network issue. Please check your connection and try again."
+            logging.error(f"PDF processing request error: {e}")
             return False, {"error": error_msg}
 
         except ValueError as e:
@@ -145,6 +160,36 @@ class FileController:
             except OSError:
                 pass
 
+    def _display_upload_message(self, filename: str):
+        """Display upload message in chat UI"""
+        with st.chat_message("user", avatar=self.config_obj.user_avatar):
+            st.markdown(f"📄 **Uploaded PDF:** {filename}")
+
+    def _make_resilient_request(self, url: str, files: dict, base_timeout: int = None) -> requests.Response:
+        """
+        Make a long-running HTTP request with specified timeout
+
+        Args:
+            url: The URL to make the request to
+            files: Files to upload
+            max_retries: Unused parameter (kept for backwards compatibility)
+            base_timeout: Timeout in seconds for the request
+
+        Returns:
+            requests.Response object
+
+        Raises:
+            requests.exceptions.RequestException: If the request fails
+        """
+        if base_timeout is None:
+            base_timeout = config.get_api_timeout("pdf")
+
+        logging.info(f"PDF processing with {base_timeout} seconds timeout")
+
+        response = requests.post(url, files=files, timeout=base_timeout)
+        response.raise_for_status()
+        return response
+
     def _handle_successful_processing(self, filename: str, pdf_data: dict):
         """
         Handle successful PDF processing
@@ -153,7 +198,7 @@ class FileController:
             filename: Name of the processed file
             pdf_data: Processed PDF data
         """
-        pages = pdf_data.get('pages', [])
+        pages = pdf_data.get("pages", [])
         summarization_threshold = config.file_processing.PDF_SUMMARIZATION_THRESHOLD
         summarization_enabled = config.file_processing.PDF_SUMMARIZATION_ENABLED
 
@@ -224,7 +269,7 @@ class FileController:
             pdf_data: PDF data to summarize
         """
         try:
-            filename = pdf_data.get('filename', 'Unknown')
+            filename = pdf_data.get("filename", "Unknown")
             logging.info(f"Starting async summarization for PDF: {filename}")
 
             # Perform recursive summarization
@@ -277,7 +322,7 @@ class FileController:
             # 3. Use Redis or another external store
 
             # For now, we'll update if we can safely access the session state
-            if hasattr(st.session_state, 'uploaded_pdfs') and pdf_id in st.session_state.uploaded_pdfs:
+            if hasattr(st.session_state, "uploaded_pdfs") and pdf_id in st.session_state.uploaded_pdfs:
                 st.session_state.uploaded_pdfs[pdf_id] = enhanced_pdf_data
                 logging.info(f"Updated PDF '{enhanced_pdf_data.get('filename')}' with summarization data")
             else:
@@ -318,10 +363,36 @@ class FileController:
         Returns:
             True if this is a new upload, False otherwise
         """
+        # Check if we're currently processing this file
+        if (
+            hasattr(st.session_state, "currently_processing_pdf")
+            and st.session_state.currently_processing_pdf == uploaded_file.name
+        ):
+            logging.info(f"PDF '{uploaded_file.name}' is already being processed, skipping duplicate processing")
+            return False
+
+        # Check if this file was already processed successfully
         return (
-            not hasattr(st.session_state, 'last_uploaded_pdf')
+            not hasattr(st.session_state, "last_uploaded_pdf")
             or st.session_state.last_uploaded_pdf != uploaded_file.name
         )
+
+    def mark_file_as_processing(self, filename: str):
+        """
+        Mark a file as currently being processed to prevent duplicates
+
+        Args:
+            filename: Name of the file being processed
+        """
+        st.session_state.currently_processing_pdf = filename
+        logging.info(f"Marked PDF '{filename}' as currently being processed")
+
+    def clear_processing_file(self):
+        """Clear the currently processing file marker"""
+        if hasattr(st.session_state, "currently_processing_pdf"):
+            filename = st.session_state.currently_processing_pdf
+            st.session_state.currently_processing_pdf = None
+            logging.info(f"Cleared processing marker for PDF '{filename}'")
 
     def mark_file_as_processed(self, filename: str):
         """
@@ -331,6 +402,7 @@ class FileController:
             filename: Name of the processed file
         """
         st.session_state.last_uploaded_pdf = filename
+        logging.info(f"Marked PDF '{filename}' as successfully processed")
 
     def get_supported_file_types(self) -> list:
         """
@@ -358,7 +430,7 @@ class FileController:
             filename: Name of the PDF file
             pdf_data: Processed PDF data
         """
-        pages = pdf_data.get('pages', [])
+        pages = pdf_data.get("pages", [])
 
         # Just add a confirmation message - the actual PDF content will be injected automatically
         confirmation_msg = (

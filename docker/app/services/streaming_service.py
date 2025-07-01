@@ -5,7 +5,6 @@ This service handles streaming responses from LLM models with
 a simplified approach that avoids complex threading patterns.
 """
 
-import asyncio
 import logging
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
@@ -100,7 +99,7 @@ class StreamingService:
             api_params = {
                 "model": model,
                 "messages": messages,
-                "stream": True,
+                "stream": True,  # Enable streaming for async iteration
                 **config.get_llm_parameters(),
                 **kwargs,
             }
@@ -108,6 +107,7 @@ class StreamingService:
             if tools:
                 api_params["tools"] = tools
                 api_params["tool_choice"] = "auto"
+                api_params["parallel_tool_calls"] = True
 
             # Create streaming response
             response = await client.chat.completions.create(**api_params)
@@ -159,6 +159,7 @@ class StreamingService:
             if tools:
                 api_params["tools"] = tools
                 api_params["tool_choice"] = "auto"
+                api_params["parallel_tool_calls"] = True
 
             return client.chat.completions.create(**api_params)
 

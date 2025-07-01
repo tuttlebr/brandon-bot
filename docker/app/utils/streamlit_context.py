@@ -7,9 +7,8 @@ when executing code in threads or async contexts.
 
 import functools
 import logging
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
-import streamlit as st
 from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
 
 logger = logging.getLogger(__name__)
@@ -83,7 +82,13 @@ def run_with_streamlit_context(func: Callable, *args, **kwargs) -> Any:
                 # Import here to avoid circular imports
                 import threading
 
-                add_script_run_ctx(threading.current_thread(), ctx)
+                # Add context to current thread
+                try:
+                    add_script_run_ctx(threading.current_thread(), ctx)
+                except Exception:
+                    # If adding context fails, continue without it
+                    pass
+
                 return func(*args, **kwargs)
 
             return wrapped_func()
@@ -133,8 +138,6 @@ def suppress_streamlit_warnings():
     This should be used sparingly and only when you're sure the warnings
     are benign (e.g., in background tasks that don't interact with UI)
     """
-    import sys
-
     # Create a custom filter to suppress specific warnings
     class StreamlitContextFilter(logging.Filter):
         def filter(self, record):
@@ -143,6 +146,36 @@ def suppress_streamlit_warnings():
                 return False
             return True
 
-    # Add filter to Streamlit logger
+    # Add filter to various loggers that might emit these warnings
+    filter_instance = StreamlitContextFilter()
+
+    # Apply to streamlit logger
     streamlit_logger = logging.getLogger("streamlit")
-    streamlit_logger.addFilter(StreamlitContextFilter())
+    streamlit_logger.addFilter(filter_instance)
+
+    # Apply to streamlit.runtime logger
+    streamlit_runtime_logger = logging.getLogger("streamlit.runtime")
+    streamlit_runtime_logger.addFilter(filter_instance)
+
+    # Apply to root logger to catch any that slip through
+    root_logger = logging.getLogger()
+    root_logger.addFilter(filter_instance)
+
+    # Also try to suppress at the thread level by capturing the warning source
+    try:
+        import streamlit.runtime.scriptrunner as scriptrunner
+
+        # Monkey patch to suppress the warning at source
+        original_get_script_run_ctx = scriptrunner.get_script_run_ctx
+
+        def patched_get_script_run_ctx(*args, **kwargs):
+            try:
+                return original_get_script_run_ctx(*args, **kwargs)
+            except Exception:
+                # Silently return None instead of logging warning
+                return None
+
+        scriptrunner.get_script_run_ctx = patched_get_script_run_ctx
+    except Exception:
+        # If patching fails, fall back to just the filters
+        pass

@@ -8,7 +8,7 @@ of tool calls from both standard OpenAI format and custom formats.
 import json
 import logging
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 from utils.exceptions import LLMServiceError
 from utils.text_processing import strip_think_tags

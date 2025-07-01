@@ -18,6 +18,8 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 COPY app/ .
 
+# Modify Streamlit timeout from 60 to 360 seconds
+RUN sed -i 's/SCRIPT_RUN_CHECK_TIMEOUT: Final = 60/SCRIPT_RUN_CHECK_TIMEOUT: Final = 360/' /app/.venv/lib/python3.13/site-packages/streamlit/runtime/runtime.py
 
 # Place executables in the environment at the front of the path
 ENV PATH="/app/.venv/bin:$PATH"

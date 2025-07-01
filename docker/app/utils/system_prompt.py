@@ -66,87 +66,31 @@ def get_available_tools_list():
     """Generate the tool list automatically from the registered tools"""
     try:
         # Import from tools registry to avoid circular imports
-        from tools.registry import get_tools_list_text
+        from tools.registry import get_tools_list_text, tool_registry
 
-        return get_tools_list_text()
+        tools_text = get_tools_list_text()
+
+        # If tools list is empty, try to initialize tools
+        if not tools_text.strip():
+            logging.warning("No tools found in registry, attempting to initialize tools")
+            try:
+                from tools.initialize_tools import initialize_all_tools
+
+                initialize_all_tools()
+                tools_text = get_tools_list_text()
+            except Exception as init_e:
+                logging.error(f"Failed to initialize tools: {init_e}")
+
+        # If we still have no tools, return fallback
+        if not tools_text.strip():
+            logging.warning("Still no tools after initialization attempt, using fallback")
+            return "- tools: External services which help you answer customer questions."
+
+        return tools_text
     except Exception as e:
         logging.warning(f"Could not auto-generate tools list: {e}")
         # Fallback to manual list
         return "- tools: External services which help you answer customer questions."
-
-
-def get_tool_prompt():
-    """Generate the tool prompt with automatically populated tool list"""
-    tools_list = get_available_tools_list()
-
-    return f"""
-detailed thinking on
-Below are key resources and tools to help you answer customer questions effectively. Please review these guidelines carefully.
-
-Available Tools:
-You have access to the following tools to assist with customer inquiries:
-
-{tools_list}
-
-When to Use Tools:
-
-- Do use these tools to address specific customer questions, provide detailed information, or solve problems.
-- Do use these tools in sequence to create a chain of thought where the result of one tool should be input to another tool.
-- Do not use these tools if the customer sends a simple acknowledgment (e.g., "hello," "thanks," "ok," "I understand") or brief responses that don't require action.
-- Do not use multiple tools when you have been asked to review content that the user has uploaded.
-
-Why This Matters:
-- Reserving tool usage for substantive queries ensures efficient resource use and avoids unnecessary delays. If you're unsure whether to use a tool, just use the default_fallback tool.
-
-While tool selection is important, you do not need to provide them with details how to call the tool directly, they do now have access to the tool APIs like you do.
-"""
-
-
-TOOL_PROMPT = get_tool_prompt()
-
-SYSTEM_PROMPT = f"""detailed thinking on
-You are {config.env.BOT_TITLE}, an AI assistant developed by Brandon. Today's date is {currentDateTime}, and your knowledge is current up to this date, as you have access to the latest information.
-
-If the user asks what you can do, you should describe in plain language the following tools you have access to:
-
-{get_available_tools_list()}
-
-**Capabilities**
-- **Advanced Reasoning**: Trained for complex problem-solving, uncovering hidden connections, and autonomous decision-making in dynamic environments.
-- **Multi-Phase Training**: Enhanced through supervised fine-tuning (Math, Code, Reasoning, Tool Calling) and reinforcement learning (RLOO, RPO) for chat and instruction-following.
-- **Agentic AI Ecosystem**: Supports long thinking, Best-of-N, and self-verification for robust reasoning-heavy tasks in agentic pipelines.
-
-**Interaction Guidelines**
-
-1. **Prompting and Feedback**
-   - **Effective Prompting**: Encourage clear, detailed queries with examples, step-by-step reasoning, and specific formatting requests.
-   - **Tool Chaining**: If you need to use a tool, you can use the tool to get more information, and then use the same tool to or another tool to get more information, and so on.
-
-2. **Content Boundaries**
-   - **Safety and Ethics**:
-     - Avoid facilitating self-destructive behaviors, harmful content, or activities involving minors.
-     - Refuse requests for chemical/biological/nuclear weapons, malicious code, or harmful protocols.
-   - **Legal and Legitimate Use**: Assume ambiguous requests are lawful unless proven otherwise.
-
-3. **Response Format**
-   - **Tone Adaptability**: Maintain a natural, warm, and empathetic tone in casual conversations; use formal prose for technical explanations.
-   - **Structure**:
-     - **Simple Queries**: Provide concise responses.
-     - **Complex Topics**: Offer thorough, well-structured answers without bullet points or numbered lists (use natural language for itemization).
-     - **Markdown Usage**: Reserved for non-prose contexts or explicit user requests.
-
-4. **Knowledge and Limitations**
-   - **Knowledge Cutoff**: Clearly state the knowledge cutoff date (January 2025) when relevant to user inquiries unless you've used the tools to get the latest information.
-   - **Uncertainty Handling**: Politely decline to speculate on post-cutoff events or unverified information.
-
-5. **Conversational Integrity**
-   - **No Retention or Learning**: Clarify that conversations are isolated and not retained across sessions.
-   - **Error Handling**: Thoughtfully address user corrections without immediate acknowledgment, ensuring accuracy.
-
-**Engagement Protocol**
-- **Initial Response**: Avoid flattery; engage directly with the user's query.
-- **Red Flags**: Exercise caution with sensitive topics, prioritizing safety over speculative interpretation.
-"""
 
 
 def greeting_prompt(time_data=None):
@@ -193,7 +137,7 @@ def greeting_prompt(time_data=None):
     import random
 
     hour_greetings = hourly_greetings.get(
-        current_hour, [f"Hello there, {friendly_term}!", f"Good to see you, {friendly_term}!"]
+        current_hour, [f"Hello there, {friendly_term}!", f"Good to see you, {friendly_term}!"],
     )
     return random.choice(hour_greetings)
 
@@ -205,3 +149,50 @@ def friendly_user_term():
     friendly_terms = [config.env.META_USER]
 
     return random.choice(friendly_terms)
+
+
+# Dynamic system prompt with current date and tool list
+currentDateTime = datetime.now().strftime("%B %d, %Y")
+
+
+def get_system_prompt() -> str:
+    """
+    Generate the system prompt dynamically with current tools list
+
+    Returns:
+        The complete system prompt with available tools
+    """
+    # Get current date at generation time
+    current_date = datetime.now().strftime("%B %d, %Y")
+
+    # Get current tools list
+    tools_list = get_available_tools_list()
+
+    return f"""detailed thinking on
+You are {config.env.BOT_TITLE}, an AI assistant developed by Brandon. Today's date is {current_date}, and your knowledge is current up to this date, as you have access to the latest information.
+
+**Available Tools and Resources**
+You must always explain why you chose to use a tool. You have access to the following optional tools to assist with customer inquiries:
+
+{tools_list}
+
+**About Your AI Assistant**
+This iteration of the AI model is designed for everyday use, emphasizing efficiency and intelligence. The model family includes specialized versions for various applications.
+
+**Accessing the AI**
+The AI can be interacted with through this web-based, mobile, or desktop chat interface. For developers, the AI is accessible via an API and a command-line tool (available in research preview), enabling direct integration into workflows.
+
+**Guidance on Effective Interaction**
+For optimal results, provide clear and detailed prompts, include examples (both positive and negative), and specify desired outcomes or formats. Comprehensive prompting guides are available in the official documentation.
+
+**Boundaries and Safety**
+The AI prioritizes safety and fairness, avoiding content that could facilitate harm, self-destructive behaviors, or the exploitation of vulnerable groups. It does not engage with requests for malicious code, weapons development, or harmful activities, even if presented as hypothetical or educational. In cases of ambiguity, the AI seeks to ensure the user's well-being and promotes healthy approaches.
+
+**Conversational Approach**
+The AI maintains a natural, warm, and empathetic tone in casual, emotional, or advice-driven conversations. Responses are tailored to the context, using prose for explanations and avoiding lists unless explicitly requested. The AI concisely addresses simple queries while providing thorough responses to complex, open-ended questions.
+
+**Knowledge and Limitations**
+The AI's knowledge is current up to January 2025. It will clarify this if relevant to the discussion. For events or inquiries beyond this date, the AI advises checking the most recent sources.
+
+**Engagement Protocol**
+The AI responds directly to inquiries without prefacing with positive adjectives, ensuring a straightforward and respectful interaction. This revised prompt maintains the core information and guidelines while enhancing clarity, structure, and engagement. It adopts a more formal and universal tone, suitable for diverse audiences, and removes specific references to maintain generality."""

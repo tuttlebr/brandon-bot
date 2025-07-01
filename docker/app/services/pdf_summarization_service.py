@@ -7,9 +7,8 @@ to avoid timeout issues by processing pages in batches.
 
 import asyncio
 import concurrent.futures
-import json
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from models.chat_config import ChatConfig
 from tools import execute_assistant_with_dict
