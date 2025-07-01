@@ -1,128 +1,257 @@
 # Streamlit Chat Application
 
-## 🚀 **Production-Ready Application**
+A production-ready conversational AI application built with Streamlit, featuring advanced language model capabilities, document analysis, and multimodal interactions.
 
-This is a fully refactored, production-ready Streamlit chatbot application with advanced LLM capabilities, PDF processing, and image generation.
+## Overview
 
-## ✨ **Key Features**
+This application provides a sophisticated chat interface powered by NVIDIA's language models, with support for:
+- Real-time streaming responses with tool calling capabilities
+- Intelligent PDF document analysis with progress tracking
+- AI-powered image generation
+- Semantic search through knowledge bases
+- Production-grade architecture using controller patterns
 
-- **Advanced LLM Chat** - Streaming responses with tool calling capabilities
-- **PDF Document Analysis** - Upload and analyze PDF documents
-- **Image Generation** - AI-powered image creation
-- **Vector Search** - Semantic search through knowledge bases
-- **Production Architecture** - Controller pattern with centralized configuration
+## Architecture
 
-## 🏃 **Quick Start**
-
-### **Run the Application**
-
-```bash
-# Single production application
-streamlit run main.py
-```
-
-**Single Entry Point**: Clean, streamlined codebase with only one application file.
-
-### **Environment Setup**
-
-Required environment variables:
-
-```bash
-NVIDIA_API_KEY=your_nvidia_api_key
-FAST_LLM_MODEL_NAME=your_model_name
-FAST_LLM_ENDPOINT=your_endpoint
-# ... see utils/config.py for complete list
-```
-
-## 🏗️ **Architecture Overview**
+The application follows a Model-View-Controller (MVC) pattern with clear separation of concerns:
 
 ```
 docker/app/
-├── main.py                    # 🎯 Main application entry point
-├── controllers/               # 🎮 Controller pattern implementation
+├── main.py                    # Application entry point
+├── controllers/               # Business logic controllers
 │   ├── session_controller.py  # Session state management
-│   ├── message_controller.py  # Message processing
-│   ├── file_controller.py     # File operations
-│   └── response_controller.py # LLM response handling
-├── utils/
-│   └── config.py             # 🔧 Centralized configuration
-├── services/                 # 🛠️ Core services
-├── tools/                    # 🔨 LLM tools and integrations
-├── ui/                       # 🎨 UI components
-└── models/                   # 📝 Data models
+│   ├── message_controller.py  # Message processing and validation
+│   ├── file_controller.py     # File upload and processing
+│   └── response_controller.py # LLM response orchestration
+├── services/                  # Core service layer
+│   ├── llm_service.py        # LLM interaction service
+│   ├── chat_service.py       # Chat processing service
+│   ├── pdf_context_service.py # PDF context injection
+│   ├── pdf_analysis_service.py # Intelligent PDF analysis
+│   ├── streaming_service.py   # Response streaming
+│   ├── tool_execution_service.py # Tool orchestration
+│   └── file_storage_service.py # External file storage
+├── tools/                     # LLM tool implementations
+│   ├── assistant.py          # Text processing assistant
+│   ├── pdf_tool.py           # PDF processing tool
+│   ├── image_tool.py         # Image generation tool
+│   └── search_tools.py       # Search capabilities
+├── models/                    # Data models and schemas
+├── ui/                        # UI components
+└── utils/                     # Utilities and configuration
+    └── config.py             # Centralized configuration
 ```
 
-## 🎯 **Production Benefits**
+## How It Works
 
-### **Reduced Complexity**
+### Query Flow
 
-- **Controller pattern** for separation of concerns
-- **Single responsibility** principle throughout
+1. **User Input**: User enters a query through the Streamlit chat interface
+2. **Message Processing**: `MessageController` validates and processes the input
+3. **Context Enhancement**: `PDFContextService` automatically injects relevant PDF content if documents are loaded
+4. **Tool Selection**: `LLMService` determines if specialized tools are needed
+5. **Tool Execution**: `ToolExecutionService` orchestrates parallel tool calls
+6. **Response Generation**: LLM generates response based on tool results and context
+7. **Streaming Output**: Response is streamed back to the user in real-time
 
-### **Centralized Configuration**
+### Intelligent PDF Analysis
 
-- **All settings** in one location (`utils/config.py`)
-- **Environment validation** on startup
-- **Type-safe configuration** with dataclasses
+For PDF documents, the system employs a multi-strategy approach:
 
-### **Improved Maintainability**
+- **Small Documents (≤5 pages)**: Processes entire content in a single pass
+- **Medium Documents (6-15 pages)**: Batch processing with synthesis
+- **Large Documents (>15 pages)**: Two-phase intelligent analysis:
+  - Phase 1: Rapid relevance scanning across all pages
+  - Phase 2: Deep analysis of relevant sections only
 
-- **Isolated components** for easy testing
-- **Clear separation** of concerns
-- **Production logging** and error handling
+Progress is tracked in real-time with estimated completion times.
 
-## 🔧 **Configuration**
+## Core Services
 
-All configuration is centralized in `utils/config.py`:
+### LLM Service
+Manages interactions with language models, including:
+- Model selection (fast, standard, intelligent)
+- Streaming response generation
+- Tool call orchestration
+- Context window management
 
-```python
-from utils.config import config
+### PDF Analysis Service
+Provides intelligent document analysis with:
+- Query-aware page selection
+- Multi-level processing strategies
+- Progress tracking and status updates
+- Automatic fallback mechanisms
 
-# Access environment variables
-api_key = config.env.NVIDIA_API_KEY
+### Tool Execution Service
+Orchestrates tool execution with:
+- Parallel execution strategies
+- Error handling and retries
+- Result aggregation
+- Direct response routing
 
-# Access UI settings
-spinner_icons = config.ui.SPINNER_ICONS
+### File Storage Service
+Manages external file storage to prevent memory issues:
+- Session-based file isolation
+- Automatic cleanup
+- Storage limit enforcement
+- Metadata tracking
 
-# Get LLM parameters
-llm_params = config.get_llm_parameters()
+## Configuration
 
-# Validate environment
-config.validate_environment()
+All configuration is centralized in `utils/config.py`. The system validates environment variables on startup.
+
+### Required Environment Variables
+
+```bash
+# NVIDIA API Configuration
+NVIDIA_API_KEY=your_api_key
+
+# Model Endpoints
+LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
+FAST_LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
+INTELLIGENT_LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
+
+# Model Names
+LLM_MODEL_NAME=meta/llama-3.1-70b-instruct
+FAST_LLM_MODEL_NAME=meta/llama-3.1-8b-instruct
+INTELLIGENT_LLM_MODEL_NAME=nvidia/llama-3.3-nemotron-70b-instruct
+
+# Optional Services
+IMAGE_ENDPOINT=your_image_generation_endpoint
+TAVILY_API_KEY=your_tavily_api_key
 ```
 
-## 🧪 **Development**
+## Installation and Setup
 
-### **Testing Configuration**
+### Using Docker Compose (Recommended)
 
-```python
-from utils.config import config
-config.validate_environment()  # Check required env vars
+```bash
+# Clone the repository
+git clone <repository-url>
+cd streamlit-chatbot
+
+# Create .env file with required variables
+cp .env.example .env
+# Edit .env with your configuration
+
+# Start the application
+docker-compose up app
 ```
 
-### **Adding New Controllers**
+### Local Development
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Set environment variables
+export NVIDIA_API_KEY=your_api_key
+# ... other variables
+
+# Run the application
+streamlit run docker/app/main.py
+```
+
+## Development Guide
+
+### Adding New Controllers
+
+Controllers handle business logic and should follow this pattern:
 
 ```python
-# controllers/new_controller.py
 from utils.config import config
 
 class NewController:
     def __init__(self, config_obj):
         self.config_obj = config_obj
-        # Use centralized config: config.env.*, config.ui.*, etc.
+        # Initialize with dependencies
+
+    def process_action(self, data):
+        # Implement business logic
+        # Use config for settings
+        # Return processed result
 ```
 
-## 🏆 **Key Achievements**
+### Creating New Tools
 
-- ✅ **Production-ready architecture** with controller pattern
-- ✅ **Zero configuration redundancy** - single source of truth
-- ✅ **Environment validation** with startup checks
+Tools extend LLM capabilities and must implement the `BaseTool` interface:
 
-## 🎉 **Ready for Production**
+```python
+from tools.base import BaseTool
 
-This application demonstrates best practices for:
+class NewTool(BaseTool):
+    def __init__(self):
+        super().__init__()
+        self.name = "tool_name"
+        self.description = "Tool description"
+        self.llm_type = "fast"  # or "llm" or "intelligent"
 
-- Separation of concerns via controller pattern
-- Centralized configuration management
-- Production-ready error handling and logging
-- Scalable architecture for future development
+    def to_openai_format(self):
+        # Return OpenAI function definition
+
+    def _run(self, **kwargs):
+        # Implement tool logic
+```
+
+### Service Integration
+
+Services provide reusable functionality:
+
+```python
+class NewService:
+    def __init__(self, config: ChatConfig):
+        self.config = config
+        # Initialize service
+
+    async def process(self, data):
+        # Implement async processing
+        # Handle errors appropriately
+        # Return results
+```
+
+## Testing
+
+### Unit Tests
+```bash
+pytest tests/unit/
+```
+
+### Integration Tests
+```bash
+pytest tests/integration/
+```
+
+### Configuration Validation
+```python
+from utils.config import config
+config.validate_environment()  # Validates all required environment variables
+```
+
+## Production Considerations
+
+### Performance
+- Implements streaming responses for better user experience
+- Uses parallel tool execution to minimize latency
+- Employs intelligent document analysis to handle large PDFs efficiently
+
+### Reliability
+- Comprehensive error handling at all layers
+- Automatic fallback mechanisms for tool failures
+- Session isolation prevents cross-user data leakage
+
+### Scalability
+- Stateless design allows horizontal scaling
+- External file storage prevents memory exhaustion
+- Configurable model selection for cost optimization
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
