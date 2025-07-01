@@ -134,22 +134,14 @@ cd streamlit-chatbot
 cp .env.example .env
 # Edit .env with your configuration
 
-# Start the application
-docker-compose up app
-```
-
-### Local Development
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Set environment variables
-export NVIDIA_API_KEY=your_api_key
-# ... other variables
-
-# Run the application
-streamlit run docker/app/main.py
+#!/bin/bash
+clear
+set -e  # Exit on any error
+export COMPOSE_BAKE=true
+docker run -it --rm -v ./docker:/docker --workdir /docker --entrypoint uv ghcr.io/astral-sh/uv:python3.13-bookworm-slim sync
+docker compose build app
+docker compose up app nginx -d
+docker compose logs -f app
 ```
 
 ## Development Guide
