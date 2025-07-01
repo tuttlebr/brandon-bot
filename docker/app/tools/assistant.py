@@ -1,11 +1,13 @@
 import json
 import logging
+import time
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from models.chat_config import ChatConfig
 from pydantic import Field
 from services.llm_client_service import llm_client_service
+from services.pdf_analysis_service import PDFAnalysisService
 from tools.base import BaseTool, BaseToolResponse
 from utils.config import config as app_config
 
@@ -19,6 +21,7 @@ SUPPORTED_LANGUAGES = ["English", "German", "French", "Italian", "Portuguese", "
 class AssistantTaskType(str, Enum):
     """Enumeration of assistant task types"""
 
+    ANALYZE = "analyze"
     SUMMARIZE = "summarize"
     PROOFREAD = "proofread"
     REWRITE = "rewrite"
@@ -49,9 +52,11 @@ class AssistantTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "text_assistant"
-        self.description = "Text processing tool for SPECIFIC user requests ONLY. ONLY use when user EXPLICITLY asks to: SUMMARIZE ('summarize this...', 'give me a summary'), PROOFREAD ('check grammar', 'fix spelling'), REWRITE ('rewrite this', 'make it more formal'), CRITIC ('critique this', 'give feedback on'), WRITER ('write a story about', 'create content'), or TRANSLATE ('translate to Spanish', 'convert to French'). User MUST provide substantial text AND explicitly request one of these operations. Never use for PDF content - use PDF tools instead."
+        self.description = "Intelligent text analysis and processing tool. PRIMARY USE: ANALYZE documents and answer user questions about content ('What does this document say about...?', 'Explain the main concepts', 'Answer questions based on this text'). ALSO supports specific tasks when explicitly requested: SUMMARIZE ('summarize this...'), PROOFREAD ('check grammar', 'fix spelling'), REWRITE ('rewrite this', 'make it more formal'), CRITIC ('critique this', 'give feedback'), WRITER ('write a story about', 'create content'), or TRANSLATE ('translate to Spanish'). Can process uploaded PDF content or provided text."
         # Use intelligent model for high-quality text processing
         self.llm_type = "intelligent"
+        # Initialize PDF analysis service for intelligent document processing
+        self.pdf_analysis_service = None
 
     def to_openai_format(self) -> Dict[str, Any]:
         """
@@ -70,16 +75,16 @@ class AssistantTool(BaseTool):
                     "properties": {
                         "task_type": {
                             "type": "string",
-                            "enum": ["summarize", "proofread", "rewrite", "critic", "writer", "translate"],
-                            "description": "The type of task to perform: 'summarize' to create a concise summary, 'proofread' to check for errors and suggest improvements, 'rewrite' to rephrase and improve the text, 'critic' to critique the text and provide feedback on the text, 'writer' to write a story based on the user's prompt, 'translate' to translate text from one language to another",
+                            "enum": ["analyze", "summarize", "proofread", "rewrite", "critic", "writer", "translate"],
+                            "description": "The type of task to perform: 'analyze' (DEFAULT) to analyze documents and answer specific questions (MUST use 'instructions' field for the question when text='the PDF'), 'summarize' to create a concise summary, 'proofread' to check for errors and suggest improvements, 'rewrite' to rephrase and improve the text, 'critic' to critique the text and provide feedback, 'writer' to write a story based on the user's prompt, 'translate' to translate text from one language to another",
                         },
                         "text": {
                             "type": "string",
-                            "description": "The text content to be processed. Can be 'the PDF' or 'the document' to process uploaded PDF content, or specific text to process.",
+                            "description": "The text content to be processed. Use 'the PDF' or 'the document' when referring to uploaded PDF content, or provide specific text to process.",
                         },
                         "instructions": {
                             "type": "string",
-                            "description": "Optional specific instructions for the task (e.g., 'make it more formal', 'bullet points only', 'fix grammar only')",
+                            "description": "REQUIRED when analyzing PDF content: The specific question or task about the document (e.g., 'Who are the authors?', 'What is the main topic?', 'Summarize the key findings'). Optional for other text processing tasks.",
                         },
                         "source_language": {
                             "type": "string",
@@ -113,6 +118,7 @@ class AssistantTool(BaseTool):
             Formatted system prompt
         """
         base_prompts = {
+            AssistantTaskType.ANALYZE: """**Role:** Document Intelligence Specialist\nYou are an expert document analyst capable of understanding complex texts and providing insightful answers. Focus on:\n- **Deep Comprehension:** Thoroughly understand the document's content, context, and nuances\n- **Precise Answering:** Provide accurate, specific answers to user questions based on the document\n- **Evidence-Based Responses:** Support your answers with relevant quotes or references from the text\n- **Contextual Understanding:** Consider the document's purpose, audience, and broader implications\n- **Clarity & Completeness:** Ensure answers are clear, comprehensive, and directly address the user's query\nWhen analyzing, extract key insights, identify important themes, and be prepared to answer specific questions about any aspect of the content.""",
             AssistantTaskType.SUMMARIZE: """**Role:** Precision-Driven Condenser\nYou are a clarity expert tasked with extracting value from complexity. Prioritize:\n- **Essentialism:** Isolate the 20% of data that delivers 80% of the insight\n- **Audience-Centric Framing:** Tailor density to the reader's expertise (e.g., avoid jargon for lay audiences)\n- **Narrative Skeleton:** Preserve causal relationships and progression\n- **Ruthless Pruning:** Eliminate redundancy without sacrificing meaning\nDeliver a self-contained snapshot that mirrors the source's value proposition.""",
             AssistantTaskType.PROOFREAD: """**Role:** Text Surgeon\nYou are a precision editor specializing in textual refinement. Execute:\n1. **Mechanical Repair:** Grammar/punctuation fixes (Chicago/AP/MLA as relevant)\n2. **Friction Removal:** Streamline awkward phrasing\n3. **Consistency Protocols:** Enforce style guides (e.g., Oxford commas, numeral usage)\n4. **Micro-Flow Tuning:** Adjust sentence-level transitions\nReturn:\n- Clean text marked with [**] for critical changes\n- Brief rationale for high-impact edits (e.g., "Passive→active voice for authority")""",
             AssistantTaskType.REWRITE: """**Role:** Tone Architect\nYou are a strategic rephraser focused on repositioning existing content. Leverage:\n- **Voice Chameleon:** Shift formality (colloquial→academic), perspective (1st→3rd person), or emotional tone (neutral→urgent)\n- **Engagement Levers:** Replace generic verbs with vivid alternatives (e.g., "said"→"argued")\n- **Structural Remix:** Reorder sections for dramatic impact (e.g., problem-solution→solution-benefit)\n- **Lexical Upgrade:** Replace clichés with fresh metaphors\nPreserve core arguments while reimagining delivery for specific audiences. If the user appears to have provided code, make sure to respond with rewritten code in a code block.""",
@@ -121,7 +127,7 @@ class AssistantTool(BaseTool):
             AssistantTaskType.TRANSLATE: """**Role:** Professional Translation Specialist\nYou are an expert linguist specializing in accurate, culturally-aware translation between English, German, French, Italian, Portuguese, Hindi, Spanish, and Thai. Focus on:\n- **Linguistic Precision:** Maintain accuracy while adapting for natural flow in the target language\n- **Cultural Adaptation:** Preserve meaning while accounting for cultural context and idioms\n- **Tone Preservation:** Match the original's formality level, emotional tone, and style\n- **Context Sensitivity:** Consider domain-specific terminology (technical, legal, medical, etc.)\n- **Readability:** Ensure the translation reads naturally to native speakers of the target language\nIf the source language is not specified, auto-detect it from the supported languages. Always provide a natural, fluent translation that maintains the original meaning and intent.""",
         }
 
-        prompt = base_prompts.get(task_type, base_prompts[AssistantTaskType.REWRITE])
+        prompt = base_prompts.get(task_type, base_prompts[AssistantTaskType.ANALYZE])
 
         if instructions:
             prompt += f"\n\nAdditional instructions: {instructions}"
@@ -154,13 +160,30 @@ class AssistantTool(BaseTool):
         logger.info(f"Processing text with task type: {task_type}")
 
         try:
+            # Check if this is an ANALYZE task with PDF content and specific instructions
+            if (
+                task_type == AssistantTaskType.ANALYZE
+                and instructions
+                and self._is_pdf_content(text)
+                and len(text) > 5000
+            ):  # Only use intelligent analysis for substantial content
+
+                logger.info("Using intelligent PDF analysis for large document with specific query")
+                return self._process_pdf_analysis(text, instructions, config)
+
+            # Regular processing for all other cases
             # Get the appropriate client based on this tool's LLM type
             client = llm_client_service.get_client(self.llm_type)
             model_name = llm_client_service.get_model_name(self.llm_type)
             system_prompt = self._get_system_prompt(task_type, instructions)
 
             # Prepare the user message based on task type
-            if task_type == AssistantTaskType.SUMMARIZE:
+            if task_type == AssistantTaskType.ANALYZE:
+                if instructions:
+                    user_message = f"Please analyze the following document and answer this question: {instructions}\n\nDocument:\n{text}"
+                else:
+                    user_message = f"Please analyze the following document and provide key insights, main themes, and be ready to answer questions about its content:\n\n{text}"
+            elif task_type == AssistantTaskType.SUMMARIZE:
                 user_message = f"Please summarize the following text:\n\n{text}"
             elif task_type == AssistantTaskType.PROOFREAD:
                 user_message = (
@@ -210,7 +233,13 @@ class AssistantTool(BaseTool):
             response_source_language = None
             response_target_language = None
 
-            if task_type == AssistantTaskType.SUMMARIZE:
+            if task_type == AssistantTaskType.ANALYZE:
+                processing_notes = f"Document analysis completed for {len(text.split())} words of content"
+                if instructions:
+                    processing_notes += (
+                        f" with specific query: {instructions[:100]}{'...' if len(instructions) > 100 else ''}"
+                    )
+            elif task_type == AssistantTaskType.SUMMARIZE:
                 summary_length = len(result.split())
                 processing_notes = f"Original text: {len(text.split())} words, Summary: {summary_length} words"
             elif task_type == AssistantTaskType.PROOFREAD:
@@ -235,7 +264,7 @@ class AssistantTool(BaseTool):
             logger.info(f"Successfully processed text with {task_type}")
 
             return AssistantResponse(
-                original_text=(text[:500] + "..." if len(text) > 500 else text),  # Truncate for storage
+                original_text=text,  # Truncate for storage
                 task_type=task_type,
                 result=result,
                 improvements=improvements,
@@ -289,6 +318,53 @@ class AssistantTool(BaseTool):
         if text is None:
             raise ValueError("text parameter is required")
 
+        # Extract messages from kwargs if available
+        messages = kwargs.get("messages", [])
+
+        # Check if we need to extract PDF content
+        # This happens when:
+        # 1. Text is empty or very short
+        # 2. Text mentions "pdf" or "document"
+        # 3. Messages contain PDF data OR PDF exists in session state
+        text_lower = text.lower() if text else ""
+        logger.debug(
+            f"PDF extraction check - text: '{text}', text_length: {len(text) if text else 0}, messages_count: {len(messages) if messages else 0}"
+        )
+
+        if not text or len(text) < 50 or 'pdf' in text_lower or 'document' in text_lower:
+            logger.info(f"Attempting to extract PDF content - first trying messages, then session state")
+            pdf_content = None
+
+            # First try to get PDF content from messages (injected context)
+            if messages:
+                pdf_content = self._get_pdf_content_from_messages(messages)
+                if pdf_content:
+                    logger.info("Found PDF content in messages")
+
+            # If not found in messages, try to get directly from session state
+            if not pdf_content:
+                logger.info("No PDF content in messages, trying session state")
+                pdf_content = self._get_pdf_content_from_session()
+                if pdf_content:
+                    logger.info("Found PDF content in session state")
+
+            if pdf_content:
+                # If text was asking about the PDF, replace it with the PDF content
+                # Otherwise, append the PDF content to the existing text
+                if not text or 'pdf' in text_lower or 'document' in text_lower:
+                    logger.info(
+                        f"Using PDF content as text for {task_type} task (PDF content length: {len(pdf_content)} chars)"
+                    )
+                    text = pdf_content
+                else:
+                    # Append PDF content to existing text
+                    logger.info(
+                        f"Appending PDF content to existing text (PDF content length: {len(pdf_content)} chars)"
+                    )
+                    text = f"{text}\n\n{pdf_content}"
+            else:
+                logger.warning("No PDF content found in messages or session state despite conditions being met")
+
         # Validate task type
         try:
             task_enum = AssistantTaskType(task_type.lower())
@@ -325,40 +401,735 @@ class AssistantTool(BaseTool):
             Extracted PDF text content or None
         """
         if not messages:
+            logger.debug("No messages provided for PDF extraction")
             return None
 
+        logger.debug(f"Searching for PDF content in {len(messages)} messages")
+
         # Look for injected PDF data in system messages
-        for message in messages:
+        for i, message in enumerate(messages):
+            logger.debug(f"Message {i}: role={message.get('role')}, content_type={type(message.get('content'))}")
+
             if message.get("role") == "system":
                 try:
                     content = message.get("content", "")
                     if isinstance(content, str):
-                        data = json.loads(content)
-                        if (
-                            isinstance(data, dict)
-                            and data.get("type") == "pdf_data"
-                            and data.get("tool_name") == "process_pdf_document"
-                        ):
-                            # Found injected PDF data
-                            pages = data.get("pages", [])
-                            filename = data.get("filename", "Unknown")
+                        logger.debug(f"System message content length: {len(content)}")
+                        # Check if this looks like JSON
+                        if content.strip().startswith('{') and content.strip().endswith('}'):
+                            logger.debug("Found JSON-like system message, attempting to parse")
+                            data = json.loads(content)
+                            logger.debug(
+                                f"Parsed JSON data keys: {list(data.keys()) if isinstance(data, dict) else 'not a dict'}"
+                            )
 
-                            if pages:
-                                # Extract all text from PDF pages
-                                document_text = []
-                                for page in pages:
-                                    page_text = page.get("text", "")
-                                    if page_text:
-                                        document_text.append(f"[Page {page.get('page', '?')}]\n{page_text}")
+                            if (
+                                isinstance(data, dict)
+                                and data.get("type") == "pdf_data"
+                                and data.get("tool_name") == "process_pdf_document"
+                            ):
+                                logger.info("Found matching PDF data in system message")
+                                # Found injected PDF data
+                                pages = data.get("pages", [])
+                                filename = data.get("filename", "Unknown")
 
-                                if document_text:
-                                    full_text = "\n\n".join(document_text)
-                                    logger.info(f"Extracted PDF content from '{filename}' with {len(pages)} pages")
-                                    return full_text
-                except (json.JSONDecodeError, TypeError):
+                                if pages:
+                                    logger.info(f"Extracting text from {len(pages)} PDF pages")
+                                    # Extract all text from PDF pages
+                                    document_text = []
+                                    for page in pages:
+                                        page_text = page.get("text", "")
+                                        if page_text:
+                                            document_text.append(f"[Page {page.get('page', '?')}]\n{page_text}")
+
+                                    if document_text:
+                                        full_text = "\n\n".join(document_text)
+                                        logger.info(
+                                            f"Extracted PDF content from '{filename}' with {len(pages)} pages, total text length: {len(full_text)}"
+                                        )
+                                        return full_text
+                                else:
+                                    logger.warning("PDF data found but no pages available")
+                            else:
+                                logger.debug("System message JSON doesn't match PDF data criteria")
+                        else:
+                            logger.debug("System message content doesn't look like JSON")
+                except (json.JSONDecodeError, TypeError) as e:
+                    logger.debug(f"Failed to parse system message as JSON: {e}")
                     continue
 
+        logger.debug("No PDF content found in any messages")
         return None
+
+    def _is_pdf_content(self, text: str) -> bool:
+        """
+        Check if the text contains PDF page markers indicating it's from a PDF document
+
+        Args:
+            text: Text to check
+
+        Returns:
+            True if text appears to be from a PDF document
+        """
+        if not text:
+            return False
+
+        # Look for page markers that indicate PDF content
+        pdf_indicators = [
+            "[Page ",
+            "Page 1:",
+            "Page 2:",
+            "\n\nPage ",
+        ]
+
+        for indicator in pdf_indicators:
+            if indicator in text:
+                return True
+
+        return False
+
+    def _process_pdf_analysis(self, text: str, instructions: str, config: ChatConfig) -> AssistantResponse:
+        """
+        Process PDF content using intelligent analysis service
+
+        Args:
+            text: PDF content with page markers
+            instructions: User's specific question
+            config: ChatConfig instance
+
+        Returns:
+            AssistantResponse with intelligent analysis result
+        """
+        try:
+            # Import here to avoid circular imports
+            import streamlit as st
+
+            # Initialize progress tracking
+            st.session_state.pdf_analysis_progress = {
+                'status': 'starting',
+                'message': 'Initializing intelligent PDF analysis...',
+                'progress': 0,
+            }
+
+            # Initialize PDF analysis service if not already done
+            if self.pdf_analysis_service is None:
+                self.pdf_analysis_service = PDFAnalysisService(config)
+
+            # Parse PDF content back into page structure
+            pdf_data = self._parse_pdf_content(text)
+
+            # Create a simplified analysis to avoid recursion
+            # Use direct analysis instead of going through the full assistant tool
+            result = self._analyze_pdf_directly(pdf_data, instructions)
+
+            processing_notes = f"Intelligent PDF analysis completed for query: {instructions[:100]}{'...' if len(instructions) > 100 else ''}"
+
+            return AssistantResponse(
+                original_text=(text[:500] + "..." if len(text) > 500 else text),
+                task_type=AssistantTaskType.ANALYZE,
+                result=result,
+                processing_notes=processing_notes,
+            )
+
+        except Exception as e:
+            logger.error(f"Error in PDF analysis: {e}")
+            # Fallback to regular processing
+            logger.info("Falling back to regular text processing due to PDF analysis error")
+            return self._fallback_regular_processing(text, instructions, config)
+
+    def _analyze_pdf_directly(self, pdf_data: Dict[str, Any], instructions: str) -> str:
+        """
+        Analyze PDF directly without recursion through the assistant tool
+
+        Args:
+            pdf_data: PDF data dictionary
+            instructions: User's question
+
+        Returns:
+            Analysis result
+        """
+        try:
+            import streamlit as st
+
+            pages = pdf_data.get('pages', [])
+            total_pages = len(pages)
+            filename = pdf_data.get('filename', 'Document')
+
+            logger.info(f"Starting direct PDF analysis for query '{instructions}' on {filename} ({total_pages} pages)")
+
+            if total_pages == 0:
+                return "The document appears to be empty or contains no extractable text."
+
+            # Update progress
+            st.session_state.pdf_analysis_progress = {
+                'status': 'analyzing',
+                'message': f'Analyzing {total_pages} pages...',
+                'progress': 10,
+            }
+            time.sleep(0.1)  # Brief pause for UI update
+
+            # For large documents, use intelligent search approach
+            if total_pages > 15:
+                return self._analyze_large_document_direct(pages, instructions, filename)
+            elif total_pages > 5:
+                return self._analyze_medium_document_direct(pages, instructions, filename)
+            else:
+                return self._analyze_small_document_direct(pages, instructions, filename)
+
+        except Exception as e:
+            logger.error(f"Error in direct PDF analysis: {e}")
+            return f"I encountered an error while analyzing the document: {str(e)}"
+
+    def _analyze_small_document_direct(self, pages: List[Dict], instructions: str, filename: str) -> str:
+        """Directly analyze small documents (≤5 pages) using regular LLM processing"""
+        try:
+            import streamlit as st
+
+            # Update progress
+            st.session_state.pdf_analysis_progress = {
+                'status': 'analyzing',
+                'message': 'Processing all pages together...',
+                'progress': 30,
+            }
+            time.sleep(0.1)  # Brief pause for UI update
+
+            # Combine all pages
+            full_text = "\n\n".join(
+                [f"Page {page.get('page', i+1)}:\n{page.get('text', '')}" for i, page in enumerate(pages)]
+            )
+
+            # Use regular LLM processing
+            client = llm_client_service.get_client(self.llm_type)
+            model_name = llm_client_service.get_model_name(self.llm_type)
+            system_prompt = self._get_system_prompt(AssistantTaskType.ANALYZE, instructions)
+
+            user_message = f"Based on the document '{filename}', please answer this question: {instructions}\n\nDocument:\n{full_text}"
+
+            # Update progress
+            st.session_state.pdf_analysis_progress = {
+                'status': 'analyzing',
+                'message': 'Generating analysis...',
+                'progress': 70,
+            }
+            time.sleep(0.1)  # Brief pause for UI update
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ]
+
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                temperature=0.3,
+                top_p=app_config.llm.DEFAULT_TOP_P,
+                frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
+                presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,
+            )
+
+            result = response.choices[0].message.content.strip()
+
+            # Update progress - completed
+            st.session_state.pdf_analysis_progress = {
+                'status': 'completed',
+                'message': 'Analysis completed!',
+                'progress': 100,
+            }
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error analyzing small document: {e}")
+            return f"Error analyzing document: {str(e)}"
+
+    def _analyze_medium_document_direct(self, pages: List[Dict], instructions: str, filename: str) -> str:
+        """Directly analyze medium documents (6-15 pages) in batches"""
+        try:
+            import streamlit as st
+
+            batch_size = max(3, len(pages) // 3)  # 3-5 pages per batch
+            batch_results = []
+
+            # Update progress
+            st.session_state.pdf_analysis_progress = {
+                'status': 'analyzing',
+                'message': f'Processing {len(pages)} pages in batches...',
+                'progress': 20,
+            }
+            time.sleep(0.1)  # Brief pause for UI update
+
+            # Process in batches
+            for i in range(0, len(pages), batch_size):
+                batch_end = min(i + batch_size, len(pages))
+                batch_pages = pages[i:batch_end]
+
+                # Update progress
+                progress = 20 + (i / len(pages)) * 60
+                st.session_state.pdf_analysis_progress = {
+                    'status': 'analyzing',
+                    'message': f'Analyzing pages {i+1}-{batch_end}...',
+                    'progress': int(progress),
+                }
+                time.sleep(0.1)  # Brief pause for UI update
+
+                batch_text = "\n\n".join(
+                    [f"Page {page.get('page', i+j+1)}:\n{page.get('text', '')}" for j, page in enumerate(batch_pages)]
+                )
+
+                # Use regular LLM processing
+                client = llm_client_service.get_client(self.llm_type)
+                model_name = llm_client_service.get_model_name(self.llm_type)
+                system_prompt = self._get_system_prompt(AssistantTaskType.ANALYZE, instructions)
+
+                user_message = f"Analyze pages {i+1}-{batch_end} of '{filename}' for this question: {instructions}. If relevant information is found, provide it with page numbers. If not relevant, say 'No relevant information found in these pages.'\n\nDocument:\n{batch_text}"
+
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message},
+                ]
+
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    temperature=0.3,
+                    top_p=app_config.llm.DEFAULT_TOP_P,
+                    frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
+                    presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,
+                )
+
+                batch_results.append(
+                    {"page_range": f"{i+1}-{batch_end}", "analysis": response.choices[0].message.content.strip()}
+                )
+
+            # Update progress
+            st.session_state.pdf_analysis_progress = {
+                'status': 'analyzing',
+                'message': 'Combining results...',
+                'progress': 85,
+            }
+            time.sleep(0.1)  # Brief pause for UI update
+
+            # Combine batch results
+            combined_findings = "\n\n".join(
+                [f"Analysis of pages {result['page_range']}:\n{result['analysis']}" for result in batch_results]
+            )
+
+            # Final synthesis
+            client = llm_client_service.get_client(self.llm_type)
+            model_name = llm_client_service.get_model_name(self.llm_type)
+            system_prompt = self._get_system_prompt(AssistantTaskType.ANALYZE, instructions)
+
+            user_message = f"Based on these analyses of different sections of '{filename}', provide a comprehensive answer to: {instructions}. Combine relevant information and provide a cohesive response.\n\nAnalyses:\n{combined_findings}"
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ]
+
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                temperature=0.3,
+                top_p=app_config.llm.DEFAULT_TOP_P,
+                frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
+                presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,
+            )
+
+            result = response.choices[0].message.content.strip()
+
+            # Update progress - completed
+            st.session_state.pdf_analysis_progress = {
+                'status': 'completed',
+                'message': 'Analysis completed!',
+                'progress': 100,
+            }
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error analyzing medium document: {e}")
+            return f"Error analyzing document: {str(e)}"
+
+    def _analyze_large_document_direct(self, pages: List[Dict], instructions: str, filename: str) -> str:
+        """Directly analyze large documents (>15 pages) using intelligent search"""
+        try:
+            import streamlit as st
+
+            # Update progress
+            st.session_state.pdf_analysis_progress = {
+                'status': 'analyzing',
+                'message': 'Scanning pages for relevant content...',
+                'progress': 20,
+            }
+            time.sleep(0.1)  # Brief pause for UI update
+
+            # Step 1: Find relevant pages using quick scans
+            relevant_pages = []
+            batch_size = 5  # Scan 5 pages at a time
+
+            for i in range(0, len(pages), batch_size):
+                batch_end = min(i + batch_size, len(pages))
+                batch_pages = pages[i:batch_end]
+
+                # Update progress
+                progress = 20 + (i / len(pages)) * 40
+                st.session_state.pdf_analysis_progress = {
+                    'status': 'analyzing',
+                    'message': f'Scanning pages {i+1}-{batch_end} for relevance...',
+                    'progress': int(progress),
+                }
+                time.sleep(0.1)  # Brief pause for UI update
+
+                # Create summary of each page for relevance checking
+                page_summaries = []
+                for j, page in enumerate(batch_pages):
+                    page_text = page.get('text', '')[:1000]  # First 1000 chars
+                    page_summaries.append(f"Page {page.get('page', i+j+1)}: {page_text}...")
+
+                batch_text = "\n\n".join(page_summaries)
+
+                # Use regular LLM to check relevance
+                client = llm_client_service.get_client(self.llm_type)
+                model_name = llm_client_service.get_model_name(self.llm_type)
+
+                user_message = f"Given this query: '{instructions}', which of these pages (if any) contain relevant information? List ONLY the page numbers that are relevant, or say 'None' if no pages are relevant. Be specific about page numbers.\n\n{batch_text}"
+
+                messages = [
+                    {
+                        "role": "system",
+                        "content": "You are an expert at identifying relevant content. Only list page numbers that directly relate to the query.",
+                    },
+                    {"role": "user", "content": user_message},
+                ]
+
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    temperature=0.1,  # Lower temperature for accuracy
+                    top_p=app_config.llm.DEFAULT_TOP_P,
+                    frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
+                    presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,
+                )
+
+                # Parse relevant page numbers
+                relevant_in_batch = self._extract_page_numbers_simple(
+                    response.choices[0].message.content, i + 1, batch_end
+                )
+
+                # Add full page data for relevant pages
+                for page_num in relevant_in_batch:
+                    for page in batch_pages:
+                        if page.get('page') == page_num:
+                            relevant_pages.append(page)
+                            break
+
+            logger.info(f"Found {len(relevant_pages)} relevant pages out of {len(pages)} total pages")
+
+            if not relevant_pages:
+                return f"I searched through all {len(pages)} pages of '{filename}' but couldn't find information directly related to your question: '{instructions}'. The document may not contain relevant information, or the question might need to be rephrased."
+
+            # Update progress
+            st.session_state.pdf_analysis_progress = {
+                'status': 'analyzing',
+                'message': f'Analyzing {len(relevant_pages)} relevant pages...',
+                'progress': 70,
+            }
+            time.sleep(0.1)  # Brief pause for UI update
+
+            # Step 2: Deep analysis of relevant pages
+            if len(relevant_pages) <= 5:
+                # Analyze all relevant pages together
+                full_text = "\n\n".join(
+                    [f"Page {page.get('page')}:\n{page.get('text', '')}" for page in relevant_pages]
+                )
+
+                client = llm_client_service.get_client(self.llm_type)
+                model_name = llm_client_service.get_model_name(self.llm_type)
+                system_prompt = self._get_system_prompt(AssistantTaskType.ANALYZE, instructions)
+
+                user_message = f"Based on these relevant pages from '{filename}', provide a comprehensive answer to: {instructions}. Include specific details and page references.\n\nDocument:\n{full_text}"
+
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message},
+                ]
+
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    temperature=0.3,
+                    top_p=app_config.llm.DEFAULT_TOP_P,
+                    frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
+                    presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,
+                )
+
+                result = response.choices[0].message.content.strip()
+            else:
+                # Process relevant pages in smaller batches
+                batch_results = []
+                batch_size = 3
+
+                for i in range(0, len(relevant_pages), batch_size):
+                    batch = relevant_pages[i : i + batch_size]
+                    batch_text = "\n\n".join([f"Page {page.get('page')}:\n{page.get('text', '')}" for page in batch])
+
+                    client = llm_client_service.get_client(self.llm_type)
+                    model_name = llm_client_service.get_model_name(self.llm_type)
+                    system_prompt = self._get_system_prompt(AssistantTaskType.ANALYZE, instructions)
+
+                    user_message = f"Analyze these pages from '{filename}' for: {instructions}. Extract any relevant information with page numbers.\n\nDocument:\n{batch_text}"
+
+                    messages = [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_message},
+                    ]
+
+                    response = client.chat.completions.create(
+                        model=model_name,
+                        messages=messages,
+                        temperature=0.3,
+                        top_p=app_config.llm.DEFAULT_TOP_P,
+                        frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
+                        presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,
+                    )
+
+                    batch_results.append(
+                        {
+                            "pages": [p.get('page') for p in batch],
+                            "analysis": response.choices[0].message.content.strip(),
+                        }
+                    )
+
+                # Synthesize final answer
+                combined_findings = "\n\n".join(
+                    [
+                        f"Pages {', '.join(map(str, result['pages']))}:\n{result['analysis']}"
+                        for result in batch_results
+                    ]
+                )
+
+                client = llm_client_service.get_client(self.llm_type)
+                model_name = llm_client_service.get_model_name(self.llm_type)
+                system_prompt = self._get_system_prompt(AssistantTaskType.ANALYZE, instructions)
+
+                user_message = f"Based on these detailed analyses from '{filename}', provide a final comprehensive answer to: {instructions}. Synthesize all relevant information into a cohesive response.\n\nAnalyses:\n{combined_findings}"
+
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message},
+                ]
+
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    temperature=0.3,
+                    top_p=app_config.llm.DEFAULT_TOP_P,
+                    frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
+                    presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,
+                )
+
+                result = response.choices[0].message.content.strip()
+
+            # Update progress - completed
+            st.session_state.pdf_analysis_progress = {
+                'status': 'completed',
+                'message': 'Analysis completed!',
+                'progress': 100,
+            }
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error analyzing large document: {e}")
+            return f"Error analyzing document: {str(e)}"
+
+    def _extract_page_numbers_simple(self, text: str, start_page: int, end_page: int) -> List[int]:
+        """Extract page numbers from LLM response (simple version)"""
+        import re
+
+        if 'none' in text.lower() or 'no pages' in text.lower():
+            return []
+
+        # Find all numbers that could be page numbers
+        numbers = re.findall(r'\b(\d+)\b', text)
+        page_numbers = []
+
+        for num_str in numbers:
+            try:
+                num = int(num_str)
+                if start_page <= num <= end_page:
+                    page_numbers.append(num)
+            except ValueError:
+                continue
+
+        return list(set(page_numbers))  # Remove duplicates
+
+    def _parse_pdf_content(self, text: str) -> Dict[str, Any]:
+        """
+        Parse PDF content back into page structure for analysis
+
+        Args:
+            text: PDF content with page markers
+
+        Returns:
+            PDF data dictionary with pages
+        """
+        try:
+            pages = []
+            current_page = None
+            current_text = []
+
+            lines = text.split('\n')
+
+            for line in lines:
+                # Check for page marker
+                if line.startswith('[Page ') and line.endswith(']'):
+                    # Save previous page if exists
+                    if current_page is not None and current_text:
+                        pages.append({'page': current_page, 'text': '\n'.join(current_text).strip()})
+
+                    # Start new page
+                    try:
+                        page_num = int(line.replace('[Page ', '').replace(']', ''))
+                        current_page = page_num
+                        current_text = []
+                    except ValueError:
+                        # If can't parse page number, continue with current page
+                        if current_text or not line.strip():
+                            current_text.append(line)
+                else:
+                    # Regular content line
+                    if current_text or line.strip():  # Don't start with empty lines
+                        current_text.append(line)
+
+            # Save final page
+            if current_page is not None and current_text:
+                pages.append({'page': current_page, 'text': '\n'.join(current_text).strip()})
+
+            # If no pages were parsed (content doesn't have page markers), treat as single page
+            if not pages:
+                pages = [{'page': 1, 'text': text}]
+
+            return {'pages': pages, 'filename': 'Document'}
+
+        except Exception as e:
+            logger.error(f"Error parsing PDF content: {e}")
+            # Fallback: treat entire text as single page
+            return {'pages': [{'page': 1, 'text': text}], 'filename': 'Document'}
+
+    def _fallback_regular_processing(self, text: str, instructions: str, config: ChatConfig) -> AssistantResponse:
+        """
+        Fallback to regular text processing when PDF analysis fails
+
+        Args:
+            text: Text to process
+            instructions: User instructions
+            config: ChatConfig instance
+
+        Returns:
+            AssistantResponse from regular processing
+        """
+        try:
+            # Use regular LLM processing as fallback
+            client = llm_client_service.get_client(self.llm_type)
+            model_name = llm_client_service.get_model_name(self.llm_type)
+            system_prompt = self._get_system_prompt(AssistantTaskType.ANALYZE, instructions)
+
+            user_message = (
+                f"Please analyze the following document and answer this question: {instructions}\n\nDocument:\n{text}"
+            )
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ]
+
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                temperature=0.3,
+                top_p=app_config.llm.DEFAULT_TOP_P,
+                frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
+                presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,
+            )
+
+            result = response.choices[0].message.content.strip()
+            processing_notes = f"Fallback analysis completed for {len(text.split())} words of content"
+
+            return AssistantResponse(
+                original_text=(text[:500] + "..." if len(text) > 500 else text),
+                task_type=AssistantTaskType.ANALYZE,
+                result=result,
+                processing_notes=processing_notes,
+            )
+
+        except Exception as e:
+            logger.error(f"Error in fallback processing: {e}")
+            raise
+
+    def _get_pdf_content_from_session(self) -> Optional[str]:
+        """
+        Extract PDF content directly from session state
+
+        Returns:
+            Extracted PDF text content or None
+        """
+        try:
+            # Import here to avoid circular imports
+            import streamlit as st
+            from services.file_storage_service import FileStorageService
+
+            logger.debug("Attempting to get PDF content from session state")
+
+            # Check if there are stored PDFs in session
+            if not hasattr(st.session_state, 'stored_pdfs') or not st.session_state.stored_pdfs:
+                logger.debug("No stored PDFs in session state")
+                return None
+
+            # Get the latest PDF ID
+            latest_pdf_id = st.session_state.stored_pdfs[-1]
+            logger.debug(f"Latest PDF ID in session: {latest_pdf_id}")
+
+            # Get PDF data from file storage
+            file_storage = FileStorageService()
+            pdf_data = file_storage.get_pdf(latest_pdf_id)
+
+            if not pdf_data:
+                logger.warning(f"Failed to retrieve PDF data for ID: {latest_pdf_id}")
+                return None
+
+            pages = pdf_data.get('pages', [])
+            filename = pdf_data.get('filename', 'Unknown')
+
+            if not pages:
+                logger.warning("PDF data found but no pages available")
+                return None
+
+            logger.info(f"Extracting text from {len(pages)} PDF pages from session state")
+
+            # Extract all text from PDF pages
+            document_text = []
+            for page in pages:
+                page_text = page.get("text", "")
+                if page_text:
+                    document_text.append(f"[Page {page.get('page', '?')}]\n{page_text}")
+
+            if document_text:
+                full_text = "\n\n".join(document_text)
+                logger.info(
+                    f"Extracted PDF content from session state for '{filename}' with {len(pages)} pages, total text length: {len(full_text)}"
+                )
+                return full_text
+            else:
+                logger.warning("PDF pages found but no text content extracted")
+                return None
+
+        except ImportError as e:
+            logger.debug(f"Cannot access session state (expected in some contexts): {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Error extracting PDF content from session state: {e}")
+            return None
 
     def run_with_dict(self, params: Dict[str, Any]) -> AssistantResponse:
         """
@@ -388,10 +1159,25 @@ class AssistantTool(BaseTool):
         # This happens when:
         # 1. Text is empty or very short
         # 2. Text mentions "pdf" or "document"
-        # 3. Messages contain PDF data
+        # 3. Messages contain PDF data OR PDF exists in session state
         text_lower = text.lower() if text else ""
-        if messages and (not text or len(text) < 50 or 'pdf' in text_lower or 'document' in text_lower):
-            pdf_content = self._get_pdf_content_from_messages(messages)
+        if not text or len(text) < 50 or 'pdf' in text_lower or 'document' in text_lower:
+            logger.info(f"Attempting to extract PDF content - first trying messages, then session state")
+            pdf_content = None
+
+            # First try to get PDF content from messages (injected context)
+            if messages:
+                pdf_content = self._get_pdf_content_from_messages(messages)
+                if pdf_content:
+                    logger.info("Found PDF content in messages")
+
+            # If not found in messages, try to get directly from session state
+            if not pdf_content:
+                logger.info("No PDF content in messages, trying session state")
+                pdf_content = self._get_pdf_content_from_session()
+                if pdf_content:
+                    logger.info("Found PDF content in session state")
+
             if pdf_content:
                 # If text was asking about the PDF, replace it with the PDF content
                 # Otherwise, append the PDF content to the existing text

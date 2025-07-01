@@ -138,10 +138,52 @@ class ProductionStreamlitChatApp:
             self.session_controller.set_processing_state(False)
 
     @st.fragment(run_every=2)
+    def pdf_analysis_progress_fragment(self):
+        """
+        Fragment to show real-time PDF analysis progress
+        """
+        if hasattr(st.session_state, 'pdf_analysis_progress') and st.session_state.pdf_analysis_progress:
+            progress_info = st.session_state.pdf_analysis_progress
+
+            if progress_info.get('status') in ['starting', 'analyzing']:
+                st.info("🔍 **Intelligent PDF Analysis in Progress**")
+
+                message = progress_info.get('message', 'Processing...')
+                progress = progress_info.get('progress', 0)
+
+                st.write(f"📊 {message}")
+
+                # Progress bar
+                progress_bar = st.progress(progress / 100.0 if progress > 0 else 0.01)
+
+                # Estimated time remaining (rough estimate)
+                if progress > 10:
+                    estimated_total = 120  # Rough estimate: 2 minutes for large documents
+                    time_remaining = int((estimated_total * (100 - progress)) / 100)
+                    st.caption(f"⏱️ Estimated time remaining: ~{time_remaining}s")
+                else:
+                    st.caption("⏱️ Initializing analysis...")
+
+                # Additional helpful info
+                st.caption(
+                    "💡 The system is intelligently scanning pages and analyzing content to provide you with the most accurate answer."
+                )
+
+            elif progress_info.get('status') == 'completed':
+                st.success("✅ **PDF Analysis Completed!**")
+                # Clear progress after a brief moment
+                if not hasattr(st.session_state, 'analysis_completion_shown'):
+                    st.session_state.analysis_completion_shown = True
+                else:
+                    # Clear the progress info
+                    st.session_state.pdf_analysis_progress = None
+                    del st.session_state.analysis_completion_shown
+
+    @st.fragment(run_every=5)
     def pdf_processing_fragment(self):
         """
         Self-contained PDF processing fragment that runs independently
-        Uses st.fragment to poll every 2 seconds and update status
+        Uses st.fragment to poll every 5 seconds and update status
         """
         st.subheader("📄 PDF Document Upload")
 
@@ -215,7 +257,7 @@ class ProductionStreamlitChatApp:
                     st.session_state.pdf_processing_file = uploaded_file.name
 
                     # Process PDF synchronously with spinner
-                    with st.spinner(f"🔄 Processing PDF: {uploaded_file.name}..."):
+                    with st.spinner(f"Processing {uploaded_file.name}..."):
                         try:
                             logging.info(f"Starting synchronous PDF processing for: {uploaded_file.name}")
 
@@ -254,22 +296,32 @@ class ProductionStreamlitChatApp:
                         st.rerun()
 
         # Debug info (can be removed in production)
-        # with st.expander("Debug Info", expanded=False):
-        #     debug_info = {
-        #         "processing_status": processing_status,
-        #         "is_processing": self.session_controller.is_processing(),
-        #         "has_pdfs": self.session_controller.has_pdf_documents(),
-        #         "stored_pdfs": getattr(st.session_state, 'stored_pdfs', []),
-        #         "currently_processing_pdf": getattr(st.session_state, 'currently_processing_pdf', None),
-        #         "last_uploaded_pdf": getattr(st.session_state, 'last_uploaded_pdf', None),
-        #     }
-        #     st.json(debug_info)
+        with st.expander("Debug Info", expanded=False):
+            debug_info = {
+                "processing_status": processing_status,
+                "is_processing": self.session_controller.is_processing(),
+                "has_pdfs": self.session_controller.has_pdf_documents(),
+                "stored_pdfs": getattr(st.session_state, 'stored_pdfs', []),
+                "currently_processing_pdf": getattr(st.session_state, 'currently_processing_pdf', None),
+                "last_uploaded_pdf": getattr(st.session_state, 'last_uploaded_pdf', None),
+                "session_id": getattr(st.session_state, 'session_id', None),
+                "initialized": getattr(st.session_state, 'initialized', False),
+            }
+            st.json(debug_info)
+
+            # Show full session state in a separate section
+            st.write("**Full Session State:**")
+            session_state_dict = dict(st.session_state)
+            st.json(session_state_dict)
 
     def run(self):
         """Run the production-ready application using controller pattern"""
         try:
             # Display chat history
             self.display_chat_history()
+
+            # Show PDF analysis progress if active
+            self.pdf_analysis_progress_fragment()
 
             # Handle user input with centralized configuration
             if prompt := st.chat_input():

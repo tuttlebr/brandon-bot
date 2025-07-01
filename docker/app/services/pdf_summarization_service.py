@@ -11,7 +11,6 @@ import logging
 from typing import Dict, List, Optional
 
 from models.chat_config import ChatConfig
-from tools import execute_assistant_with_dict
 from utils.config import config
 from utils.streamlit_context import run_with_streamlit_context
 
@@ -113,6 +112,9 @@ class PDFSummarizationService:
                     "instructions": f"Create a concise summary of these {len(batch_pages)} pages from a PDF document. Focus on key information, main topics, and important details. Maximum {self.max_summary_length} words.",
                 }
 
+                # Import locally to avoid circular imports
+                from tools.assistant import execute_assistant_with_dict
+
                 # Execute summarization using assistant tool in thread pool with context preserved
                 loop = asyncio.get_event_loop()
                 summary_result = await loop.run_in_executor(
@@ -170,6 +172,9 @@ class PDFSummarizationService:
                     "instructions": "Create a cohesive summary that combines these section summaries. Maintain key information while reducing redundancy.",
                 }
 
+                # Import locally to avoid circular imports
+                from tools.assistant import execute_assistant_with_dict
+
                 loop = asyncio.get_event_loop()
                 summary_result = await loop.run_in_executor(
                     self.executor, run_with_streamlit_context, execute_assistant_with_dict, summary_params
@@ -210,6 +215,9 @@ class PDFSummarizationService:
                 "text": combined_text,
                 "instructions": f"Create a comprehensive executive summary of the entire document '{filename}'. Include main topics, key findings, important details, and overall conclusions. Make it informative yet concise.",
             }
+
+            # Import locally to avoid circular imports
+            from tools.assistant import execute_assistant_with_dict
 
             loop = asyncio.get_event_loop()
             summary_result = await loop.run_in_executor(
@@ -279,6 +287,9 @@ class PDFSummarizationService:
                 "text": combined_text,
                 "instructions": f"Create a concise summary of this document '{filename}'. Focus on the main topics and key information.",
             }
+
+            # Import locally to avoid circular imports
+            from tools.assistant import execute_assistant_with_dict
 
             summary_result = execute_assistant_with_dict(summary_params)
 

@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import os
 import tempfile
@@ -50,7 +51,7 @@ class FileController:
             # self._display_upload_message(uploaded_file.name)
 
             # Add user action to chat history
-            self.message_controller.safe_add_message_to_history("user", f"📄 Uploaded PDF: {uploaded_file.name}")
+            # self.message_controller.safe_add_message_to_history("user", f"📄 Uploaded PDF: {uploaded_file.name}")
 
             # Process the PDF file
             success, result = self._process_pdf_file(uploaded_file)
@@ -218,8 +219,16 @@ class FileController:
             pdf_id = self.session_controller.store_pdf_document(filename, pdf_data)
             logging.info(f"Stored PDF '{filename}' with ID '{pdf_id}' in session state")
 
-            # Add PDF content directly to message history as a tool response
-            self._add_pdf_content_to_history(filename, pdf_data)
+            # Add PDF content availability to message history
+            self._add_pdf_content_to_history(filename, pdf_data, pdf_id)
+
+            # Verify storage in session state
+            if hasattr(st.session_state, 'stored_pdfs') and pdf_id in st.session_state.stored_pdfs:
+                logging.info(
+                    f"✅ Verified PDF '{pdf_id}' is in session state stored_pdfs list: {st.session_state.stored_pdfs}"
+                )
+            else:
+                logging.error(f"❌ PDF '{pdf_id}' NOT found in session state stored_pdfs list")
 
             # No automatic summarization - this is now user-driven
 
@@ -229,6 +238,44 @@ class FileController:
 
         # The detailed confirmation is now handled by _add_pdf_content_to_history
         logging.info(f"Successfully processed PDF: {filename} ({len(pages)} pages)")
+
+    def _add_pdf_content_to_history(self, filename: str, pdf_data: dict, pdf_id: str):
+        """
+        Add PDF content availability notification to message history
+
+        Args:
+            filename: Name of the PDF file
+            pdf_data: Processed PDF data
+            pdf_id: PDF reference ID
+        """
+        try:
+            pages = pdf_data.get("pages", [])
+            total_pages = len(pages)
+
+            # Create a system message indicating PDF availability
+            pdf_availability_message = {
+                "role": "system",
+                "content": json.dumps(
+                    {
+                        "type": "pdf_data",
+                        "tool_name": "process_pdf_document",
+                        "filename": filename,
+                        "pdf_id": pdf_id,
+                        "pages": pages,
+                        "total_pages": total_pages,
+                        "status": "available",
+                        "message": f"PDF '{filename}' ({total_pages} pages) is now available for analysis",
+                    }
+                ),
+            }
+
+            # Add to message history via message controller
+            self.message_controller.safe_add_message_to_history("system", pdf_availability_message["content"])
+
+            logging.info(f"Added PDF availability notification to message history for '{filename}'")
+
+        except Exception as e:
+            logging.error(f"Error adding PDF content to history: {e}")
 
     def _run_async_summarization(self, pdf_id: str, pdf_data: dict):
         """
@@ -421,34 +468,3 @@ class FileController:
             File size limit in MB
         """
         return config.file_processing.MAX_PDF_SIZE // (1024 * 1024)
-
-    def _add_pdf_content_to_history(self, filename: str, pdf_data: dict):
-        """
-        Add a simple confirmation message to history
-
-        Args:
-            filename: Name of the PDF file
-            pdf_data: Processed PDF data
-        """
-        pages = pdf_data.get("pages", [])
-
-        # Just add a confirmation message - the actual PDF content will be injected automatically
-        confirmation_msg = (
-            f"✅ I've successfully loaded your PDF document **{filename}** ({len(pages)} pages). "
-            f"The full document content is now available for me to reference when answering your questions.\n\n"
-        )
-
-        # Add tips for large documents
-        if len(pages) > 10:
-            confirmation_msg += (
-                f"💡 **Tips for working with this document:**\n"
-                f"- Ask me to 'summarize the document' for a quick overview\n"
-                f"- Request specific information like 'What does the document say about X?'\n"
-                f"- Ask about specific pages or sections\n"
-                f"- I can translate, proofread, or rewrite sections\n\n"
-            )
-
-        confirmation_msg += "What would you like to know about this document?"
-
-        self.message_controller.safe_add_message_to_history("assistant", confirmation_msg)
-        logging.info(f"PDF '{filename}' is now available for automatic context injection")

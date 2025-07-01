@@ -214,8 +214,16 @@ class ToolExecutionService:
         # Add original prompt for assistant tool
         if tool_name == "text_assistant" and current_user_message:
             user_content = current_user_message.get("content", "")
+
+            # If text is not provided, use the user's original message
             if user_content and "text" not in modified_args:
                 modified_args["text"] = user_content
+
+            # If text refers to PDF content but no instructions provided, use user's question as instructions
+            text_arg = modified_args.get("text", "").lower()
+            if ("pdf" in text_arg or "document" in text_arg) and "instructions" not in modified_args and user_content:
+                logger.info(f"Adding user question as instructions for PDF analysis: {user_content}")
+                modified_args["instructions"] = user_content
 
         return modified_args
 
