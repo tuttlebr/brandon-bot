@@ -98,7 +98,7 @@ class LLMService:
 
             # Parse response for content and tool calls
             content, tool_calls = self.parsing_service.parse_response(response)
-            logging.info(f"Tool calls: {tool_calls}")
+            logging.debug(f"Tool calls: {tool_calls}")
 
             # If there are tool calls, execute them
             if tool_calls:

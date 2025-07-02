@@ -1,7 +1,5 @@
 [project]
-authors = [
-    { name = "Brandon Tuttle", email = "tuttlebr@ncc-1701.biz" }
-]
+authors = [{ name = "Brandon Tuttle", email = "tuttlebr@ncc-1701.biz" }]
 name = "brandonbot"
 version = "0.1.0"
 description = "Agentic chatbot for the BrandonBot project"
@@ -26,4 +24,15 @@ jupyterlab = [
     "pandas==2.3.0",
     "seaborn==0.13.2",
     "theme-darcula==4.0.0",
+]
+
+streamlit-docs = [
+    "mkdocs==1.5.3",
+    "mkdocs-material==9.4.8",
+    "mkdocs-minify-plugin==0.7.1",
+    "pymdown-extensions==10.4",
+    "markdown==3.5.1",
+    "Pygments==2.17.2",
+    "fastapi==0.104.1",
+    "uvicorn==0.24.0",
 ]

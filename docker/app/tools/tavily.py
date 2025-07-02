@@ -128,7 +128,7 @@ class TavilyTool(BaseTool):
         # Remove leading/trailing quotes that might be artifacts
         content = content.strip("\"'")
 
-        return content[:500] + "..."
+        return content
 
     def search_tavily(self, query: str, **kwargs) -> TavilyResponse:
         """

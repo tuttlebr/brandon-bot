@@ -75,7 +75,7 @@ class ToolContextConfig:
 
     # Context display limits
     MAX_PAGES_IN_CONTEXT: int = 3
-    PREVIEW_TEXT_LENGTH: int = 500
+    PREVIEW_TEXT_LENGTH: int = 4096
 
     # Context formatting
     CONTEXT_SEPARATOR: str = "\n\n---\n\n"
@@ -94,7 +94,7 @@ class LLMConfig:
 
     # Context and token limits
     SLIDING_WINDOW_MAX_TURNS: int = 20  # Increased from 6 to prevent context loss
-    MAX_CONTEXT_LENGTH: int = 60000  # Maximum context length for LLM (chars)
+    MAX_CONTEXT_LENGTH: int = 1000000  # Maximum context length for LLM (chars)
 
     # Conversation context injection
     AUTO_INJECT_CONVERSATION_CONTEXT: bool = True  # Automatically inject conversation context

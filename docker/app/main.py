@@ -99,8 +99,8 @@ class ProductionStreamlitChatApp:
 
             # Display user message with centralized configuration
             with st.chat_message("user", avatar=self.config_obj.user_avatar):
-                truncated_prompt = self.message_controller.truncate_long_prompt(prompt)
-                st.markdown(truncated_prompt)
+                # truncated_prompt = self.message_controller.truncate_long_prompt(prompt)
+                st.markdown(prompt)
 
             # Validate prompt using controller with proper error handling
             if not self.message_controller.validate_prompt(prompt):
@@ -296,23 +296,23 @@ class ProductionStreamlitChatApp:
                         st.rerun()
 
         # Debug info (can be removed in production)
-        with st.expander("Debug Info", expanded=False):
-            debug_info = {
-                "processing_status": processing_status,
-                "is_processing": self.session_controller.is_processing(),
-                "has_pdfs": self.session_controller.has_pdf_documents(),
-                "stored_pdfs": getattr(st.session_state, 'stored_pdfs', []),
-                "currently_processing_pdf": getattr(st.session_state, 'currently_processing_pdf', None),
-                "last_uploaded_pdf": getattr(st.session_state, 'last_uploaded_pdf', None),
-                "session_id": getattr(st.session_state, 'session_id', None),
-                "initialized": getattr(st.session_state, 'initialized', False),
-            }
-            st.json(debug_info)
+        # with st.expander("Debug Info", expanded=False):
+        #     debug_info = {
+        #         "processing_status": processing_status,
+        #         "is_processing": self.session_controller.is_processing(),
+        #         "has_pdfs": self.session_controller.has_pdf_documents(),
+        #         "stored_pdfs": getattr(st.session_state, 'stored_pdfs', []),
+        #         "currently_processing_pdf": getattr(st.session_state, 'currently_processing_pdf', None),
+        #         "last_uploaded_pdf": getattr(st.session_state, 'last_uploaded_pdf', None),
+        #         "session_id": getattr(st.session_state, 'session_id', None),
+        #         "initialized": getattr(st.session_state, 'initialized', False),
+        #     }
+        #     st.json(debug_info)
 
-            # Show full session state in a separate section
-            st.write("**Full Session State:**")
-            session_state_dict = dict(st.session_state)
-            st.json(session_state_dict)
+        #     # Show full session state in a separate section
+        #     st.write("**Full Session State:**")
+        #     session_state_dict = dict(st.session_state)
+        #     st.json(session_state_dict)
 
     def run(self):
         """Run the production-ready application using controller pattern"""

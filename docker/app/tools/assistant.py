@@ -167,6 +167,7 @@ Provide accurate translation that preserves meaning and cultural context. Mainta
         instructions: Optional[str] = None,
         source_language: Optional[str] = None,
         target_language: Optional[str] = None,
+        messages: Optional[List[Dict[str, Any]]] = None,
     ) -> AssistantResponse:
         """
         Process text using the appropriate LLM task
@@ -178,6 +179,7 @@ Provide accurate translation that preserves meaning and cultural context. Mainta
             instructions: Optional user instructions
             source_language: Source language for translation (optional)
             target_language: Target language for translation (required for translation)
+            messages: Optional conversation messages to use instead of constructing new ones
 
         Returns:
             AssistantResponse with the processed result
@@ -202,45 +204,51 @@ Provide accurate translation that preserves meaning and cultural context. Mainta
             model_name = llm_client_service.get_model_name(self.llm_type)
             system_prompt = self._get_system_prompt(task_type, instructions)
 
-            # Prepare the user message based on task type
-            if task_type == AssistantTaskType.ANALYZE:
-                if instructions:
-                    user_message = f"Please analyze the following document and answer this question: {instructions}\n\nDocument:\n{text}"
-                else:
-                    user_message = f"Please analyze the following document and provide key insights, main themes, and be ready to answer questions about its content:\n\n{text}"
-            elif task_type == AssistantTaskType.SUMMARIZE:
-                user_message = f"Please summarize the following text:\n\n{text}"
-            elif task_type == AssistantTaskType.PROOFREAD:
-                user_message = (
-                    f"Please proofread the following text and provide corrections with explanations:\n\n{text}"
-                )
-            elif task_type == AssistantTaskType.REWRITE:
-                user_message = f"Please rewrite and improve the following text:\n\n{text}"
-            elif task_type == AssistantTaskType.CRITIC:
-                user_message = f"Please critique the following text and provide feedback on the text:\n\n{text}"
-            elif task_type == AssistantTaskType.WRITER:
-                user_message = f"Please write a story based on the following prompt:\n\n{text}"
-            elif task_type == AssistantTaskType.TRANSLATE:
-                if not target_language:
-                    raise ValueError("target_language is required for translation tasks")
+            # Use provided messages if available, otherwise construct minimal message
+            if messages:
+                # Use the original message history but ensure we have the appropriate system prompt
+                # First, filter out any existing system messages that might conflict
+                filtered_messages = [
+                    msg
+                    for msg in messages
+                    if msg.get("role") != "system"
+                    or not any(task.value in msg.get("content", "").lower() for task in AssistantTaskType)
+                ]
 
-                if source_language:
-                    user_message = (
-                        f"Please translate the following text from {source_language} to {target_language}:\n\n{text}"
-                    )
-                else:
-                    user_message = f"Please translate the following text to {target_language} (auto-detect source language):\n\n{text}"
+                # If text contains injected context that's not in the messages, we need to add it
+                if "--- Additional Context ---" in text:
+                    # Extract the injected context from the text
+                    parts = text.split("--- Additional Context ---")
+                    if len(parts) == 2:
+                        user_text_part = parts[0].strip()
+                        injected_context_part = parts[1].strip()
 
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message},
-            ]
+                        # Add the injected context as a system message before user messages
+                        final_messages = [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "system", "content": f"Additional context provided:\n\n{injected_context_part}"},
+                        ] + filtered_messages
+                    else:
+                        # Fallback if split doesn't work as expected
+                        final_messages = [{"role": "system", "content": system_prompt}] + filtered_messages
+                else:
+                    # No injected context, just add system prompt
+                    final_messages = [{"role": "system", "content": system_prompt}] + filtered_messages
+            else:
+                # Fallback: construct a simple message if none provided
+                # This maintains backward compatibility but should rarely be used
+                logger.warning("No messages provided to _process_text, constructing minimal message")
+                final_messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": text},
+                ]
 
             logger.debug(f"Making LLM request with model: {model_name} (type: {self.llm_type})")
+            logger.debug(f"Message count: {len(final_messages)}")
 
             response = client.chat.completions.create(
                 model=model_name,
-                messages=messages,
+                messages=final_messages,
                 temperature=app_config.llm.DEFAULT_TEMPERATURE,
                 top_p=app_config.llm.DEFAULT_TOP_P,
                 frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
@@ -287,7 +295,7 @@ Provide accurate translation that preserves meaning and cultural context. Mainta
             logger.info(f"Successfully processed text with {task_type}")
 
             return AssistantResponse(
-                original_text=text,  # Truncate for storage
+                original_text=text,
                 task_type=task_type,
                 result=result,
                 improvements=improvements,
@@ -344,49 +352,52 @@ Provide accurate translation that preserves meaning and cultural context. Mainta
         # Extract messages from kwargs if available
         messages = kwargs.get("messages", [])
 
-        # Check if we need to extract PDF content
-        # This happens when:
-        # 1. Text is empty or very short
-        # 2. Text mentions "pdf" or "document"
-        # 3. Messages contain PDF data OR PDF exists in session state
-        text_lower = text.lower() if text else ""
+        # Always check for injected context in messages
         logger.debug(
-            f"PDF extraction check - text: '{text}', text_length: {len(text) if text else 0}, messages_count: {len(messages) if messages else 0}"
+            f"Context extraction check - text_length: {len(text) if text else 0}, messages_count: {len(messages) if messages else 0}"
         )
 
-        if not text or len(text) < 50 or "pdf" in text_lower or "document" in text_lower:
-            logger.info(f"Attempting to extract PDF content - first trying messages, then session state")
-            pdf_content = None
+        # First, always try to extract any injected context from messages
+        injected_context = None
+        if messages:
+            # Check for PDF content
+            pdf_content = self._get_pdf_content_from_messages(messages)
+            if pdf_content:
+                logger.info("Found PDF content in messages")
+                injected_context = pdf_content
+            else:
+                # Check for other types of injected context
+                other_context = self._get_other_context_from_messages(messages)
+                if other_context:
+                    logger.info("Found other injected context in messages")
+                    injected_context = other_context
 
-            # First try to get PDF content from messages (injected context)
-            if messages:
-                pdf_content = self._get_pdf_content_from_messages(messages)
-                if pdf_content:
-                    logger.info("Found PDF content in messages")
-
-            # If not found in messages, try to get directly from session state
-            if not pdf_content:
-                logger.info("No PDF content in messages, trying session state")
+        # If no injected context in messages, check session state for PDFs
+        if not injected_context:
+            text_lower = text.lower() if text else ""
+            # Only check session state if text mentions PDF/document or is very short
+            if not text or len(text) < 50 or "pdf" in text_lower or "document" in text_lower:
+                logger.info("Checking session state for PDF content")
                 pdf_content = self._get_pdf_content_from_session()
                 if pdf_content:
                     logger.info("Found PDF content in session state")
+                    injected_context = pdf_content
 
-            if pdf_content:
-                # If text was asking about the PDF, replace it with the PDF content
-                # Otherwise, append the PDF content to the existing text
-                if not text or "pdf" in text_lower or "document" in text_lower:
-                    logger.info(
-                        f"Using PDF content as text for {task_type} task (PDF content length: {len(pdf_content)} chars)"
-                    )
-                    text = pdf_content
-                else:
-                    # Append PDF content to existing text
-                    logger.info(
-                        f"Appending PDF content to existing text (PDF content length: {len(pdf_content)} chars)"
-                    )
-                    text = f"{text}\n\n{pdf_content}"
+        # Combine injected context with user text
+        if injected_context:
+            text_lower = text.lower() if text else ""
+            # If text is empty or just asking about a document, replace with injected context
+            if not text or len(text) < 50 or ("pdf" in text_lower or "document" in text_lower):
+                logger.info(
+                    f"Using injected context as primary text for {task_type} task (context length: {len(injected_context)} chars)"
+                )
+                text = injected_context
             else:
-                logger.warning("No PDF content found in messages or session state despite conditions being met")
+                # Otherwise, append injected context to existing text
+                logger.info(f"Appending injected context to user text (context length: {len(injected_context)} chars)")
+                text = f"{text}\n\n--- Additional Context ---\n\n{injected_context}"
+        else:
+            logger.debug("No injected context found in messages or session state")
 
         # Validate task type
         try:
@@ -411,7 +422,7 @@ Provide accurate translation that preserves meaning and cultural context. Mainta
 
         # Create config from environment
         config = ChatConfig.from_environment()
-        return self._process_text(task_enum, text, config, instructions, source_language, target_language)
+        return self._process_text(task_enum, text, config, instructions, source_language, target_language, messages)
 
     def _get_pdf_content_from_messages(self, messages: List[Dict[str, Any]]) -> Optional[str]:
         """
@@ -482,6 +493,69 @@ Provide accurate translation that preserves meaning and cultural context. Mainta
                     continue
 
         logger.debug("No PDF content found in any messages")
+        return None
+
+    def _get_other_context_from_messages(self, messages: List[Dict[str, Any]]) -> Optional[str]:
+        """
+        Extract non-PDF injected context from messages
+
+        Args:
+            messages: List of conversation messages
+
+        Returns:
+            Extracted context or None
+        """
+        if not messages:
+            logger.debug("No messages provided for context extraction")
+            return None
+
+        logger.debug(f"Searching for injected context in {len(messages)} messages")
+
+        # Look for injected context in system messages
+        for i, message in enumerate(messages):
+            if message.get("role") == "system":
+                content = message.get("content", "")
+                if isinstance(content, str) and content:
+                    logger.debug(f"System message {i} content length: {len(content)}")
+
+                    # Check if this is JSON-formatted injected context
+                    if content.strip().startswith("{") and content.strip().endswith("}"):
+                        try:
+                            data = json.loads(content)
+
+                            # Look for general injected context (not PDF data)
+                            if isinstance(data, dict):
+                                # Check for context injection patterns
+                                if data.get("type") == "injected_context":
+                                    logger.info("Found injected context in system message")
+                                    return data.get("content", "")
+                                elif data.get("type") == "context" and "content" in data:
+                                    logger.info("Found context data in system message")
+                                    return data.get("content", "")
+                                elif data.get("context") and isinstance(data.get("context"), str):
+                                    logger.info("Found context field in system message")
+                                    return data.get("context")
+                        except (json.JSONDecodeError, TypeError):
+                            # Not JSON, check if it's direct context
+                            pass
+
+                    # Check for non-JSON context patterns
+                    # Look for system messages that are substantial and not standard prompts
+                    if len(content) > 500 and not content.startswith("You are"):
+                        # This might be injected context
+                        logger.info(f"Found potential injected context in system message (length: {len(content)})")
+                        # Check if it looks like injected context (not a standard system prompt)
+                        lower_content = content.lower()
+                        if any(
+                            indicator in lower_content
+                            for indicator in ["context:", "document:", "information:", "data:"]
+                        ):
+                            logger.info(
+                                "System message appears to contain injected context based on content indicators"
+                            )
+                            return content
+
+        logger.debug("No injected context found in messages")
         return None
 
     def _is_pdf_content(self, text: str) -> bool:
@@ -1180,38 +1254,52 @@ Provide accurate translation that preserves meaning and cultural context. Mainta
         target_language = params.get("target_language")
         messages = params.get("messages", [])
 
-        # Check if we need to extract PDF content
-        # This happens when:
-        # 1. Text is empty or very short
-        # 2. Text mentions "pdf" or "document"
-        # 3. Messages contain PDF data OR PDF exists in session state
-        text_lower = text.lower() if text else ""
-        if not text or len(text) < 50 or "pdf" in text_lower or "document" in text_lower:
-            logger.info(f"Attempting to extract PDF content - first trying messages, then session state")
-            pdf_content = None
+        # Always check for injected context in messages
+        logger.debug(
+            f"Context extraction check - text_length: {len(text) if text else 0}, messages_count: {len(messages) if messages else 0}"
+        )
 
-            # First try to get PDF content from messages (injected context)
-            if messages:
-                pdf_content = self._get_pdf_content_from_messages(messages)
-                if pdf_content:
-                    logger.info("Found PDF content in messages")
+        # First, always try to extract any injected context from messages
+        injected_context = None
+        if messages:
+            # Check for PDF content
+            pdf_content = self._get_pdf_content_from_messages(messages)
+            if pdf_content:
+                logger.info("Found PDF content in messages")
+                injected_context = pdf_content
+            else:
+                # Check for other types of injected context
+                other_context = self._get_other_context_from_messages(messages)
+                if other_context:
+                    logger.info("Found other injected context in messages")
+                    injected_context = other_context
 
-            # If not found in messages, try to get directly from session state
-            if not pdf_content:
-                logger.info("No PDF content in messages, trying session state")
+        # If no injected context in messages, check session state for PDFs
+        if not injected_context:
+            text_lower = text.lower() if text else ""
+            # Only check session state if text mentions PDF/document or is very short
+            if not text or len(text) < 50 or "pdf" in text_lower or "document" in text_lower:
+                logger.info("Checking session state for PDF content")
                 pdf_content = self._get_pdf_content_from_session()
                 if pdf_content:
                     logger.info("Found PDF content in session state")
+                    injected_context = pdf_content
 
-            if pdf_content:
-                # If text was asking about the PDF, replace it with the PDF content
-                # Otherwise, append the PDF content to the existing text
-                if not text or "pdf" in text_lower or "document" in text_lower:
-                    logger.info(f"Using PDF content as text for {task_type} task")
-                    text = pdf_content
-                else:
-                    # Append PDF content to existing text
-                    text = f"{text}\n\n{pdf_content}"
+        # Combine injected context with user text
+        if injected_context:
+            text_lower = text.lower() if text else ""
+            # If text is empty or just asking about a document, replace with injected context
+            if not text or len(text) < 50 or ("pdf" in text_lower or "document" in text_lower):
+                logger.info(
+                    f"Using injected context as primary text for {task_type} task (context length: {len(injected_context)} chars)"
+                )
+                text = injected_context
+            else:
+                # Otherwise, append injected context to existing text
+                logger.info(f"Appending injected context to user text (context length: {len(injected_context)} chars)")
+                text = f"{text}\n\n--- Additional Context ---\n\n{injected_context}"
+        else:
+            logger.debug("No injected context found in messages or session state")
 
         # Validate translation parameters
         if task_type.lower() == "translate":
@@ -1231,7 +1319,13 @@ Provide accurate translation that preserves meaning and cultural context. Mainta
         # Create config from environment
         config = ChatConfig.from_environment()
         return self._process_text(
-            AssistantTaskType(task_type.lower()), text, config, instructions, source_language, target_language,
+            AssistantTaskType(task_type.lower()),
+            text,
+            config,
+            instructions,
+            source_language,
+            target_language,
+            messages,
         )
 
     def execute(self, params: Dict[str, Any]) -> AssistantResponse:

@@ -1,65 +1,65 @@
+name: streamlit-chatbot
+volumes:
+  ssl_certs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: nginx/ssl
+
 services:
   app:
+    image: streamlit-chatbot:local
     build:
-      context: docker
+      context: ./docker
       dockerfile: Dockerfile
       target: app
-    image: streamlit-app
-    restart: always
-    hostname: app
+    environment:
+      WATCHMAN_VERSION: none
+    user: "1000:1000"
+    ports:
+      - "8501:8501"
     env_file:
       - .env
+    restart: unless-stopped
     networks:
-      - app-network
+      - chatbot-network
+
+  docs:
+    image: streamlit-chatbot-docs:local
+    build:
+      context: ./docker
+      dockerfile: Dockerfile
+      target: docs
     ports:
-      - 8501:8501
+      - "8001:8001"
     volumes:
-      - type: bind
-        source: ./tmp/chatbot_storage
-        target: /tmp/chatbot_storage
-    develop:
-      watch:
-        - action: rebuild
-          path: ./docker/app
-          target: /app
-          ignore:
-            - .venv/
-        - action: rebuild
-          path: ./docker/uv.lock
+      - ./docker/app/docs:/app/docs:ro
+    restart: unless-stopped
+    networks:
+      - chatbot-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   nginx:
     image: nginx:alpine
-    restart: always
-    container_name: nginx-proxy
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/conf.d:/etc/nginx/conf.d
-      - ./nginx/ssl:/etc/nginx/ssl
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/logs:/var/log/nginx
-    networks:
-      - app-network
+      - ssl_certs:/etc/nginx/ssl:ro
     depends_on:
-      app:
-        condition: service_healthy
-
-  jupyterlab:
-    build:
-      context: docker
-      dockerfile: Dockerfile
-      target: jupyterlab
-    image: jupyterlab
-    working_dir: /app
-    env_file:
-      - .env
+      - app
+      - docs
+    restart: unless-stopped
     networks:
-      - app-network
-    ports:
-      - 8888:8888
-    volumes:
-      - ./workspace/tool-calling.ipynb:/app/tool-calling.ipynb
+      - chatbot-network
 
 networks:
-  app-network:
+  chatbot-network:
     driver: bridge
