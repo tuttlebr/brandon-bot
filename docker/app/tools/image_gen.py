@@ -60,7 +60,7 @@ class ImageGenerationTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "generate_image"
-        self.description = "Use this tool ONLY when the user explicitly requests visual content creation. Trigger words include: 'create/generate/make/design/draw/paint/illustrate an image/picture/visual/graphic/artwork/illustration'. Do NOT use for: explaining what something looks like, describing images, or any non-generation requests."
+        self.description = "Creates AI-generated images based on text descriptions, supporting various artistic styles, moods, and aspect ratios."
 
     def to_openai_format(self) -> Dict[str, Any]:
         """

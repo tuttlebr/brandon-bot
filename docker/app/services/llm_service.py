@@ -9,6 +9,7 @@ import logging
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from models.chat_config import ChatConfig
+from services.conversation_context_service import ConversationContextService
 from services.response_parsing_service import ResponseParsingService
 from services.streaming_service import StreamingService
 from services.tool_execution_service import ToolExecutionService
@@ -33,6 +34,7 @@ class LLMService:
         self.streaming_service = StreamingService(config)
         self.parsing_service = ResponseParsingService()
         self.tool_execution_service = ToolExecutionService(config)
+        self.conversation_context_service = ConversationContextService(config)
 
         # For backward compatibility
         self.last_tool_responses = []
@@ -71,6 +73,18 @@ class LLMService:
         try:
             # Apply sliding window to messages
             windowed_messages = self._apply_sliding_window(messages)
+
+            # Get current user message for context injection
+            current_user_message = ""
+            for msg in reversed(windowed_messages):
+                if msg.get("role") == "user":
+                    current_user_message = msg.get("content", "")
+                    break
+
+            # Inject conversation context automatically
+            windowed_messages = self.conversation_context_service.inject_conversation_context(
+                windowed_messages, current_user_message
+            )
 
             # Get tool definitions
             tools = tool_registry.get_all_definitions()

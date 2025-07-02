@@ -15,7 +15,16 @@ from utils.config import config as app_config
 logger = logging.getLogger(__name__)
 
 # Supported languages for translation
-SUPPORTED_LANGUAGES = ["English", "German", "French", "Italian", "Portuguese", "Hindi", "Spanish", "Thai"]
+SUPPORTED_LANGUAGES = [
+    "English",
+    "German",
+    "French",
+    "Italian",
+    "Portuguese",
+    "Hindi",
+    "Spanish",
+    "Thai",
+]
 
 
 class AssistantTaskType(str, Enum):
@@ -26,7 +35,6 @@ class AssistantTaskType(str, Enum):
     PROOFREAD = "proofread"
     REWRITE = "rewrite"
     CRITIC = "critic"
-    WRITER = "writer"
     TRANSLATE = "translate"
 
 
@@ -52,7 +60,7 @@ class AssistantTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "text_assistant"
-        self.description = "Intelligent text analysis and processing tool. PRIMARY USE: ANALYZE documents and answer user questions about content ('What does this document say about...?', 'Explain the main concepts', 'Answer questions based on this text'). ALSO supports specific tasks when explicitly requested: SUMMARIZE ('summarize this...'), PROOFREAD ('check grammar', 'fix spelling'), REWRITE ('rewrite this', 'make it more formal'), CRITIC ('critique this', 'give feedback'), WRITER ('write a story about', 'create content'), or TRANSLATE ('translate to Spanish'). Can process uploaded PDF content or provided text."
+        self.description = "Performs advanced text processing tasks including document analysis, summarization, proofreading, rewriting, critiquing,  writing, and translation."
         # Use intelligent model for high-quality text processing
         self.llm_type = "intelligent"
         # Initialize PDF analysis service for intelligent document processing
@@ -75,8 +83,8 @@ class AssistantTool(BaseTool):
                     "properties": {
                         "task_type": {
                             "type": "string",
-                            "enum": ["analyze", "summarize", "proofread", "rewrite", "critic", "writer", "translate"],
-                            "description": "The type of task to perform: 'analyze' (DEFAULT) to analyze documents and answer specific questions (MUST use 'instructions' field for the question when text='the PDF'), 'summarize' to create a concise summary, 'proofread' to check for errors and suggest improvements, 'rewrite' to rephrase and improve the text, 'critic' to critique the text and provide feedback, 'writer' to write a story based on the user's prompt, 'translate' to translate text from one language to another",
+                            "enum": ["analyze", "summarize", "proofread", "rewrite", "critic", "translate",],
+                            "description": "Performs advanced text processing tasks including document analysis, summarization, proofreading, rewriting, critiquing, writing, and translation.",
                         },
                         "text": {
                             "type": "string",
@@ -118,13 +126,30 @@ class AssistantTool(BaseTool):
             Formatted system prompt
         """
         base_prompts = {
-            AssistantTaskType.ANALYZE: """**Role:** Document Intelligence Specialist\nYou are an expert document analyst capable of understanding complex texts and providing insightful answers. Focus on:\n- **Deep Comprehension:** Thoroughly understand the document's content, context, and nuances\n- **Precise Answering:** Provide accurate, specific answers to user questions based on the document\n- **Evidence-Based Responses:** Support your answers with relevant quotes or references from the text\n- **Contextual Understanding:** Consider the document's purpose, audience, and broader implications\n- **Clarity & Completeness:** Ensure answers are clear, comprehensive, and directly address the user's query\nWhen analyzing, extract key insights, identify important themes, and be prepared to answer specific questions about any aspect of the content.""",
-            AssistantTaskType.SUMMARIZE: """**Role:** Precision-Driven Condenser\nYou are a clarity expert tasked with extracting value from complexity. Prioritize:\n- **Essentialism:** Isolate the 20% of data that delivers 80% of the insight\n- **Audience-Centric Framing:** Tailor density to the reader's expertise (e.g., avoid jargon for lay audiences)\n- **Narrative Skeleton:** Preserve causal relationships and progression\n- **Ruthless Pruning:** Eliminate redundancy without sacrificing meaning\nDeliver a self-contained snapshot that mirrors the source's value proposition.""",
-            AssistantTaskType.PROOFREAD: """**Role:** Text Surgeon\nYou are a precision editor specializing in textual refinement. Execute:\n1. **Mechanical Repair:** Grammar/punctuation fixes (Chicago/AP/MLA as relevant)\n2. **Friction Removal:** Streamline awkward phrasing\n3. **Consistency Protocols:** Enforce style guides (e.g., Oxford commas, numeral usage)\n4. **Micro-Flow Tuning:** Adjust sentence-level transitions\nReturn:\n- Clean text marked with [**] for critical changes\n- Brief rationale for high-impact edits (e.g., "Passive→active voice for authority")""",
-            AssistantTaskType.REWRITE: """**Role:** Tone Architect\nYou are a strategic rephraser focused on repositioning existing content. Leverage:\n- **Voice Chameleon:** Shift formality (colloquial→academic), perspective (1st→3rd person), or emotional tone (neutral→urgent)\n- **Engagement Levers:** Replace generic verbs with vivid alternatives (e.g., "said"→"argued")\n- **Structural Remix:** Reorder sections for dramatic impact (e.g., problem-solution→solution-benefit)\n- **Lexical Upgrade:** Replace clichés with fresh metaphors\nPreserve core arguments while reimagining delivery for specific audiences. If the user appears to have provided code, make sure to respond with rewritten code in a code block.""",
-            AssistantTaskType.CRITIC: """**Role:** Market-Focused Literary Strategist\nYou are a publishing viability specialist. Assess:\n- **Commercial Positioning:** How does this fit current genre trends (e.g., "revenge lit," climate dystopias)?\n- **Execution Gaps:** Identify plot holes, flat character motivations, or pacing drags\n- **Author Platform:** Does the creator have promotable angles (e.g., lived experience, viral potential)?\n- **Differentiation:** What unique value does this offer vs. category bestsellers?\nDeliver a 3-tier verdict:\n1. **Passion Fit:** Would I champion this?\n2. **Market Fit:** Does it align with publisher priorities?\n3. **Revision Path:** 2-3 actionable steps to elevate salability""",
-            AssistantTaskType.WRITER: """**Role:** Narrative Architect\nYou are a storycraft specialist generating original content. Build worlds using:\n- **Hook-First Design:** Start with disruption (e.g., "The day I stole the CEO's lunch")\n- **Emotional Stakes:** What do characters *fear losing*?\n- **Sensory Anchors:** Embed 2-3 vivid details per scene (e.g., "the smell of burnt coffee")\n- **Pacing Engine:** Alternate tension/release cycles\n- **Thematic Resonance:** Surface universal truths through specific moments\nDeliver a complete narrative arc with a clear 'why it matters' core.""",
-            AssistantTaskType.TRANSLATE: """**Role:** Professional Translation Specialist\nYou are an expert linguist specializing in accurate, culturally-aware translation between English, German, French, Italian, Portuguese, Hindi, Spanish, and Thai. Focus on:\n- **Linguistic Precision:** Maintain accuracy while adapting for natural flow in the target language\n- **Cultural Adaptation:** Preserve meaning while accounting for cultural context and idioms\n- **Tone Preservation:** Match the original's formality level, emotional tone, and style\n- **Context Sensitivity:** Consider domain-specific terminology (technical, legal, medical, etc.)\n- **Readability:** Ensure the translation reads naturally to native speakers of the target language\nIf the source language is not specified, auto-detect it from the supported languages. Always provide a natural, fluent translation that maintains the original meaning and intent.""",
+            AssistantTaskType.ANALYZE: """detailed thinking on
+            You are analyzing a document to provide comprehensive insights and answer specific questions.
+
+When analyzing documents, thoroughly understand the content, context, and purpose. Extract key insights, identify main themes and arguments, and provide accurate answers supported by evidence from the text. Be specific and cite relevant sections when answering questions. Consider the document's audience and broader implications in your analysis.""",
+            AssistantTaskType.SUMMARIZE: """detailed thinking on
+            You are creating a concise summary that captures the essential information.
+
+Focus on extracting the most important points that deliver the core insights. Maintain the logical flow and causal relationships from the original. Eliminate redundancy while preserving all critical information. Tailor the summary density to the intended audience, avoiding unnecessary jargon when appropriate.""",
+            AssistantTaskType.PROOFREAD: """detailed thinking on
+            You are proofreading text to identify and correct errors.
+
+Check for grammar, punctuation, and spelling mistakes. Improve awkward phrasing and ensure consistency in style. Mark significant changes with [**] brackets and provide brief explanations for important corrections. Focus on clarity and readability while maintaining the author's voice.""",
+            AssistantTaskType.REWRITE: """detailed thinking on
+            You are rewriting text to improve its effectiveness and impact.
+
+Enhance clarity, flow, and engagement while preserving the core message. Adjust tone, formality, and style as needed for the target audience. Use stronger verbs and more precise language. Reorganize content for better logical flow when beneficial. For code, provide the rewritten version in appropriate code blocks.""",
+            AssistantTaskType.CRITIC: """detailed thinking on
+            You are providing constructive critique and actionable feedback.
+
+Evaluate the text's strengths and weaknesses objectively. Identify areas for improvement in structure, argumentation, and execution. Consider the intended audience and purpose. Provide specific, actionable suggestions for enhancement. Be honest but constructive in your assessment.""",
+            AssistantTaskType.TRANSLATE: """detailed thinking on
+            You are translating text between English, German, French, Italian, Portuguese, Hindi, Spanish, and Thai.
+
+Provide accurate translation that preserves meaning and cultural context. Maintain appropriate tone and formality level. Handle idioms and cultural references appropriately. Ensure natural flow in the target language. If source language is not specified, auto-detect from supported languages.""",
         }
 
         prompt = base_prompts.get(task_type, base_prompts[AssistantTaskType.ANALYZE])
@@ -216,9 +241,7 @@ class AssistantTool(BaseTool):
             response = client.chat.completions.create(
                 model=model_name,
                 messages=messages,
-                temperature=app_config.llm.DEFAULT_TEMPERATURE
-                if task_type == AssistantTaskType.TRANSLATE
-                else 0.3,  # Lower temperature for translation accuracy
+                temperature=app_config.llm.DEFAULT_TEMPERATURE,
                 top_p=app_config.llm.DEFAULT_TOP_P,
                 frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
                 presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,
@@ -331,7 +354,7 @@ class AssistantTool(BaseTool):
             f"PDF extraction check - text: '{text}', text_length: {len(text) if text else 0}, messages_count: {len(messages) if messages else 0}"
         )
 
-        if not text or len(text) < 50 or 'pdf' in text_lower or 'document' in text_lower:
+        if not text or len(text) < 50 or "pdf" in text_lower or "document" in text_lower:
             logger.info(f"Attempting to extract PDF content - first trying messages, then session state")
             pdf_content = None
 
@@ -351,7 +374,7 @@ class AssistantTool(BaseTool):
             if pdf_content:
                 # If text was asking about the PDF, replace it with the PDF content
                 # Otherwise, append the PDF content to the existing text
-                if not text or 'pdf' in text_lower or 'document' in text_lower:
+                if not text or "pdf" in text_lower or "document" in text_lower:
                     logger.info(
                         f"Using PDF content as text for {task_type} task (PDF content length: {len(pdf_content)} chars)"
                     )
@@ -416,7 +439,7 @@ class AssistantTool(BaseTool):
                     if isinstance(content, str):
                         logger.debug(f"System message content length: {len(content)}")
                         # Check if this looks like JSON
-                        if content.strip().startswith('{') and content.strip().endswith('}'):
+                        if content.strip().startswith("{") and content.strip().endswith("}"):
                             logger.debug("Found JSON-like system message, attempting to parse")
                             data = json.loads(content)
                             logger.debug(
@@ -506,9 +529,9 @@ class AssistantTool(BaseTool):
 
             # Initialize progress tracking
             st.session_state.pdf_analysis_progress = {
-                'status': 'starting',
-                'message': 'Initializing intelligent PDF analysis...',
-                'progress': 0,
+                "status": "starting",
+                "message": "Initializing intelligent PDF analysis...",
+                "progress": 0,
             }
 
             # Initialize PDF analysis service if not already done
@@ -551,9 +574,9 @@ class AssistantTool(BaseTool):
         try:
             import streamlit as st
 
-            pages = pdf_data.get('pages', [])
+            pages = pdf_data.get("pages", [])
             total_pages = len(pages)
-            filename = pdf_data.get('filename', 'Document')
+            filename = pdf_data.get("filename", "Document")
 
             logger.info(f"Starting direct PDF analysis for query '{instructions}' on {filename} ({total_pages} pages)")
 
@@ -562,9 +585,9 @@ class AssistantTool(BaseTool):
 
             # Update progress
             st.session_state.pdf_analysis_progress = {
-                'status': 'analyzing',
-                'message': f'Analyzing {total_pages} pages...',
-                'progress': 10,
+                "status": "analyzing",
+                "message": f"Analyzing {total_pages} pages...",
+                "progress": 10,
             }
             time.sleep(0.1)  # Brief pause for UI update
 
@@ -587,9 +610,9 @@ class AssistantTool(BaseTool):
 
             # Update progress
             st.session_state.pdf_analysis_progress = {
-                'status': 'analyzing',
-                'message': 'Processing all pages together...',
-                'progress': 30,
+                "status": "analyzing",
+                "message": "Processing all pages together...",
+                "progress": 30,
             }
             time.sleep(0.1)  # Brief pause for UI update
 
@@ -607,9 +630,9 @@ class AssistantTool(BaseTool):
 
             # Update progress
             st.session_state.pdf_analysis_progress = {
-                'status': 'analyzing',
-                'message': 'Generating analysis...',
-                'progress': 70,
+                "status": "analyzing",
+                "message": "Generating analysis...",
+                "progress": 70,
             }
             time.sleep(0.1)  # Brief pause for UI update
 
@@ -631,9 +654,9 @@ class AssistantTool(BaseTool):
 
             # Update progress - completed
             st.session_state.pdf_analysis_progress = {
-                'status': 'completed',
-                'message': 'Analysis completed!',
-                'progress': 100,
+                "status": "completed",
+                "message": "Analysis completed!",
+                "progress": 100,
             }
 
             return result
@@ -652,9 +675,9 @@ class AssistantTool(BaseTool):
 
             # Update progress
             st.session_state.pdf_analysis_progress = {
-                'status': 'analyzing',
-                'message': f'Processing {len(pages)} pages in batches...',
-                'progress': 20,
+                "status": "analyzing",
+                "message": f"Processing {len(pages)} pages in batches...",
+                "progress": 20,
             }
             time.sleep(0.1)  # Brief pause for UI update
 
@@ -666,9 +689,9 @@ class AssistantTool(BaseTool):
                 # Update progress
                 progress = 20 + (i / len(pages)) * 60
                 st.session_state.pdf_analysis_progress = {
-                    'status': 'analyzing',
-                    'message': f'Analyzing pages {i+1}-{batch_end}...',
-                    'progress': int(progress),
+                    "status": "analyzing",
+                    "message": f"Analyzing pages {i+1}-{batch_end}...",
+                    "progress": int(progress),
                 }
                 time.sleep(0.1)  # Brief pause for UI update
 
@@ -698,14 +721,14 @@ class AssistantTool(BaseTool):
                 )
 
                 batch_results.append(
-                    {"page_range": f"{i+1}-{batch_end}", "analysis": response.choices[0].message.content.strip()}
+                    {"page_range": f"{i+1}-{batch_end}", "analysis": response.choices[0].message.content.strip(),}
                 )
 
             # Update progress
             st.session_state.pdf_analysis_progress = {
-                'status': 'analyzing',
-                'message': 'Combining results...',
-                'progress': 85,
+                "status": "analyzing",
+                "message": "Combining results...",
+                "progress": 85,
             }
             time.sleep(0.1)  # Brief pause for UI update
 
@@ -739,9 +762,9 @@ class AssistantTool(BaseTool):
 
             # Update progress - completed
             st.session_state.pdf_analysis_progress = {
-                'status': 'completed',
-                'message': 'Analysis completed!',
-                'progress': 100,
+                "status": "completed",
+                "message": "Analysis completed!",
+                "progress": 100,
             }
 
             return result
@@ -757,9 +780,9 @@ class AssistantTool(BaseTool):
 
             # Update progress
             st.session_state.pdf_analysis_progress = {
-                'status': 'analyzing',
-                'message': 'Scanning pages for relevant content...',
-                'progress': 20,
+                "status": "analyzing",
+                "message": "Scanning pages for relevant content...",
+                "progress": 20,
             }
             time.sleep(0.1)  # Brief pause for UI update
 
@@ -774,16 +797,16 @@ class AssistantTool(BaseTool):
                 # Update progress
                 progress = 20 + (i / len(pages)) * 40
                 st.session_state.pdf_analysis_progress = {
-                    'status': 'analyzing',
-                    'message': f'Scanning pages {i+1}-{batch_end} for relevance...',
-                    'progress': int(progress),
+                    "status": "analyzing",
+                    "message": f"Scanning pages {i+1}-{batch_end} for relevance...",
+                    "progress": int(progress),
                 }
                 time.sleep(0.1)  # Brief pause for UI update
 
                 # Create summary of each page for relevance checking
                 page_summaries = []
                 for j, page in enumerate(batch_pages):
-                    page_text = page.get('text', '')[:1000]  # First 1000 chars
+                    page_text = page.get("text", "")[:1000]  # First 1000 chars
                     page_summaries.append(f"Page {page.get('page', i+j+1)}: {page_text}...")
 
                 batch_text = "\n\n".join(page_summaries)
@@ -819,7 +842,7 @@ class AssistantTool(BaseTool):
                 # Add full page data for relevant pages
                 for page_num in relevant_in_batch:
                     for page in batch_pages:
-                        if page.get('page') == page_num:
+                        if page.get("page") == page_num:
                             relevant_pages.append(page)
                             break
 
@@ -830,9 +853,9 @@ class AssistantTool(BaseTool):
 
             # Update progress
             st.session_state.pdf_analysis_progress = {
-                'status': 'analyzing',
-                'message': f'Analyzing {len(relevant_pages)} relevant pages...',
-                'progress': 70,
+                "status": "analyzing",
+                "message": f"Analyzing {len(relevant_pages)} relevant pages...",
+                "progress": 70,
             }
             time.sleep(0.1)  # Brief pause for UI update
 
@@ -895,7 +918,7 @@ class AssistantTool(BaseTool):
 
                     batch_results.append(
                         {
-                            "pages": [p.get('page') for p in batch],
+                            "pages": [p.get("page") for p in batch],
                             "analysis": response.choices[0].message.content.strip(),
                         }
                     )
@@ -932,9 +955,9 @@ class AssistantTool(BaseTool):
 
             # Update progress - completed
             st.session_state.pdf_analysis_progress = {
-                'status': 'completed',
-                'message': 'Analysis completed!',
-                'progress': 100,
+                "status": "completed",
+                "message": "Analysis completed!",
+                "progress": 100,
             }
 
             return result
@@ -947,11 +970,11 @@ class AssistantTool(BaseTool):
         """Extract page numbers from LLM response (simple version)"""
         import re
 
-        if 'none' in text.lower() or 'no pages' in text.lower():
+        if "none" in text.lower() or "no pages" in text.lower():
             return []
 
         # Find all numbers that could be page numbers
-        numbers = re.findall(r'\b(\d+)\b', text)
+        numbers = re.findall(r"\b(\d+)\b", text)
         page_numbers = []
 
         for num_str in numbers:
@@ -979,18 +1002,20 @@ class AssistantTool(BaseTool):
             current_page = None
             current_text = []
 
-            lines = text.split('\n')
+            lines = text.split("\n")
 
             for line in lines:
                 # Check for page marker
-                if line.startswith('[Page ') and line.endswith(']'):
+                if line.startswith("[Page ") and line.endswith("]"):
                     # Save previous page if exists
                     if current_page is not None and current_text:
-                        pages.append({'page': current_page, 'text': '\n'.join(current_text).strip()})
+                        pages.append(
+                            {"page": current_page, "text": "\n".join(current_text).strip(),}
+                        )
 
                     # Start new page
                     try:
-                        page_num = int(line.replace('[Page ', '').replace(']', ''))
+                        page_num = int(line.replace("[Page ", "").replace("]", ""))
                         current_page = page_num
                         current_text = []
                     except ValueError:
@@ -1004,18 +1029,18 @@ class AssistantTool(BaseTool):
 
             # Save final page
             if current_page is not None and current_text:
-                pages.append({'page': current_page, 'text': '\n'.join(current_text).strip()})
+                pages.append({"page": current_page, "text": "\n".join(current_text).strip()})
 
             # If no pages were parsed (content doesn't have page markers), treat as single page
             if not pages:
-                pages = [{'page': 1, 'text': text}]
+                pages = [{"page": 1, "text": text}]
 
-            return {'pages': pages, 'filename': 'Document'}
+            return {"pages": pages, "filename": "Document"}
 
         except Exception as e:
             logger.error(f"Error parsing PDF content: {e}")
             # Fallback: treat entire text as single page
-            return {'pages': [{'page': 1, 'text': text}], 'filename': 'Document'}
+            return {"pages": [{"page": 1, "text": text}], "filename": "Document"}
 
     def _fallback_regular_processing(self, text: str, instructions: str, config: ChatConfig) -> AssistantResponse:
         """
@@ -1082,7 +1107,7 @@ class AssistantTool(BaseTool):
             logger.debug("Attempting to get PDF content from session state")
 
             # Check if there are stored PDFs in session
-            if not hasattr(st.session_state, 'stored_pdfs') or not st.session_state.stored_pdfs:
+            if not hasattr(st.session_state, "stored_pdfs") or not st.session_state.stored_pdfs:
                 logger.debug("No stored PDFs in session state")
                 return None
 
@@ -1098,8 +1123,8 @@ class AssistantTool(BaseTool):
                 logger.warning(f"Failed to retrieve PDF data for ID: {latest_pdf_id}")
                 return None
 
-            pages = pdf_data.get('pages', [])
-            filename = pdf_data.get('filename', 'Unknown')
+            pages = pdf_data.get("pages", [])
+            filename = pdf_data.get("filename", "Unknown")
 
             if not pages:
                 logger.warning("PDF data found but no pages available")
@@ -1161,7 +1186,7 @@ class AssistantTool(BaseTool):
         # 2. Text mentions "pdf" or "document"
         # 3. Messages contain PDF data OR PDF exists in session state
         text_lower = text.lower() if text else ""
-        if not text or len(text) < 50 or 'pdf' in text_lower or 'document' in text_lower:
+        if not text or len(text) < 50 or "pdf" in text_lower or "document" in text_lower:
             logger.info(f"Attempting to extract PDF content - first trying messages, then session state")
             pdf_content = None
 
@@ -1181,7 +1206,7 @@ class AssistantTool(BaseTool):
             if pdf_content:
                 # If text was asking about the PDF, replace it with the PDF content
                 # Otherwise, append the PDF content to the existing text
-                if not text or 'pdf' in text_lower or 'document' in text_lower:
+                if not text or "pdf" in text_lower or "document" in text_lower:
                     logger.info(f"Using PDF content as text for {task_type} task")
                     text = pdf_content
                 else:
@@ -1206,7 +1231,7 @@ class AssistantTool(BaseTool):
         # Create config from environment
         config = ChatConfig.from_environment()
         return self._process_text(
-            AssistantTaskType(task_type.lower()), text, config, instructions, source_language, target_language
+            AssistantTaskType(task_type.lower()), text, config, instructions, source_language, target_language,
         )
 
     def execute(self, params: Dict[str, Any]) -> AssistantResponse:
@@ -1258,7 +1283,7 @@ def execute_assistant_task(
     """
     config = ChatConfig.from_environment()
     return assistant_tool._process_text(
-        AssistantTaskType(task_type.lower()), text, config, instructions, source_language, target_language
+        AssistantTaskType(task_type.lower()), text, config, instructions, source_language, target_language,
     )
 
 

@@ -40,7 +40,7 @@ class PDFSummaryTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "retrieve_pdf_summary"
-        self.description = "Use this tool ONLY when the user explicitly asks for a 'summary', 'overview', 'brief', or 'condensed version' of a PDF. This generates AI summaries for large PDFs (>10 pages). Do NOT use for: general PDF questions, finding specific information, or when users ask what's in a PDF (use retrieve_pdf_content instead)."
+        self.description = "Generates comprehensive summaries of PDF documents, providing both document-level overviews and page-by-page summaries for large PDFs."
         self.summarization_service = None  # Will be initialized on first use
 
     def to_openai_format(self) -> Dict[str, Any]:

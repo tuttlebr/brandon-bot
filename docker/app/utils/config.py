@@ -87,7 +87,7 @@ class LLMConfig:
     """LLM service configuration"""
 
     # Default model parameters
-    DEFAULT_TEMPERATURE: float = 0.6
+    DEFAULT_TEMPERATURE: float = 0.3
     DEFAULT_TOP_P: float = 0.95
     DEFAULT_FREQUENCY_PENALTY: float = 0.0
     DEFAULT_PRESENCE_PENALTY: float = 0.0
@@ -95,6 +95,10 @@ class LLMConfig:
     # Context and token limits
     SLIDING_WINDOW_MAX_TURNS: int = 20  # Increased from 6 to prevent context loss
     MAX_CONTEXT_LENGTH: int = 60000  # Maximum context length for LLM (chars)
+
+    # Conversation context injection
+    AUTO_INJECT_CONVERSATION_CONTEXT: bool = True  # Automatically inject conversation context
+    MIN_TURNS_FOR_CONTEXT_INJECTION: int = 1  # Minimum turns before injecting context
 
 
 @dataclass

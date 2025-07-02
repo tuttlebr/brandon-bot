@@ -51,7 +51,7 @@ class ConversationContextTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "conversation_context"
-        self.description = "Use this tool ONLY when you need to analyze conversation patterns, extract key themes from chat history, or understand the user's overall intent across multiple messages. Do NOT use for every query - only when historical context is essential for the response."
+        self.description = "Analyzes conversation history to extract context, identify user intent, summarize topics, and track ongoing tasks or creative projects."
         # Use fast model for quick context analysis
         self.llm_type = "fast"
 
@@ -95,51 +95,30 @@ class ConversationContextTool(BaseTool):
         """Get the appropriate system prompt for context analysis"""
 
         base_prompts = {
-            ContextType.CONVERSATION_SUMMARY: """**Comprehensive Conversation Synthesis**
-        As a seasoned dialogue strategist, distill the interaction history into a succinct overview, encapsulating:
-        - **Core Themes**: Primary subjects explored
-        - **User Objectives**: Explicit requests or implicit goals
-        - **Contextual Anchors**: Critical background for immediate relevance
-        - **Ongoing Endeavors**: Tasks or challenges in progress
-        **Constraint**: Deliver a focused snapshot within 200 words.""",
-            ContextType.RECENT_TOPICS: """**Topical Landscape Analysis**
-        In the capacity of a thematic cartographer, chart the conversational terrain to pinpoint:
-        - **Primary Discussion Threads** (enumerated)
-        - **Recurrent Motifs**: Enduring interests or preoccupations
-        - **Present Focus**: Current axis of engagement
-        - **Adjacent Domains**: Relevant peripheral concepts
-        **Orientation**: Prioritize topics instrumental to operational efficacy.""",
-            ContextType.USER_PREFERENCES: """**User Profiling & Preference Mapping**
-        Assuming the role of a behavioral insights specialist, decode the user's interaction patterns to reveal:
-        - **Communicative Idioms**: Stylistic inclinations and response modalities
-        - **Request Typology**: Nature of inquiries or directives
-        - **Format Affinities**: Preferred information architectures
-        - **Boundary Conditions**: Explicit constraints or predispositions
-        - **Competency Indicators**: Implicit or expressed expertise levels""",
-            ContextType.TASK_CONTINUITY: """**Task Progression & Support Needs Assessment**
-        As a procedural continuity expert, evaluate the user's operational context to determine:
-        - **Active Initiative**: The overarching task or objective
-        - **Accomplishments & Milestones**: Completed stages or discussed pathways
-        - **Current Juncture**: Precise stage within the task lifecycle
-        - **Anticipated Requirements**: Foreseen informational or assistance needs
-        - **Contextual Prerequisites**: Essential background for seamless task resumption""",
-            ContextType.CREATIVE_DIRECTOR: """**Immersive Creative Continuity Steward**
-        As a visionary creative concierge, safeguard the integrity and evolution of iterative creative work by:
-        - **Project Horizon Mapping**: Defining the creative endeavor's vision, scope, and deliverables
-        - **Idea Genesis Tracking**: Documenting the emergence and refinement of core concepts
-        - **Aesthetic Cohesion Enforcement**: Flagging and resolving discordances in tone, style, or narrative
-        - **Inspiration Infusion**: Proposing fresh perspectives or cross-disciplinary stimuli
-        - **Asset Curation**: Maintaining an inventory of referenced materials, prototypes, or inspirations
-        **Focus**: Ensure a rich, adaptable narrative that honors the project's essence while embracing evolution""",
-            ContextType.DOCUMENT_ANALYSIS: """**Document Content Analysis & Synthesis**
-        As a specialized document analysis expert, examine uploaded document content to provide comprehensive insights:
-        - **Content Summary**: Distill key points, themes, and main arguments
-        - **Structural Analysis**: Identify document organization, sections, and flow
-        - **Key Information Extraction**: Highlight critical data, facts, and conclusions
-        - **Contextual Understanding**: Relate content to user queries and specific focus areas
-        - **Action Items**: Identify tasks, recommendations, or next steps mentioned
-        - **Cross-Reference Opportunities**: Note connections to conversation topics or user goals
-        **Approach**: Provide thorough yet accessible analysis that directly addresses user needs and questions about the document.""",
+            ContextType.CONVERSATION_SUMMARY: """detailed thinking on
+            You are summarizing the conversation history to provide context.
+
+Create a concise overview that captures the main themes, user objectives, and ongoing tasks. Include critical background information needed for immediate context. Keep the summary focused and within 200 words.""",
+            ContextType.RECENT_TOPICS: """detailed thinking on
+            You are identifying and listing the main topics discussed in the conversation.
+
+Extract and enumerate the primary discussion threads. Note recurring themes and the current focus of engagement. Include relevant related topics that may be important. Prioritize topics that are most relevant to ongoing tasks or questions.""",
+            ContextType.USER_PREFERENCES: """detailed thinking on
+            You are analyzing user interaction patterns and preferences.
+
+Identify the user's communication style, typical request types, and preferred response formats. Note any stated constraints or preferences. Assess the user's apparent expertise level and information needs based on their interactions.""",
+            ContextType.TASK_CONTINUITY: """detailed thinking on
+            You are tracking task progression and continuity.
+
+Identify the main task or objective being pursued. Document completed steps and current progress. Determine what stage the user is at in their task. Anticipate likely next steps and information needs. Provide essential context for seamless task continuation.""",
+            ContextType.CREATIVE_DIRECTOR: """detailed thinking on
+            You are maintaining creative project continuity and coherence.
+
+Track the creative project's vision, scope, and goals. Document the evolution of core ideas and concepts. Ensure consistency in tone, style, and narrative direction. Identify opportunities for enhancement or new perspectives. Maintain an awareness of referenced materials and inspirations.""",
+            ContextType.DOCUMENT_ANALYSIS: """detailed thinking on
+            You are analyzing document content in relation to the conversation.
+
+Summarize key points, themes, and main arguments from the document. Identify the document's structure and organization. Extract critical information, facts, and conclusions. Relate content to user queries and conversation context. Note any action items or recommendations. Identify connections between document content and conversation topics.""",
         }
 
         prompt = base_prompts.get(context_type, base_prompts[ContextType.CONVERSATION_SUMMARY])

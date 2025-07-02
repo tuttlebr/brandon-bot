@@ -49,11 +49,7 @@ class NewsTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "tavily_news_search"
-        self.description = (
-            "Use this tool ONLY when the user explicitly asks about: (1) Current news or recent events; (2) Latest developments in a topic; (3) What's happening today/this week; (4) Breaking news. Searches these news sources: "
-            + ", ".join(INCLUDED_DOMAINS)
-            + ". Do NOT use for: general information, research, or non-news queries."
-        )
+        self.description = "Searches for recent news articles and current events from trusted news sources."
 
     def to_openai_format(self) -> Dict[str, Any]:
         """
