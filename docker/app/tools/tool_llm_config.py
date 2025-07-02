@@ -16,7 +16,7 @@ TOOL_LLM_TYPES = {
     "pdf_text_processor": "llm",  # PDF text processing
     "text_assistant": "llm",  # Complex text processing tasks
     "image_gen": "fast",  # Complex prompt enhancement for image generation
-    "tool_selection": "fasf",  # Tool selection and reasoning - determines which tools to use for user queries
+    "tool_selection": "fast",  # Tool selection and reasoning - determines which tools to use for user queries
 }
 
 # Default LLM type if not specified

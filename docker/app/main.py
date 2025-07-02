@@ -137,7 +137,7 @@ class ProductionStreamlitChatApp:
         finally:
             self.session_controller.set_processing_state(False)
 
-    @st.fragment(run_every=2)
+    @st.fragment(run_every=1)
     def pdf_analysis_progress_fragment(self):
         """
         Fragment to show real-time PDF analysis progress
@@ -179,7 +179,7 @@ class ProductionStreamlitChatApp:
                     st.session_state.pdf_analysis_progress = None
                     del st.session_state.analysis_completion_shown
 
-    @st.fragment(run_every=5)
+    @st.fragment(run_every=1)
     def pdf_processing_fragment(self):
         """
         Self-contained PDF processing fragment that runs independently
