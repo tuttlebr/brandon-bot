@@ -44,12 +44,6 @@ class ValidationError(ChatbotException):
     pass
 
 
-class SessionStateError(ChatbotException):
-    """Raised when session state operations fail"""
-
-    pass
-
-
 class FileProcessingError(ChatbotException):
     """Raised when file processing fails"""
 

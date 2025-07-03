@@ -9,7 +9,7 @@ import logging
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from models.chat_config import ChatConfig
-from openai import AsyncOpenAI, OpenAI
+from services.llm_client_service import llm_client_service
 from utils.config import config
 from utils.exceptions import StreamingError
 
@@ -27,27 +27,8 @@ class StreamingService:
             config_obj: Application configuration
         """
         self.config = config_obj
-        self._init_clients()
-
-    def _init_clients(self):
-        """Initialize OpenAI clients"""
-        try:
-            # Sync clients for backward compatibility
-            self.client = OpenAI(api_key=self.config.api_key, base_url=self.config.llm_endpoint)
-            self.fast_client = OpenAI(api_key=self.config.api_key, base_url=self.config.fast_llm_endpoint)
-            self.intelligent_client = OpenAI(
-                api_key=self.config.api_key, base_url=self.config.intelligent_llm_endpoint
-            )
-
-            # Async clients for streaming
-            self.async_client = AsyncOpenAI(api_key=self.config.api_key, base_url=self.config.llm_endpoint)
-            self.async_fast_client = AsyncOpenAI(api_key=self.config.api_key, base_url=self.config.fast_llm_endpoint)
-            self.async_intelligent_client = AsyncOpenAI(
-                api_key=self.config.api_key, base_url=self.config.intelligent_llm_endpoint
-            )
-        except Exception as e:
-            logger.error(f"Failed to initialize clients: {e}")
-            raise StreamingError(f"Client initialization failed: {e}")
+        # Initialize llm_client_service if not already done
+        llm_client_service.initialize(config_obj)
 
     def get_client(self, model_type: str = "fast", async_client: bool = False):
         """
@@ -60,14 +41,10 @@ class StreamingService:
         Returns:
             OpenAI client instance
         """
-        client_map = {
-            "fast": (self.fast_client, self.async_fast_client),
-            "llm": (self.client, self.async_client),
-            "intelligent": (self.intelligent_client, self.async_intelligent_client),
-        }
-
-        clients = client_map.get(model_type, client_map["fast"])
-        return clients[1] if async_client else clients[0]
+        if async_client:
+            return llm_client_service.get_async_client(model_type)
+        else:
+            return llm_client_service.get_client(model_type)
 
     async def stream_completion(
         self,
@@ -186,9 +163,4 @@ class StreamingService:
 
     def _get_model_name(self, model_type: str) -> str:
         """Get model name for the specified type"""
-        model_map = {
-            "fast": self.config.fast_llm_model_name,
-            "llm": self.config.llm_model_name,
-            "intelligent": self.config.intelligent_llm_model_name,
-        }
-        return model_map.get(model_type, self.config.fast_llm_model_name)
+        return llm_client_service.get_model_name(model_type)

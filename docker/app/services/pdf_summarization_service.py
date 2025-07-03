@@ -11,6 +11,7 @@ import logging
 from typing import Dict, List, Optional
 
 from models.chat_config import ChatConfig
+from utils.batch_processor import BatchProcessor, DocumentProcessor
 from utils.config import config
 from utils.streamlit_context import run_with_streamlit_context
 
@@ -89,22 +90,15 @@ class PDFSummarizationService:
         Returns:
             List of page summaries
         """
-        page_summaries = []
-        total_pages = len(pages)
+        batch_processor = BatchProcessor(batch_size=self.batch_size, delay_between_batches=0.5)
 
-        # Process pages in batches
-        for i in range(0, total_pages, self.batch_size):
-            batch_end = min(i + self.batch_size, total_pages)
-            batch_pages = pages[i:batch_end]
+        async def summarize_batch(batch_pages: List[Dict], start_idx: int, end_idx: int) -> Dict:
+            """Summarize a single batch of pages"""
+            logger.info(f"Processing pages {start_idx+1}-{end_idx} of {len(pages)} for {filename}")
 
-            logger.info(f"Processing pages {i+1}-{batch_end} of {total_pages} for {filename}")
+            # Use DocumentProcessor to format pages
+            batch_text = DocumentProcessor.format_pages_for_analysis(batch_pages)
 
-            # Combine text from batch pages
-            batch_text = "\n\n".join(
-                [f"Page {page.get('page', i+j+1)}:\n{page.get('text', '')}" for j, page in enumerate(batch_pages)]
-            )
-
-            # Summarize the batch
             try:
                 summary_params = {
                     "task_type": "summarize",
@@ -115,35 +109,28 @@ class PDFSummarizationService:
                 # Import locally to avoid circular imports
                 from tools.assistant import execute_assistant_with_dict
 
-                # Execute summarization using assistant tool in thread pool with context preserved
                 loop = asyncio.get_event_loop()
                 summary_result = await loop.run_in_executor(
                     self.executor, run_with_streamlit_context, execute_assistant_with_dict, summary_params
                 )
 
-                page_summaries.append(
-                    {
-                        "page_range": f"{i+1}-{batch_end}",
-                        "summary": summary_result.result,
-                        "pages_covered": batch_end - i,
-                    }
-                )
+                return {
+                    "page_range": f"{start_idx+1}-{end_idx}",
+                    "summary": summary_result.result,
+                    "pages_covered": end_idx - start_idx,
+                }
 
             except Exception as e:
-                logger.error(f"Error summarizing pages {i+1}-{batch_end}: {e}")
-                # Add a placeholder if summarization fails
-                page_summaries.append(
-                    {
-                        "page_range": f"{i+1}-{batch_end}",
-                        "summary": "Summary unavailable due to processing error",
-                        "pages_covered": batch_end - i,
-                    }
-                )
+                logger.error(f"Error summarizing pages {start_idx+1}-{end_idx}: {e}")
+                return {
+                    "page_range": f"{start_idx+1}-{end_idx}",
+                    "summary": "Summary unavailable due to processing error",
+                    "pages_covered": end_idx - start_idx,
+                }
 
-            # Small delay to avoid overwhelming the LLM service
-            await asyncio.sleep(0.5)
-
-        return page_summaries
+        # Process all pages and filter out None results
+        summaries = await batch_processor.process_in_batches(pages, summarize_batch)
+        return [s for s in summaries if s is not None]
 
     async def _create_intermediate_summaries(self, page_summaries: List[Dict]) -> List[Dict]:
         """

@@ -22,12 +22,11 @@ from .image_gen import (
     get_image_generation_tool_definition,
 )
 from .news import NewsTool, execute_news_search, execute_news_with_dict, get_news_tool_definition
-from .pdf_summary import execute_pdf_summary_with_dict, get_pdf_summary_tool_definition, pdf_summary_tool
+from .pdf_summary import execute_pdf_summary_with_dict, get_pdf_summary_tool_definition
 from .pdf_text_processor import (
     PDFTextProcessorTool,
     execute_pdf_text_processor_with_dict,
     get_pdf_text_processor_tool_definition,
-    pdf_text_processor_tool,
 )
 from .registry import get_all_tool_definitions, get_tools_list_text
 from .retriever import (
@@ -59,7 +58,6 @@ __all__ = [
     "PDFTextProcessorTool",
     "get_pdf_text_processor_tool_definition",
     "execute_pdf_text_processor_with_dict",
-    "pdf_text_processor_tool",
     "TavilyTool",
     "get_tavily_tool_definition",
     "execute_tavily_search",
@@ -79,7 +77,6 @@ __all__ = [
     "execute_news_with_dict",
     "get_all_tool_definitions",
     "get_tools_list_text",
-    "pdf_summary_tool",
     "execute_pdf_summary_with_dict",
     "get_pdf_summary_tool_definition",
 ]

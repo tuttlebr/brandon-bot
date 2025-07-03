@@ -7,6 +7,7 @@ from pydantic import Field
 from services.llm_client_service import llm_client_service
 from tools.base import BaseTool, BaseToolResponse
 from utils.config import config as app_config
+from utils.pdf_extractor import PDFDataExtractor
 from utils.text_processing import strip_think_tags
 
 # Configure logger
@@ -86,10 +87,6 @@ class ConversationContextTool(BaseTool):
                 },
             },
         }
-
-    def get_definition(self) -> Dict[str, Any]:
-        """Get tool definition for BaseTool interface"""
-        return self.to_openai_format()
 
     def _get_system_prompt(self, context_type: ContextType, focus_query: Optional[str] = None) -> str:
         """Get the appropriate system prompt for context analysis"""
@@ -339,24 +336,16 @@ Summarize key points, themes, and main arguments from the document. Identify the
         Returns:
             Formatted PDF content string or None if not available
         """
-        try:
-            pages = pdf_data.get('pages', [])
-            if not pages:
-                return None
-
-            # Extract text content from PDF pages
-            document_text = []
-            for page in pages[:5]:  # Limit to first 5 pages for context analysis
-                page_text = page.get("text", "")
+        if pdf_data:
+            # Limit to first 5 pages for context analysis
+            limited_data = {'pages': pdf_data.get('pages', [])[:5], 'filename': pdf_data.get('filename')}
+            # Get text but limit each page to 1000 chars
+            pages_text = []
+            for page in limited_data['pages']:
+                page_text = page.get('text', '')
                 if page_text:
-                    document_text.append(f"Page {page.get('page', '?')}: {page_text[:1000]}...")  # Limit per page
-
-            if document_text:
-                return "\n\n".join(document_text)
-
-        except Exception as e:
-            logger.error(f"Error extracting PDF content from passed data: {e}")
-
+                    pages_text.append(f"Page {page.get('page', '?')}: {page_text[:1000]}...")
+            return "\n\n".join(pages_text) if pages_text else None
         return None
 
     def _get_pdf_content_from_messages(self, messages: List[Dict[str, Any]]) -> Optional[str]:
@@ -369,61 +358,17 @@ Summarize key points, themes, and main arguments from the document. Identify the
         Returns:
             Formatted PDF content string or None if not available
         """
-        import json
-
-        # First look for injected PDF data in system messages
-        for message in messages:
-            if message.get("role") == "system":
-                try:
-                    content = message.get("content", "")
-                    if isinstance(content, str):
-                        data = json.loads(content)
-                        if (
-                            isinstance(data, dict)
-                            and data.get("type") == "pdf_data"
-                            and data.get("tool_name") == "process_pdf_document"
-                        ):
-                            # Found injected PDF data
-                            pages = data.get("pages", [])
-                            if pages:
-                                document_text = []
-                                for page in pages[:5]:  # Limit to first 5 pages for context analysis
-                                    page_text = page.get("text", "")
-                                    if page_text:
-                                        document_text.append(f"Page {page.get('page', '?')}: {page_text[:1000]}...")
-                                if document_text:
-                                    return "\n\n".join(document_text)
-                except (json.JSONDecodeError, TypeError):
-                    continue
-
-        # Fallback: Look for PDF data in tool messages
-        for message in reversed(messages):
-            if message.get("role") == "tool":
-                try:
-                    content = message.get("content", "")
-                    if isinstance(content, str):
-                        tool_data = json.loads(content)
-                        if (
-                            isinstance(tool_data, dict)
-                            and tool_data.get("tool_name") == "process_pdf_document"
-                            and tool_data.get("status") == "success"
-                        ):
-                            # Extract text content from PDF pages
-                            pages = tool_data.get("pages", [])
-                            if pages:
-                                document_text = []
-                                for page in pages[:5]:  # Limit to first 5 pages for context analysis
-                                    page_text = page.get("text", "")
-                                    if page_text:
-                                        document_text.append(
-                                            f"Page {page.get('page', '?')}: {page_text[:1000]}..."
-                                        )  # Limit per page
-
-                                if document_text:
-                                    return "\n\n".join(document_text)
-                except (json.JSONDecodeError, TypeError):
-                    continue
-
+        pdf_data = PDFDataExtractor.extract_from_messages(messages)
+        if pdf_data:
+            # Limit to first 5 pages for context analysis
+            limited_data = {'pages': pdf_data.get('pages', [])[:5], 'filename': pdf_data.get('filename')}
+            # Get text but limit each page to 1000 chars
+            pages_text = []
+            for page in limited_data['pages']:
+                page_text = page.get('text', '')
+                if page_text:
+                    pages_text.append(f"Page {page.get('page', '?')}: {page_text[:1000]}...")
+            return "\n\n".join(pages_text) if pages_text else None
         return None
 
     def execute(self, params: Dict[str, Any]) -> ConversationContextResponse:

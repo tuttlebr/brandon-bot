@@ -317,38 +317,54 @@ class FileStorageService:
         Raises:
             MemoryLimitError: If limits are exceeded
         """
-        try:
-            # Count files for this session
-            count = 0
-            total_size = 0
+        # Use a more efficient approach with early termination
+        count = 0
+        total_size = 0
 
+        # Define limits upfront
+        max_count = (
+            config.session.MAX_IMAGES_IN_SESSION if file_type == "images" else config.session.MAX_PDFS_IN_SESSION
+        )
+        max_size = 100 * 1024 * 1024  # 100MB
+
+        try:
             for metadata_file in self.metadata_dir.glob("*.json"):
                 try:
+                    # Read file only if we haven't exceeded limits
+                    if count >= max_count or total_size > max_size:
+                        break
+
                     metadata = json.loads(metadata_file.read_text())
-                    if metadata.get("session_id") == session_id:
-                        if file_type == "images" and "image_id" in metadata:
-                            count += 1
-                            total_size += metadata.get("size_bytes", 0)
-                        elif file_type == "pdfs" and "pdf_id" in metadata:
-                            count += 1
-                            total_size += metadata.get("size_bytes", 0)
-                except:
+
+                    # Skip if not for this session
+                    if metadata.get("session_id") != session_id:
+                        continue
+
+                    # Check file type and update counters
+                    if file_type == "images" and "image_id" in metadata:
+                        count += 1
+                        total_size += metadata.get("size_bytes", 0)
+                    elif file_type == "pdfs" and "pdf_id" in metadata:
+                        count += 1
+                        total_size += metadata.get("size_bytes", 0)
+
+                except (json.JSONDecodeError, IOError) as e:
+                    logger.debug(f"Error reading metadata file {metadata_file}: {e}")
                     continue
 
             # Check limits
-            if file_type == "images" and count >= config.session.MAX_IMAGES_IN_SESSION:
-                raise MemoryLimitError(f"Image limit exceeded: {count}/{config.session.MAX_IMAGES_IN_SESSION}")
-            elif file_type == "pdfs" and count >= config.session.MAX_PDFS_IN_SESSION:
-                raise MemoryLimitError(f"PDF limit exceeded: {count}/{config.session.MAX_PDFS_IN_SESSION}")
+            if count >= max_count:
+                raise MemoryLimitError(f"{file_type.title()} limit exceeded: {count}/{max_count}")
 
-            # Check total size (100MB limit per session)
-            if total_size > 100 * 1024 * 1024:
+            if total_size > max_size:
                 raise MemoryLimitError(f"Storage limit exceeded: {total_size / (1024*1024):.1f}MB")
 
         except MemoryLimitError:
             raise
         except Exception as e:
-            logger.warning(f"Error checking storage limits: {e}")
+            logger.error(f"Unexpected error checking storage limits: {e}")
+            # Don't suppress the error, let it propagate
+            raise
 
     def get_storage_stats(self) -> Dict[str, Any]:
         """Get storage statistics"""

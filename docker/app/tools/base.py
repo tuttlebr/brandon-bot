@@ -40,7 +40,6 @@ class BaseTool(ABC):
         # Default to "fast" for efficiency, tools can override
         self.llm_type: Literal["fast", "llm", "intelligent"] = "fast"
 
-    @abstractmethod
     def get_definition(self) -> Dict[str, Any]:
         """
         Return OpenAI-compatible tool definition
@@ -48,7 +47,11 @@ class BaseTool(ABC):
         Returns:
             Dict containing the tool definition in OpenAI function calling format
         """
-        pass
+        # Default implementation: use to_openai_format if available
+        if hasattr(self, 'to_openai_format'):
+            return self.to_openai_format()
+        else:
+            raise NotImplementedError("Tool must implement either to_openai_format() or override get_definition()")
 
     @abstractmethod
     def execute(self, params: Dict[str, Any]) -> BaseToolResponse:

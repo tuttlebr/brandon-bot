@@ -9,7 +9,7 @@ import logging
 from typing import Literal, Optional
 
 from models.chat_config import ChatConfig
-from openai import OpenAI
+from openai import AsyncOpenAI, OpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,7 @@ class LLMClientService:
 
         self._config: Optional[ChatConfig] = None
         self._clients = {}
+        self._async_clients = {}
         self._initialized = True
         logger.debug("LLM Client Service instance created")
 
@@ -48,6 +49,7 @@ class LLMClientService:
 
         self._config = config
         self._clients = {}  # Clear any cached clients
+        self._async_clients = {}  # Clear any cached async clients
         logger.info("LLM Client Service initialized")
 
     def get_client(self, llm_type: Literal["fast", "llm", "intelligent"]) -> OpenAI:
@@ -93,6 +95,51 @@ class LLMClientService:
 
         except Exception as e:
             logger.error(f"Failed to create {llm_type} client: {e}")
+            raise
+
+    def get_async_client(self, llm_type: Literal["fast", "llm", "intelligent"]) -> AsyncOpenAI:
+        """
+        Get an async OpenAI client for the specified LLM type
+
+        Args:
+            llm_type: The type of LLM client to get
+
+        Returns:
+            AsyncOpenAI client configured for the specified type
+
+        Raises:
+            ValueError: If service not initialized or invalid type
+        """
+        if not self._config:
+            # Try to initialize with default config
+            try:
+                self._config = ChatConfig.from_environment()
+            except Exception as e:
+                raise ValueError(f"LLM Client Service not initialized and failed to auto-initialize: {e}")
+
+        # Check cache first
+        if llm_type in self._async_clients:
+            return self._async_clients[llm_type]
+
+        # Create new async client based on type
+        try:
+            if llm_type == "fast":
+                client = AsyncOpenAI(api_key=self._config.api_key, base_url=self._config.fast_llm_endpoint)
+            elif llm_type == "llm":
+                client = AsyncOpenAI(api_key=self._config.api_key, base_url=self._config.llm_endpoint)
+            elif llm_type == "intelligent":
+                client = AsyncOpenAI(api_key=self._config.api_key, base_url=self._config.intelligent_llm_endpoint)
+            else:
+                raise ValueError(f"Invalid LLM type: {llm_type}")
+
+            # Cache the client
+            self._async_clients[llm_type] = client
+            logger.debug(f"Created {llm_type} async LLM client")
+
+            return client
+
+        except Exception as e:
+            logger.error(f"Failed to create async {llm_type} client: {e}")
             raise
 
     def get_model_name(self, llm_type: Literal["fast", "llm", "intelligent"]) -> str:

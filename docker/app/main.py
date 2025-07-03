@@ -125,8 +125,13 @@ class ProductionStreamlitChatApp:
 
             # Generate and display response using controller with centralized spinner
             random_icon = random.choice(config.ui.SPINNER_ICONS)
-            with st.spinner(f"{random_icon} _Typing..._", show_time=True):
-                self.response_controller.generate_and_display_response_no_spinner(prepared_messages)
+            cleanup_fn = None
+            with st.spinner(f"{random_icon} _Typing..._", show_time=False):
+                cleanup_fn = self.response_controller.generate_response_with_cleanup_separation(prepared_messages)
+
+            # Execute cleanup after spinner closes to avoid delay
+            if cleanup_fn:
+                cleanup_fn()
 
         except ChatbotException as e:
             logging.error(f"Chatbot error processing prompt: {e}")
@@ -186,7 +191,7 @@ class ProductionStreamlitChatApp:
             # Clear processing status after brief display
             if not hasattr(st.session_state, "completion_shown") or not st.session_state.completion_shown:
                 st.session_state.completion_shown = True
-                time.sleep(1)
+                time.sleep(0.01)
             else:
                 # Reset after showing completion
                 st.session_state.pdf_processing_status = None
@@ -202,7 +207,7 @@ class ProductionStreamlitChatApp:
             # Clear error status after brief display
             if not hasattr(st.session_state, "error_shown") or not st.session_state.error_shown:
                 st.session_state.error_shown = True
-                time.sleep(1)
+                time.sleep(0.01)
             else:
                 # Reset after showing error
                 st.session_state.pdf_processing_status = None
@@ -270,25 +275,6 @@ class ProductionStreamlitChatApp:
                     if st.button("🗑️ Remove Current PDF", help="Remove the current PDF from session",):
                         self.session_controller.clear_pdf_documents()
                         st.rerun()
-
-        # Debug info (can be removed in production)
-        # with st.expander("Debug Info", expanded=False):
-        #     debug_info = {
-        #         "processing_status": processing_status,
-        #         "is_processing": self.session_controller.is_processing(),
-        #         "has_pdfs": self.session_controller.has_pdf_documents(),
-        #         "stored_pdfs": getattr(st.session_state, 'stored_pdfs', []),
-        #         "currently_processing_pdf": getattr(st.session_state, 'currently_processing_pdf', None),
-        #         "last_uploaded_pdf": getattr(st.session_state, 'last_uploaded_pdf', None),
-        #         "session_id": getattr(st.session_state, 'session_id', None),
-        #         "initialized": getattr(st.session_state, 'initialized', False),
-        #     }
-        #     st.json(debug_info)
-
-        #     # Show full session state in a separate section
-        #     st.write("**Full Session State:**")
-        #     session_state_dict = dict(st.session_state)
-        #     st.json(session_state_dict)
 
     def run(self):
         """Run the production-ready application using controller pattern"""

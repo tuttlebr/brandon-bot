@@ -76,10 +76,6 @@ class NewsTool(BaseTool):
             },
         }
 
-    def get_definition(self) -> Dict[str, Any]:
-        """Get tool definition for BaseTool interface"""
-        return self.to_openai_format()
-
     def execute(self, params: Dict[str, Any]):
         """Execute the tool with given parameters"""
         return self.run_with_dict(params)

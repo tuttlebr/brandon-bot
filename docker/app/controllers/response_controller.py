@@ -80,6 +80,31 @@ class ResponseController:
         except Exception as e:
             self._handle_response_error(e)
 
+    def generate_response_with_cleanup_separation(self, prepared_messages: List[Dict[str, Any]]):
+        """
+        Generate and display streaming response, returning cleanup function for later execution
+        This allows the spinner to close immediately after response is displayed
+
+        Args:
+            prepared_messages: Prepared messages for API call
+
+        Returns:
+            Cleanup function to be called after spinner closes
+        """
+        try:
+            # Generate and display response chunks
+            self._generate_response_chunks(prepared_messages)
+
+            # Return cleanup function to be called after spinner
+            def cleanup():
+                self._display_response()
+
+            return cleanup
+
+        except Exception as e:
+            self._handle_response_error(e)
+            return lambda: None  # Return no-op function on error
+
     def _generate_response_chunks(self, prepared_messages: List[Dict[str, Any]]):
         """
         Generate response chunks from LLM service using simplified streaming

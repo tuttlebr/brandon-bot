@@ -6,12 +6,13 @@ by processing pages in batches and combining relevant findings.
 """
 
 import asyncio
-import concurrent.futures
 import logging
 from typing import Dict, List, Optional, Tuple
 
 from models.chat_config import ChatConfig
+from utils.batch_processor import BatchProcessor, DocumentProcessor
 from utils.config import config
+from utils.executor_pool import get_shared_executor
 from utils.streamlit_context import run_with_streamlit_context
 
 logger = logging.getLogger(__name__)
@@ -29,7 +30,7 @@ class PDFAnalysisService:
         """
         self.config = config_obj
         self.batch_size = config.file_processing.PDF_SUMMARIZATION_BATCH_SIZE  # Reuse batch size
-        self.executor = concurrent.futures.ThreadPoolExecutor(max_workers=3)
+        self.executor = get_shared_executor()
 
     async def analyze_pdf_for_query(self, pdf_data: Dict, user_query: str) -> str:
         """
@@ -54,29 +55,25 @@ class PDFAnalysisService:
             if total_pages == 0:
                 return "The document appears to be empty or contains no extractable text."
 
-            # For small documents (≤5 pages), process all at once
-            if total_pages <= 5:
-                return await self._analyze_small_document(pages, user_query, filename)
+            # Use DocumentProcessor to categorize and route appropriately
+            doc_size = DocumentProcessor.categorize_document_size(total_pages)
 
-            # For medium documents (6-15 pages), process in 2-3 batches
-            elif total_pages <= 15:
-                return await self._analyze_medium_document(pages, user_query, filename)
-
-            # For large documents (>15 pages), use intelligent search approach
-            else:
-                return await self._analyze_large_document(pages, user_query, filename)
+            if doc_size == "small":
+                return await self._analyze_document_simple(pages, user_query, filename)
+            elif doc_size == "medium":
+                return await self._analyze_document_batched(pages, user_query, filename)
+            else:  # large
+                return await self._analyze_document_intelligent(pages, user_query, filename)
 
         except Exception as e:
             logger.error(f"Error in PDF analysis: {e}")
             return f"I encountered an error while analyzing the document: {str(e)}"
 
-    async def _analyze_small_document(self, pages: List[Dict], user_query: str, filename: str) -> str:
-        """Analyze small documents (≤5 pages) all at once"""
+    async def _analyze_document_simple(self, pages: List[Dict], user_query: str, filename: str) -> str:
+        """Analyze small documents in a single pass"""
         try:
-            # Combine all pages
-            full_text = "\n\n".join(
-                [f"Page {page.get('page', i+1)}:\n{page.get('text', '')}" for i, page in enumerate(pages)]
-            )
+            # Use DocumentProcessor to format pages
+            full_text = DocumentProcessor.format_pages_for_analysis(pages)
 
             analysis_params = {
                 "task_type": "analyze",
@@ -95,28 +92,25 @@ class PDFAnalysisService:
             return result.result
 
         except Exception as e:
-            logger.error(f"Error analyzing small document: {e}")
+            logger.error(f"Error analyzing document: {e}")
             return f"Error analyzing document: {str(e)}"
 
-    async def _analyze_medium_document(self, pages: List[Dict], user_query: str, filename: str) -> str:
-        """Analyze medium documents (6-15 pages) in batches"""
+    async def _analyze_document_batched(self, pages: List[Dict], user_query: str, filename: str) -> str:
+        """Analyze medium documents using batch processing"""
         try:
-            batch_size = max(3, len(pages) // 3)  # 3-5 pages per batch
-            batch_results = []
+            # Use BatchProcessor for efficient batch handling
+            batch_processor = BatchProcessor(
+                batch_size=max(3, len(pages) // 3), delay_between_batches=0.3  # 3-5 pages per batch
+            )
 
-            # Process in batches
-            for i in range(0, len(pages), batch_size):
-                batch_end = min(i + batch_size, len(pages))
-                batch_pages = pages[i:batch_end]
-
-                batch_text = "\n\n".join(
-                    [f"Page {page.get('page', i+j+1)}:\n{page.get('text', '')}" for j, page in enumerate(batch_pages)]
-                )
+            async def analyze_batch(batch_pages: List[Dict], start_idx: int, end_idx: int) -> Dict:
+                """Analyze a single batch of pages"""
+                batch_text = DocumentProcessor.format_pages_for_analysis(batch_pages)
 
                 analysis_params = {
                     "task_type": "analyze",
                     "text": batch_text,
-                    "instructions": f"Analyze pages {i+1}-{batch_end} of '{filename}' for this question: {user_query}. If relevant information is found, provide it with page numbers. If not relevant, say 'No relevant information found in these pages.'",
+                    "instructions": f"Analyze pages {start_idx+1}-{end_idx} of '{filename}' for this question: {user_query}. If relevant information is found, provide it with page numbers. If not relevant, say 'No relevant information found in these pages.'",
                 }
 
                 # Import locally to avoid circular imports
@@ -127,56 +121,57 @@ class PDFAnalysisService:
                     self.executor, run_with_streamlit_context, execute_assistant_with_dict, analysis_params
                 )
 
-                batch_results.append({"page_range": f"{i+1}-{batch_end}", "analysis": result.result})
+                return {"page_range": f"{start_idx+1}-{end_idx}", "analysis": result.result}
 
-                # Small delay to avoid overwhelming the LLM service
-                await asyncio.sleep(0.3)
+            # Process pages in batches
+            batch_results = await batch_processor.process_in_batches(pages, analyze_batch)
+
+            # Filter out None results (from errors)
+            valid_results = [r for r in batch_results if r is not None]
 
             # Combine batch results into final answer
-            return await self._synthesize_batch_results(batch_results, user_query, filename)
+            return await self._synthesize_batch_results(valid_results, user_query, filename)
 
         except Exception as e:
-            logger.error(f"Error analyzing medium document: {e}")
+            logger.error(f"Error analyzing document: {e}")
             return f"Error analyzing document: {str(e)}"
 
-    async def _analyze_large_document(self, pages: List[Dict], user_query: str, filename: str) -> str:
-        """Analyze large documents (>15 pages) using intelligent search"""
+    async def _analyze_document_intelligent(self, pages: List[Dict], user_query: str, filename: str) -> str:
+        """Analyze large documents using intelligent search approach"""
         try:
-            # Step 1: Quick scan of all pages to find potentially relevant sections
+            # Step 1: Find relevant pages using efficient scanning
             relevant_pages = await self._find_relevant_pages(pages, user_query, filename)
 
             if not relevant_pages:
                 return f"I searched through all {len(pages)} pages of '{filename}' but couldn't find information directly related to your question: '{user_query}'. The document may not contain relevant information, or the question might need to be rephrased."
 
-            # Step 2: Deep analysis of relevant pages
-            return await self._deep_analyze_relevant_pages(relevant_pages, user_query, filename)
+            # Step 2: Perform detailed analysis on relevant pages
+            return await self._analyze_relevant_pages(relevant_pages, user_query, filename)
 
         except Exception as e:
-            logger.error(f"Error analyzing large document: {e}")
+            logger.error(f"Error analyzing document: {e}")
             return f"Error analyzing document: {str(e)}"
 
     async def _find_relevant_pages(self, pages: List[Dict], user_query: str, filename: str) -> List[Dict]:
         """Find pages potentially relevant to the user query"""
         try:
-            relevant_pages = []
-            batch_size = 5  # Scan 5 pages at a time
+            batch_processor = BatchProcessor(batch_size=5, delay_between_batches=0.2)
 
-            for i in range(0, len(pages), batch_size):
-                batch_end = min(i + batch_size, len(pages))
-                batch_pages = pages[i:batch_end]
-
-                # Create summary of each page for relevance checking
+            async def scan_batch(batch_pages: List[Dict], start_idx: int, end_idx: int) -> List[int]:
+                """Scan a batch of pages for relevance"""
+                # Create summaries using DocumentProcessor
                 page_summaries = []
-                for j, page in enumerate(batch_pages):
+                for page in batch_pages:
+                    page_num = page.get('page', start_idx + 1)
                     page_text = page.get('text', '')[:1000]  # First 1000 chars
-                    page_summaries.append(f"Page {page.get('page', i+j+1)}: {page_text}...")
+                    page_summaries.append(f"Page {page_num}: {page_text}...")
 
                 batch_text = "\n\n".join(page_summaries)
 
                 relevance_params = {
                     "task_type": "analyze",
                     "text": batch_text,
-                    "instructions": f"Given this query: '{user_query}', which of these pages (if any) contain relevant information? List ONLY the page numbers that are relevant, or say 'None' if no pages are relevant. Be specific about page numbers.",
+                    "instructions": f"Given this query: '{user_query}', which of these pages (if any) contain relevant information? List ONLY the page numbers that are relevant, or say 'None' if no pages are relevant.",
                 }
 
                 # Import locally to avoid circular imports
@@ -187,17 +182,28 @@ class PDFAnalysisService:
                     self.executor, run_with_streamlit_context, execute_assistant_with_dict, relevance_params
                 )
 
-                # Parse relevant page numbers from result
-                relevant_in_batch = self._extract_page_numbers(result.result, i + 1, batch_end)
+                # Use DocumentProcessor to extract page numbers
+                return DocumentProcessor.extract_page_numbers_from_text(
+                    result.result, valid_range=(start_idx + 1, end_idx)
+                )
 
-                # Add full page data for relevant pages
-                for page_num in relevant_in_batch:
-                    for page in batch_pages:
-                        if page.get('page') == page_num:
-                            relevant_pages.append(page)
-                            break
+            # Process all pages to find relevant ones
+            batch_results = await batch_processor.process_in_batches(pages, scan_batch)
 
-                await asyncio.sleep(0.2)
+            # Collect all relevant page numbers
+            all_relevant_nums = []
+            for nums in batch_results:
+                if nums:  # Skip None results
+                    all_relevant_nums.extend(nums)
+
+            # Get unique page numbers
+            relevant_page_nums = list(set(all_relevant_nums))
+
+            # Extract the full page data for relevant pages
+            relevant_pages = []
+            for page in pages:
+                if page.get('page') in relevant_page_nums:
+                    relevant_pages.append(page)
 
             logger.info(f"Found {len(relevant_pages)} relevant pages out of {len(pages)} total pages")
             return relevant_pages
@@ -207,93 +213,41 @@ class PDFAnalysisService:
             # Fallback: return first 10 pages
             return pages[:10]
 
-    def _extract_page_numbers(self, text: str, start_page: int, end_page: int) -> List[int]:
-        """Extract page numbers from LLM response"""
-        import re
-
-        if 'none' in text.lower() or 'no pages' in text.lower():
-            return []
-
-        # Find all numbers that could be page numbers
-        numbers = re.findall(r'\b(\d+)\b', text)
-        page_numbers = []
-
-        for num_str in numbers:
-            num = int(num_str)
-            if start_page <= num <= end_page:
-                page_numbers.append(num)
-
-        return list(set(page_numbers))  # Remove duplicates
-
-    async def _deep_analyze_relevant_pages(self, relevant_pages: List[Dict], user_query: str, filename: str) -> str:
-        """Perform deep analysis on relevant pages"""
+    async def _analyze_relevant_pages(self, relevant_pages: List[Dict], user_query: str, filename: str) -> str:
+        """Analyze the relevant pages found during scanning"""
         try:
+            # Determine if we can analyze all at once or need batching
             if len(relevant_pages) <= 5:
-                # Analyze all relevant pages together
-                full_text = "\n\n".join(
-                    [f"Page {page.get('page')}:\n{page.get('text', '')}" for page in relevant_pages]
-                )
-
-                analysis_params = {
-                    "task_type": "analyze",
-                    "text": full_text,
-                    "instructions": f"Based on these relevant pages from '{filename}', provide a comprehensive answer to: {user_query}. Include specific details and page references.",
-                }
-
-                # Import locally to avoid circular imports
-                from tools.assistant import execute_assistant_with_dict
-
-                loop = asyncio.get_event_loop()
-                result = await loop.run_in_executor(
-                    self.executor, run_with_streamlit_context, execute_assistant_with_dict, analysis_params
-                )
-
-                return result.result
+                # Simple analysis for few pages
+                return await self._analyze_document_simple(relevant_pages, user_query, filename)
             else:
-                # Too many relevant pages, process in smaller batches
-                batch_results = []
-                batch_size = 3
-
-                for i in range(0, len(relevant_pages), batch_size):
-                    batch = relevant_pages[i : i + batch_size]
-                    batch_text = "\n\n".join([f"Page {page.get('page')}:\n{page.get('text', '')}" for page in batch])
-
-                    analysis_params = {
-                        "task_type": "analyze",
-                        "text": batch_text,
-                        "instructions": f"Analyze these pages from '{filename}' for: {user_query}. Extract any relevant information with page numbers.",
-                    }
-
-                    # Import locally to avoid circular imports
-                    from tools.assistant import execute_assistant_with_dict
-
-                    loop = asyncio.get_event_loop()
-                    result = await loop.run_in_executor(
-                        self.executor, run_with_streamlit_context, execute_assistant_with_dict, analysis_params
-                    )
-
-                    batch_results.append({"pages": [p.get('page') for p in batch], "analysis": result.result})
-
-                    await asyncio.sleep(0.3)
-
-                # Synthesize final answer
-                return await self._synthesize_deep_analysis(batch_results, user_query, filename)
+                # Use batched analysis for many relevant pages
+                return await self._analyze_document_batched(relevant_pages, user_query, filename)
 
         except Exception as e:
-            logger.error(f"Error in deep analysis: {e}")
-            return f"Error during detailed analysis: {str(e)}"
+            logger.error(f"Error analyzing relevant pages: {e}")
+            return f"Error during analysis: {str(e)}"
 
     async def _synthesize_batch_results(self, batch_results: List[Dict], user_query: str, filename: str) -> str:
-        """Synthesize results from multiple batches"""
+        """Synthesize results from multiple batch analyses"""
         try:
-            combined_findings = "\n\n".join(
-                [f"Analysis of pages {result['page_range']}:\n{result['analysis']}" for result in batch_results]
-            )
+            # Format batch results for synthesis
+            formatted_results = []
+            for result in batch_results:
+                if 'page_range' in result:
+                    formatted_results.append(f"Analysis of pages {result['page_range']}:\n{result['analysis']}")
+                elif 'pages' in result:
+                    page_list = ', '.join(map(str, result['pages']))
+                    formatted_results.append(f"Pages {page_list}:\n{result['analysis']}")
+                else:
+                    formatted_results.append(result['analysis'])
+
+            combined_findings = "\n\n".join(formatted_results)
 
             synthesis_params = {
                 "task_type": "analyze",
                 "text": combined_findings,
-                "instructions": f"Based on these analyses of different sections of '{filename}', provide a comprehensive answer to: {user_query}. Combine relevant information and provide a cohesive response.",
+                "instructions": f"Based on these analyses from '{filename}', provide a comprehensive answer to: {user_query}. Synthesize all relevant information into a cohesive response.",
             }
 
             # Import locally to avoid circular imports
@@ -309,37 +263,4 @@ class PDFAnalysisService:
         except Exception as e:
             logger.error(f"Error synthesizing results: {e}")
             # Fallback: return all individual results
-            return "\n\n".join([result['analysis'] for result in batch_results])
-
-    async def _synthesize_deep_analysis(self, batch_results: List[Dict], user_query: str, filename: str) -> str:
-        """Synthesize results from deep analysis batches"""
-        try:
-            combined_findings = "\n\n".join(
-                [f"Pages {', '.join(map(str, result['pages']))}:\n{result['analysis']}" for result in batch_results]
-            )
-
-            synthesis_params = {
-                "task_type": "analyze",
-                "text": combined_findings,
-                "instructions": f"Based on these detailed analyses from '{filename}', provide a final comprehensive answer to: {user_query}. Synthesize all relevant information into a cohesive response.",
-            }
-
-            # Import locally to avoid circular imports
-            from tools.assistant import execute_assistant_with_dict
-
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                self.executor, run_with_streamlit_context, execute_assistant_with_dict, synthesis_params
-            )
-
-            return result.result
-
-        except Exception as e:
-            logger.error(f"Error in final synthesis: {e}")
-            # Fallback: return all individual results
-            return "\n\n".join([result['analysis'] for result in batch_results])
-
-    def __del__(self):
-        """Cleanup executor on deletion"""
-        if hasattr(self, 'executor'):
-            self.executor.shutdown(wait=False)
+            return "\n\n".join([result.get('analysis', '') for result in batch_results if result])

@@ -45,16 +45,48 @@ class PDFContextService:
         if not self.has_pdf_in_session():
             return False
 
-        # Keywords that indicate PDF-related questions
-        pdf_keywords = [
+        message_lower = user_message.lower()
+
+        # Messages that clearly indicate NOT wanting PDF context
+        non_pdf_indicators = [
+            'thanks',
+            'thank you',
+            'goodbye',
+            'bye',
+            'hello',
+            'hi',
+            'how are you',
+            'what\'s up',
+            'weather',
+            'news',
+            'image',
+            'picture',
+            'generate',
+            'create',
+            'draw',
+        ]
+
+        # Check if message is clearly NOT about the PDF
+        for indicator in non_pdf_indicators:
+            if indicator in message_lower and len(message_lower.split()) <= 5:
+                logger.debug(f"Message '{user_message}' identified as non-PDF query")
+                return False
+
+        # Keywords that strongly indicate PDF-related questions
+        strong_pdf_keywords = [
             'pdf',
             'document',
             'file',
             'paper',
-            'text',
+            'uploaded',
             'page',
             'summary',
             'summarize',
+        ]
+
+        # Keywords that might indicate PDF-related questions (need context)
+        weak_pdf_keywords = [
+            'text',
             'content',
             'says',
             'mentions',
@@ -67,20 +99,60 @@ class PDFContextService:
             'section',
             'chapter',
             'paragraph',
+            'analyze',
+            'explain',
+            'describe',
         ]
 
-        message_lower = user_message.lower()
-
-        # Check for any PDF-related keywords
-        for keyword in pdf_keywords:
+        # Check for strong PDF keywords
+        for keyword in strong_pdf_keywords:
             if keyword in message_lower:
+                logger.debug(f"Strong PDF keyword '{keyword}' found in message")
                 return True
 
-        # If the message is short and doesn't specify what to do,
-        # assume it's about the PDF if one was recently uploaded
-        if len(message_lower.split()) < 10:
-            return True
+        # For weak keywords, only inject if the message seems to be asking a question
+        # and is substantial enough (not just "explain" or "what")
+        question_indicators = [
+            'what',
+            'how',
+            'why',
+            'when',
+            'where',
+            'who',
+            'which',
+            'can you',
+            'could you',
+            'would you',
+            '?',
+        ]
+        is_question = any(indicator in message_lower for indicator in question_indicators)
 
+        if is_question and len(message_lower.split()) >= 3:
+            for keyword in weak_pdf_keywords:
+                if keyword in message_lower:
+                    logger.debug(f"Weak PDF keyword '{keyword}' found in question context")
+                    return True
+
+        # For very short messages, default to NOT injecting PDF context
+        # unless they contain strong PDF keywords (already checked above)
+        if len(message_lower.split()) < 3:
+            logger.debug(f"Short message '{user_message}' - not injecting PDF context")
+            return False
+
+        # For ambiguous medium-length messages, check if they seem to be continuing
+        # a conversation about the PDF (this is a conservative approach)
+        # Only inject if there are clear contextual clues
+        if 3 <= len(message_lower.split()) < 10:
+            # Check for pronouns or references that might refer to the document
+            contextual_references = ['it', 'this', 'that', 'the above', 'the text']
+            has_reference = any(ref in message_lower for ref in contextual_references)
+
+            if has_reference and is_question:
+                logger.debug(f"Message contains contextual reference and is a question - injecting PDF context")
+                return True
+
+        # Default: don't inject PDF context for general conversation
+        logger.debug(f"Message '{user_message}' does not require PDF context")
         return False
 
     def has_pdf_in_session(self) -> bool:

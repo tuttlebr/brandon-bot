@@ -393,14 +393,3 @@ def apply_custom_styles():
     # """,
     #     unsafe_allow_html=True,
     # )
-
-
-def get_typing_indicator_html() -> str:
-    """Get the HTML for the typing indicator animation"""
-    return """
-    <div class="typing-animation">
-        <span style="--i:1"></span>
-        <span style="--i:2"></span>
-        <span style="--i:3"></span>
-    </div>
-    """

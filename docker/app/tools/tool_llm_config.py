@@ -15,7 +15,7 @@ TOOL_LLM_TYPES = {
     "retriever": "llm",  # Semantic search and retrieval
     "pdf_summary": "llm",  # PDF summarization
     "pdf_text_processor": "llm",  # PDF text processing
-    "text_assistant": "llm",  # Complex text processing tasks
+    "text_assistant": "intelligent",  # Complex text processing tasks
     "image_gen": "fast",  # Complex prompt enhancement for image generation
     "tool_selection": "llm",  # Tool selection, no reasoning - determines which tools to use for user queries
 }
