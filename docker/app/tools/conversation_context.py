@@ -52,7 +52,7 @@ class ConversationContextTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "conversation_context"
-        self.description = "Analyzes conversation history to extract context, identify user intent, summarize topics, and track ongoing tasks or creative projects."
+        self.description = "INTERNAL TOOL: Analyzes conversation history to extract specific types of context. Use ONLY when you need to analyze the conversation itself (not for answering general questions). For analyzing what has been discussed, user patterns, or tracking ongoing tasks/projects."
         # Use fast model for quick context analysis
         self.llm_type = "fast"
 
@@ -71,7 +71,18 @@ class ConversationContextTool(BaseTool):
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string", "description": "The current user query to analyze in context",},
+                        "query": {
+                            "type": "string",
+                            "enum": [
+                                "conversation_summary",
+                                "recent_topics",
+                                "user_preferences",
+                                "task_continuity",
+                                "creative_director",
+                                "document_analysis",
+                            ],
+                            "description": "Type of context analysis to perform. Choose 'conversation_summary' for overall summary, 'recent_topics' to list discussion topics, 'user_preferences' for user patterns, 'task_continuity' for tracking tasks, 'creative_director' for creative projects, or 'document_analysis' for document-related context.",
+                        },
                         "max_messages": {
                             "type": "integer",
                             "description": "Maximum number of messages to analyze (default: 20)",
