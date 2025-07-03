@@ -99,13 +99,16 @@ class LLMService:
             # Parse response for content and tool calls
             content, tool_calls = self.parsing_service.parse_response(response)
 
-            # If there are tool calls, execute them
+            # If there are tool calls, execute them and stream the response
             if tool_calls:
                 # Log which tools were selected
                 logging.info(f"Tool calls: {tool_calls}")
                 tool_names = [tc.get("name", "unknown") for tc in tool_calls]
                 logger.info(f"Tool selection ({tool_selection_model_type} model): {', '.join(tool_names)}")
-                yield await self._handle_tool_calls(tool_calls, windowed_messages, model, model_type)
+
+                # Stream chunks from tool handling
+                async for chunk in self._handle_tool_calls(tool_calls, windowed_messages, model, model_type):
+                    yield chunk
 
             else:
                 # Fallback to streaming if no tool calls
@@ -121,8 +124,8 @@ class LLMService:
 
     async def _handle_tool_calls(
         self, tool_calls: List[Dict[str, Any]], messages: List[Dict[str, Any]], model: str, model_type: str
-    ) -> str:
-        """Handle tool calls and generate final response"""
+    ) -> AsyncGenerator[str, None]:
+        """Handle tool calls and generate streaming response"""
         # Determine execution strategy
         strategy = self.tool_execution_service.determine_execution_strategy(tool_calls)
 
@@ -140,7 +143,13 @@ class LLMService:
         # Check for direct response tools
         for response in tool_responses:
             if response.get("role") == "direct_response":
-                return response.get("content", "")
+                # For direct response tools, yield the content directly
+                content = response.get("content", "")
+                # Yield in small chunks for better streaming experience
+                chunk_size = 50  # Characters per chunk
+                for i in range(0, len(content), chunk_size):
+                    yield content[i : i + chunk_size]
+                return
 
         # Add tool responses to messages
         extended_messages = messages.copy()
@@ -153,12 +162,9 @@ class LLMService:
                     }
                 )
 
-        # Generate final response based on tool results
-        final_response = ""
+        # Stream the final response based on tool results
         async for chunk in self.streaming_service.stream_completion(extended_messages, model, model_type):
-            final_response += chunk
-
-        return final_response
+            yield chunk
 
     def _apply_sliding_window(
         self, messages: List[Dict[str, Any]], max_turns: Optional[int] = None

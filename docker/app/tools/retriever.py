@@ -132,7 +132,19 @@ class SimilaritySearch:
                 payload, config.env.RERANKER_ENDPOINT, config.env.NVIDIA_API_KEY
             )
             combined_results = self._combine_results(embedding_response, reranker_response)
-            validated_results, stats = self._remove_outliers(combined_results[0], std_threshold=0.85, key="logit")
+
+            # Check if we have valid results before trying to remove outliers
+            if not combined_results or not combined_results[0]:
+                logging.warning("No valid results after combining with reranker response")
+                return None
+
+            # Check if results have logit values
+            results_with_logits = [r for r in combined_results[0] if "logit" in r and r["logit"] is not None]
+            if not results_with_logits:
+                logging.warning("No results with valid logit scores after reranking")
+                return None
+
+            validated_results, stats = self._remove_outliers(results_with_logits, std_threshold=0.85, key="logit")
             limit = int(self.config.topk * 0.5)
             return [validated_results[:limit]]
         except Exception as e:
@@ -147,7 +159,9 @@ class SimilaritySearch:
             "model": model,
             "query": {"text": query},
             "passages": [
-                {"text": result["entity"]["text"]} for result in embedding_response[0] if result["entity"]["text"]
+                {"text": result["entity"]["text"]}
+                for result in embedding_response[0]
+                if result.get("entity", {}).get("text")
             ],
             "truncate": "END",
         }
@@ -156,7 +170,7 @@ class SimilaritySearch:
         """Call reranker service with prepared payload"""
         headers = {
             "Authorization": f"Bearer {api_key}",
-            "Accept": "tapplication/json",
+            "Accept": "application/json",
         }
 
         logging.debug(f"Payload: {payload}")
@@ -170,8 +184,27 @@ class SimilaritySearch:
         self, embedding_response: List[Dict[str, Any]], reranker_response: Dict[str, Any],
     ) -> List[Dict[str, Any]]:
         """Combine embedding and reranker results"""
-        for rank in reranker_response["rankings"]:
-            embedding_response[0][rank["index"]].update({"logit": rank["logit"], "index": rank["index"]})
+        # Check if reranker response has the expected structure
+        if not reranker_response or "rankings" not in reranker_response:
+            logging.warning("Reranker response missing 'rankings' field")
+            return []
+
+        # Update results with reranker scores
+        for rank in reranker_response.get("rankings", []):
+            index = rank.get("index")
+            logit = rank.get("logit")
+
+            # Validate index and logit
+            if index is None or logit is None:
+                logging.debug(f"Skipping ranking with missing index or logit: {rank}")
+                continue
+
+            # Check if index is within bounds
+            if index < 0 or index >= len(embedding_response[0]):
+                logging.debug(f"Skipping ranking with out-of-bounds index: {index}")
+                continue
+
+            embedding_response[0][index].update({"logit": logit, "index": index})
 
         rerankable_results = [result for result in embedding_response[0] if "logit" in result]
 
