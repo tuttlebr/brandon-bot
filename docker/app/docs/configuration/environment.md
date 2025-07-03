@@ -1,10 +1,10 @@
 # Environment Configuration
 
-Complete guide to configuring the Streamlit Chat Application through environment variables.
+Complete guide to configuring Nano Chat Application through environment variables.
 
 ## Overview
 
-The application uses environment variables for configuration, following the 12-factor app methodology. All configuration is centralized in the `utils/config.py` module.
+Nano uses environment variables for configuration, following the 12-factor app methodology. All configuration is centralized in the `utils/config.py` module.
 
 ## Required Environment Variables
 
@@ -29,14 +29,24 @@ INTELLIGENT_LLM_MODEL_NAME=nvidia/llama-3.3-nemotron-70b-instruct
 
 ## Optional Environment Variables
 
+### Branding and UI
+
+```bash
+# Application title (default: "Nano")
+BOT_TITLE=Nano
+
+# User reference term (default: "human")
+META_USER=human
+
+# Brand color in hex (default: "#76b900")
+BRAND_COLOR=#76b900
+```
+
 ### Image Generation
 
 ```bash
 # Endpoint for image generation service
 IMAGE_ENDPOINT=https://your-image-api.com/v1/generate
-
-# API key for image service (if different from NVIDIA)
-IMAGE_API_KEY=your-image-api-key
 ```
 
 ### Web Search
@@ -46,50 +56,78 @@ IMAGE_API_KEY=your-image-api-key
 TAVILY_API_KEY=tvly-your-api-key-here
 ```
 
-### Application Settings
+### PDF Processing
 
 ```bash
-# Maximum file upload size in MB (default: 200)
-MAX_FILE_SIZE_MB=500
+# NVIDIA Ingest endpoint for PDF processing
+NVINGEST_ENDPOINT=http://nvingest:7670/v1/extract_text
+```
 
-# Session timeout in minutes (default: 60)
-SESSION_TIMEOUT_MINUTES=120
+### Vector Database (Milvus)
 
-# Enable debug logging (default: INFO)
-LOGGING_LEVEL=DEBUG
+```bash
+# Database configuration for semantic search
+DATABASE_URL=http://milvus-standalone:19530
+COLLECTION_NAME=milvus
+PARTITION_NAME=milvus
+DEFAULT_DB=milvus
 
-# Custom branding
-APP_TITLE="My Custom Chat Application"
-BRAND_COLOR="#FF6B6B"
+# Embedding configuration
+EMBEDDING_ENDPOINT=https://integrate.api.nvidia.com/v1
+EMBEDDING_MODEL=nvidia/nv-embedqa-e5-v5
+
+# Reranker configuration
+RERANKER_ENDPOINT=https://integrate.api.nvidia.com/v1/ranking
+RERANKER_MODEL=nvidia/nv-rerankqa-mistral-4b-v3
 ```
 
 ### Performance Tuning
 
 ```bash
-# Maximum tokens for context (default: 4096)
-MAX_CONTEXT_TOKENS=8192
+# LLM parameters
+DEFAULT_TEMPERATURE=0.3
+DEFAULT_TOP_P=0.95
+DEFAULT_FREQUENCY_PENALTY=0.0
+DEFAULT_PRESENCE_PENALTY=0.0
 
-# Streaming chunk size (default: 10)
-STREAM_CHUNK_SIZE=20
+# Context window settings
+SLIDING_WINDOW_MAX_TURNS=20  # Number of conversation turns to keep
+MAX_CONTEXT_LENGTH=1000000   # Maximum context length in characters
 
-# Request timeout in seconds (default: 300)
-REQUEST_TIMEOUT=600
+# Conversation context injection
+AUTO_INJECT_CONVERSATION_CONTEXT=true
+MIN_TURNS_FOR_CONTEXT_INJECTION=1
 
-# Maximum retries for API calls (default: 3)
-MAX_RETRIES=5
+# API timeouts (in seconds)
+DEFAULT_REQUEST_TIMEOUT=3600
+LLM_REQUEST_TIMEOUT=3600
+IMAGE_REQUEST_TIMEOUT=3600
+PDF_PROCESSING_TIMEOUT=6000
 ```
 
 ### Storage Configuration
 
 ```bash
-# External storage path (default: /tmp/file_storage)
-FILE_STORAGE_PATH=/persistent/storage
+# File processing limits
+MAX_PDF_SIZE=16777216  # 16MB in bytes
+SUPPORTED_PDF_TYPES=pdf
 
-# Maximum storage per session in MB (default: 1000)
-MAX_SESSION_STORAGE_MB=2000
+# Session limits
+MAX_IMAGES_IN_SESSION=50
+MAX_PDFS_IN_SESSION=3
 
-# Storage cleanup interval in hours (default: 24)
-STORAGE_CLEANUP_INTERVAL=12
+# Storage paths
+FILE_STORAGE_PATH=/tmp/chatbot_storage
+```
+
+### System Settings
+
+```bash
+# Logging level (DEBUG, INFO, WARNING, ERROR)
+LOG_LEVEL=INFO
+
+# Suppress Streamlit warnings
+SUPPRESS_STREAMLIT_WARNINGS=true
 ```
 
 ## Configuration File Examples
@@ -99,9 +137,8 @@ STORAGE_CLEANUP_INTERVAL=12
 ```bash
 # Development settings
 NVIDIA_API_KEY=nvapi-dev-key
-LOGGING_LEVEL=DEBUG
-MAX_FILE_SIZE_MB=50
-SESSION_TIMEOUT_MINUTES=30
+BOT_TITLE=Nano Dev
+LOG_LEVEL=DEBUG
 
 # Use faster models for development
 LLM_MODEL_NAME=meta/llama-3.1-8b-instruct
@@ -112,6 +149,10 @@ INTELLIGENT_LLM_MODEL_NAME=meta/llama-3.1-70b-instruct
 LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
 FAST_LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
 INTELLIGENT_LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
+
+# Reduced limits for faster testing
+MAX_PDF_SIZE=5242880  # 5MB
+SLIDING_WINDOW_MAX_TURNS=10
 ```
 
 ### Production Configuration (.env.production)
@@ -119,9 +160,8 @@ INTELLIGENT_LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
 ```bash
 # Production settings
 NVIDIA_API_KEY=${NVIDIA_API_KEY_PROD}
-LOGGING_LEVEL=INFO
-MAX_FILE_SIZE_MB=200
-SESSION_TIMEOUT_MINUTES=60
+BOT_TITLE=Nano
+LOG_LEVEL=INFO
 
 # Production models
 LLM_MODEL_NAME=meta/llama-3.1-70b-instruct
@@ -133,33 +173,14 @@ LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
 FAST_LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
 INTELLIGENT_LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
 
-# Performance settings
-MAX_CONTEXT_TOKENS=8192
-REQUEST_TIMEOUT=300
-MAX_RETRIES=5
+# Production settings
+SLIDING_WINDOW_MAX_TURNS=20
+AUTO_INJECT_CONVERSATION_CONTEXT=true
+SUPPRESS_STREAMLIT_WARNINGS=true
 
-# Storage settings
-FILE_STORAGE_PATH=/persistent/storage
-MAX_SESSION_STORAGE_MB=1000
-```
-
-### Testing Configuration (.env.test)
-
-```bash
-# Test settings
-NVIDIA_API_KEY=test-api-key
-LOGGING_LEVEL=WARNING
-MAX_FILE_SIZE_MB=10
-
-# Mock endpoints for testing
-LLM_ENDPOINT=http://localhost:8000/mock/v1
-FAST_LLM_ENDPOINT=http://localhost:8000/mock/v1
-INTELLIGENT_LLM_ENDPOINT=http://localhost:8000/mock/v1
-
-# Test models
-LLM_MODEL_NAME=test-model
-FAST_LLM_MODEL_NAME=test-model-fast
-INTELLIGENT_LLM_MODEL_NAME=test-model-intelligent
+# Production services
+NVINGEST_ENDPOINT=http://nvingest:7670/v1/extract_text
+DATABASE_URL=http://milvus-standalone:19530
 ```
 
 ## Using Environment Files
@@ -171,7 +192,7 @@ INTELLIGENT_LLM_MODEL_NAME=test-model-intelligent
 docker compose --env-file .env.production up
 
 # Using Python directly
-python -m dotenv -f .env.development run python main.py
+python -m python-dotenv run python main.py
 
 # Export to shell
 export $(cat .env | grep -v '^#' | xargs)
@@ -181,31 +202,17 @@ export $(cat .env | grep -v '^#' | xargs)
 
 1. System environment variables (highest priority)
 2. `.env` file in project root
-3. Default values in code (lowest priority)
+3. Default values in `utils/config.py` (lowest priority)
 
 ## Configuration Validation
 
-The application validates configuration on startup:
+Nano validates configuration on startup:
 
 ```python
-# In utils/config.py
-def validate_environment():
-    """Validate all required environment variables"""
-    required_vars = [
-        'NVIDIA_API_KEY',
-        'LLM_ENDPOINT',
-        'LLM_MODEL_NAME'
-    ]
-
-    missing = []
-    for var in required_vars:
-        if not os.getenv(var):
-            missing.append(var)
-
-    if missing:
-        raise ConfigurationError(
-            f"Missing required environment variables: {', '.join(missing)}"
-        )
+# The application checks for required variables
+missing_vars = config.env.validate_required_env_vars()
+if missing_vars:
+    logging.warning(f"Missing required environment variables: {', '.join(missing_vars)}")
 ```
 
 ## Dynamic Configuration
@@ -216,19 +223,8 @@ Some settings can be changed at runtime:
 
 Users can switch models during conversation:
 - "Use the fast model" - Switches to FAST_LLM_MODEL_NAME
+- "Use the standard model" - Switches to LLM_MODEL_NAME
 - "Use intelligent mode" - Switches to INTELLIGENT_LLM_MODEL_NAME
-
-### Debug Mode
-
-Enable debug mode temporarily:
-```python
-# In the chat
-"Enable debug mode for this session"
-
-# Via API
-POST /api/session/debug
-{"enabled": true}
-```
 
 ## Security Best Practices
 
@@ -263,37 +259,6 @@ kubectl create secret generic app-secrets \
 docker compose --env-file .env.new up -d --no-deps app
 ```
 
-### 4. Limit Scope
-
-Use different API keys for different environments:
-- Development: Limited quota, test data only
-- Staging: Production-like but isolated
-- Production: Full access, monitoring enabled
-
-## Monitoring Configuration
-
-### Health Check Variables
-
-```bash
-# Enable health endpoint
-ENABLE_HEALTH_CHECK=true
-HEALTH_CHECK_PATH=/health
-
-# Health check intervals
-HEALTH_CHECK_INTERVAL=30
-```
-
-### Metrics Collection
-
-```bash
-# Enable metrics
-ENABLE_METRICS=true
-METRICS_PORT=9090
-
-# Prometheus endpoint
-PROMETHEUS_ENDPOINT=http://prometheus:9090
-```
-
 ## Troubleshooting Configuration
 
 ### Common Issues
@@ -307,20 +272,16 @@ PROMETHEUS_ENDPOINT=http://prometheus:9090
    docker compose exec app env | grep NVIDIA
    ```
 
-2. **Wrong Variable Format**
+2. **PDF Processing Fails**
    ```bash
-   # Correct
-   NVIDIA_API_KEY=nvapi-abc123
-
-   # Wrong (quotes not needed in .env)
-   NVIDIA_API_KEY="nvapi-abc123"
+   # Ensure NVINGEST_ENDPOINT is accessible
+   curl http://nvingest:7670/health
    ```
 
-3. **Path Issues**
+3. **Model Not Found**
    ```bash
-   # Use absolute paths in production
-   FILE_STORAGE_PATH=/app/storage  # Good
-   FILE_STORAGE_PATH=./storage     # May cause issues
+   # Verify model names are correct
+   # Check NVIDIA API documentation for valid models
    ```
 
 ### Debug Configuration
@@ -329,7 +290,7 @@ PROMETHEUS_ENDPOINT=http://prometheus:9090
 # Print all configuration
 docker compose exec app python -c "
 from utils.config import config
-config.print_configuration()
+print(config.__dict__)
 "
 
 # Validate configuration
@@ -345,25 +306,30 @@ config.validate_environment()
 
 | Variable | Type | Default | Required | Description |
 |----------|------|---------|----------|-------------|
+| **Core Settings** |
 | NVIDIA_API_KEY | string | - | Yes | NVIDIA API authentication key |
+| BOT_TITLE | string | Nano | No | Application name |
+| META_USER | string | human | No | User reference term |
+| **Model Configuration** |
 | LLM_ENDPOINT | string | - | Yes | Main LLM endpoint URL |
 | LLM_MODEL_NAME | string | - | Yes | Main model identifier |
 | FAST_LLM_ENDPOINT | string | - | Yes | Fast model endpoint URL |
 | FAST_LLM_MODEL_NAME | string | - | Yes | Fast model identifier |
 | INTELLIGENT_LLM_ENDPOINT | string | - | Yes | Intelligent model endpoint URL |
 | INTELLIGENT_LLM_MODEL_NAME | string | - | Yes | Intelligent model identifier |
+| **Optional Services** |
 | IMAGE_ENDPOINT | string | - | No | Image generation endpoint |
-| IMAGE_API_KEY | string | NVIDIA_API_KEY | No | Image service API key |
 | TAVILY_API_KEY | string | - | No | Tavily search API key |
-| MAX_FILE_SIZE_MB | int | 200 | No | Maximum upload size |
-| SESSION_TIMEOUT_MINUTES | int | 60 | No | Session timeout |
-| LOGGING_LEVEL | string | INFO | No | Log level |
-| APP_TITLE | string | "Streamlit Chat" | No | Application title |
-| BRAND_COLOR | string | "#FF4B4B" | No | Brand color |
-| MAX_CONTEXT_TOKENS | int | 4096 | No | Context window size |
-| STREAM_CHUNK_SIZE | int | 10 | No | Streaming chunk size |
-| REQUEST_TIMEOUT | int | 300 | No | API request timeout |
-| MAX_RETRIES | int | 3 | No | API retry attempts |
+| NVINGEST_ENDPOINT | string | - | No | PDF processing endpoint |
+| DATABASE_URL | string | - | No | Milvus database URL |
+| **Performance** |
+| SLIDING_WINDOW_MAX_TURNS | int | 20 | No | Conversation history limit |
+| MAX_CONTEXT_LENGTH | int | 1000000 | No | Maximum context size |
+| AUTO_INJECT_CONVERSATION_CONTEXT | bool | true | No | Auto-inject context |
+| **Limits** |
+| MAX_PDF_SIZE | int | 16777216 | No | Max PDF size in bytes |
+| MAX_IMAGES_IN_SESSION | int | 50 | No | Max images per session |
+| MAX_PDFS_IN_SESSION | int | 3 | No | Max PDFs per session |
 
 ## Next Steps
 

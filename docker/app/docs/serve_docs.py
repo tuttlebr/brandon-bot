@@ -10,80 +10,323 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 # Initialize FastAPI app
-app = FastAPI(title="Streamlit Chat Documentation", docs_url=None, redoc_url=None, openapi_url=None)
+app = FastAPI(title="Nano Chat Documentation", docs_url=None, redoc_url=None, openapi_url=None)
 
 # Documentation root directory
 DOCS_ROOT = Path(__file__).parent
 
-# CSS for documentation pages
+# CSS for documentation pages - Matching Nano chat interface
 DOCS_CSS = """
+:root {
+    --brand-color: #76b900;
+    --bg-primary: #0e1117;
+    --bg-secondary: #1e2329;
+    --bg-tertiary: #282c34;
+    --text-primary: #ffffff;
+    --text-secondary: #b8bcc8;
+    --text-muted: #8b92a4;
+    --border-color: #3d4147;
+    --code-bg: #1a1d23;
+    --link-color: #76b900;
+    --link-hover: #8fd11f;
+}
+
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0;
+    line-height: 1.6;
+    color: var(--text-primary);
+    background: var(--bg-primary);
+    min-height: 100vh;
+}
+
+/* Header styling similar to chat interface */
+.header {
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    padding: 1rem 2rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--brand-color);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.header h1::before {
+    content: "🤖";
+    font-size: 1.75rem;
+}
+
+/* Navigation styling */
+.nav {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 2rem;
+}
+
+.nav ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.nav li {
+    margin: 0;
+}
+
+.nav a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    display: inline-block;
+}
+
+.nav a:hover {
+    background: var(--bg-tertiary);
+    color: var(--brand-color);
+    text-decoration: none;
+}
+
+/* Content area */
+.content {
+    padding: 2rem;
     max-width: 900px;
     margin: 0 auto;
-    padding: 20px;
-    line-height: 1.6;
-    color: #333;
 }
+
+/* Typography */
 h1, h2, h3, h4, h5, h6 {
-    color: #2c3e50;
-    margin-top: 1.5em;
-    margin-bottom: 0.5em;
+    color: var(--text-primary);
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    font-weight: 600;
 }
-h1 { border-bottom: 2px solid #eee; padding-bottom: 0.3em; }
+
+h1 {
+    font-size: 2.5rem;
+    border-bottom: 2px solid var(--brand-color);
+    padding-bottom: 0.5rem;
+}
+
+h2 {
+    font-size: 2rem;
+    color: var(--brand-color);
+}
+
+h3 {
+    font-size: 1.5rem;
+}
+
+p {
+    color: var(--text-secondary);
+    margin: 1rem 0;
+}
+
+/* Code styling */
 code {
-    background: #f4f4f4;
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-family: 'Courier New', monospace;
+    background: var(--code-bg);
+    color: var(--brand-color);
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 0.9em;
 }
+
 pre {
-    background: #f4f4f4;
-    padding: 15px;
-    border-radius: 5px;
+    background: var(--code-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
     overflow-x: auto;
+    margin: 1rem 0;
 }
+
 pre code {
     background: none;
     padding: 0;
+    color: var(--text-secondary);
 }
+
+/* Blockquotes */
 blockquote {
-    border-left: 4px solid #ddd;
-    margin: 0;
-    padding-left: 20px;
-    color: #666;
+    border-left: 4px solid var(--brand-color);
+    margin: 1rem 0;
+    padding-left: 1rem;
+    color: var(--text-secondary);
+    font-style: italic;
 }
+
+/* Tables */
 table {
     border-collapse: collapse;
     width: 100%;
-    margin: 20px 0;
+    margin: 1.5rem 0;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    overflow: hidden;
 }
+
 th, td {
-    border: 1px solid #ddd;
-    padding: 8px;
+    border: 1px solid var(--border-color);
+    padding: 0.75rem;
     text-align: left;
 }
+
 th {
-    background: #f4f4f4;
-    font-weight: bold;
+    background: var(--bg-secondary);
+    font-weight: 600;
+    color: var(--brand-color);
 }
-a { color: #3498db; text-decoration: none; }
-a:hover { text-decoration: underline; }
-.nav { background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
-.nav ul { list-style: none; margin: 0; padding: 0; }
-.nav li { display: inline; margin-right: 20px; }
-.section { margin-bottom: 30px; }
+
+td {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+tr:hover td {
+    background: var(--bg-secondary);
+}
+
+/* Links */
+a {
+    color: var(--link-color);
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+a:hover {
+    color: var(--link-hover);
+    text-decoration: underline;
+}
+
+/* Lists */
+ul, ol {
+    color: var(--text-secondary);
+    margin: 1rem 0;
+    padding-left: 2rem;
+}
+
+li {
+    margin: 0.5rem 0;
+}
+
+/* Sections */
+.section {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 1.5rem 0;
+}
+
+/* Notes and warnings - similar to chat messages */
+.note, .warning, .success {
+    padding: 1rem;
+    border-radius: 8px;
+    margin: 1rem 0;
+    border: 1px solid;
+}
+
 .note {
-    background: #e3f2fd;
-    border-left: 4px solid #2196F3;
-    padding: 10px 15px;
-    margin: 20px 0;
+    background: rgba(118, 185, 0, 0.1);
+    border-color: var(--brand-color);
+    color: var(--text-secondary);
 }
+
 .warning {
-    background: #fff3cd;
-    border-left: 4px solid #ffc107;
-    padding: 10px 15px;
-    margin: 20px 0;
+    background: rgba(255, 193, 7, 0.1);
+    border-color: #ffc107;
+    color: var(--text-secondary);
+}
+
+.success {
+    background: rgba(40, 167, 69, 0.1);
+    border-color: #28a745;
+    color: var(--text-secondary);
+}
+
+/* Feature cards */
+.feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin: 2rem 0;
+}
+
+.feature-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.feature-card:hover {
+    border-color: var(--brand-color);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(118, 185, 0, 0.2);
+}
+
+.feature-card h3 {
+    color: var(--brand-color);
+    margin-top: 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    body {
+        font-size: 0.95rem;
+    }
+
+    .nav ul {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .content {
+        padding: 1rem;
+    }
+
+    h1 {
+        font-size: 2rem;
+    }
+
+    h2 {
+        font-size: 1.5rem;
+    }
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.content > * {
+    animation: fadeIn 0.3s ease-out;
 }
 """
 
@@ -165,12 +408,17 @@ def create_page(title: str, content: str, nav_html: str = "") -> str:
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>{title} - Streamlit Chat Documentation</title>
+        <title>{title} - Nano Chat Documentation</title>
         <style>{DOCS_CSS}</style>
     </head>
     <body>
+        <div class="header">
+            <h1>Nano Chat Documentation</h1>
+        </div>
         {nav_html}
-        {content}
+        <div class="content">
+            {content}
+        </div>
     </body>
     </html>
     """
@@ -181,11 +429,12 @@ def get_nav_html() -> str:
     return """
     <div class="nav">
         <ul>
-            <li><a href="/docs/">Home</a></li>
-            <li><a href="/docs/quickstart">Quick Start</a></li>
-            <li><a href="/docs/user-guide">User Guide</a></li>
-            <li><a href="/docs/architecture">Architecture</a></li>
-            <li><a href="/docs/api">API Reference</a></li>
+            <li><a href="/docs/">🏠 Home</a></li>
+            <li><a href="/docs/quickstart">🚀 Quick Start</a></li>
+            <li><a href="/docs/user-guide">📖 User Guide</a></li>
+            <li><a href="/docs/architecture">🏗️ Architecture</a></li>
+            <li><a href="/docs/api">🔧 API Reference</a></li>
+            <li><a href="/docs/troubleshooting">🐛 Troubleshooting</a></li>
         </ul>
     </div>
     """
@@ -200,33 +449,46 @@ def get_home_content():
         return render_markdown_simple(content)
     else:
         return """
-        <h1>Streamlit Chat Documentation</h1>
-        <p>Welcome to the Streamlit Chat Application documentation.</p>
+        <h1>Welcome to Nano Chat</h1>
+        <p class="lead">A production-ready conversational AI platform powered by NVIDIA's advanced language models.</p>
 
-        <div class="section">
-            <h2>Getting Started</h2>
-            <ul>
-                <li><a href="/docs/quickstart">Quick Start Guide</a> - Get up and running in 5 minutes</li>
-                <li><a href="/docs/installation">Installation Guide</a> - Detailed setup instructions</li>
-                <li><a href="/docs/first-steps">First Steps</a> - Your first chat session</li>
-            </ul>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h3>🚀 Getting Started</h3>
+                <ul>
+                    <li><a href="/docs/quickstart">Quick Start Guide</a> - Get up and running in 5 minutes</li>
+                    <li><a href="/docs/installation">Installation Guide</a> - Detailed setup instructions</li>
+                    <li><a href="/docs/first-steps">First Steps</a> - Your first chat session</li>
+                </ul>
+            </div>
+
+            <div class="feature-card">
+                <h3>💡 Key Features</h3>
+                <ul>
+                    <li><a href="/docs/chat-interface">Chat Interface</a> - Natural conversations with AI</li>
+                    <li><a href="/docs/pdf-analysis">PDF Analysis</a> - Intelligent document processing</li>
+                    <li><a href="/docs/image-generation">Image Generation</a> - Create images with AI</li>
+                    <li><a href="/docs/search-features">Search Tools</a> - Web and knowledge search</li>
+                </ul>
+            </div>
+
+            <div class="feature-card">
+                <h3>🔧 Technical Docs</h3>
+                <ul>
+                    <li><a href="/docs/architecture">Architecture Overview</a> - System design</li>
+                    <li><a href="/docs/api">API Reference</a> - Service and controller APIs</li>
+                    <li><a href="/docs/configuration">Configuration</a> - Environment setup</li>
+                </ul>
+            </div>
         </div>
 
         <div class="section">
-            <h2>Features</h2>
+            <h2>🤖 About Nano</h2>
+            <p>Nano is powered by NVIDIA's state-of-the-art language models, offering three specialized models for different use cases:</p>
             <ul>
-                <li><a href="/docs/chat-interface">Chat Interface</a> - Using the chat features</li>
-                <li><a href="/docs/pdf-analysis">PDF Analysis</a> - Document processing capabilities</li>
-                <li><a href="/docs/image-generation">Image Generation</a> - Creating images with AI</li>
-            </ul>
-        </div>
-
-        <div class="section">
-            <h2>Technical Documentation</h2>
-            <ul>
-                <li><a href="/docs/architecture">Architecture Overview</a> - System design and components</li>
-                <li><a href="/docs/api">API Reference</a> - Service and controller APIs</li>
-                <li><a href="/docs/configuration">Configuration Guide</a> - Environment setup</li>
+                <li><strong>Fast Model</strong> - Quick responses for simple queries</li>
+                <li><strong>Standard Model</strong> - Balanced performance for general use</li>
+                <li><strong>Intelligent Model</strong> - Advanced reasoning for complex tasks</li>
             </ul>
         </div>
         """

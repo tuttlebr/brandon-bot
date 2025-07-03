@@ -1,6 +1,6 @@
 # Architecture Overview
 
-The Streamlit Chat Application follows a production-ready Model-View-Controller (MVC) architecture with clear separation of concerns and enterprise-grade design patterns.
+Nano Chat Application follows a production-ready Model-View-Controller (MVC) architecture with clear separation of concerns and enterprise-grade design patterns.
 
 ## High-Level Architecture
 
@@ -22,21 +22,30 @@ graph TB
         CS[Chat Service]
         LS[LLM Service]
         PS[PDF Services]
-        TS[Tool Service]
-        SS[Storage Service]
+        TS[Tool Execution Service]
+        SS[Streaming Service]
+        FS[File Storage Service]
+        CCS[Conversation Context Service]
     end
 
     subgraph "Tool Layer"
-        AT[Assistant Tool]
-        PT[PDF Tool]
-        IT[Image Tool]
-        ST[Search Tools]
+        AT[Text Assistant]
+        PCT[PDF Context Tool]
+        PST[PDF Summary Tool]
+        IG[Image Generation]
+        WS[Web Search]
+        NS[News Search]
+        WT[Weather Tool]
+        ET[Extract Tool]
+        RT[Retrieval Tool]
     end
 
     subgraph "External Services"
-        NVIDIA[NVIDIA LLM API]
-        IMG[Image API]
-        SEARCH[Search API]
+        NVIDIA[NVIDIA LLM APIs]
+        IMG[Image Generation API]
+        TAVILY[Tavily Search API]
+        MILVUS[Milvus Vector DB]
+        NVINGEST[NVIngest PDF Service]
     end
 
     UI --> SC
@@ -51,13 +60,16 @@ graph TB
 
     LS --> TS
     TS --> AT
-    TS --> PT
-    TS --> IT
-    TS --> ST
+    TS --> PCT
+    TS --> PST
+    TS --> IG
+    TS --> WS
 
     LS --> NVIDIA
-    IT --> IMG
-    ST --> SEARCH
+    IG --> IMG
+    WS --> TAVILY
+    RT --> MILVUS
+    FC --> NVINGEST
 ```
 
 ## Core Design Principles
@@ -66,10 +78,10 @@ graph TB
 
 Each layer has distinct responsibilities:
 
-- **UI Layer**: User interface and presentation
+- **UI Layer**: User interface and presentation using Streamlit
 - **Controller Layer**: Business logic and flow control
 - **Service Layer**: Core functionality and external integrations
-- **Tool Layer**: Specialized capabilities
+- **Tool Layer**: Specialized capabilities extending LLM functionality
 
 ### 2. Dependency Injection
 
@@ -77,22 +89,26 @@ Components receive dependencies through constructors:
 
 ```python
 class ResponseController:
-    def __init__(self, config, llm_service, message_controller):
+    def __init__(self, config, llm_service, message_controller,
+                 session_controller, chat_history_component):
         self.config = config
         self.llm_service = llm_service
         self.message_controller = message_controller
+        self.session_controller = session_controller
+        self.chat_history_component = chat_history_component
 ```
 
 ### 3. Configuration-Driven
 
-Centralized configuration management:
+Centralized configuration management through `utils/config.py`:
 
 ```python
 # All configuration from environment
-config = ChatConfig.from_environment()
+config = AppConfig()
 
 # Used throughout the application
-self.max_file_size = config.file_size_limit_mb
+self.max_pdf_size = config.file_processing.MAX_PDF_SIZE
+self.brand_color = config.ui.BRAND_COLOR
 ```
 
 ### 4. Stateless Services
@@ -112,30 +128,38 @@ class ChatService:
 
 Controllers orchestrate the application flow:
 
-- **SessionController**: Manages user session state
-- **MessageController**: Handles message validation and processing
-- **FileController**: Manages file uploads and processing
-- **ResponseController**: Orchestrates LLM responses
+- **SessionController**: Manages user session state and file references
+- **MessageController**: Handles message validation and chat history
+- **FileController**: Manages PDF uploads and processing
+- **ResponseController**: Orchestrates LLM responses and streaming
 
 ### Services
 
 Services provide core functionality:
 
-- **LLMService**: Interfaces with language models
-- **ChatService**: Processes chat interactions
-- **PDFContextService**: Injects document context
-- **PDFAnalysisService**: Analyzes PDF documents
-- **StreamingService**: Handles response streaming
-- **ToolExecutionService**: Manages tool calls
+- **LLMService**: Simplified service orchestrating streaming, parsing, and tools
+- **ChatService**: Processes chat interactions and message formatting
+- **PDFContextService**: Automatically injects PDF content when relevant
+- **PDFAnalysisService**: Intelligent PDF document analysis
+- **StreamingService**: Handles response streaming with tool support
+- **ToolExecutionService**: Manages parallel/sequential tool execution
+- **FileStorageService**: External file storage (singleton pattern)
+- **ConversationContextService**: Auto-injects conversation summaries
 
 ### Tools
 
 Tools extend LLM capabilities:
 
-- **AssistantTool**: Text processing and analysis
-- **PDFTool**: Document-specific operations
-- **ImageTool**: Image generation
-- **SearchTools**: Web and knowledge search
+- **TextAssistant**: Advanced text processing (summarize, proofread, translate)
+- **PDFTextProcessor**: Process specific PDF pages
+- **PDFSummary**: Generate/retrieve document summaries
+- **ImageGeneration**: AI-powered image creation with style control
+- **WebExtract**: Extract content from URLs
+- **TavilySearch**: General web search
+- **NewsSearch**: Current events and news
+- **Weather**: Real-time weather data
+- **Retrieval**: Semantic search in vector database
+- **ConversationContext**: Analyze conversation history
 
 ## Data Flow
 
@@ -152,39 +176,51 @@ sequenceDiagram
     User->>UI: Enter message
     UI->>MessageController: validate_prompt()
     MessageController->>ChatService: process_message()
-    ChatService->>SessionController: update_state()
+    ChatService->>SessionController: add_message()
     SessionController->>UI: refresh_display()
 ```
 
-### 2. LLM Response Flow
+### 2. LLM Response Flow with Tools
 
 ```mermaid
 sequenceDiagram
     participant ResponseController
     participant LLMService
-    participant ToolService
+    participant ToolExecutionService
+    participant Tool
     participant StreamingService
     participant UI
 
-    ResponseController->>LLMService: generate_response()
-    LLMService->>ToolService: execute_tools()
-    ToolService->>LLMService: tool_results
-    LLMService->>StreamingService: stream_response()
-    StreamingService->>UI: display_chunks()
+    ResponseController->>LLMService: generate_streaming_response()
+    LLMService->>LLMService: inject_conversation_context()
+    LLMService->>StreamingService: sync_completion()
+    StreamingService->>LLMService: check_tool_calls()
+
+    alt Has Tool Calls
+        LLMService->>ToolExecutionService: execute_tools()
+        ToolExecutionService->>Tool: run_with_dict()
+        Tool->>ToolExecutionService: tool_result
+        ToolExecutionService->>LLMService: tool_responses
+        LLMService->>StreamingService: stream_with_context()
+    end
+
+    StreamingService->>UI: stream_chunks()
 ```
 
 ## Key Design Patterns
 
-### 1. Factory Pattern
+### 1. Singleton Pattern
 
-Used for creating service instances:
+Used for shared resources:
 
 ```python
-def create_llm_client(model_type: str):
-    if model_type == "fast":
-        return FastLLMClient(config)
-    elif model_type == "intelligent":
-        return IntelligentLLMClient(config)
+class FileStorageService:
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
 ```
 
 ### 2. Strategy Pattern
@@ -193,26 +229,39 @@ For PDF processing strategies:
 
 ```python
 class PDFAnalysisService:
-    def select_strategy(self, page_count):
+    def categorize_and_route(self, page_count):
         if page_count <= 5:
-            return SmallDocumentStrategy()
+            return self._analyze_small_document()
         elif page_count <= 15:
-            return MediumDocumentStrategy()
+            return self._analyze_medium_document()
         else:
-            return LargeDocumentStrategy()
+            return self._analyze_large_document()
 ```
 
-### 3. Observer Pattern
+### 3. Registry Pattern
 
-For progress tracking:
+For tool management:
 
 ```python
-class ProgressObserver:
-    def update(self, progress, message):
-        st.session_state.pdf_analysis_progress = {
-            'progress': progress,
-            'message': message
-        }
+class ToolRegistry:
+    def register(self, tool: BaseTool):
+        self._tools[tool.name] = tool
+
+    def execute_tool(self, name: str, params: Dict):
+        tool = self.get_tool(name)
+        return tool.execute(params)
+```
+
+### 4. Context Preservation
+
+For thread safety in Streamlit:
+
+```python
+def run_with_streamlit_context(func, *args, **kwargs):
+    ctx = get_script_run_ctx()
+    if ctx:
+        add_script_run_ctx(threading.current_thread(), ctx)
+    return func(*args, **kwargs)
 ```
 
 ## Scalability Considerations
@@ -225,7 +274,7 @@ class ProgressObserver:
 
 ### 2. External Storage
 
-- Files stored externally
+- Files stored externally with reference IDs
 - Prevents memory issues
 - Allows distributed deployment
 
@@ -234,6 +283,13 @@ class ProgressObserver:
 - Streaming responses
 - Non-blocking operations
 - Efficient resource usage
+- Thread pool for tool execution
+
+### 4. Context Management
+
+- Sliding window for conversation history
+- Automatic context injection
+- Smart PDF context detection
 
 ## Security Architecture
 
@@ -246,14 +302,14 @@ class ProgressObserver:
 ### 2. Input Validation
 
 - All inputs validated
-- Injection prevention
+- Tool call instruction filtering
 - Size limits enforced
 
 ### 3. API Key Management
 
 - Keys stored in environment
 - Never exposed to frontend
-- Rotation supported
+- Different keys per environment
 
 ## Error Handling
 
@@ -263,6 +319,9 @@ class ProgressObserver:
 try:
     # Controller level
     result = self.process_action()
+except ToolExecutionError as e:
+    # Tool level error
+    self.handle_tool_error(e)
 except ServiceException as e:
     # Service level error
     self.handle_service_error(e)
@@ -274,24 +333,30 @@ except Exception as e:
 ### 2. Graceful Degradation
 
 - Fallback to simpler models
-- Retry with backoff
+- Continue without failed tools
 - User-friendly error messages
 
 ## Performance Optimization
 
-### 1. Caching
+### 1. Intelligent Processing
 
-- Model responses cached
-- PDF analysis results stored
-- Configuration cached
+- Document size-based routing
+- Parallel tool execution
+- Batch processing for large PDFs
 
-### 2. Lazy Loading
+### 2. Caching
+
+- File storage service (singleton)
+- Streamlit's native caching
+- Configuration caching
+
+### 3. Lazy Loading
 
 - Tools loaded on demand
 - Models initialized when needed
 - Resources released after use
 
-### 3. Streaming
+### 4. Streaming
 
 - Responses streamed in chunks
 - Progress updated in real-time
