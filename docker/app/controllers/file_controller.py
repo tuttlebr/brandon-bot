@@ -200,19 +200,6 @@ class FileController:
             pdf_data: Processed PDF data
         """
         pages = pdf_data.get("pages", [])
-        summarization_threshold = config.file_processing.PDF_SUMMARIZATION_THRESHOLD
-        summarization_enabled = config.file_processing.PDF_SUMMARIZATION_ENABLED
-
-        # Display processing results
-        with st.chat_message("assistant", avatar=self.config_obj.assistant_avatar):
-            st.success(f"✅ Successfully processed PDF: **{filename}**")
-            st.info(f"📊 Extracted text from **{len(pages)} pages**")
-
-            # For large documents, mention summarization capability
-            if len(pages) > summarization_threshold:
-                st.markdown("💡 This is a large document. You can ask me to 'summarize the PDF' for a quick overview!")
-
-            st.markdown("📝 I can now answer questions about this document!")
 
         # Store PDF data in session state via session controller
         if self.session_controller:
@@ -223,7 +210,7 @@ class FileController:
             self._add_pdf_content_to_history(filename, pdf_data, pdf_id)
 
             # Verify storage in session state
-            if hasattr(st.session_state, 'stored_pdfs') and pdf_id in st.session_state.stored_pdfs:
+            if hasattr(st.session_state, "stored_pdfs") and pdf_id in st.session_state.stored_pdfs:
                 logging.info(
                     f"✅ Verified PDF '{pdf_id}' is in session state stored_pdfs list: {st.session_state.stored_pdfs}"
                 )

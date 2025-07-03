@@ -125,7 +125,7 @@ class ProductionStreamlitChatApp:
 
             # Generate and display response using controller with centralized spinner
             random_icon = random.choice(config.ui.SPINNER_ICONS)
-            with st.spinner(f"{random_icon} _Typing..._", show_time=False):
+            with st.spinner(f"{random_icon} _Typing..._", show_time=True):
                 self.response_controller.generate_and_display_response_no_spinner(prepared_messages)
 
         except ChatbotException as e:
@@ -142,37 +142,20 @@ class ProductionStreamlitChatApp:
         """
         Fragment to show real-time PDF analysis progress
         """
-        if hasattr(st.session_state, 'pdf_analysis_progress') and st.session_state.pdf_analysis_progress:
+        if hasattr(st.session_state, "pdf_analysis_progress") and st.session_state.pdf_analysis_progress:
             progress_info = st.session_state.pdf_analysis_progress
 
-            if progress_info.get('status') in ['starting', 'analyzing']:
-                st.info("🔍 **Intelligent PDF Analysis in Progress**")
+            if progress_info.get("status") in ["starting", "analyzing"]:
+                # st.info("🔍 **Intelligent PDF Analysis in Progress**")
 
-                message = progress_info.get('message', 'Processing...')
-                progress = progress_info.get('progress', 0)
+                message = progress_info.get("message", "Processing...")
 
-                st.write(f"📊 {message}")
+                logging.debug(f"PDF analysis message: {message}")
 
-                # Progress bar
-                progress_bar = st.progress(progress / 100.0 if progress > 0 else 0.01)
-
-                # Estimated time remaining (rough estimate)
-                if progress > 10:
-                    estimated_total = 120  # Rough estimate: 2 minutes for large documents
-                    time_remaining = int((estimated_total * (100 - progress)) / 100)
-                    st.caption(f"⏱️ Estimated time remaining: ~{time_remaining}s")
-                else:
-                    st.caption("⏱️ Initializing analysis...")
-
-                # Additional helpful info
-                st.caption(
-                    "💡 The system is intelligently scanning pages and analyzing content to provide you with the most accurate answer."
-                )
-
-            elif progress_info.get('status') == 'completed':
-                st.success("✅ **PDF Analysis Completed!**")
+            elif progress_info.get("status") == "completed":
+                logging.debug("PDF analysis completed")
                 # Clear progress after a brief moment
-                if not hasattr(st.session_state, 'analysis_completion_shown'):
+                if not hasattr(st.session_state, "analysis_completion_shown"):
                     st.session_state.analysis_completion_shown = True
                 else:
                     # Clear the progress info
@@ -183,36 +166,25 @@ class ProductionStreamlitChatApp:
     def pdf_processing_fragment(self):
         """
         Self-contained PDF processing fragment that runs independently
-        Uses st.fragment to poll every 5 seconds and update status
+        Uses st.fragment to poll every second and update status
         """
         st.subheader("📄 PDF Document Upload")
 
         # Get current processing status
-        processing_status = getattr(st.session_state, 'pdf_processing_status', None)
+        processing_status = getattr(st.session_state, "pdf_processing_status", None)
 
         if processing_status == "processing":
             # Show processing status
-            processing_file = getattr(st.session_state, 'pdf_processing_file', 'Unknown')
-            processing_start = getattr(st.session_state, 'pdf_processing_start_time', time.time())
-            elapsed = int(time.time() - processing_start)
-
-            st.info(f"🔄 Processing: {processing_file}")
-            st.caption(f"Processing time: {elapsed}s")
-
-            # Show progress bar (indeterminate)
-            progress_bar = st.progress(0)
-            for i in range(100):
-                progress_bar.progress((i + elapsed * 10) % 100 + 1)
-
-            st.info("Please wait while your PDF is being processed...")
+            processing_file = getattr(st.session_state, "pdf_processing_file", "Unknown")
+            processing_start = getattr(st.session_state, "pdf_processing_start_time", time.time())
 
         elif processing_status == "completed":
             # Show completion message
-            message = getattr(st.session_state, 'pdf_processing_message', '✅ Processing completed')
+            message = getattr(st.session_state, "pdf_processing_message", "✅ Processing completed")
             st.success(message)
 
             # Clear processing status after brief display
-            if not hasattr(st.session_state, 'completion_shown') or not st.session_state.completion_shown:
+            if not hasattr(st.session_state, "completion_shown") or not st.session_state.completion_shown:
                 st.session_state.completion_shown = True
                 time.sleep(1)
             else:
@@ -224,11 +196,11 @@ class ProductionStreamlitChatApp:
 
         elif processing_status == "error":
             # Show error message
-            message = getattr(st.session_state, 'pdf_processing_message', '❌ Processing failed')
+            message = getattr(st.session_state, "pdf_processing_message", "❌ Processing failed")
             st.error(message)
 
             # Clear error status after brief display
-            if not hasattr(st.session_state, 'error_shown') or not st.session_state.error_shown:
+            if not hasattr(st.session_state, "error_shown") or not st.session_state.error_shown:
                 st.session_state.error_shown = True
                 time.sleep(1)
             else:
@@ -287,11 +259,15 @@ class ProductionStreamlitChatApp:
             if self.session_controller.has_pdf_documents():
                 latest_pdf = self.session_controller.get_latest_pdf_document()
                 if latest_pdf:
-                    filename = latest_pdf.get('filename', 'Unknown')
-                    pages = len(latest_pdf.get('pages', []))
+                    filename = latest_pdf.get("filename", "Unknown")
+                    pages = len(latest_pdf.get("pages", []))
                     st.success(f"✅ Current PDF: {filename} ({pages} pages)")
+                    if pages > config.file_processing.PDF_SUMMARIZATION_THRESHOLD:
+                        st.markdown(
+                            "💡 This is a large document. You can ask me to 'summarize the PDF' for a quick overview!"
+                        )
 
-                    if st.button("🗑️ Remove Current PDF", help="Remove the current PDF from session"):
+                    if st.button("🗑️ Remove Current PDF", help="Remove the current PDF from session",):
                         self.session_controller.clear_pdf_documents()
                         st.rerun()
 
