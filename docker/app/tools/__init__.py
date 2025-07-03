@@ -9,6 +9,12 @@ from .conversation_context import (
     execute_conversation_context_with_dict,
     get_conversation_context_tool_definition,
 )
+from .extract import (
+    WebExtractTool,
+    execute_web_extract,
+    execute_web_extract_with_dict,
+    get_web_extract_tool_definition,
+)
 from .image_gen import (
     ImageGenerationTool,
     execute_image_generation,
@@ -42,6 +48,10 @@ __all__ = [
     "ConversationContextTool",
     "get_conversation_context_tool_definition",
     "execute_conversation_context_with_dict",
+    "WebExtractTool",
+    "get_web_extract_tool_definition",
+    "execute_web_extract",
+    "execute_web_extract_with_dict",
     "ImageGenerationTool",
     "get_image_generation_tool_definition",
     "execute_image_generation",

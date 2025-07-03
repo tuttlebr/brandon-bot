@@ -125,7 +125,7 @@ class ProductionStreamlitChatApp:
 
             # Generate and display response using controller with centralized spinner
             random_icon = random.choice(config.ui.SPINNER_ICONS)
-            with st.spinner(f"{random_icon} _Typing..._", show_time=True):
+            with st.spinner(f"{random_icon} _Typing..._", show_time=False):
                 self.response_controller.generate_and_display_response_no_spinner(prepared_messages)
 
         except ChatbotException as e:

@@ -78,6 +78,6 @@ class ChatConfig:
         st.set_page_config(
             page_title=config.env.BOT_TITLE,
             page_icon=config.ui.ASSISTANT_AVATAR_PATH,
-            initial_sidebar_state="expanded",
+            initial_sidebar_state="collapsed",
         )
         return cls()

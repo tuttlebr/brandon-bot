@@ -39,6 +39,12 @@ def initialize_all_tools():
         context = ConversationContextTool()
         tool_registry.register(context)
 
+        # Web Extract Tool
+        from tools.extract import WebExtractTool
+
+        extract = WebExtractTool()
+        tool_registry.register(extract)
+
         # Image Generation Tool
         from tools.image_gen import ImageGenerationTool
 

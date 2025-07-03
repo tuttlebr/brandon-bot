@@ -54,7 +54,7 @@ class ResponseController:
         try:
             # Show spinner during the slow LLM API call
             random_icon = random.choice(config.ui.SPINNER_ICONS)
-            with st.spinner(f"{random_icon} _Typing..._", show_time=True):
+            with st.spinner(f"{random_icon} _Typing..._", show_time=False):
                 self._generate_response_chunks(prepared_messages)
 
             # Display the response without spinner

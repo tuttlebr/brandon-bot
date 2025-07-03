@@ -8,6 +8,7 @@ Tools can use "fast", "llm", or "intelligent" models based on their requirements
 # Tool LLM type configurations
 TOOL_LLM_TYPES = {
     "conversation_context": "intelligent",  # Quick context analysis
+    "extract_web_content": "fast",  # Simple API calls and formatting
     "weather": "fast",  # Simple API calls and formatting
     "news": "fast",  # Simple API calls and formatting
     "tavily": "fast",  # Complex web search and synthesis
