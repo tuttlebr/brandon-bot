@@ -104,6 +104,7 @@ class StreamingService:
         model: str,
         model_type: str = "fast",
         tools: Optional[List[Dict[str, Any]]] = None,
+        tool_choice: Optional[str] = "auto",
         **kwargs,
     ) -> Any:
         """
@@ -114,6 +115,7 @@ class StreamingService:
             model: Model name
             model_type: Type of model to use
             tools: Optional tool definitions
+            tool_choice: How to handle tool selection ("auto", "none", or specific tool)
             **kwargs: Additional parameters for the API
 
         Returns:
@@ -121,7 +123,7 @@ class StreamingService:
         """
         client = self.get_client(model_type, async_client=False)
 
-        logger.debug(f"Sync completion with model_type: {model_type}, model: {model}")
+        logger.debug(f"Sync completion with model_type: {model_type}, model: {model}, tool_choice: {tool_choice}")
 
         try:
             # Prepare API parameters
@@ -135,7 +137,7 @@ class StreamingService:
 
             if tools:
                 api_params["tools"] = tools
-                api_params["tool_choice"] = "auto"
+                api_params["tool_choice"] = tool_choice
                 api_params["parallel_tool_calls"] = True
 
             return client.chat.completions.create(**api_params)

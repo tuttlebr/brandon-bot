@@ -46,6 +46,9 @@ class ResponseParsingService:
             if custom_tool_calls:
                 content = self._clean_tool_instructions(content)
 
+            if len(all_tool_calls) == 0:
+                all_tool_calls = None
+
             return content, all_tool_calls
 
         except Exception as e:

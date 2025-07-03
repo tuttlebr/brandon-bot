@@ -93,27 +93,25 @@ class LLMService:
             tool_selection_model_type = get_tool_llm_type("tool_selection")
             tool_selection_model = self._get_model_for_type(tool_selection_model_type)
             response = self.streaming_service.sync_completion(
-                windowed_messages, tool_selection_model, tool_selection_model_type, tools=tools
+                windowed_messages, tool_selection_model, tool_selection_model_type, tools=tools, tool_choice="auto"
             )
 
             # Parse response for content and tool calls
             content, tool_calls = self.parsing_service.parse_response(response)
-            logging.debug(f"Tool calls: {tool_calls}")
 
             # If there are tool calls, execute them
             if tool_calls:
                 # Log which tools were selected
+                logging.info(f"Tool calls: {tool_calls}")
                 tool_names = [tc.get("name", "unknown") for tc in tool_calls]
                 logger.info(f"Tool selection ({tool_selection_model_type} model): {', '.join(tool_names)}")
                 yield await self._handle_tool_calls(tool_calls, windowed_messages, model, model_type)
-            elif content:
-                # Stream the content
-                for char in content:
-                    yield char
+
             else:
                 # Fallback to streaming if no tool calls
+                logger.info("No tool calls found, streaming response")
                 async for chunk in self.streaming_service.stream_completion(
-                    windowed_messages, model, model_type, tools=tools
+                    windowed_messages, model, model_type, tools=None
                 ):
                     yield chunk
 
