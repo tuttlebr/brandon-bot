@@ -513,7 +513,7 @@ class ResponseController:
         Args:
             error: The exception that occurred
         """
-        error_msg = f"Error generating response: {error}"
+        error_msg = f"Error generating response: ```json\n{error}\n```"
         logging.error(error_msg)
         self.message_controller.update_chat_history(
             "I apologize, but I encountered an error while generating a response.", "assistant"

@@ -266,6 +266,23 @@ class SessionController:
 
         pdfs = {}
         for pdf_id in getattr(st.session_state, 'stored_pdfs', []):
+            # Check if this is a batch-processed PDF
+            batch_info_key = f"{pdf_id}_batch_info"
+            if hasattr(st.session_state, batch_info_key):
+                batch_info = getattr(st.session_state, batch_info_key)
+                if batch_info.get('batch_processed', False):
+                    # For batch-processed PDFs, return metadata only
+                    pdfs[pdf_id] = {
+                        'pdf_id': pdf_id,
+                        'filename': batch_info.get('filename', 'Unknown'),
+                        'total_pages': batch_info.get('total_pages', 0),
+                        'batch_processed': True,
+                        'total_batches': batch_info.get('total_batches', 0),
+                        'pages': [],  # Empty to avoid loading all batches
+                    }
+                    continue
+
+            # Regular PDF
             pdf_data = self.file_storage.get_pdf(pdf_id)
             if pdf_data:
                 pdfs[pdf_id] = pdf_data
@@ -284,6 +301,23 @@ class SessionController:
 
         # Get the last PDF ID
         latest_pdf_id = st.session_state.stored_pdfs[-1]
+
+        # Check if this is a batch-processed PDF
+        batch_info_key = f"{latest_pdf_id}_batch_info"
+        if hasattr(st.session_state, batch_info_key):
+            batch_info = getattr(st.session_state, batch_info_key)
+            if batch_info.get('batch_processed', False):
+                # Return metadata for batch-processed PDF
+                return {
+                    'pdf_id': latest_pdf_id,
+                    'filename': batch_info.get('filename', 'Unknown'),
+                    'total_pages': batch_info.get('total_pages', 0),
+                    'batch_processed': True,
+                    'total_batches': batch_info.get('total_batches', 0),
+                    'pages': [],  # Empty to avoid loading all batches
+                }
+
+        # Regular PDF
         return self.file_storage.get_pdf(latest_pdf_id)
 
     def clear_pdf_documents(self):

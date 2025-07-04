@@ -10,7 +10,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from utils.config import config
 from utils.exceptions import FileProcessingError, MemoryLimitError
@@ -186,6 +186,49 @@ class FileStorageService:
             logger.error(f"Failed to store PDF: {e}")
             raise FileProcessingError(f"PDF storage failed: {e}")
 
+    def store_pdf_batch(self, filename: str, batch_data: Dict[str, Any], session_id: str, batch_num: int) -> str:
+        """
+        Store a batch of PDF pages
+
+        Args:
+            filename: Original PDF filename
+            batch_data: Batch data containing pages
+            session_id: Session identifier
+            batch_num: Batch number
+
+        Returns:
+            Batch reference ID
+        """
+        try:
+            # Generate batch ID based on filename and batch number
+            pdf_hash = hashlib.md5(filename.encode()).hexdigest()[:12]
+            batch_id = f"pdf_{pdf_hash}_batch_{batch_num}"
+
+            # Save batch data
+            batch_path = self.pdfs_dir / f"{batch_id}.json"
+            batch_path.write_text(json.dumps(batch_data, indent=2))
+
+            # Save batch metadata
+            metadata = {
+                "batch_id": batch_id,
+                "pdf_id": f"pdf_{pdf_hash}",
+                "filename": filename,
+                "session_id": session_id,
+                "batch_num": batch_num,
+                "pages_in_batch": len(batch_data.get("pages", [])),
+                "batch_info": batch_data.get("batch_info", {}),
+            }
+
+            metadata_path = self.metadata_dir / f"{batch_id}_meta.json"
+            metadata_path.write_text(json.dumps(metadata, indent=2))
+
+            logger.info(f"Stored PDF batch {batch_id} for session {session_id}")
+            return batch_id
+
+        except Exception as e:
+            logger.error(f"Failed to store PDF batch: {e}")
+            raise FileProcessingError(f"PDF batch storage failed: {e}")
+
     def get_pdf(self, pdf_id: str) -> Optional[Dict[str, Any]]:
         """
         Retrieve PDF data
@@ -235,6 +278,65 @@ class FileStorageService:
         except Exception as e:
             logger.error(f"Failed to retrieve PDF {pdf_id}: {e}")
             return None
+
+    def get_pdf_batches(self, pdf_id: str) -> List[Dict[str, Any]]:
+        """
+        Retrieve all batches for a PDF
+
+        Args:
+            pdf_id: PDF reference ID
+
+        Returns:
+            List of batch data
+        """
+        batches = []
+        batch_pattern = f"{pdf_id}_batch_*.json"
+
+        for batch_file in sorted(self.pdfs_dir.glob(batch_pattern)):
+            try:
+                batch_data = json.loads(batch_file.read_text())
+                batches.append(batch_data)
+            except Exception as e:
+                logger.error(f"Failed to read batch {batch_file}: {e}")
+
+        return batches
+
+    def merge_pdf_batches(self, pdf_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Merge all batches of a PDF into a single document
+
+        Args:
+            pdf_id: PDF reference ID
+
+        Returns:
+            Merged PDF data or None
+        """
+        batches = self.get_pdf_batches(pdf_id)
+        if not batches:
+            return None
+
+        # Merge all pages
+        merged_pages = []
+        for batch in batches:
+            merged_pages.extend(batch.get('pages', []))
+
+        # Get metadata from first batch
+        first_batch_meta = self.metadata_dir / f"{pdf_id}_batch_0_meta.json"
+        if first_batch_meta.exists():
+            metadata = json.loads(first_batch_meta.read_text())
+            filename = metadata.get('filename', 'Unknown')
+        else:
+            filename = 'Unknown'
+
+        merged_data = {
+            'filename': filename,
+            'pdf_id': pdf_id,
+            'pages': merged_pages,
+            'batch_processed': True,
+            'total_batches': len(batches),
+        }
+
+        return merged_data
 
     def update_pdf(self, pdf_id: str, pdf_data: Dict[str, Any]) -> bool:
         """

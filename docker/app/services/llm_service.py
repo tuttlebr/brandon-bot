@@ -74,6 +74,18 @@ class LLMService:
             # Apply sliding window to messages
             windowed_messages = self._apply_sliding_window(messages)
 
+            # Check token count and truncate if necessary
+            max_tokens = config.llm.MAX_CONTEXT_TOKENS
+            estimated_tokens = self._count_message_tokens(windowed_messages)
+
+            if estimated_tokens > max_tokens:
+                logger.warning(f"Message tokens ({estimated_tokens}) exceed limit ({max_tokens}). Truncating...")
+                windowed_messages, was_truncated = self._truncate_messages(windowed_messages, max_tokens)
+
+                if was_truncated:
+                    # Yield a warning message to the user
+                    yield "\n⚠️ **Note:** The conversation history was truncated to fit within the model's context limit. Some older messages may have been removed.\n\n"
+
             # Get current user message for context injection
             current_user_message = ""
             for msg in reversed(windowed_messages):
@@ -120,7 +132,10 @@ class LLMService:
 
         except Exception as e:
             logger.error(f"Error generating response: {e}")
-            yield f"Error: {str(e)}"
+            if "maximum context length" in str(e):
+                yield "⚠️ The message was too long even after truncation. Please try with a shorter message or start a new conversation."
+            else:
+                yield f"Error: {str(e)}"
 
     async def _handle_tool_calls(
         self, tool_calls: List[Dict[str, Any]], messages: List[Dict[str, Any]], model: str, model_type: str
@@ -161,6 +176,20 @@ class LLMService:
                         "content": f"Tool {response.get('tool_name')} returned: {response.get('content')}",
                     }
                 )
+
+        # Check token count after adding tool responses and truncate if necessary
+        max_tokens = config.llm.MAX_CONTEXT_TOKENS
+        estimated_tokens = self._count_message_tokens(extended_messages)
+
+        if estimated_tokens > max_tokens:
+            logger.warning(
+                f"Messages with tool responses ({estimated_tokens} tokens) exceed limit ({max_tokens}). Truncating..."
+            )
+            extended_messages, was_truncated = self._truncate_messages(extended_messages, max_tokens)
+
+            if was_truncated:
+                # Yield a warning about truncation
+                yield "\n⚠️ **Note:** The conversation including tool responses exceeded the context limit and was truncated.\n\n"
 
         # Stream the final response based on tool results
         async for chunk in self.streaming_service.stream_completion(extended_messages, model, model_type):
@@ -234,3 +263,121 @@ class LLMService:
         """Simple response generation for backward compatibility"""
         async for chunk in self.streaming_service.simple_stream(message):
             yield chunk
+
+    def _estimate_tokens(self, text: str) -> int:
+        """
+        Estimate token count from text using character-based approximation
+
+        Args:
+            text: Text to estimate tokens for
+
+        Returns:
+            Estimated token count
+        """
+        # Rough estimation: ~4 characters per token
+        # This is a reasonable approximation for English text
+        return len(text) // 4
+
+    def _count_message_tokens(self, messages: List[Dict[str, Any]]) -> int:
+        """
+        Count total estimated tokens in messages
+
+        Args:
+            messages: List of message dictionaries
+
+        Returns:
+            Total estimated token count
+        """
+        total_tokens = 0
+        for message in messages:
+            # Count role tokens (roughly 1 token)
+            total_tokens += 1
+
+            # Count content tokens
+            content = message.get("content", "")
+            if isinstance(content, str):
+                total_tokens += self._estimate_tokens(content)
+
+            # Add some overhead for message structure
+            total_tokens += 3  # <|im_start|>, <|im_end|> etc.
+
+        return total_tokens
+
+    def _truncate_messages(self, messages: List[Dict[str, Any]], max_tokens: int) -> tuple[List[Dict[str, Any]], bool]:
+        """
+        Truncate messages to fit within token limit
+
+        Args:
+            messages: List of message dictionaries
+            max_tokens: Maximum allowed tokens
+
+        Returns:
+            Tuple of (truncated messages, was_truncated flag)
+        """
+        # Always keep system messages and the latest user message
+        system_messages = [msg for msg in messages if msg.get("role") == "system"]
+        non_system_messages = [msg for msg in messages if msg.get("role") != "system"]
+
+        if not non_system_messages:
+            return messages, False
+
+        # Calculate tokens for system messages
+        system_tokens = self._count_message_tokens(system_messages)
+
+        # Reserve tokens for the latest user message (must always be included)
+        latest_user_idx = None
+        for i in range(len(non_system_messages) - 1, -1, -1):
+            if non_system_messages[i].get("role") == "user":
+                latest_user_idx = i
+                break
+
+        if latest_user_idx is None:
+            return messages, False
+
+        latest_user_msg = non_system_messages[latest_user_idx]
+        latest_user_tokens = self._count_message_tokens([latest_user_msg])
+
+        # Reserve some tokens for the response
+        response_buffer = 4000  # Reserve 4k tokens for response
+        available_tokens = max_tokens - system_tokens - latest_user_tokens - response_buffer
+
+        if available_tokens <= 0:
+            # Even with just system + latest user message, we're over limit
+            # Truncate the user message content
+            logger.warning(f"Message exceeds token limit even with minimal context. Truncating user message.")
+            truncated_content = latest_user_msg["content"]
+            while self._estimate_tokens(truncated_content) > (max_tokens - system_tokens - response_buffer - 100):
+                # Remove 25% of the content
+                truncated_content = truncated_content[: int(len(truncated_content) * 0.75)]
+
+            latest_user_msg = {
+                **latest_user_msg,
+                "content": truncated_content + "\n\n[Note: Message truncated due to length]",
+            }
+            return system_messages + [latest_user_msg], True
+
+        # Build message list from most recent, keeping within token limit
+        selected_messages = [latest_user_msg]
+        selected_tokens = latest_user_tokens
+
+        # Add messages from most recent to oldest (excluding latest user message)
+        for i in range(len(non_system_messages) - 1, -1, -1):
+            if i == latest_user_idx:
+                continue
+
+            msg = non_system_messages[i]
+            msg_tokens = self._count_message_tokens([msg])
+
+            if selected_tokens + msg_tokens > available_tokens:
+                break
+
+            selected_messages.insert(0, msg)
+            selected_tokens += msg_tokens
+
+        # Check if we truncated
+        was_truncated = len(selected_messages) < len(non_system_messages)
+
+        # Combine system messages with selected messages
+        final_messages = system_messages + selected_messages
+
+        return final_messages, was_truncated

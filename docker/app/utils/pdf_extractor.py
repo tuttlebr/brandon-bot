@@ -19,26 +19,49 @@ class PDFDataExtractor:
     @staticmethod
     def extract_from_messages(messages: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         """
-        Extract PDF data from injected system messages
+        Extract PDF data from message history
+
+        This method searches through messages to find PDF data that was
+        injected by tools or system messages.
 
         Args:
-            messages: List of conversation messages
+            messages: List of message dictionaries
 
         Returns:
-            Extracted PDF data dictionary or None
+            PDF data dictionary or None if not found
         """
-        if not messages:
-            logger.debug("No messages provided to extract PDF data from")
-            return None
+        # Search for PDF data in reverse order (most recent first)
+        for message in reversed(messages):
+            content = message.get("content", "")
 
-        # Look for PDF content in system messages
-        for message in messages:
+            # Handle system messages with PDF data
             if message.get("role") == "system":
-                content = message.get("content", "")
-                if isinstance(content, str) and "## PDF Document Context" in content:
-                    return PDFDataExtractor._parse_pdf_context_message(content)
-                elif isinstance(content, str) and PDFDataExtractor._is_json_pdf_data(content):
-                    return PDFDataExtractor._parse_json_pdf_data(content)
+                try:
+                    # Try to parse as JSON
+                    data = json.loads(content)
+                    if data.get("type") == "pdf_data" and data.get("pages"):
+                        # Found PDF data in system message
+                        logger.debug(f"Found PDF data in system message: {data.get('filename')}")
+                        return {
+                            "filename": data.get("filename", "Unknown"),
+                            "pages": data.get("pages", []),
+                            "pdf_id": data.get("pdf_id"),
+                            "total_pages": data.get("total_pages", len(data.get("pages", []))),
+                        }
+                    # Check for batch-processed PDF
+                    elif data.get("type") == "pdf_data" and data.get("batch_processed"):
+                        logger.debug(f"Found batch-processed PDF in system message: {data.get('filename')}")
+                        return {
+                            "filename": data.get("filename", "Unknown"),
+                            "pdf_id": data.get("pdf_id"),
+                            "total_pages": data.get("total_pages", 0),
+                            "batch_processed": True,
+                            "total_batches": data.get("total_batches", 0),
+                            "pages": [],  # Empty for batch-processed
+                        }
+                except (json.JSONDecodeError, TypeError):
+                    # Not JSON or not the format we're looking for
+                    pass
 
         logger.debug("No PDF data found in system messages")
         return None

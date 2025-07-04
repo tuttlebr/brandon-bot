@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
 """
-Documentation API Server - Simplified and robust version
+Documentation API Server - Enhanced version with better navigation and content handling
 """
 
+import re
 from pathlib import Path
+from typing import Dict, List, Optional
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 # Initialize FastAPI app
-app = FastAPI(title="Nano Chat Documentation", docs_url=None, redoc_url=None, openapi_url=None)
+app = FastAPI(title="Nemotron Chat Documentation", docs_url=None, redoc_url=None, openapi_url=None)
 
 # Documentation root directory
 DOCS_ROOT = Path(__file__).parent
 
-# CSS for documentation pages - Matching Nano chat interface
+# Enhanced CSS for documentation pages
 DOCS_CSS = """
 :root {
     --brand-color: #76b900;
@@ -328,29 +330,62 @@ li {
 .content > * {
     animation: fadeIn 0.3s ease-out;
 }
+
+/* Mermaid diagram support */
+.mermaid {
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+    text-align: center;
+}
 """
 
 
 def render_markdown_simple(content: str) -> str:
-    """Simple markdown to HTML conversion"""
+    """Enhanced markdown to HTML conversion with better code block handling"""
     lines = content.split('\n')
     html_lines = []
     in_code_block = False
     in_list = False
+    in_blockquote = False
+    code_language = ""
 
-    for line in lines:
-        # Code blocks
+    for i, line in enumerate(lines):
+        # Code blocks with language support
         if line.strip().startswith('```'):
             if in_code_block:
-                html_lines.append('</pre>')
+                html_lines.append('</code></pre>')
                 in_code_block = False
+                code_language = ""
             else:
-                html_lines.append('<pre>')
+                # Extract language if specified
+                lang_match = re.match(r'^```(\w+)', line.strip())
+                if lang_match:
+                    code_language = lang_match.group(1)
+                    html_lines.append(f'<pre class="language-{code_language}"><code>')
+                else:
+                    html_lines.append('<pre><code>')
                 in_code_block = True
             continue
 
         if in_code_block:
-            html_lines.append(line)
+            # Escape HTML in code blocks
+            escaped_line = line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            html_lines.append(escaped_line)
+            continue
+
+        # Blockquotes
+        if line.strip().startswith('>'):
+            if not in_blockquote:
+                html_lines.append('<blockquote>')
+                in_blockquote = True
+            html_lines.append(line.strip()[1:].strip())
+            # Check if next line is not a blockquote
+            if i + 1 < len(lines) and not lines[i + 1].strip().startswith('>'):
+                html_lines.append('</blockquote>')
+                in_blockquote = False
             continue
 
         # Headers
@@ -362,58 +397,105 @@ def render_markdown_simple(content: str) -> str:
             html_lines.append(f'<h3>{line[4:]}</h3>')
         elif line.startswith('#### '):
             html_lines.append(f'<h4>{line[5:]}</h4>')
+        elif line.startswith('##### '):
+            html_lines.append(f'<h5>{line[6:]}</h5>')
         # Lists
         elif line.strip().startswith('- ') or line.strip().startswith('* '):
             if not in_list:
                 html_lines.append('<ul>')
                 in_list = True
-            html_lines.append(f'<li>{line.strip()[2:]}</li>')
+            html_lines.append(f'<li>{process_inline_formatting(line.strip()[2:])}</li>')
         # Empty line
         elif not line.strip():
             if in_list:
                 html_lines.append('</ul>')
                 in_list = False
+            if in_blockquote:
+                html_lines.append('</blockquote>')
+                in_blockquote = False
             html_lines.append('<br>')
         # Regular paragraph
         else:
             if in_list:
                 html_lines.append('</ul>')
                 in_list = False
-            # Basic inline formatting
-            text = line
-            # Bold
-            while '**' in text:
-                text = text.replace('**', '<strong>', 1).replace('**', '</strong>', 1)
-            # Italic
-            while '*' in text and '<strong>' not in text and '</strong>' not in text:
-                text = text.replace('*', '<em>', 1).replace('*', '</em>', 1)
-            # Inline code
-            while '`' in text:
-                text = text.replace('`', '<code>', 1).replace('`', '</code>', 1)
-            html_lines.append(f'<p>{text}</p>')
+            if in_blockquote:
+                html_lines.append('</blockquote>')
+                in_blockquote = False
 
+            # Process the line for inline formatting
+            processed_line = process_inline_formatting(line)
+
+            # Check for mermaid diagrams
+            if 'mermaid' in processed_line.lower() and 'graph' in processed_line:
+                html_lines.append(f'<div class="mermaid">{processed_line}</div>')
+            else:
+                html_lines.append(f'<p>{processed_line}</p>')
+
+    # Close any open tags
     if in_list:
         html_lines.append('</ul>')
     if in_code_block:
-        html_lines.append('</pre>')
+        html_lines.append('</code></pre>')
+    if in_blockquote:
+        html_lines.append('</blockquote>')
 
     return '\n'.join(html_lines)
 
 
+def process_inline_formatting(text: str) -> str:
+    """Process inline markdown formatting"""
+    # Links [text](url)
+    text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2">\1</a>', text)
+
+    # Bold **text**
+    text = re.sub(r'\*\*([^*]+)\*\*', r'<strong>\1</strong>', text)
+
+    # Italic *text* (but not **text**)
+    text = re.sub(r'(?<!\*)\*([^*]+)\*(?!\*)', r'<em>\1</em>', text)
+
+    # Inline code `text`
+    text = re.sub(r'`([^`]+)`', r'<code>\1</code>', text)
+
+    return text
+
+
 def create_page(title: str, content: str, nav_html: str = "") -> str:
-    """Create a complete HTML page"""
+    """Create a complete HTML page with mermaid support"""
     return f"""
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>{title} - Nano Chat Documentation</title>
+        <title>{title} - Nemotron Chat Documentation</title>
         <style>{DOCS_CSS}</style>
+        <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+        <script>
+            mermaid.initialize({{
+                startOnLoad: true,
+                theme: 'dark',
+                themeVariables: {{
+                    primaryColor: '#76b900',
+                    primaryTextColor: '#fff',
+                    primaryBorderColor: '#3d4147',
+                    lineColor: '#76b900',
+                    secondaryColor: '#1e2329',
+                    tertiaryColor: '#282c34',
+                    background: '#0e1117',
+                    mainBkg: '#1e2329',
+                    secondBkg: '#282c34',
+                    tertiaryBkg: '#3d4147',
+                    textColor: '#b8bcc8',
+                    lineColor: '#76b900',
+                    borderColor: '#3d4147'
+                }}
+            }});
+        </script>
     </head>
     <body>
         <div class="header">
-            <h1>Nano Chat Documentation</h1>
+            <h1>Nemotron Chat Documentation</h1>
         </div>
         {nav_html}
         <div class="content">
@@ -425,73 +507,123 @@ def create_page(title: str, content: str, nav_html: str = "") -> str:
 
 
 def get_nav_html() -> str:
-    """Get navigation HTML"""
+    """Get enhanced navigation HTML"""
     return """
     <div class="nav">
         <ul>
             <li><a href="/docs/">🏠 Home</a></li>
-            <li><a href="/docs/quickstart">🚀 Quick Start</a></li>
+            <li><a href="/docs/getting-started">🚀 Getting Started</a></li>
             <li><a href="/docs/user-guide">📖 User Guide</a></li>
             <li><a href="/docs/architecture">🏗️ Architecture</a></li>
             <li><a href="/docs/api">🔧 API Reference</a></li>
+            <li><a href="/docs/configuration">⚙️ Configuration</a></li>
+            <li><a href="/docs/deployment">🚢 Deployment</a></li>
+            <li><a href="/docs/faq">❓ FAQ</a></li>
             <li><a href="/docs/troubleshooting">🐛 Troubleshooting</a></li>
         </ul>
     </div>
     """
 
 
-def get_home_content():
-    """Get home page content"""
-    # Try to load index.md
-    index_path = DOCS_ROOT / "index.md"
-    if index_path.exists():
-        content = index_path.read_text()
-        return render_markdown_simple(content)
-    else:
-        return """
-        <h1>Welcome to Nano Chat</h1>
-        <p class="lead">A production-ready conversational AI platform powered by NVIDIA's advanced language models.</p>
+def get_section_pages() -> Dict[str, List[str]]:
+    """Get all pages organized by section"""
+    sections = {
+        "getting-started": ["quickstart", "installation", "first-steps"],
+        "user-guide": [
+            "chat-interface",
+            "pdf-analysis",
+            "pdf_context_switching",
+            "image-generation",
+            "search-features",
+        ],
+        "architecture": ["overview", "services"],
+        "api": ["services", "controllers", "tools", "streaming"],
+        "configuration": ["environment", "models"],
+        "deployment": ["docker"],
+    }
+    return sections
 
+
+def get_section_content(section: str) -> str:
+    """Get section overview content"""
+    section_overviews = {
+        "getting-started": """
+        <h1>Getting Started</h1>
+        <p>Welcome to Nemotron Chat! Get up and running quickly with these guides.</p>
         <div class="feature-grid">
             <div class="feature-card">
-                <h3>🚀 Getting Started</h3>
-                <ul>
-                    <li><a href="/docs/quickstart">Quick Start Guide</a> - Get up and running in 5 minutes</li>
-                    <li><a href="/docs/installation">Installation Guide</a> - Detailed setup instructions</li>
-                    <li><a href="/docs/first-steps">First Steps</a> - Your first chat session</li>
-                </ul>
+                <h3>🚀 Quick Start</h3>
+                <p>Get Nemotron running in 5 minutes with Docker.</p>
+                <a href="/docs/quickstart">View Guide →</a>
             </div>
-
             <div class="feature-card">
-                <h3>💡 Key Features</h3>
-                <ul>
-                    <li><a href="/docs/chat-interface">Chat Interface</a> - Natural conversations with AI</li>
-                    <li><a href="/docs/pdf-analysis">PDF Analysis</a> - Intelligent document processing</li>
-                    <li><a href="/docs/image-generation">Image Generation</a> - Create images with AI</li>
-                    <li><a href="/docs/search-features">Search Tools</a> - Web and knowledge search</li>
-                </ul>
+                <h3>📦 Installation</h3>
+                <p>Detailed installation instructions for all platforms.</p>
+                <a href="/docs/installation">View Guide →</a>
             </div>
-
             <div class="feature-card">
-                <h3>🔧 Technical Docs</h3>
-                <ul>
-                    <li><a href="/docs/architecture">Architecture Overview</a> - System design</li>
-                    <li><a href="/docs/api">API Reference</a> - Service and controller APIs</li>
-                    <li><a href="/docs/configuration">Configuration</a> - Environment setup</li>
-                </ul>
+                <h3>👋 First Steps</h3>
+                <p>Your first conversation with Nemotron.</p>
+                <a href="/docs/first-steps">View Guide →</a>
             </div>
         </div>
-
-        <div class="section">
-            <h2>🤖 About Nano</h2>
-            <p>Nano is powered by NVIDIA's state-of-the-art language models, offering three specialized models for different use cases:</p>
-            <ul>
-                <li><strong>Fast Model</strong> - Quick responses for simple queries</li>
-                <li><strong>Standard Model</strong> - Balanced performance for general use</li>
-                <li><strong>Intelligent Model</strong> - Advanced reasoning for complex tasks</li>
-            </ul>
+        """,
+        "user-guide": """
+        <h1>User Guide</h1>
+        <p>Learn how to use all of Nemotron's features effectively.</p>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h3>💬 Chat Interface</h3>
+                <p>Master the conversation features.</p>
+                <a href="/docs/chat-interface">Learn More →</a>
+            </div>
+            <div class="feature-card">
+                <h3>📄 PDF Analysis</h3>
+                <p>Analyze documents intelligently.</p>
+                <a href="/docs/pdf-analysis">Learn More →</a>
+            </div>
+            <div class="feature-card">
+                <h3>🎨 Image Generation</h3>
+                <p>Create images with AI.</p>
+                <a href="/docs/image-generation">Learn More →</a>
+            </div>
         </div>
-        """
+        """,
+        "architecture": """
+        <h1>Architecture</h1>
+        <p>Understand Nemotron's technical architecture and design patterns.</p>
+        <ul>
+            <li><a href="/docs/architecture/overview">Architecture Overview</a> - System design and patterns</li>
+            <li><a href="/docs/architecture/services">Services Architecture</a> - Service layer details</li>
+        </ul>
+        """,
+        "api": """
+        <h1>API Reference</h1>
+        <p>Complete API documentation for developers.</p>
+        <ul>
+            <li><a href="/docs/api/services">Services API</a> - Service layer reference</li>
+            <li><a href="/docs/api/controllers">Controllers API</a> - Controller reference</li>
+            <li><a href="/docs/api/tools">Tools API</a> - Tool system documentation</li>
+            <li><a href="/docs/api/streaming">Streaming API</a> - Response streaming</li>
+        </ul>
+        """,
+        "configuration": """
+        <h1>Configuration</h1>
+        <p>Configure Nemotron for your environment.</p>
+        <ul>
+            <li><a href="/docs/configuration/environment">Environment Variables</a> - All configuration options</li>
+            <li><a href="/docs/configuration/models">Model Configuration</a> - LLM model setup</li>
+        </ul>
+        """,
+        "deployment": """
+        <h1>Deployment</h1>
+        <p>Deploy Nemotron to production.</p>
+        <ul>
+            <li><a href="/docs/deployment/docker">Docker Deployment</a> - Container deployment guide</li>
+        </ul>
+        """,
+    }
+    return section_overviews.get(section, f"<h1>{section.title()}</h1><p>Documentation section.</p>")
 
 
 # Root redirect
@@ -511,125 +643,106 @@ async def docs_redirect():
 @app.get("/docs/")
 async def docs_home():
     """Documentation home page"""
-    html_content = get_home_content()
-    return HTMLResponse(content=create_page("Home", html_content, get_nav_html()))
+    index_path = DOCS_ROOT / "index.md"
+    if index_path.exists():
+        content = render_markdown_simple(index_path.read_text())
+    else:
+        content = get_home_content()
+
+    return HTMLResponse(content=create_page("Home", content, get_nav_html()))
 
 
-@app.get("/docs/quickstart")
-async def quickstart():
-    """Quick start page"""
-    file_path = DOCS_ROOT / "getting-started" / "quickstart.md"
+def get_home_content():
+    """Get default home page content"""
+    return """
+    <h1>Welcome to Nemotron Chat</h1>
+    <p class="lead">A production-ready conversational AI platform powered by NVIDIA's advanced language models.</p>
+
+    <div class="feature-grid">
+        <div class="feature-card">
+            <h3>🚀 Getting Started</h3>
+            <ul>
+                <li><a href="/docs/quickstart">Quick Start Guide</a> - Get up and running in 5 minutes</li>
+                <li><a href="/docs/installation">Installation Guide</a> - Detailed setup instructions</li>
+                <li><a href="/docs/first-steps">First Steps</a> - Your first chat session</li>
+            </ul>
+        </div>
+
+        <div class="feature-card">
+            <h3>💡 Key Features</h3>
+            <ul>
+                <li><a href="/docs/chat-interface">Chat Interface</a> - Natural conversations with AI</li>
+                <li><a href="/docs/pdf-analysis">PDF Analysis</a> - Intelligent document processing</li>
+                <li><a href="/docs/image-generation">Image Generation</a> - Create images with AI</li>
+                <li><a href="/docs/search-features">Search Tools</a> - Web and knowledge search</li>
+            </ul>
+        </div>
+
+        <div class="feature-card">
+            <h3>🔧 Technical Docs</h3>
+            <ul>
+                <li><a href="/docs/architecture">Architecture Overview</a> - System design</li>
+                <li><a href="/docs/api">API Reference</a> - Service and controller APIs</li>
+                <li><a href="/docs/configuration">Configuration</a> - Environment setup</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>🤖 About Nemotron</h2>
+        <p>Nemotron is powered by NVIDIA's state-of-the-art language models, offering three specialized models for different use cases:</p>
+        <ul>
+            <li><strong>Fast Model</strong> - Quick responses for simple queries</li>
+            <li><strong>Standard Model</strong> - Balanced performance for general use</li>
+            <li><strong>Intelligent Model</strong> - Advanced reasoning for complex tasks</li>
+        </ul>
+    </div>
+    """
+
+
+# Section landing pages
+@app.get("/docs/{section}")
+async def section_page(section: str):
+    """Handle section landing pages"""
+    sections = get_section_pages()
+
+    if section in sections:
+        content = get_section_content(section)
+        return HTMLResponse(content=create_page(section.title(), content, get_nav_html()))
+    else:
+        # Try to find as a standalone page
+        return await get_page(section)
+
+
+# Specific documentation pages
+@app.get("/docs/{section}/{page_name}")
+async def get_section_page(section: str, page_name: str):
+    """Get a specific documentation page within a section"""
+    file_path = DOCS_ROOT / section / f"{page_name}.md"
+
     if file_path.exists():
         content = render_markdown_simple(file_path.read_text())
-        return HTMLResponse(content=create_page("Quick Start", content, get_nav_html()))
+        title = page_name.replace('-', ' ').replace('_', ' ').title()
+        return HTMLResponse(content=create_page(title, content, get_nav_html()))
 
-    # Fallback content
-    content = """
-    <h1>Quick Start Guide</h1>
-    <p>Get the Streamlit Chat Application running quickly.</p>
-
-    <h2>Prerequisites</h2>
-    <ul>
-        <li>Docker and Docker Compose installed</li>
-        <li>NVIDIA API key</li>
-    </ul>
-
-    <h2>Setup</h2>
-    <ol>
-        <li>Clone the repository</li>
-        <li>Create a .env file with your API keys</li>
-        <li>Run: <code>docker compose up -d</code></li>
-        <li>Access the app at <code>http://localhost:8080</code></li>
-    </ol>
+    # 404 page
+    content = f"""
+    <h1>Page Not Found</h1>
+    <p>The page "{section}/{page_name}" was not found.</p>
+    <p><a href="/docs/">Return to documentation home</a></p>
     """
-    return HTMLResponse(content=create_page("Quick Start", content, get_nav_html()))
-
-
-@app.get("/docs/user-guide")
-async def user_guide():
-    """User guide page"""
-    content = """
-    <h1>User Guide</h1>
-
-    <div class="section">
-        <h2>Chat Interface</h2>
-        <p>The chat interface provides natural conversation with AI models.</p>
-        <ul>
-            <li><a href="/docs/chat-interface">Chat Interface Guide</a></li>
-            <li><a href="/docs/pdf-analysis">PDF Analysis Guide</a></li>
-            <li><a href="/docs/image-generation">Image Generation Guide</a></li>
-        </ul>
-    </div>
-    """
-    return HTMLResponse(content=create_page("User Guide", content, get_nav_html()))
-
-
-@app.get("/docs/architecture")
-async def architecture():
-    """Architecture page"""
-    file_path = DOCS_ROOT / "architecture" / "overview.md"
-    if file_path.exists():
-        content = render_markdown_simple(file_path.read_text())
-        return HTMLResponse(content=create_page("Architecture", content, get_nav_html()))
-
-    content = """
-    <h1>Architecture Overview</h1>
-    <p>The application follows an MVC architecture with clear separation of concerns.</p>
-
-    <h2>Components</h2>
-    <ul>
-        <li><strong>Controllers</strong> - Handle user interactions and orchestrate services</li>
-        <li><strong>Services</strong> - Core business logic and external integrations</li>
-        <li><strong>Tools</strong> - Specialized capabilities for the AI models</li>
-    </ul>
-    """
-    return HTMLResponse(content=create_page("Architecture", content, get_nav_html()))
-
-
-@app.get("/docs/api")
-async def api_reference():
-    """API reference page"""
-    content = """
-    <h1>API Reference</h1>
-
-    <div class="section">
-        <h2>Services</h2>
-        <ul>
-            <li>LLMService - Language model interactions</li>
-            <li>ChatService - Chat management</li>
-            <li>PDFService - Document processing</li>
-        </ul>
-    </div>
-
-    <div class="section">
-        <h2>Controllers</h2>
-        <ul>
-            <li>SessionController - Session management</li>
-            <li>MessageController - Message handling</li>
-            <li>ResponseController - Response generation</li>
-        </ul>
-    </div>
-    """
-    return HTMLResponse(content=create_page("API Reference", content, get_nav_html()))
+    return HTMLResponse(content=create_page("Not Found", content, get_nav_html()), status_code=404)
 
 
 @app.get("/docs/{page_name}")
 async def get_page(page_name: str):
-    """Get a specific documentation page"""
-    # Try different paths
-    paths_to_try = [
-        DOCS_ROOT / f"{page_name}.md",
-        DOCS_ROOT / "getting-started" / f"{page_name}.md",
-        DOCS_ROOT / "user-guide" / f"{page_name}.md",
-        DOCS_ROOT / "architecture" / f"{page_name}.md",
-        DOCS_ROOT / "configuration" / f"{page_name}.md",
-    ]
-
-    for path in paths_to_try:
-        if path.exists():
-            content = render_markdown_simple(path.read_text())
-            title = page_name.replace('-', ' ').title()
-            return HTMLResponse(content=create_page(title, content, get_nav_html()))
+    """Get a standalone documentation page"""
+    # Direct file in docs root
+    file_path = DOCS_ROOT / f"{page_name}.md"
+    if file_path.exists():
+        content = render_markdown_simple(file_path.read_text())
+        title = page_name.replace('-', ' ').replace('_', ' ').title()
+        return HTMLResponse(content=create_page(title, content, get_nav_html()))
 
     # 404 page
     content = f"""
@@ -640,50 +753,91 @@ async def get_page(page_name: str):
     return HTMLResponse(content=create_page("Not Found", content, get_nav_html()), status_code=404)
 
 
+# API endpoints
 @app.get("/docs/api/toc")
 async def api_toc():
     """Get table of contents as JSON"""
-    return JSONResponse(
-        {
-            "sections": [
-                {"title": "Getting Started", "pages": ["quickstart", "installation", "first-steps"]},
-                {"title": "User Guide", "pages": ["chat-interface", "pdf-analysis", "image-generation"]},
-                {"title": "Technical", "pages": ["architecture", "api", "configuration", "troubleshooting"]},
-            ]
-        }
-    )
+    sections = get_section_pages()
+    toc = []
+
+    for section, pages in sections.items():
+        toc.append(
+            {
+                "title": section.replace('-', ' ').title(),
+                "path": section,
+                "pages": [{"title": page.replace('-', ' ').replace('_', ' ').title(), "path": page} for page in pages],
+            }
+        )
+
+    return JSONResponse({"sections": toc})
 
 
 @app.get("/docs/api/search")
 async def api_search(q: str = ""):
-    """Simple search functionality"""
+    """Enhanced search functionality"""
     if not q:
         return JSONResponse({"results": []})
 
     results = []
     query = q.lower()
 
-    # Search through markdown files
+    # Search through all markdown files
     for md_file in DOCS_ROOT.rglob("*.md"):
+        if md_file.name == "README.md":
+            continue
+
         try:
             content = md_file.read_text()
             if query in content.lower():
-                # Get the line containing the match
-                for i, line in enumerate(content.split('\n')):
+                # Get context around matches
+                lines = content.split('\n')
+                for i, line in enumerate(lines):
                     if query in line.lower():
+                        # Get surrounding context
+                        start = max(0, i - 1)
+                        end = min(len(lines), i + 2)
+                        context = '\n'.join(lines[start:end])
+
                         results.append(
                             {
                                 "file": str(md_file.relative_to(DOCS_ROOT)),
+                                "title": md_file.stem.replace('-', ' ').replace('_', ' ').title(),
                                 "line": i + 1,
-                                "text": line.strip()[:100] + "..." if len(line) > 100 else line.strip(),
+                                "context": context[:200] + "..." if len(context) > 200 else context,
+                                "url": f"/docs/{str(md_file.relative_to(DOCS_ROOT)).replace('.md', '')}",
                             }
                         )
-                        if len(results) >= 10:
+
+                        if len(results) >= 20:  # Limit results
                             break
-        except:
+
+                if len(results) >= 20:
+                    break
+        except Exception as e:
             continue
 
     return JSONResponse({"query": q, "results": results})
+
+
+@app.get("/docs/api/all-pages")
+async def api_all_pages():
+    """Get all available pages"""
+    pages = []
+
+    for md_file in DOCS_ROOT.rglob("*.md"):
+        if md_file.name == "README.md":
+            continue
+
+        rel_path = md_file.relative_to(DOCS_ROOT)
+        pages.append(
+            {
+                "path": str(rel_path).replace('.md', ''),
+                "title": md_file.stem.replace('-', ' ').replace('_', ' ').title(),
+                "section": rel_path.parent.name if rel_path.parent.name != '.' else 'root',
+            }
+        )
+
+    return JSONResponse({"pages": sorted(pages, key=lambda x: x["path"])})
 
 
 if __name__ == "__main__":

@@ -27,17 +27,49 @@ The system automatically selects the best strategy based on document size:
 - All content processed at once
 - Fastest response times
 
-### Medium Documents (6-15 pages)
-- Batch processing approach
-- Efficient memory usage
-- Progress tracking
+### Medium Documents (6-50 pages)
+- Standard processing approach
+- Full document loaded into memory
+- Efficient for most use cases
 
-### Large Documents (>15 pages)
-- Two-phase intelligent analysis:
-  1. **Phase 1**: Rapid relevance scanning
-  2. **Phase 2**: Deep analysis of relevant sections
-- Real-time progress updates
-- Optimized for accuracy
+### Large Documents (>50 pages)
+- **Automatic Batch Processing** (NEW)
+- Document split into 20-page batches
+- Memory-efficient storage and retrieval
+- Smart context loading based on your queries
+- Only relevant pages loaded when needed
+
+#### How Batch Processing Works
+
+When you upload a PDF with more than 50 pages:
+
+1. **Automatic Detection**: The system recognizes large documents and enables batch processing
+2. **Intelligent Splitting**: The PDF is divided into manageable 20-page chunks
+3. **Efficient Storage**: Each batch is stored separately to minimize memory usage
+4. **Smart Loading**: When you ask questions, only relevant pages are loaded into context
+
+#### Benefits of Batch Processing
+
+- **No Memory Overload**: Large PDFs won't cause system crashes
+- **Faster Processing**: Initial upload completes quicker
+- **Targeted Analysis**: The system loads only what's needed for your question
+- **Scalability**: Handle documents with hundreds or thousands of pages
+
+#### Working with Batch-Processed PDFs
+
+For best results with large documents:
+
+1. **Specify Page Ranges**: Mention specific pages in your queries
+   - "What does page 125 say about financial projections?"
+   - "Summarize pages 50-75"
+
+2. **Use Targeted Questions**: Be specific about what you're looking for
+   - "Find information about risk management in the document"
+   - "What are the conclusions in the final chapter?"
+
+3. **Request Summaries**: The system will intelligently summarize available content
+   - "Summarize this document" will process the first several batches
+   - You'll be notified about which pages were included
 
 ## Example Queries
 

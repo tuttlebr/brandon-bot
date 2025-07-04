@@ -55,7 +55,7 @@ sudo lsof -i :8050
    ```bash
    # Kill processes using the ports
    sudo kill -9 $(sudo lsof -t -i:8080)
-   sudo kill -9 $(sudo lsof -t -i:8050)
+   sudo kill -9 $(sudo lsof -i:8050)
 
    # Restart the application
    docker compose down
@@ -205,17 +205,35 @@ sudo lsof -i :8050
 
 ## Error Messages Reference
 
-### Common Error Messages and Solutions
+### Common Error Messages
 
-| Error Message | Cause | Solution |
-|--------------|-------|----------|
-| "Configuration error: NVIDIA_API_KEY not found" | Missing environment variable | Add `NVIDIA_API_KEY` to `.env` file |
-| "Rate limit exceeded" | Too many API requests | Wait 60 seconds, use fast model |
-| "Failed to process PDF" | Corrupted or unsupported PDF | Try a different PDF, check format |
-| "Connection refused" | Service not running | Run `docker compose up -d` |
-| "Out of memory" | Large file or response | Increase Docker memory limits |
-| "Model not found" | Invalid model name | Check model name in configuration |
-| "WebSocket connection failed" | Network or proxy issue | Check firewall, try direct connection |
+**"Configuration error: NVIDIA_API_KEY not found"**
+- **Cause**: Missing environment variable
+- **Solution**: Add `NVIDIA_API_KEY` to `.env` file
+
+**"Rate limit exceeded"**
+- **Cause**: Too many API requests
+- **Solution**: Wait 60 seconds, use fast model
+
+**"Failed to process PDF"**
+- **Cause**: Corrupted or unsupported PDF
+- **Solution**: Try a different PDF, check format
+
+**"Connection refused"**
+- **Cause**: Service not running
+- **Solution**: Run `docker compose up -d`
+
+**"Out of memory"**
+- **Cause**: Large file or response
+- **Solution**: Increase Docker memory limits
+
+**"Model not found"**
+- **Cause**: Invalid model name
+- **Solution**: Check model name in configuration
+
+**"WebSocket connection failed"**
+- **Cause**: Network or proxy issue
+- **Solution**: Check firewall, try direct connection
 
 ## Debugging Tools
 

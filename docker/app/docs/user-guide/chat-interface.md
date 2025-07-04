@@ -149,12 +149,10 @@ Request specific formats:
 
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
-|----------|---------|
-| `Enter` | Send message |
-| `Shift + Enter` | New line in message |
-| `Ctrl/Cmd + K` | Clear chat (when available) |
-| `Esc` | Cancel current input |
+**Enter** - Send message
+**Shift + Enter** - New line in message
+**Ctrl/Cmd + K** - Clear chat (when available)
+**Esc** - Cancel current input
 
 ## Interface Elements
 

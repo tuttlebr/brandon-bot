@@ -5,6 +5,7 @@ This tool generates or retrieves document summaries for uploaded PDFs.
 It will create summaries on-demand if they don't already exist.
 """
 
+import json
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -162,19 +163,27 @@ class PDFSummaryTool(BaseTool):
 
         actual_filename = pdf_data.get("filename", "Unknown")
 
+        # Check if this is a batch-processed PDF
+        if pdf_data.get("batch_processed", False):
+            # Handle batch-processed PDF
+            return self._summarize_batch_processed_pdf(pdf_data, summary_type)
+
+        # Regular PDF processing continues...
+        pages = pdf_data.get("pages", [])
+
         # Check if summarization is complete
         if not pdf_data.get("summarization_complete", False):
             total_pages = len(pdf_data.get("pages", []))
 
             # For small documents, inform user that summarization isn't needed
-            if total_pages <= 10:
-                return PDFSummaryResponse(
-                    success=False,
-                    filename=actual_filename,
-                    summary_type=summary_type,
-                    message=f"**{actual_filename}** has only {total_pages} pages. For documents this size, I can analyze the content directly without needing a summary. Please ask specific questions about the document instead.",
-                    direct_response=True,
-                )
+            # if total_pages <= 10:
+            #     return PDFSummaryResponse(
+            #         success=False,
+            #         filename=actual_filename,
+            #         summary_type=summary_type,
+            #         message=f"**{actual_filename}** has only {total_pages} pages. For documents this size, I can analyze the content directly without needing a summary. Please ask specific questions about the document instead.",
+            #         direct_response=True,
+            #     )
 
             # For large documents, generate summary on-demand
             logger.info(f"Generating on-demand summary for {actual_filename} ({total_pages} pages)")
@@ -306,6 +315,111 @@ class PDFSummaryTool(BaseTool):
     def _get_pdf_data_from_messages(self, messages: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         """Extract PDF data from injected system messages"""
         return PDFDataExtractor.extract_from_messages(messages)
+
+    def _summarize_batch_processed_pdf(self, pdf_data: Dict[str, Any], summary_type: str) -> PDFSummaryResponse:
+        """
+        Handle summarization of batch-processed PDFs
+
+        Args:
+            pdf_data: PDF metadata with batch information
+            summary_type: Type of summary requested
+
+        Returns:
+            PDFSummaryResponse
+        """
+        filename = pdf_data.get("filename", "Unknown")
+        total_pages = pdf_data.get("total_pages", 0)
+        total_batches = pdf_data.get("total_batches", 0)
+        pdf_id = pdf_data.get("pdf_id")
+
+        # Import file storage service
+        from services.file_storage_service import FileStorageService
+
+        file_storage = FileStorageService()
+
+        # For batch-processed PDFs, we'll summarize the first few batches
+        max_batches_to_summarize = min(3, total_batches)  # Summarize up to 3 batches
+
+        combined_text = []
+        pages_included = 0
+
+        for batch_num in range(max_batches_to_summarize):
+            batch_id = f"{pdf_id}_batch_{batch_num}"
+            batch_path = file_storage.pdfs_dir / f"{batch_id}.json"
+
+            if batch_path.exists():
+                batch_data = json.loads(batch_path.read_text())
+                batch_pages = batch_data.get("pages", [])
+
+                for page in batch_pages[:5]:  # Max 5 pages per batch
+                    page_text = page.get("text", "").strip()
+                    if page_text:
+                        page_num = page.get("page", pages_included + 1)
+                        # Truncate very long pages
+                        if len(page_text) > 2000:
+                            page_text = page_text[:2000] + "..."
+                        combined_text.append(f"Page {page_num}:\n{page_text}")
+                        pages_included += 1
+
+        if not combined_text:
+            return PDFSummaryResponse(
+                success=False,
+                filename=filename,
+                summary_type=summary_type,
+                message="Unable to extract text from the batch-processed PDF.",
+                direct_response=True,
+            )
+
+        # Prepare summary request
+        full_text = "\n\n".join(combined_text)
+
+        if summary_type == "detailed":
+            instructions = (
+                f"Create a comprehensive, detailed summary of this document. "
+                f"Include all major sections, key findings, methodologies, and conclusions. "
+                f"Note: This summary is based on the first {pages_included} pages of a {total_pages}-page document."
+            )
+        else:  # brief
+            instructions = (
+                f"Create a concise summary highlighting the main purpose and key points of this document. "
+                f"Keep it under 300 words. "
+                f"Note: This summary is based on the first {pages_included} pages of a {total_pages}-page document."
+            )
+
+        # Use assistant tool for summarization
+        summary_params = {
+            "task_type": "summarize",
+            "text": full_text,
+            "instructions": instructions,
+        }
+
+        from tools.assistant import execute_assistant_with_dict
+
+        summary_result = execute_assistant_with_dict(summary_params)
+
+        # Format response
+        summary_text = summary_result.result if hasattr(summary_result, 'result') else str(summary_result)
+
+        # Add note about partial document
+        if pages_included < total_pages:
+            summary_text += (
+                f"\n\n**Note:** This summary is based on {pages_included} of {total_pages} total pages. "
+                f"The document was processed in {total_batches} batches for memory efficiency. "
+                f"For specific information from other sections, please ask about particular topics or page ranges."
+            )
+
+        formatted_summary = f"## {summary_type.title()} Summary of {filename}\n\n{summary_text}"
+
+        return PDFSummaryResponse(
+            success=True,
+            filename=filename,
+            summary_type=summary_type,
+            summary=summary_text,
+            pages_summarized=pages_included,
+            total_pages=total_pages,
+            message=formatted_summary,
+            direct_response=True,
+        )
 
 
 # Create global instance

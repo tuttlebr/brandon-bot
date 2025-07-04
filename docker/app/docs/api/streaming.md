@@ -1,3 +1,6 @@
+# Streaming
+
+```mermaid
 sequenceDiagram
     participant User
     participant ResponseController
@@ -33,3 +36,4 @@ sequenceDiagram
             ResponseController-->>UI: Update display
         end
     end
+```

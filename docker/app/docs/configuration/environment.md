@@ -304,32 +304,40 @@ config.validate_environment()
 
 ### Complete Variable Reference
 
-| Variable | Type | Default | Required | Description |
-|----------|------|---------|----------|-------------|
-| **Core Settings** |
-| NVIDIA_API_KEY | string | - | Yes | NVIDIA API authentication key |
-| BOT_TITLE | string | Nano | No | Application name |
-| META_USER | string | human | No | User reference term |
-| **Model Configuration** |
-| LLM_ENDPOINT | string | - | Yes | Main LLM endpoint URL |
-| LLM_MODEL_NAME | string | - | Yes | Main model identifier |
-| FAST_LLM_ENDPOINT | string | - | Yes | Fast model endpoint URL |
-| FAST_LLM_MODEL_NAME | string | - | Yes | Fast model identifier |
-| INTELLIGENT_LLM_ENDPOINT | string | - | Yes | Intelligent model endpoint URL |
-| INTELLIGENT_LLM_MODEL_NAME | string | - | Yes | Intelligent model identifier |
-| **Optional Services** |
-| IMAGE_ENDPOINT | string | - | No | Image generation endpoint |
-| TAVILY_API_KEY | string | - | No | Tavily search API key |
-| NVINGEST_ENDPOINT | string | - | No | PDF processing endpoint |
-| DATABASE_URL | string | - | No | Milvus database URL |
-| **Performance** |
-| SLIDING_WINDOW_MAX_TURNS | int | 20 | No | Conversation history limit |
-| MAX_CONTEXT_LENGTH | int | 1000000 | No | Maximum context size |
-| AUTO_INJECT_CONVERSATION_CONTEXT | bool | true | No | Auto-inject context |
-| **Limits** |
-| MAX_PDF_SIZE | int | 16777216 | No | Max PDF size in bytes |
-| MAX_IMAGES_IN_SESSION | int | 50 | No | Max images per session |
-| MAX_PDFS_IN_SESSION | int | 3 | No | Max PDFs per session |
+**Core Settings**
+- `NVIDIA_API_KEY` (string, required) - NVIDIA API authentication key
+- `BOT_TITLE` (string, default: "Nano") - Application name
+- `META_USER` (string, default: "human") - User reference term
+
+**Model Configuration**
+- `LLM_ENDPOINT` (string, required) - Main LLM endpoint URL
+- `LLM_MODEL_NAME` (string, required) - Main model identifier
+- `FAST_LLM_ENDPOINT` (string, required) - Fast model endpoint URL
+- `FAST_LLM_MODEL_NAME` (string, required) - Fast model identifier
+- `INTELLIGENT_LLM_ENDPOINT` (string, required) - Intelligent model endpoint URL
+- `INTELLIGENT_LLM_MODEL_NAME` (string, required) - Intelligent model identifier
+
+**Optional Services**
+- `IMAGE_ENDPOINT` (string) - Image generation endpoint
+- `TAVILY_API_KEY` (string) - Tavily search API key
+- `NVINGEST_ENDPOINT` (string) - PDF processing endpoint
+- `DATABASE_URL` (string) - Milvus database URL
+
+**Performance**
+- `SLIDING_WINDOW_MAX_TURNS` (int, default: 20) - Conversation history limit
+- `MAX_CONTEXT_LENGTH` (int, default: 1000000) - Maximum context size
+- `AUTO_INJECT_CONVERSATION_CONTEXT` (bool, default: true) - Auto-inject context
+
+**Limits**
+- `MAX_PDF_SIZE` (int, default: 16777216) - Max PDF size in bytes
+- `MAX_IMAGES_IN_SESSION` (int, default: 50) - Max images per session
+- `MAX_PDFS_IN_SESSION` (int, default: 3) - Max PDFs per session
+
+**PDF Batch Processing**
+- `PDF_BATCH_PROCESSING_THRESHOLD` (int, default: 50) - Pages threshold to trigger batch processing
+- `PDF_PAGES_PER_BATCH` (int, default: 20) - Maximum pages per batch
+- `PDF_CONTEXT_MAX_PAGES` (int, default: 30) - Maximum pages to include in context at once
+- `PDF_CONTEXT_MAX_CHARS` (int, default: 100000) - Maximum characters per context injection
 
 ## Next Steps
 

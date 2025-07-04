@@ -124,6 +124,12 @@ class PDFTextProcessorTool(BaseTool):
         pages = pdf_data.get("pages", [])
         total_pages = len(pages)
 
+        # Check if this is a batch-processed PDF
+        if pdf_data.get("batch_processed", False):
+            return self._process_batch_pdf(
+                pdf_data, task_type, page_numbers, instructions, source_language, target_language
+            )
+
         # Determine which pages to process
         if page_numbers:
             pages_to_process = [p for p in page_numbers if 0 < p <= total_pages]
@@ -329,6 +335,148 @@ class PDFTextProcessorTool(BaseTool):
     def _get_pdf_data_from_messages(self, messages: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
         """Extract PDF data from injected system messages"""
         return PDFDataExtractor.extract_from_messages(messages)
+
+    def _process_batch_pdf(
+        self,
+        pdf_data: Dict[str, Any],
+        task_type: str,
+        page_numbers: List[int],
+        instructions: str,
+        source_language: Optional[str],
+        target_language: Optional[str],
+    ) -> PDFTextProcessorResponse:
+        """
+        Process a batch-processed PDF
+
+        Args:
+            pdf_data: PDF metadata with batch information
+            task_type: Type of text processing
+            page_numbers: Specific page numbers to process
+            instructions: Additional instructions
+            source_language: Source language for translation
+            target_language: Target language for translation
+
+        Returns:
+            PDFTextProcessorResponse
+        """
+        filename = pdf_data.get("filename", "Unknown")
+        total_pages = pdf_data.get("total_pages", 0)
+        pdf_id = pdf_data.get("pdf_id")
+
+        # Import file storage service
+        from services.file_storage_service import FileStorageService
+
+        file_storage = FileStorageService()
+
+        # Determine which pages to process
+        if page_numbers:
+            pages_to_process = [p for p in page_numbers if 0 < p <= total_pages]
+        else:
+            # For batch PDFs without specific pages, process first 30 pages max
+            pages_to_process = list(range(1, min(31, total_pages + 1)))
+
+        if not pages_to_process:
+            return PDFTextProcessorResponse(
+                success=False,
+                filename=filename,
+                task_type=task_type,
+                pages_processed=[],
+                result="",
+                message="No valid pages to process.",
+                direct_response=True,
+            )
+
+        # Load the required pages from batches
+        extracted_text = self._extract_batch_pages_text(file_storage, pdf_id, pages_to_process)
+
+        if not extracted_text:
+            return PDFTextProcessorResponse(
+                success=False,
+                filename=filename,
+                task_type=task_type,
+                pages_processed=pages_to_process,
+                result="",
+                message="Unable to extract text from the specified pages.",
+                direct_response=True,
+            )
+
+        # Check if we need to chunk
+        if len(extracted_text) > MAX_CHARS_PER_CHUNK or len(pages_to_process) > MAX_PAGES_PER_CHUNK:
+            # Process in chunks
+            result = self._process_in_chunks(
+                task_type, extracted_text, pages_to_process, instructions, source_language, target_language
+            )
+            chunks_processed = len(self._create_chunks(extracted_text, pages_to_process))
+        else:
+            # Process all at once
+            result = self._process_text(task_type, extracted_text, instructions, source_language, target_language)
+            chunks_processed = 1
+
+        # Format the response
+        pages_desc = self._format_page_range(pages_to_process)
+        task_desc = self._get_task_description(task_type)
+
+        # Add note about batch processing
+        if len(pages_to_process) < total_pages:
+            result += (
+                f"\n\n**Note:** Processed {len(pages_to_process)} of {total_pages} total pages. "
+                f"To process other pages, please specify the page numbers."
+            )
+
+        return PDFTextProcessorResponse(
+            success=True,
+            filename=filename,
+            task_type=task_type,
+            pages_processed=pages_to_process,
+            result=result,
+            chunks_processed=chunks_processed,
+            message=f"## {task_desc} of {filename} ({pages_desc})\n\n{result}",
+            direct_response=True,
+        )
+
+    def _extract_batch_pages_text(self, file_storage, pdf_id: str, page_numbers: List[int]) -> str:
+        """
+        Extract text from specific pages in a batch-processed PDF
+
+        Args:
+            file_storage: File storage service instance
+            pdf_id: PDF reference ID
+            page_numbers: List of page numbers to extract
+
+        Returns:
+            Extracted text
+        """
+        pages_per_batch = 20  # This should match PDF_PAGES_PER_BATCH from config
+        text_parts = []
+
+        # Group pages by batch
+        pages_by_batch = {}
+        for page_num in page_numbers:
+            batch_num = (page_num - 1) // pages_per_batch
+            if batch_num not in pages_by_batch:
+                pages_by_batch[batch_num] = []
+            pages_by_batch[batch_num].append(page_num)
+
+        # Load and extract text from each batch
+        for batch_num, batch_pages in sorted(pages_by_batch.items()):
+            batch_id = f"{pdf_id}_batch_{batch_num}"
+            batch_path = file_storage.pdfs_dir / f"{batch_id}.json"
+
+            if batch_path.exists():
+                import json
+
+                batch_data = json.loads(batch_path.read_text())
+                batch_page_list = batch_data.get("pages", [])
+
+                for page_num in batch_pages:
+                    page_idx_in_batch = (page_num - 1) % pages_per_batch
+                    if page_idx_in_batch < len(batch_page_list):
+                        page_data = batch_page_list[page_idx_in_batch]
+                        page_text = page_data.get("text", "")
+                        if page_text:
+                            text_parts.append(f"[Page {page_num}]\n{page_text}")
+
+        return "\n\n".join(text_parts)
 
 
 # Create global instance

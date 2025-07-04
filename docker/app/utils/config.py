@@ -68,6 +68,12 @@ class FileProcessingConfig:
     PDF_SUMMARIZATION_ENABLED: bool = False  # Disabled - summarization should be user-driven
     PDF_SUMMARIZATION_USE_ASYNC: bool = True  # Use async (True) or sync (False) processing
 
+    # PDF Batch Processing settings
+    PDF_BATCH_PROCESSING_THRESHOLD: int = 50  # Number of pages to trigger batch processing
+    PDF_PAGES_PER_BATCH: int = 20  # Maximum pages to process per batch
+    PDF_CONTEXT_MAX_PAGES: int = 30  # Maximum pages to include in context at once
+    PDF_CONTEXT_MAX_CHARS: int = 100000  # Maximum characters per context injection
+
 
 @dataclass
 class ToolContextConfig:
@@ -94,7 +100,10 @@ class LLMConfig:
 
     # Context and token limits
     SLIDING_WINDOW_MAX_TURNS: int = 20  # Increased from 6 to prevent context loss
-    MAX_CONTEXT_LENGTH: int = 1000000  # Maximum context length for LLM (chars)
+    MAX_CONTEXT_TOKENS: int = field(
+        default_factory=lambda: int(os.getenv("MAX_CONTEXT_TOKENS", "128000"))
+    )  # Maximum context length for LLM (tokens)
+    MAX_CONTEXT_LENGTH: int = 1000000  # Maximum context length for LLM (characters) - deprecated, use MAX_CONTEXT_TOKENS
 
     # Conversation context injection
     AUTO_INJECT_CONVERSATION_CONTEXT: bool = True  # Automatically inject conversation context

@@ -17,53 +17,53 @@ nav:
   - User Guide:
       - Chat Interface: user-guide/chat-interface.md
       - PDF Analysis: user-guide/pdf-analysis.md
+      - PDF Context Switching: user-guide/pdf_context_switching.md
       - Image Generation: user-guide/image-generation.md
       - Search Features: user-guide/search-features.md
   - Architecture:
       - Overview: architecture/overview.md
       - Services: architecture/services.md
-      - Controllers: architecture/controllers.md
-      - Tools: architecture/tools.md
   - API Reference:
-      - Services API: api/services.md
-      - Controllers API: api/controllers.md
-      - Tools API: api/tools.md
-      - Models: api/models.md
+      - Services: api/services.md
+      - Controllers: api/controllers.md
+      - Tools: api/tools.md
+      - Streaming: api/streaming.md
   - Configuration:
       - Environment Variables: configuration/environment.md
       - Model Configuration: configuration/models.md
-      - UI Configuration: configuration/ui.md
   - Deployment:
-      - Docker Deployment: deployment/docker.md
-      - Production Setup: deployment/production.md
-      - Scaling: deployment/scaling.md
-  - Development:
-      - Development Setup: development/setup.md
-      - Contributing: development/contributing.md
-      - Testing: development/testing.md
+      - Docker Setup: deployment/docker.md
+  - FAQ: faq.md
   - Troubleshooting: troubleshooting.md
 
-# plugins:
-#   - search
-#   - minify:
-#       minify_html: true
+plugins:
+  - search
+  - mermaid2
+  - minify:
+      minify_html: true
 
-# markdown_extensions:
-#   - pymdownx.highlight:
-#       anchor_linenums: true
-#   - pymdownx.inlinehilite
-#   - pymdownx.snippets
-#   - pymdownx.superfences
-#   - pymdownx.tabbed:
-#       alternate_style: true
-#   - admonition
-#   - pymdownx.details
-#   - attr_list
-#   - md_in_html
-#   - toc:
-#       permalink: true
+markdown_extensions:
+  - admonition
+  - codehilite
+  - tables
+  - toc:
+      permalink: true
+  - mermaid2
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tasklist:
+      custom_checkbox: true
 
-# extra:
-#   social:
-#     - icon: fontawesome/brands/github
-#       link: https://github.com/tuttlebr/streamlit-chatbot
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/tuttlebr/streamlit-chatbot

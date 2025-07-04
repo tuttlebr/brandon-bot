@@ -35,4 +35,5 @@ streamlit-docs = [
     "Pygments==2.17.2",
     "fastapi==0.104.1",
     "uvicorn==0.24.0",
+    "mkdocs-mermaid2-plugin==1.2.1",
 ]

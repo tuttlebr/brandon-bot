@@ -16,6 +16,9 @@ services:
       target: app
     environment:
       WATCHMAN_VERSION: none
+    shm_size: 16G
+    volumes:
+      - ./tmp:/tmp
     user: "1000:1000"
     ports:
       - "8501:8501"

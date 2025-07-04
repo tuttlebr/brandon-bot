@@ -10,6 +10,7 @@ import requests
 import streamlit as st
 from controllers.message_controller import MessageController
 from models.chat_config import ChatConfig
+from services.pdf_batch_processor import PDFBatchProcessor
 from services.pdf_summarization_service import PDFSummarizationService
 from utils.config import config
 
@@ -32,6 +33,7 @@ class FileController:
         self.message_controller = message_controller
         self.session_controller = session_controller
         self.pdf_summarization_service = PDFSummarizationService(config_obj)
+        self.batch_processor = PDFBatchProcessor()
 
     def process_pdf_upload(self, uploaded_file) -> bool:
         """
@@ -200,31 +202,132 @@ class FileController:
             pdf_data: Processed PDF data
         """
         pages = pdf_data.get("pages", [])
+        total_pages = len(pages)
 
-        # Store PDF data in session state via session controller
-        if self.session_controller:
-            pdf_id = self.session_controller.store_pdf_document(filename, pdf_data)
-            logging.info(f"Stored PDF '{filename}' with ID '{pdf_id}' in session state")
-
-            # Add PDF content availability to message history
-            self._add_pdf_content_to_history(filename, pdf_data, pdf_id)
-
-            # Verify storage in session state
-            if hasattr(st.session_state, "stored_pdfs") and pdf_id in st.session_state.stored_pdfs:
-                logging.info(
-                    f"✅ Verified PDF '{pdf_id}' is in session state stored_pdfs list: {st.session_state.stored_pdfs}"
-                )
-            else:
-                logging.error(f"❌ PDF '{pdf_id}' NOT found in session state stored_pdfs list")
-
-            # No automatic summarization - this is now user-driven
-
+        # Check if batch processing is needed
+        if self.batch_processor.should_batch_process(total_pages):
+            logging.info(f"Large PDF detected ({total_pages} pages), using batch processing")
+            self._handle_batch_processing(filename, pdf_data)
         else:
-            # Log warning but don't add complex tool responses
-            logging.warning("Session controller not available for PDF storage")
+            # Normal processing for smaller PDFs
+            if self.session_controller:
+                pdf_id = self.session_controller.store_pdf_document(filename, pdf_data)
+                logging.info(f"Stored PDF '{filename}' with ID '{pdf_id}' in session state")
+
+                # Add PDF content availability to message history
+                self._add_pdf_content_to_history(filename, pdf_data, pdf_id)
+
+                # Verify storage in session state
+                if hasattr(st.session_state, "stored_pdfs") and pdf_id in st.session_state.stored_pdfs:
+                    logging.info(
+                        f"✅ Verified PDF '{pdf_id}' is in session state stored_pdfs list: {st.session_state.stored_pdfs}"
+                    )
+                else:
+                    logging.error(f"❌ PDF '{pdf_id}' NOT found in session state stored_pdfs list")
+
+            else:
+                # Log warning but don't add complex tool responses
+                logging.warning("Session controller not available for PDF storage")
 
         # The detailed confirmation is now handled by _add_pdf_content_to_history
-        logging.info(f"Successfully processed PDF: {filename} ({len(pages)} pages)")
+        logging.info(f"Successfully processed PDF: {filename} ({total_pages} pages)")
+
+    def _handle_batch_processing(self, filename: str, pdf_data: dict):
+        """
+        Handle batch processing for large PDFs
+
+        Args:
+            filename: Name of the processed file
+            pdf_data: Processed PDF data
+        """
+        pages = pdf_data.get("pages", [])
+        total_pages = len(pages)
+
+        # Create batches
+        batches = self.batch_processor.create_page_batches(total_pages)
+
+        # Generate PDF ID
+        import hashlib
+
+        pdf_hash = hashlib.md5(filename.encode()).hexdigest()[:12]
+        pdf_id = f"pdf_{pdf_hash}"
+
+        # Process and store each batch
+        from services.file_storage_service import FileStorageService
+
+        file_storage = FileStorageService()
+
+        for batch_num, (start_idx, end_idx) in enumerate(batches):
+            batch_data = self.batch_processor.process_batch(pdf_data, (start_idx, end_idx))
+            batch_id = file_storage.store_pdf_batch(filename, batch_data, st.session_state.session_id, batch_num)
+            logging.info(f"Stored batch {batch_num + 1}/{len(batches)} with ID: {batch_id}")
+
+        # Store PDF reference in session state
+        if self.session_controller:
+            # Add PDF ID to stored PDFs list
+            if 'stored_pdfs' not in st.session_state:
+                st.session_state.stored_pdfs = []
+            st.session_state.stored_pdfs.append(pdf_id)
+
+            # Store metadata about batch processing
+            st.session_state[f"{pdf_id}_batch_info"] = {
+                'filename': filename,
+                'total_pages': total_pages,
+                'total_batches': len(batches),
+                'batch_processed': True,
+            }
+
+            # Add notification to message history
+            self._add_batch_processed_notification(filename, total_pages, len(batches), pdf_id)
+
+    def _add_batch_processed_notification(self, filename: str, total_pages: int, total_batches: int, pdf_id: str):
+        """
+        Add notification about batch processed PDF to message history
+
+        Args:
+            filename: Name of the PDF file
+            total_pages: Total number of pages
+            total_batches: Number of batches created
+            pdf_id: PDF reference ID
+        """
+        try:
+            # Create a system message indicating PDF availability with batch processing
+            pdf_availability_message = {
+                "role": "system",
+                "content": json.dumps(
+                    {
+                        "type": "pdf_data",
+                        "tool_name": "process_pdf_document",
+                        "filename": filename,
+                        "pdf_id": pdf_id,
+                        "total_pages": total_pages,
+                        "status": "available",
+                        "batch_processed": True,
+                        "total_batches": total_batches,
+                        "message": f"Large PDF '{filename}' ({total_pages} pages) processed in {total_batches} batches and is now available for analysis",
+                    }
+                ),
+            }
+
+            # Add to message history via message controller
+            self.message_controller.safe_add_message_to_history("system", pdf_availability_message["content"])
+
+            # Add user-friendly notification
+            user_notification = (
+                f"✅ **PDF Uploaded Successfully**\n\n"
+                f"The large document '{filename}' ({total_pages} pages) has been processed efficiently "
+                f"in {total_batches} batches to optimize memory usage. You can now ask questions about it!"
+            )
+
+            with st.chat_message("assistant", avatar=self.config_obj.assistant_avatar):
+                st.markdown(user_notification)
+
+            self.message_controller.safe_add_message_to_history("assistant", user_notification)
+
+            logging.info(f"Added batch processing notification to message history for '{filename}'")
+
+        except Exception as e:
+            logging.error(f"Error adding batch processing notification to history: {e}")
 
     def _add_pdf_content_to_history(self, filename: str, pdf_data: dict, pdf_id: str):
         """
