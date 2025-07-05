@@ -29,7 +29,7 @@ Key settings in `utils/config.py`:
 
 ```python
 PDF_BATCH_PROCESSING_THRESHOLD = 50  # Trigger batch processing for PDFs > 50 pages
-PDF_PAGES_PER_BATCH = 20            # Pages per batch
+PDF_PAGES_PER_BATCH = 100            # Pages per batch
 PDF_CONTEXT_MAX_PAGES = 30          # Max pages in context
 PDF_CONTEXT_MAX_CHARS = 100000      # Max characters in context
 ```

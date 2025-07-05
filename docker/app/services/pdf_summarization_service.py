@@ -240,7 +240,10 @@ class PDFSummarizationService:
 
     def summarize_pdf_sync(self, pdf_data: Dict) -> Dict:
         """
-        Synchronous version of PDF summarization (fallback option)
+        Synchronous version of PDF summarization (DEPRECATED - use async version instead)
+
+        This method is kept for backward compatibility but should not be used.
+        Use summarize_pdf_recursive for full document processing.
 
         Args:
             pdf_data: PDF data from NVINGEST containing pages
@@ -253,13 +256,15 @@ class PDFSummarizationService:
             total_pages = len(pages)
             filename = pdf_data.get('filename', 'Unknown')
 
-            logger.info(f"Starting synchronous summarization for {filename} ({total_pages} pages)")
+            logger.warning(
+                f"Using deprecated sync summarization for {filename} ({total_pages} pages). Use async version for better results."
+            )
 
             if total_pages == 0:
                 return pdf_data
 
-            # Process first few pages only for sync version to avoid timeouts
-            pages_to_process = pages[: min(20, total_pages)]  # Limit to 20 pages
+            # Process all pages (removed 20-page limit)
+            pages_to_process = pages  # Process all pages instead of limiting to 20
 
             # Create a quick summary
             combined_text = "\n\n".join(

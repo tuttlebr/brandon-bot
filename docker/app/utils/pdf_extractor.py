@@ -36,8 +36,8 @@ class PDFDataExtractor:
 
             # Handle system messages with PDF data
             if message.get("role") == "system":
+                # First try to parse as JSON
                 try:
-                    # Try to parse as JSON
                     data = json.loads(content)
                     if data.get("type") == "pdf_data" and data.get("pages"):
                         # Found PDF data in system message
@@ -60,8 +60,15 @@ class PDFDataExtractor:
                             "pages": [],  # Empty for batch-processed
                         }
                 except (json.JSONDecodeError, TypeError):
-                    # Not JSON or not the format we're looking for
+                    # Not JSON, try parsing as context message format
                     pass
+
+                # Try to parse as context message format (PDF content with markers)
+                if "---BEGIN PDF CONTENT---" in content and "---END PDF CONTENT---" in content:
+                    pdf_data = PDFDataExtractor._parse_pdf_context_message(content)
+                    if pdf_data:
+                        logger.debug(f"Found PDF data in context message: {pdf_data.get('filename')}")
+                        return pdf_data
 
         logger.debug("No PDF data found in system messages")
         return None

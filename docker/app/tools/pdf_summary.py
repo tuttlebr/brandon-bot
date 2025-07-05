@@ -5,6 +5,7 @@ This tool generates or retrieves document summaries for uploaded PDFs.
 It will create summaries on-demand if they don't already exist.
 """
 
+import asyncio
 import json
 import logging
 from typing import Any, Dict, List, Optional
@@ -13,7 +14,10 @@ from models.chat_config import ChatConfig
 from pydantic import Field
 from services.pdf_summarization_service import PDFSummarizationService
 from tools.base import BaseTool, BaseToolResponse
+from utils.config import AppConfig
 from utils.pdf_extractor import PDFDataExtractor
+
+config = AppConfig()
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -61,9 +65,9 @@ class PDFSummaryTool(BaseTool):
                         },
                         "summary_type": {
                             "type": "string",
-                            "enum": ["document", "pages", "all"],
+                            "enum": ["document", "pages", "all", "debug"],
                             "default": "document",
-                            "description": "Type of summary to retrieve: 'document' for overall summary, 'pages' for page-level summaries, 'all' for both",
+                            "description": "Type of summary to retrieve: 'document' for overall summary, 'pages' for page-level summaries, 'all' for both, 'debug' for troubleshooting",
                         },
                     },
                     "required": [],
@@ -168,6 +172,10 @@ class PDFSummaryTool(BaseTool):
             # Handle batch-processed PDF
             return self._summarize_batch_processed_pdf(pdf_data, summary_type)
 
+        # Handle debug request
+        if summary_type == "debug":
+            return self.debug_pdf_processing(params)
+
         # Regular PDF processing continues...
         pages = pdf_data.get("pages", [])
 
@@ -175,17 +183,7 @@ class PDFSummaryTool(BaseTool):
         if not pdf_data.get("summarization_complete", False):
             total_pages = len(pdf_data.get("pages", []))
 
-            # For small documents, inform user that summarization isn't needed
-            # if total_pages <= 10:
-            #     return PDFSummaryResponse(
-            #         success=False,
-            #         filename=actual_filename,
-            #         summary_type=summary_type,
-            #         message=f"**{actual_filename}** has only {total_pages} pages. For documents this size, I can analyze the content directly without needing a summary. Please ask specific questions about the document instead.",
-            #         direct_response=True,
-            #     )
-
-            # For large documents, generate summary on-demand
+            # For large documents, generate summary on-demand using async recursive summarization
             logger.info(f"Generating on-demand summary for {actual_filename} ({total_pages} pages)")
 
             try:
@@ -195,10 +193,21 @@ class PDFSummaryTool(BaseTool):
                     self.summarization_service = PDFSummarizationService(config)
 
                 # Log progress message (UI operations should be handled by the caller)
-                logger.info(f"Generating summary for {actual_filename} ({total_pages} pages)...")
+                logger.info(f"Generating comprehensive summary for {actual_filename} ({total_pages} pages)...")
 
-                # Perform synchronous summarization for immediate results
-                enhanced_pdf_data = self.summarization_service.summarize_pdf_sync(pdf_data)
+                # Use async recursive summarization for full document processing
+                # Create a new event loop for async operations
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    # If no event loop exists, create a new one
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+
+                # Perform async recursive summarization for comprehensive results
+                enhanced_pdf_data = loop.run_until_complete(
+                    self.summarization_service.summarize_pdf_recursive(pdf_data)
+                )
 
                 # Update the PDF data in storage only if it came from storage
                 if pdf_id != "direct":
@@ -207,22 +216,24 @@ class PDFSummaryTool(BaseTool):
                     file_storage = FileStorageService()
 
                     if file_storage.update_pdf(pdf_id, enhanced_pdf_data):
-                        logger.info(f"Updated PDF '{actual_filename}' with summarization data")
+                        logger.info(f"Updated PDF '{actual_filename}' with comprehensive summarization data")
                         pdf_data = enhanced_pdf_data
                     else:
                         logger.error(f"Failed to update PDF '{actual_filename}' in storage")
                 else:
                     # For directly passed PDFs, just update the local copy
-                    logger.info(f"Updated directly passed PDF '{actual_filename}' with summarization data")
+                    logger.info(
+                        f"Updated directly passed PDF '{actual_filename}' with comprehensive summarization data"
+                    )
                     pdf_data = enhanced_pdf_data
 
             except Exception as e:
-                logger.error(f"Error generating summary: {e}")
+                logger.error(f"Error generating comprehensive summary: {e}")
                 return PDFSummaryResponse(
                     success=False,
                     filename=actual_filename,
                     summary_type=summary_type,
-                    message=f"❌ Error generating summary for **{actual_filename}**: {str(e)}",
+                    message=f"❌ Error generating comprehensive summary for **{actual_filename}**: {str(e)}",
                     direct_response=True,
                 )
 
@@ -351,13 +362,10 @@ class PDFSummaryTool(BaseTool):
                 batch_data = json.loads(batch_path.read_text())
                 batch_pages = batch_data.get("pages", [])
 
-                for page in batch_pages[:5]:  # Max 5 pages per batch
+                for page in batch_pages[: config.file_processing.PDF_PAGES_PER_BATCH]:
                     page_text = page.get("text", "").strip()
                     if page_text:
                         page_num = page.get("page", pages_included + 1)
-                        # Truncate very long pages
-                        if len(page_text) > 2000:
-                            page_text = page_text[:2000] + "..."
                         combined_text.append(f"Page {page_num}:\n{page_text}")
                         pages_included += 1
 
@@ -418,6 +426,48 @@ class PDFSummaryTool(BaseTool):
             pages_summarized=pages_included,
             total_pages=total_pages,
             message=formatted_summary,
+            direct_response=True,
+        )
+
+    def debug_pdf_processing(self, params: Dict[str, Any]) -> PDFSummaryResponse:
+        """
+        Debug PDF processing issues
+
+        Args:
+            params: Dictionary containing parameters
+
+        Returns:
+            PDFSummaryResponse with debug information
+        """
+        messages = params.get("messages", [])
+        pdf_data = self._get_pdf_data_from_messages(messages)
+
+        if not pdf_data:
+            return PDFSummaryResponse(
+                success=False,
+                filename="Unknown",
+                summary_type="debug",
+                message="No PDF document found. Please upload a PDF first.",
+                direct_response=True,
+            )
+
+        filename = pdf_data.get("filename", "Unknown")
+        pdf_id = pdf_data.get("pdf_id", "Unknown")
+
+        # Import PDF context service for debugging
+        from models.chat_config import ChatConfig
+        from services.pdf_context_service import PDFContextService
+
+        config = ChatConfig.from_environment()
+        pdf_context_service = PDFContextService(config)
+
+        debug_info = pdf_context_service.debug_batch_processing(pdf_id)
+
+        return PDFSummaryResponse(
+            success=True,
+            filename=filename,
+            summary_type="debug",
+            message=f"## Debug Information for {filename}\n\n{debug_info}",
             direct_response=True,
         )
 

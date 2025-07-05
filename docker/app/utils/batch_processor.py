@@ -108,7 +108,9 @@ class DocumentProcessor:
         formatted_pages = []
 
         for i, page in enumerate(pages):
-            page_num = page.get('page', i + 1)
+            page_num = page.get('page')
+            if page_num is None:
+                page_num = i + 1
             page_text = page.get('text', '')
 
             if max_chars_per_page and len(page_text) > max_chars_per_page:

@@ -100,6 +100,12 @@ When analyzing documents, thoroughly understand the content, context, and purpos
         if total_pages == 0:
             return {"success": False, "error": "The document appears to be empty or contains no extractable text."}
 
+        # Verify comprehensive analysis
+        if total_pages < 100:
+            logger.warning(f"⚠️  Only {total_pages} pages available for analysis - may not be comprehensive")
+        else:
+            logger.info(f"✓ Comprehensive analysis confirmed: Processing {total_pages} pages")
+
         # Categorize document and route appropriately
         doc_size = DocumentProcessor.categorize_document_size(total_pages)
 
@@ -135,10 +141,18 @@ When analyzing documents, thoroughly understand the content, context, and purpos
             batch_end = min(i + batch_size, len(pages))
             batch_pages = pages[i:batch_end]
 
+            # Determine actual page numbers for this batch
+            if batch_pages:
+                start_page_num = batch_pages[0].get('page', i + 1)
+                end_page_num = batch_pages[-1].get('page', batch_end)
+            else:
+                start_page_num = i + 1
+                end_page_num = batch_end
+
             batch_text = DocumentProcessor.format_pages_for_analysis(batch_pages)
 
             batch_instruction = (
-                f"Analyze pages {i+1}-{batch_end} of '{filename}' for this question: {instructions}. "
+                f"Analyze pages {start_page_num}-{end_page_num} of '{filename}' for this question: {instructions}. "
                 f"If relevant information is found, provide it with page numbers. "
                 f"If not relevant, say 'No relevant information found in these pages.'"
             )
@@ -146,72 +160,48 @@ When analyzing documents, thoroughly understand the content, context, and purpos
             result = self.analyze_document(batch_text, batch_instruction, "PDF", filename)
 
             if result["success"]:
-                batch_results.append({"page_range": f"{i+1}-{batch_end}", "analysis": result["result"]})
+                batch_results.append({"page_range": f"{start_page_num}-{end_page_num}", "analysis": result["result"]})
 
         # Synthesize results
         return self._synthesize_batch_results(batch_results, instructions, filename)
 
     def _analyze_large_document(self, pages: List[Dict[str, Any]], instructions: str, filename: str) -> Dict[str, any]:
-        """Analyze large documents using intelligent search"""
+        """Analyze large documents comprehensively by processing ALL pages"""
 
-        # First, find relevant pages
-        relevant_pages = self._find_relevant_pages(pages, instructions, filename)
+        logger.info(f"Starting comprehensive analysis of all {len(pages)} pages for '{filename}'")
 
-        if not relevant_pages:
-            return {
-                "success": True,
-                "result": f"I searched through all {len(pages)} pages of '{filename}' but couldn't find information directly related to your question: '{instructions}'.",
-            }
-
-        # Analyze relevant pages
-        if len(relevant_pages) <= 5:
-            return self._analyze_small_document(relevant_pages, instructions, filename)
-        else:
-            return self._analyze_medium_document(relevant_pages, instructions, filename)
-
-    def _find_relevant_pages(
-        self, pages: List[Dict[str, Any]], instructions: str, filename: str
-    ) -> List[Dict[str, Any]]:
-        """Find pages relevant to the query"""
-
-        relevant_pages = []
-        batch_size = 5
+        # Process ALL pages in batches for comprehensive analysis
+        # Use medium document approach but with larger batches for efficiency
+        batch_size = max(10, len(pages) // 10)  # Process in larger batches
+        batch_results = []
 
         for i in range(0, len(pages), batch_size):
             batch_end = min(i + batch_size, len(pages))
             batch_pages = pages[i:batch_end]
 
-            # Create page summaries for relevance checking
-            page_summaries = []
-            for j, page in enumerate(batch_pages):
-                page_num = page.get('page', i + j + 1)
-                page_text = page.get('text', '')[:1000]  # First 1000 chars
-                page_summaries.append(f"Page {page_num}: {page_text}...")
+            # Determine actual page numbers for this batch
+            if batch_pages:
+                start_page_num = batch_pages[0].get('page', i + 1)
+                end_page_num = batch_pages[-1].get('page', batch_end)
+            else:
+                start_page_num = i + 1
+                end_page_num = batch_end
 
-            batch_text = "\n\n".join(page_summaries)
+            batch_text = DocumentProcessor.format_pages_for_analysis(batch_pages)
 
-            relevance_check = self.analyze_document(
-                batch_text,
-                f"Given this query: '{instructions}', which of these pages (if any) contain relevant information? List ONLY the page numbers that are relevant, or say 'None' if no pages are relevant.",
-                "text",
-                None,
+            batch_instruction = (
+                f"Comprehensively analyze pages {start_page_num}-{end_page_num} of '{filename}' for this question: {instructions}. "
+                f"Provide detailed analysis of any relevant information found in these pages. "
+                f"If no relevant information is found, note that these pages were checked but contained no relevant content."
             )
 
-            if relevance_check["success"]:
-                # Extract page numbers from response
-                page_nums = DocumentProcessor.extract_page_numbers_from_text(
-                    relevance_check["result"], valid_range=(i + 1, batch_end)
-                )
+            result = self.analyze_document(batch_text, batch_instruction, "PDF", filename)
 
-                # Add relevant pages
-                for page_num in page_nums:
-                    for page in batch_pages:
-                        if page.get('page') == page_num:
-                            relevant_pages.append(page)
-                            break
+            if result["success"]:
+                batch_results.append({"page_range": f"{start_page_num}-{end_page_num}", "analysis": result["result"]})
 
-        logger.info(f"Found {len(relevant_pages)} relevant pages out of {len(pages)} total")
-        return relevant_pages
+        # Synthesize results from ALL batches
+        return self._synthesize_batch_results(batch_results, instructions, filename)
 
     def _synthesize_batch_results(
         self, batch_results: List[Dict[str, str]], instructions: str, filename: str

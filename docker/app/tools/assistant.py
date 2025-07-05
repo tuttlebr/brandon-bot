@@ -157,10 +157,13 @@ class AssistantTool(BaseTool):
 
         # Check for PDF content in messages
         if messages:
+            logger.debug(f"Checking {len(messages)} messages for PDF content")
             pdf_data = PDFDataExtractor.extract_from_messages(messages)
             if pdf_data:
+                logger.info(f"Found PDF data: {pdf_data.get('filename')} with {len(pdf_data.get('pages', []))} pages")
                 pdf_text = PDFDataExtractor.extract_text_from_pdf_data(pdf_data)
                 if pdf_text:
+                    logger.info(f"Extracted {len(pdf_text)} characters of PDF text")
                     # Replace generic references with actual content
                     text_lower = text.lower()
                     if text_lower in ["the pdf", "the document"] or "pdf" in text_lower or "document" in text_lower:
@@ -169,6 +172,10 @@ class AssistantTool(BaseTool):
                     else:
                         # Append as additional context
                         return f"{text}\n\n--- Additional Context ---\n\n{pdf_text}"
+                else:
+                    logger.warning("PDF data found but no text could be extracted")
+            else:
+                logger.debug("No PDF data found in messages")
 
         return text
 
@@ -205,11 +212,21 @@ class AssistantTool(BaseTool):
 
         # Check if this is PDF content
         if self._is_pdf_content(text) and instructions:
-            # Parse PDF pages
+            # Parse PDF pages from context
             pages = self._parse_pdf_content(text)
             if pages:
-                pdf_data = {"pages": pages, "filename": "Document"}
-                result = self.document_analyzer.analyze_pdf_pages(pages, instructions, "Document")
+                # For comprehensive analysis, try to load the complete document
+                complete_pages = self._load_complete_document_for_analysis(pages)
+                if complete_pages:
+                    logger.info(
+                        f"Loaded complete document with {len(complete_pages)} pages for comprehensive analysis"
+                    )
+                    pdf_data = {"pages": complete_pages, "filename": "Document"}
+                    result = self.document_analyzer.analyze_pdf_pages(complete_pages, instructions, "Document")
+                else:
+                    # Fallback to context pages
+                    pdf_data = {"pages": pages, "filename": "Document"}
+                    result = self.document_analyzer.analyze_pdf_pages(pages, instructions, "Document")
             else:
                 # Fallback to regular document analysis
                 result = self.document_analyzer.analyze_document(text, instructions or "Analyze this document")
@@ -308,6 +325,91 @@ class AssistantTool(BaseTool):
             pages.append({"page": current_page, "text": "\n".join(current_text).strip()})
 
         return pages
+
+    def _load_complete_document_for_analysis(self, context_pages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Load the complete document from batch files for comprehensive analysis
+
+        Args:
+            context_pages: Pages from context injection
+
+        Returns:
+            Complete list of all pages from the document
+        """
+        try:
+            # Direct approach: Load all batch files for the current PDF
+            from models.chat_config import ChatConfig
+            from services.file_storage_service import FileStorageService
+
+            config = ChatConfig.from_environment()
+            file_storage = FileStorageService()
+
+            # Get all PDF files and find the most recent one
+            pdf_files = list(file_storage.pdfs_dir.glob("*.json"))
+            if not pdf_files:
+                logger.warning("No PDF files found")
+                return context_pages
+
+            # Filter out batch files and get main PDF files
+            main_pdf_files = [f for f in pdf_files if '_batch_' not in f.stem]
+
+            if main_pdf_files:
+                # Sort by modification time to get most recent main PDF
+                main_pdf_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+                latest_pdf_file = main_pdf_files[0]
+                pdf_id = latest_pdf_file.stem  # e.g., 'pdf_5990e3a1ea80'
+            else:
+                # No standalone PDF files found – fall back to using batch filename to derive base ID
+                batch_files = [f for f in pdf_files if '_batch_' in f.stem]
+                if not batch_files:
+                    logger.warning("No PDF or batch files found in storage directory")
+                    return context_pages
+
+                # Use the most recent batch file to derive the base PDF ID
+                batch_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+                latest_batch_file = batch_files[0]
+                # Extract base ID before '_batch_' suffix
+                pdf_id = latest_batch_file.stem.split('_batch_')[0]
+                logger.info(
+                    f"Derived base PDF ID '{pdf_id}' from batch file '{latest_batch_file.name}' because no standalone PDF file found."
+                )
+
+            logger.info(f"Loading complete document for PDF: {pdf_id}")
+
+            # Get all batches for this PDF
+            batches = file_storage.get_pdf_batches(pdf_id)
+            logger.info(f"Attempting to load batches for PDF ID: {pdf_id}")
+            logger.info(f"Available batch files: {[f.name for f in pdf_files if 'batch' in f.name]}")
+
+            if batches:
+                logger.info(f"Found {len(batches)} batches for comprehensive analysis")
+
+                # Load all pages from all batches
+                all_pages = []
+                for i, batch in enumerate(batches):
+                    batch_pages = batch.get('pages', [])
+                    logger.info(f"Batch {i}: {len(batch_pages)} pages")
+                    all_pages.extend(batch_pages)
+
+                logger.info(f"Successfully loaded {len(all_pages)} pages from batches for comprehensive analysis")
+
+                # Verify we have a substantial number of pages for comprehensive analysis
+                if len(all_pages) < 100:
+                    logger.warning(f"Only loaded {len(all_pages)} pages - this may not be comprehensive analysis")
+                else:
+                    logger.info(f"✓ Comprehensive analysis confirmed: {len(all_pages)} pages loaded")
+
+                return all_pages
+            else:
+                logger.warning(f"No batches found for PDF {pdf_id}")
+                logger.warning(f"Available files: {[f.name for f in pdf_files]}")
+
+        except Exception as e:
+            logger.error(f"Error loading complete document for analysis: {e}")
+
+        # Fallback to context pages
+        logger.warning("Falling back to context pages for analysis")
+        return context_pages
 
 
 # Create a global instance for backward compatibility

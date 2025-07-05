@@ -11,14 +11,15 @@ from typing import Any, Dict, List, Optional
 from pydantic import Field
 from tools.assistant import assistant_tool
 from tools.base import BaseTool, BaseToolResponse
+from utils.config import config
 from utils.pdf_extractor import PDFDataExtractor
 
 # Configure logger
 logger = logging.getLogger(__name__)
 
 # Constants for chunking
-MAX_CHARS_PER_CHUNK = 10000  # Approximately 2000-2500 words
-MAX_PAGES_PER_CHUNK = 5
+MAX_CHARS_PER_CHUNK = 20000  # Approximately 4000-5000 words (increased from 10000)
+MAX_PAGES_PER_CHUNK = 10  # Increased from 5
 
 
 class PDFTextProcessorResponse(BaseToolResponse):
@@ -134,8 +135,8 @@ class PDFTextProcessorTool(BaseTool):
         if page_numbers:
             pages_to_process = [p for p in page_numbers if 0 < p <= total_pages]
         else:
-            # Process all pages
-            pages_to_process = list(range(1, total_pages + 1))
+            # For batch PDFs without specific pages, process first 100 pages max (increased from 30)
+            pages_to_process = list(range(1, min(101, total_pages + 1)))
 
         if not pages_to_process:
             return PDFTextProcessorResponse(
@@ -372,8 +373,8 @@ class PDFTextProcessorTool(BaseTool):
         if page_numbers:
             pages_to_process = [p for p in page_numbers if 0 < p <= total_pages]
         else:
-            # For batch PDFs without specific pages, process first 30 pages max
-            pages_to_process = list(range(1, min(31, total_pages + 1)))
+            # For batch PDFs without specific pages, process first 100 pages max (increased from 30)
+            pages_to_process = list(range(1, min(101, total_pages + 1)))
 
         if not pages_to_process:
             return PDFTextProcessorResponse(
@@ -446,7 +447,7 @@ class PDFTextProcessorTool(BaseTool):
         Returns:
             Extracted text
         """
-        pages_per_batch = 20  # This should match PDF_PAGES_PER_BATCH from config
+        pages_per_batch = config.file_processing.PDF_PAGES_PER_BATCH  # Use config instead of hardcoded value
         text_parts = []
 
         # Group pages by batch

@@ -24,6 +24,7 @@ jupyterlab = [
     "pandas==2.3.0",
     "seaborn==0.13.2",
     "theme-darcula==4.0.0",
+    "pypdfium2==4.30.1",
 ]
 
 streamlit-docs = [

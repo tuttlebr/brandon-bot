@@ -36,6 +36,11 @@ class LLMService:
         self.tool_execution_service = ToolExecutionService(config)
         self.conversation_context_service = ConversationContextService(config)
 
+        # Add PDF context service for context injection after tool execution
+        from services.pdf_context_service import PDFContextService
+
+        self.pdf_context_service = PDFContextService(config)
+
         # For backward compatibility
         self.last_tool_responses = []
 
@@ -176,6 +181,13 @@ class LLMService:
                         "content": f"Tool {response.get('tool_name')} returned: {response.get('content')}",
                     }
                 )
+
+        # Re-inject PDF context after tool execution to ensure PDF content is available
+        # for the final response generation, especially after PDF-related tool calls
+        if current_user_message:
+            # Use forced context injection after tool execution to ensure PDF content is available
+            extended_messages = self.pdf_context_service.inject_pdf_context_forced(extended_messages)
+            logger.info("Re-injected PDF context after tool execution")
 
         # Check token count after adding tool responses and truncate if necessary
         max_tokens = config.llm.MAX_CONTEXT_TOKENS

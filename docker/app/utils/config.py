@@ -63,16 +63,16 @@ class FileProcessingConfig:
 
     # PDF Summarization settings
     PDF_SUMMARIZATION_THRESHOLD: int = 10  # Number of pages to trigger summarization
-    PDF_SUMMARIZATION_BATCH_SIZE: int = 5  # Pages per batch for summarization
-    PDF_SUMMARY_MAX_LENGTH: int = 500  # Max words per page summary
-    PDF_SUMMARIZATION_ENABLED: bool = False  # Disabled - summarization should be user-driven
+    PDF_SUMMARIZATION_BATCH_SIZE: int = 10  # Pages per batch for summarization (increased from 5)
+    PDF_SUMMARY_MAX_LENGTH: int = 800  # Max words per page summary (increased from 500)
+    PDF_SUMMARIZATION_ENABLED: bool = True  # Enabled - summarization should be user-driven
     PDF_SUMMARIZATION_USE_ASYNC: bool = True  # Use async (True) or sync (False) processing
 
     # PDF Batch Processing settings
     PDF_BATCH_PROCESSING_THRESHOLD: int = 50  # Number of pages to trigger batch processing
-    PDF_PAGES_PER_BATCH: int = 20  # Maximum pages to process per batch
-    PDF_CONTEXT_MAX_PAGES: int = 30  # Maximum pages to include in context at once
-    PDF_CONTEXT_MAX_CHARS: int = 100000  # Maximum characters per context injection
+    PDF_PAGES_PER_BATCH: int = 50  # Maximum pages to process per batch (increased from 20)
+    PDF_CONTEXT_MAX_PAGES: int = 100  # Maximum pages to include in context at once (increased from 30)
+    PDF_CONTEXT_MAX_CHARS: int = 200000  # Maximum characters per context injection (increased from 100000)
 
 
 @dataclass

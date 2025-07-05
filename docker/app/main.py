@@ -236,7 +236,7 @@ class ProductionStreamlitChatApp:
                     # Process PDF synchronously with spinner
                     with st.spinner(f"Processing {uploaded_file.name}..."):
                         try:
-                            logging.info(f"Starting synchronous PDF processing for: {uploaded_file.name}")
+                            logging.debug(f"Starting synchronous PDF processing for: {uploaded_file.name}")
 
                             # Use file controller for processing - this is blocking
                             success = self.file_controller.process_pdf_upload(uploaded_file)
@@ -247,7 +247,7 @@ class ProductionStreamlitChatApp:
                                 st.session_state.pdf_processing_message = (
                                     f"✅ Successfully processed PDF: {uploaded_file.name}"
                                 )
-                                logging.info(f"Synchronous PDF processing completed for: {uploaded_file.name}")
+                                logging.debug(f"Synchronous PDF processing completed for: {uploaded_file.name}")
                             else:
                                 st.session_state.pdf_processing_status = "error"
                                 st.session_state.pdf_processing_message = (
@@ -263,9 +263,10 @@ class ProductionStreamlitChatApp:
             # Show current PDF status if available
             if self.session_controller.has_pdf_documents():
                 latest_pdf = self.session_controller.get_latest_pdf_document()
+                logging.debug(f"Latest PDF: {latest_pdf}")
                 if latest_pdf:
                     filename = latest_pdf.get("filename", "Unknown")
-                    pages = len(latest_pdf.get("pages", []))
+                    pages = latest_pdf.get("total_pages", 0)
                     st.success(f"✅ Current PDF: {filename} ({pages} pages)")
                     if pages > config.file_processing.PDF_SUMMARIZATION_THRESHOLD:
                         st.markdown(

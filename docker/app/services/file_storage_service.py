@@ -292,13 +292,25 @@ class FileStorageService:
         batches = []
         batch_pattern = f"{pdf_id}_batch_*.json"
 
+        logger.info(f"Looking for batch files with pattern: {batch_pattern}")
+        logger.info(f"Searching in directory: {self.pdfs_dir}")
+
+        # List all files in the directory for debugging
+        all_files = list(self.pdfs_dir.glob("*.json"))
+        logger.info(f"All JSON files in storage: {[f.name for f in all_files]}")
+
         for batch_file in sorted(self.pdfs_dir.glob(batch_pattern)):
+            logger.info(f"Found batch file: {batch_file.name}")
             try:
                 batch_data = json.loads(batch_file.read_text())
+                logger.info(
+                    f"Successfully loaded batch {batch_file.name} with {len(batch_data.get('pages', []))} pages"
+                )
                 batches.append(batch_data)
             except Exception as e:
                 logger.error(f"Failed to read batch {batch_file}: {e}")
 
+        logger.info(f"Total batches loaded: {len(batches)}")
         return batches
 
     def merge_pdf_batches(self, pdf_id: str) -> Optional[Dict[str, Any]]:

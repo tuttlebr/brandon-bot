@@ -55,6 +55,15 @@ class PDFAnalysisService:
             if total_pages == 0:
                 return "The document appears to be empty or contains no extractable text."
 
+            # For batch-processed PDFs, load the complete document
+            if pdf_data.get('batch_processed', False):
+                logger.info(f"Loading complete document from batches for comprehensive analysis")
+                complete_pages = await self._load_complete_document_from_batches(pdf_data)
+                if complete_pages:
+                    pages = complete_pages
+                    total_pages = len(pages)
+                    logger.info(f"Loaded {total_pages} pages from batches for comprehensive analysis")
+
             # Use DocumentProcessor to categorize and route appropriately
             doc_size = DocumentProcessor.categorize_document_size(total_pages)
 
@@ -98,9 +107,10 @@ class PDFAnalysisService:
     async def _analyze_document_batched(self, pages: List[Dict], user_query: str, filename: str) -> str:
         """Analyze medium documents using batch processing"""
         try:
-            # Use BatchProcessor for efficient batch handling
+            # Adjust batch size to process more pages per batch
             batch_processor = BatchProcessor(
-                batch_size=max(3, len(pages) // 3), delay_between_batches=0.3  # 3-5 pages per batch
+                batch_size=max(10, len(pages) // 2),
+                delay_between_batches=0.3,  # 10 pages per batch or half the document
             )
 
             async def analyze_batch(batch_pages: List[Dict], start_idx: int, end_idx: int) -> Dict:
@@ -137,16 +147,12 @@ class PDFAnalysisService:
             return f"Error analyzing document: {str(e)}"
 
     async def _analyze_document_intelligent(self, pages: List[Dict], user_query: str, filename: str) -> str:
-        """Analyze large documents using intelligent search approach"""
+        """Analyze large documents by processing ALL pages in detail"""
         try:
-            # Step 1: Find relevant pages using efficient scanning
-            relevant_pages = await self._find_relevant_pages(pages, user_query, filename)
+            logger.info(f"Starting comprehensive analysis of all {len(pages)} pages for '{filename}'")
 
-            if not relevant_pages:
-                return f"I searched through all {len(pages)} pages of '{filename}' but couldn't find information directly related to your question: '{user_query}'. The document may not contain relevant information, or the question might need to be rephrased."
-
-            # Step 2: Perform detailed analysis on relevant pages
-            return await self._analyze_relevant_pages(relevant_pages, user_query, filename)
+            # Use batched analysis for ALL pages (not just relevant ones)
+            return await self._analyze_document_batched(pages, user_query, filename)
 
         except Exception as e:
             logger.error(f"Error analyzing document: {e}")
@@ -155,15 +161,16 @@ class PDFAnalysisService:
     async def _find_relevant_pages(self, pages: List[Dict], user_query: str, filename: str) -> List[Dict]:
         """Find pages potentially relevant to the user query"""
         try:
-            batch_processor = BatchProcessor(batch_size=5, delay_between_batches=0.2)
+            batch_size = 20
+            overlap = 5
+            total_pages = len(pages)
 
             async def scan_batch(batch_pages: List[Dict], start_idx: int, end_idx: int) -> List[int]:
-                """Scan a batch of pages for relevance"""
                 # Create summaries using DocumentProcessor
                 page_summaries = []
                 for page in batch_pages:
                     page_num = page.get('page', start_idx + 1)
-                    page_text = page.get('text', '')[:1000]  # First 1000 chars
+                    page_text = page.get('text', '')[:1000]
                     page_summaries.append(f"Page {page_num}: {page_text}...")
 
                 batch_text = "\n\n".join(page_summaries)
@@ -171,10 +178,13 @@ class PDFAnalysisService:
                 relevance_params = {
                     "task_type": "analyze",
                     "text": batch_text,
-                    "instructions": f"Given this query: '{user_query}', which of these pages (if any) contain relevant information? List ONLY the page numbers that are relevant, or say 'None' if no pages are relevant.",
+                    "instructions": (
+                        f"Given this query: '{user_query}', which of these pages (if any) contain relevant information? "
+                        f"List ONLY the page numbers that are relevant, or say 'None' if no pages are relevant. "
+                        f"If you are unsure, err on the side of including the page as relevant."
+                    ),
                 }
 
-                # Import locally to avoid circular imports
                 from tools.assistant import execute_assistant_with_dict
 
                 loop = asyncio.get_event_loop()
@@ -182,21 +192,24 @@ class PDFAnalysisService:
                     self.executor, run_with_streamlit_context, execute_assistant_with_dict, relevance_params
                 )
 
-                # Use DocumentProcessor to extract page numbers
                 return DocumentProcessor.extract_page_numbers_from_text(
                     result.result, valid_range=(start_idx + 1, end_idx)
                 )
 
-            # Process all pages to find relevant ones
-            batch_results = await batch_processor.process_in_batches(pages, scan_batch)
+            # Create overlapping batches
+            batch_starts = list(range(0, total_pages, batch_size - overlap))
+            batch_ranges = [(start, min(start + batch_size, total_pages)) for start in batch_starts]
+            batch_results = []
+            for start, end in batch_ranges:
+                batch = pages[start:end]
+                result = await scan_batch(batch, start, end)
+                batch_results.append(result)
 
-            # Collect all relevant page numbers
+            # Aggregate and deduplicate relevant page numbers
             all_relevant_nums = []
             for nums in batch_results:
-                if nums:  # Skip None results
+                if nums:
                     all_relevant_nums.extend(nums)
-
-            # Get unique page numbers
             relevant_page_nums = list(set(all_relevant_nums))
 
             # Extract the full page data for relevant pages
@@ -205,7 +218,9 @@ class PDFAnalysisService:
                 if page.get('page') in relevant_page_nums:
                     relevant_pages.append(page)
 
-            logger.info(f"Found {len(relevant_pages)} relevant pages out of {len(pages)} total pages")
+            logger.info(
+                f"Found {len(relevant_pages)} relevant pages out of {len(pages)} total pages (overlapping relevance scan)"
+            )
             return relevant_pages
 
         except Exception as e:
@@ -264,3 +279,45 @@ class PDFAnalysisService:
             logger.error(f"Error synthesizing results: {e}")
             # Fallback: return all individual results
             return "\n\n".join([result.get('analysis', '') for result in batch_results if result])
+
+    async def _load_complete_document_from_batches(self, pdf_data: Dict) -> List[Dict]:
+        """
+        Load the complete document from batch files for comprehensive analysis
+
+        Args:
+            pdf_data: PDF metadata with batch information
+
+        Returns:
+            List of all pages from the document
+        """
+        try:
+            pdf_id = pdf_data.get('pdf_id')
+            if not pdf_id:
+                logger.warning("No PDF ID available for batch loading")
+                return []
+
+            # Import file storage service
+            from services.file_storage_service import FileStorageService
+
+            file_storage = FileStorageService()
+
+            # Get all batches for this PDF
+            batches = file_storage.get_pdf_batches(pdf_id)
+            if not batches:
+                logger.warning(f"No batches found for PDF {pdf_id}")
+                return []
+
+            logger.info(f"Loading complete document from {len(batches)} batches")
+
+            # Load all pages from all batches
+            all_pages = []
+            for batch in batches:
+                batch_pages = batch.get('pages', [])
+                all_pages.extend(batch_pages)
+
+            logger.info(f"Successfully loaded {len(all_pages)} pages from batches")
+            return all_pages
+
+        except Exception as e:
+            logger.error(f"Error loading complete document from batches: {e}")
+            return []

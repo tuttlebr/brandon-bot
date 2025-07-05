@@ -63,6 +63,17 @@ services:
     networks:
       - chatbot-network
 
+  jupyter:
+    build:
+      context: ./docker
+      dockerfile: Dockerfile
+      target: jupyter
+    image: jupyter/notebook:latest
+    working_dir: /workspace
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./tmp:/workspace
 networks:
   chatbot-network:
     driver: bridge

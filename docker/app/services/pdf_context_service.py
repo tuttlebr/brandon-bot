@@ -155,6 +155,50 @@ class PDFContextService:
         logger.debug(f"Message '{user_message}' does not require PDF context")
         return False
 
+    def should_inject_pdf_context_after_tool(self, user_message: str) -> bool:
+        """
+        Determine if PDF context should be injected after tool execution
+
+        This method is more permissive than should_inject_pdf_context and is used
+        after tool execution to ensure PDF content is available for follow-up responses.
+
+        Args:
+            user_message: The user's query
+
+        Returns:
+            True if PDF context should be injected
+        """
+        # Always inject if there's a PDF in session and the message isn't clearly non-PDF
+        if not self.has_pdf_in_session():
+            return False
+
+        message_lower = user_message.lower()
+
+        # Messages that clearly indicate NOT wanting PDF context (even after tools)
+        non_pdf_indicators = [
+            'thanks',
+            'thank you',
+            'goodbye',
+            'bye',
+            'hello',
+            'hi',
+            'how are you',
+            'what\'s up',
+            'weather',
+            'news',
+        ]
+
+        # Check if message is clearly NOT about the PDF
+        for indicator in non_pdf_indicators:
+            if indicator in message_lower and len(message_lower.split()) <= 3:
+                logger.debug(f"Message '{user_message}' identified as non-PDF query after tool execution")
+                return False
+
+        # After tool execution, be more permissive - inject context for most messages
+        # unless they're clearly unrelated to the PDF
+        logger.debug(f"After tool execution, injecting PDF context for message: '{user_message}'")
+        return True
+
     def has_pdf_in_session(self) -> bool:
         """
         Check if there's a PDF available in the current session
@@ -218,6 +262,30 @@ class PDFContextService:
             'total_batches': batch_info.get('total_batches', 0),
             'pages': [],  # Empty for now, will be loaded on demand
         }
+
+    def get_merged_batch_pdf(self, pdf_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a merged version of a batch-processed PDF (fallback method)
+
+        Args:
+            pdf_id: PDF reference ID
+
+        Returns:
+            Merged PDF data or None
+        """
+        try:
+            merged_data = self.file_storage.merge_pdf_batches(pdf_id)
+            if merged_data:
+                logger.info(
+                    f"Successfully merged {len(merged_data.get('pages', []))} pages from batches for PDF {pdf_id}"
+                )
+                return merged_data
+            else:
+                logger.warning(f"Failed to merge batches for PDF {pdf_id}")
+                return None
+        except Exception as e:
+            logger.error(f"Error merging batches for PDF {pdf_id}: {e}")
+            return None
 
     def inject_pdf_context(self, messages: List[Dict[str, Any]], user_message: str) -> List[Dict[str, Any]]:
         """
@@ -323,13 +391,12 @@ class PDFContextService:
         pages = pdf_data.get('pages', [])
         content_parts = ["Here is the complete content of the PDF document:", "", "---BEGIN PDF CONTENT---"]
 
-        # Use configured limits instead of half of MAX_CONTEXT_LENGTH
-        max_chars = config.file_processing.PDF_CONTEXT_MAX_CHARS
-        max_pages = config.file_processing.PDF_CONTEXT_MAX_PAGES
         current_chars = 0
+        # Use reasonable character limit to fit within LLM context window
+        max_chars = config.file_processing.PDF_CONTEXT_MAX_CHARS
         pages_included = 0
 
-        for page in pages[:max_pages]:  # Limit pages upfront
+        for page in pages[:max_chars]:  # Limit pages upfront
             page_num = page.get('page', pages_included + 1)
             page_text = page.get('text', '').strip()
 
@@ -395,31 +462,67 @@ class PDFContextService:
                 else:  # Single page
                     page_numbers.append(int(match[0]))
 
-        # If no specific pages mentioned, load first few pages and any with keywords
+        # If no specific pages mentioned, load a reasonable subset for context injection
+        # The analysis tools will handle the full document through their own batch processing
         if not page_numbers:
-            # Default to first few pages
-            page_numbers = list(range(1, min(11, pdf_data.get('total_pages', 10) + 1)))
-
-            # TODO: In a more advanced implementation, we could:
-            # 1. Use embeddings to find relevant pages
-            # 2. Search for keywords across batches
-            # 3. Use the PDF summarization to identify relevant sections
+            # Load first 50 pages for context injection (fits within LLM limits)
+            # The analysis tools will process the full document in their own batches
+            default_pages = min(50, pdf_data.get('total_pages', 50))
+            page_numbers = list(range(1, default_pages + 1))
+            logger.info(
+                f"No specific pages mentioned in query, loading first {len(page_numbers)} pages for context injection. Full document will be processed by analysis tools."
+            )
 
         # Remove duplicates and sort
         page_numbers = sorted(set(page_numbers))
+        logger.info(f"Requesting pages: {page_numbers}")
 
         # Load the specific pages from batches
         loaded_pages = self._load_pages_from_batches(pdf_data['pdf_id'], page_numbers)
 
+        if not loaded_pages:
+            logger.warning(f"No pages loaded from batches for PDF {pdf_data['pdf_id']}, trying fallback merge")
+
+            # Try to get merged PDF as fallback
+            merged_pdf = self.get_merged_batch_pdf(pdf_data['pdf_id'])
+            if merged_pdf:
+                logger.info("Using merged PDF as fallback")
+                # Use the merged PDF data instead
+                merged_pages = merged_pdf.get('pages', [])
+                if merged_pages:
+                    # Limit to requested pages if possible
+                    if page_numbers:
+                        # Filter to requested pages
+                        loaded_pages = [p for p in merged_pages if p.get('page', 0) in page_numbers]
+                    else:
+                        # Use the entire document for comprehensive analysis
+                        loaded_pages = merged_pages
+
+            if not loaded_pages:
+                content_parts.append("⚠️ **Warning:** Unable to load any pages from the batch-processed PDF.")
+                content_parts.append("This could be due to:")
+                content_parts.append("- Batch files not found or corrupted")
+                content_parts.append("- Incorrect page number calculations")
+                content_parts.append("- Storage issues")
+                content_parts.append("")
+                content_parts.append("Please try:")
+                content_parts.append("1. Re-uploading the PDF")
+                content_parts.append("2. Asking about specific page numbers")
+                content_parts.append("3. Using the PDF summary tool instead")
+                content_parts.append("---END PDF CONTENT---")
+                return content_parts
+
         current_chars = 0
+        # Use reasonable character limit to fit within LLM context window
         max_chars = config.file_processing.PDF_CONTEXT_MAX_CHARS
+        pages_included = 0
 
         for page in loaded_pages:
-            page_num = page.get('page', 1)
+            page_num = page.get('page', pages_included + 1)
             page_text = page.get('text', '').strip()
 
             if page_text:
-                if current_chars + len(page_text) > max_chars:
+                if current_chars + len(page_text) > max_chars and pages_included > 0:
                     content_parts.append(
                         f"\n[... Additional pages available but truncated to optimize memory usage ...]"
                     )
@@ -430,6 +533,7 @@ class PDFContextService:
                 content_parts.append("")
 
                 current_chars += len(page_text)
+                pages_included += 1
 
         content_parts.append("---END PDF CONTENT---")
 
@@ -437,6 +541,11 @@ class PDFContextService:
             content_parts.append(f"\nShowing pages: {', '.join(map(str, page_numbers[:10]))}")
             if len(page_numbers) > 10:
                 content_parts.append(f"and {len(page_numbers) - 10} more...")
+
+            if pages_included < len(loaded_pages):
+                content_parts.append(
+                    f"\n**Note:** Loaded {pages_included} of {len(loaded_pages)} requested pages due to character limits."
+                )
 
         return content_parts
 
@@ -451,8 +560,15 @@ class PDFContextService:
         Returns:
             List of page data
         """
+        logger.info(f"Loading pages {page_numbers} from batches for PDF {pdf_id}")
+
         # Get all batches for this PDF
         batches = self.file_storage.get_pdf_batches(pdf_id)
+        logger.info(f"Found {len(batches)} batches for PDF {pdf_id}")
+
+        if not batches:
+            logger.warning(f"No batches found for PDF {pdf_id}")
+            return []
 
         loaded_pages = []
         pages_per_batch = config.file_processing.PDF_PAGES_PER_BATCH
@@ -461,15 +577,34 @@ class PDFContextService:
             # Calculate which batch contains this page
             batch_idx = (page_num - 1) // pages_per_batch
 
+            logger.debug(f"Page {page_num} should be in batch {batch_idx}")
+
             if batch_idx < len(batches):
                 batch = batches[batch_idx]
                 batch_pages = batch.get('pages', [])
 
+                logger.debug(f"Batch {batch_idx} has {len(batch_pages)} pages")
+
                 # Find the page within the batch
                 page_idx_in_batch = (page_num - 1) % pages_per_batch
-                if page_idx_in_batch < len(batch_pages):
-                    loaded_pages.append(batch_pages[page_idx_in_batch])
 
+                logger.debug(f"Page {page_num} should be at index {page_idx_in_batch} within batch {batch_idx}")
+
+                if page_idx_in_batch < len(batch_pages):
+                    page_data = batch_pages[page_idx_in_batch]
+                    # Ensure the page has the correct page number
+                    if 'page' not in page_data:
+                        page_data['page'] = page_num
+                    loaded_pages.append(page_data)
+                    logger.debug(f"Successfully loaded page {page_num}")
+                else:
+                    logger.warning(
+                        f"Page index {page_idx_in_batch} out of range for batch {batch_idx} (batch has {len(batch_pages)} pages)"
+                    )
+            else:
+                logger.warning(f"Batch index {batch_idx} out of range (only {len(batches)} batches available)")
+
+        logger.info(f"Successfully loaded {len(loaded_pages)} pages from batches")
         return loaded_pages
 
     def get_pdf_info_for_display(self) -> Optional[str]:
@@ -487,3 +622,98 @@ class PDFContextService:
         total_pages = len(pdf_data.get('pages', []))
 
         return f"📄 Active document: {filename} ({total_pages} pages)"
+
+    def debug_batch_processing(self, pdf_id: str) -> str:
+        """
+        Debug batch processing for a PDF
+
+        Args:
+            pdf_id: PDF reference ID
+
+        Returns:
+            Debug information string
+        """
+        debug_info = []
+        debug_info.append(f"## Debug Information for PDF: {pdf_id}")
+        debug_info.append("")
+
+        # Check if PDF exists in session
+        if not self.has_pdf_in_session():
+            debug_info.append("❌ No PDFs found in session")
+            return "\n".join(debug_info)
+
+        # Get latest PDF data
+        pdf_data = self.get_latest_pdf_data()
+        if not pdf_data:
+            debug_info.append("❌ No PDF data available")
+            return "\n".join(debug_info)
+
+        debug_info.append(f"✅ PDF found: {pdf_data.get('filename', 'Unknown')}")
+        debug_info.append(f"📄 Total pages: {pdf_data.get('total_pages', 0)}")
+        debug_info.append(f"🔄 Batch processed: {pdf_data.get('batch_processed', False)}")
+
+        if pdf_data.get('batch_processed'):
+            debug_info.append(f"📦 Total batches: {pdf_data.get('total_batches', 0)}")
+
+            # Try to load batches
+            batches = self.file_storage.get_pdf_batches(pdf_id)
+            debug_info.append(f"📁 Found {len(batches)} batch files")
+
+            for i, batch in enumerate(batches):
+                pages = batch.get('pages', [])
+                debug_info.append(f"  Batch {i}: {len(pages)} pages")
+
+                if pages:
+                    first_page = pages[0]
+                    last_page = pages[-1]
+                    debug_info.append(
+                        f"    Pages {first_page.get('page', 'unknown')} to {last_page.get('page', 'unknown')}"
+                    )
+
+        return "\n".join(debug_info)
+
+    def inject_pdf_context_forced(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Force PDF context injection regardless of user message content
+
+        This method is used when we know we need PDF context (e.g., after PDF tool execution)
+        and don't want to check the user message content.
+
+        Args:
+            messages: Current conversation messages
+
+        Returns:
+            Messages with PDF context injected
+        """
+        # Check if we have a PDF in session
+        if not self.has_pdf_in_session():
+            logger.debug("No PDF in session for forced context injection")
+            return messages
+
+        # Get PDF data
+        pdf_data = self.get_latest_pdf_data()
+        if not pdf_data:
+            logger.warning("Forced PDF context injection requested but no PDF data available")
+            return messages
+
+        # Create system message with PDF content using a generic query
+        pdf_system_message = self._create_pdf_system_message(pdf_data, "the PDF document")
+
+        # Create a new message list with PDF context injected
+        enhanced_messages = []
+
+        # First, add any existing system messages
+        for msg in messages:
+            if msg.get("role") == "system":
+                enhanced_messages.append(msg)
+
+        # Add our PDF context system message
+        enhanced_messages.append(pdf_system_message)
+
+        # Add all other messages
+        for msg in messages:
+            if msg.get("role") != "system":
+                enhanced_messages.append(msg)
+
+        logger.info(f"Forced PDF context injection for '{pdf_data.get('filename')}'")
+        return enhanced_messages

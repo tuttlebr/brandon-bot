@@ -31,10 +31,11 @@ EXPOSE 8001
 ENTRYPOINT ["python", "serve_docs.py"]
 
 ####
-FROM docs AS jupyterlab
+FROM docs AS jupyter
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 ENV NODE_MAJOR=18
+ENV PATH="/app/.venv/bin:$PATH"
 RUN apt-get update && apt-get install -y ca-certificates curl gnupg --no-install-recommends --quiet
 RUN curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
 RUN echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
