@@ -62,7 +62,7 @@ class WeatherTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "get_weather"
-        self.description = "Retrieves current weather conditions and forecasts for any location worldwide using real-time weather data."
+        self.description = "ONLY use when explicitly asked about weather, temperature, climate, or weather conditions for a specific location. Retrieves current weather conditions and forecasts for any location worldwide using real-time weather data. DO NOT use for general questions, information lookup, or non-weather requests."
         self.geocoding_url = "https://geocoding-api.open-meteo.com/v1/search"
         self.weather_url = "https://api.open-meteo.com/v1/forecast"
         self.source = "[Open-Meteo](https://open-meteo.com/)"

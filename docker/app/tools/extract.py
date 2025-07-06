@@ -34,7 +34,7 @@ class WebExtractTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "extract_web_content"
-        self.description = "Extracts and reads content from web URLs provided by the user, converting web pages into clean, readable markdown format."
+        self.description = "ONLY use when explicitly asked to read, extract, or analyze content from a specific web URL that the user provides. Extracts and reads content from web URLs provided by the user, converting web pages into clean, readable markdown format. DO NOT use for general questions, information lookup, or when no specific URL is provided."
         self.extract_url = "https://api.tavily.com/extract"
 
     def to_openai_format(self) -> Dict[str, Any]:
@@ -140,6 +140,182 @@ class WebExtractTool(BaseTool):
 
         logger.warning(f"URL '{url}' was not found in any user message")
         return False
+
+    def extract_urls_batch(
+        self, urls: List[str], messages: Optional[List[Dict[str, Any]]] = None
+    ) -> List[ExtractResult]:
+        """
+        Extract content from multiple URLs in a single API call
+
+        Args:
+            urls: List of URLs to extract content from
+            messages: Optional conversation messages to verify URL sources
+
+        Returns:
+            List of ExtractResult objects, one for each URL
+
+        Raises:
+            ValueError: If URLs list is empty or invalid
+            requests.RequestException: If the API request fails
+        """
+        if not urls:
+            logger.error("No URLs provided for batch extraction")
+            return []
+
+        logger.info(f"Starting batch extraction for {len(urls)} URLs")
+
+        # Validate all URLs
+        valid_urls = []
+        for url in urls:
+            if self._validate_url(url):
+                valid_urls.append(url)
+            else:
+                logger.warning(f"Invalid URL format: '{url}'")
+
+        if not valid_urls:
+            logger.error("No valid URLs provided for batch extraction")
+            return [
+                ExtractResult(
+                    url=url,
+                    content="",
+                    success=False,
+                    error_message=f"Invalid URL format: '{url}'",
+                    response_time=0.0,
+                )
+                for url in urls
+            ]
+
+        # Get API key from environment
+        from utils.config import config
+
+        api_key = config.env.TAVILY_API_KEY
+        if not api_key:
+            logger.error("TAVILY_API_KEY environment variable is not set")
+            return [
+                ExtractResult(
+                    url=url,
+                    content="",
+                    success=False,
+                    error_message="Web extraction service is not configured.",
+                    response_time=0.0,
+                )
+                for url in valid_urls
+            ]
+
+        # Prepare request payload
+        payload = {
+            "urls": valid_urls,  # API expects a list
+            "include_images": False,
+            "include_favicon": False,
+            "extract_depth": "basic",
+            "format": "text",
+        }
+
+        # API headers
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            logger.debug(f"Making batch extract API request for {len(valid_urls)} URLs")
+
+            # Make the API request
+            response = requests.post(self.extract_url, headers=headers, json=payload)
+            response.raise_for_status()
+
+            logger.debug(f"Batch extract API request successful (HTTP {response.status_code})")
+
+            # Parse the response
+            data = response.json()
+
+            # Initialize results list
+            results = []
+
+            # Process successful extractions
+            if data.get("results"):
+                successful_extractions = {result.get("url"): result for result in data["results"]}
+
+                for url in urls:
+                    if url in successful_extractions:
+                        result = successful_extractions[url]
+                        raw_content = result.get("raw_content", "")
+                        content = self._clean_extracted_content(raw_content)
+
+                        results.append(
+                            ExtractResult(
+                                url=url,
+                                content=content,
+                                raw_content=raw_content,
+                                success=True,
+                                response_time=data.get("response_time", 0.0),
+                            )
+                        )
+                    else:
+                        # URL was not successfully extracted
+                        results.append(
+                            ExtractResult(
+                                url=url,
+                                content="",
+                                success=False,
+                                error_message=f"Failed to extract content from '{url}'",
+                                response_time=data.get("response_time", 0.0),
+                            )
+                        )
+            else:
+                # No successful extractions
+                for url in urls:
+                    results.append(
+                        ExtractResult(
+                            url=url,
+                            content="",
+                            success=False,
+                            error_message="No content could be extracted from the URL.",
+                            response_time=data.get("response_time", 0.0),
+                        )
+                    )
+
+            logger.info(
+                f"Batch extraction completed. {len([r for r in results if r.success])} successful out of {len(results)} URLs"
+            )
+            return results
+
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"HTTP error during batch extract API request: {e}")
+            return [
+                ExtractResult(
+                    url=url,
+                    content="",
+                    success=False,
+                    error_message=f"Failed to extract content: HTTP error {e.response.status_code}",
+                    response_time=0.0,
+                )
+                for url in urls
+            ]
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request exception during batch extract API call: {e}")
+            return [
+                ExtractResult(
+                    url=url,
+                    content="",
+                    success=False,
+                    error_message=f"Failed to extract content: {str(e)}",
+                    response_time=0.0,
+                )
+                for url in urls
+            ]
+        except Exception as e:
+            logger.error(f"Unexpected error during batch web extraction: {e}")
+            return [
+                ExtractResult(
+                    url=url,
+                    content="",
+                    success=False,
+                    error_message=f"An unexpected error occurred: {str(e)}",
+                    response_time=0.0,
+                )
+                for url in urls
+            ]
 
     def extract_url_content(self, url: str, messages: Optional[List[Dict[str, Any]]] = None) -> ExtractResult:
         """
@@ -381,3 +557,17 @@ def execute_web_extract_with_dict(params: Dict[str, Any]) -> ExtractResult:
         ExtractResult: The extraction result
     """
     return web_extract_tool.run_with_dict(params)
+
+
+def execute_web_extract_batch(urls: List[str], messages: Optional[List[Dict[str, Any]]] = None) -> List[ExtractResult]:
+    """
+    Execute batch web content extraction
+
+    Args:
+        urls: List of URLs to extract content from
+        messages: Optional conversation messages to verify URL sources
+
+    Returns:
+        List of ExtractResult objects, one for each URL
+    """
+    return web_extract_tool.extract_urls_batch(urls, messages)

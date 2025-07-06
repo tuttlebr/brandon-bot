@@ -449,7 +449,7 @@ class RetrieverTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "retrieval_search"
-        self.description = "Searches a specialized knowledge base for information about NVIDIA products, technologies, and mental health topics using vector similarity search."
+        self.description = "ONLY use for questions about NVIDIA products, technologies, mental health topics, or specialized knowledge base content. Searches a specialized knowledge base for information about NVIDIA products, technologies, and mental health topics using vector similarity search. DO NOT use for general web searches, current events, or topics outside the specialized knowledge base - use web search tools instead."
 
         # Initialize embedding creator and similarity search using centralized config
         self.embedding_creator = EmbeddingCreator(

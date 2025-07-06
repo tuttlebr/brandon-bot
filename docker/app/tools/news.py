@@ -9,18 +9,6 @@ from tools.base import BaseTool, BaseToolResponse
 logger = logging.getLogger(__name__)
 
 
-INCLUDED_DOMAINS = [
-    "apnews.com",
-    "npr.org",
-    "mlive.com",
-    "nvidianews.nvidia.com",
-    "freep.com",
-    "espn.com",
-    "thestreet.com",
-    "theinformation.com",
-]
-
-
 class SearchResult(BaseModel):
     """Individual search result from Tavily API"""
 
@@ -29,6 +17,7 @@ class SearchResult(BaseModel):
     content: str
     score: float
     raw_content: Optional[str] = None
+    extracted_content: Optional[str] = Field(None, description="Extracted content from URL")
 
 
 class TavilyResponse(BaseToolResponse):
@@ -49,7 +38,7 @@ class NewsTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "tavily_news_search"
-        self.description = "Searches for recent news articles and current events from trusted news sources."
+        self.description = "Specialized news search tool for finding recent news articles, breaking news, current events, and latest developments from trusted news sources. Use this for: breaking news, recent events, political updates, sports scores, market updates, celebrity news, or any time-sensitive current events. Only use for news-related queries, not general information or facts."
 
     def to_openai_format(self) -> Dict[str, Any]:
         """
@@ -68,7 +57,7 @@ class NewsTool(BaseTool):
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "The search query to look up current news information",
+                            "description": "The search query for recent news, breaking news, or current events (only use for news-related topics)",
                         }
                     },
                     "required": ["query"],
@@ -79,6 +68,60 @@ class NewsTool(BaseTool):
     def execute(self, params: Dict[str, Any]):
         """Execute the tool with given parameters"""
         return self.run_with_dict(params)
+
+    def _extract_content_for_results(self, results: List[SearchResult]) -> List[SearchResult]:
+        """
+        Extract content for high-scoring results using batch extraction
+
+        Args:
+            results: List of search results
+
+        Returns:
+            List of search results with extracted content added
+        """
+        # Filter results with score >= 0.45
+        high_scoring_results = [result for result in results if result.score >= 0.45]
+
+        if not high_scoring_results:
+            logger.debug("No high-scoring results to extract content from")
+            return results
+
+        logger.info(f"Extracting content for {len(high_scoring_results)} high-scoring results")
+
+        # Import extract tool
+        from tools.extract import execute_web_extract_batch
+
+        try:
+            # Get URLs for high-scoring results
+            urls = [result.url for result in high_scoring_results]
+
+            # Perform batch extraction
+            extract_results = execute_web_extract_batch(urls)
+            logger.info(f"Batch extraction completed. {len(extract_results)} successful extractions")
+
+            # Create a mapping of URL to extracted content
+            url_to_content = {}
+            for extract_result in extract_results:
+                if extract_result.success and extract_result.content:
+                    url_to_content[extract_result.url] = extract_result.content
+                    logger.debug(f"Successfully extracted content from {extract_result.url}")
+                else:
+                    logger.warning(
+                        f"Failed to extract content from {extract_result.url}: {extract_result.error_message}"
+                    )
+
+            # Update the original results with extracted content
+            for result in results:
+                if result.url in url_to_content:
+                    result.extracted_content = url_to_content[result.url]
+
+            logger.info(f"Batch extraction completed. {len(url_to_content)} successful extractions")
+
+        except Exception as e:
+            logger.error(f"Error in batch extraction: {e}")
+            # Continue without extracted content - don't fail the entire search
+
+        return results
 
     def format_results(self, results: List[SearchResult]) -> str:
         """
@@ -99,6 +142,17 @@ class NewsTool(BaseTool):
             clean_content = self._clean_content(result.content)
             # Format as: 1. [title](url): content
             entry = f"{i}. [{result.title}]({result.url}): {clean_content}"
+
+            # Add extracted content if available
+            if result.extracted_content:
+                # Truncate extracted content to avoid overwhelming the response
+                truncated_extract = (
+                    result.extracted_content[:500] + "..."
+                    if len(result.extracted_content) > 500
+                    else result.extracted_content
+                )
+                entry += f"\n\n**Extracted Content:** {truncated_extract}"
+
             formatted_entries.append(entry)
 
         return "\n".join(formatted_entries)
@@ -143,7 +197,7 @@ class NewsTool(BaseTool):
 
     def search_tavily(self, query: str, **kwargs) -> TavilyResponse:
         """
-        Search using Tavily API with the same parameters as the shell script.
+        Search using Tavily API with batch content extraction for high-scoring results.
 
         Args:
             query (str): The search query
@@ -173,10 +227,9 @@ class NewsTool(BaseTool):
             "query": query,
             "topic": "news",
             "auto_parameters": True,
-            "include_answer": "advanced",
             "include_raw_content": False,
             "max_results": 10,
-            "include_domains": INCLUDED_DOMAINS,
+            "include_images": False,
             "country": "united states",
         }
 
@@ -203,6 +256,9 @@ class NewsTool(BaseTool):
             # Parse the JSON response and validate with Pydantic
             response_data = response.json()
             tavily_response = TavilyResponse(**response_data)
+
+            # Extract content for high-scoring results
+            tavily_response.results = self._extract_content_for_results(tavily_response.results)
 
             # Format the results for display
             tavily_response.formatted_results = self.format_results(tavily_response.results)
@@ -232,7 +288,7 @@ class NewsTool(BaseTool):
         Execute a Tavily search with the given query.
 
         Args:
-            query (str): The search query (for backward compatibility)
+            query: The search query (for backward compatibility)
             **kwargs: Can accept a dictionary with 'query' key
 
         Returns:
