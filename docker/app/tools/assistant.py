@@ -29,6 +29,8 @@ class AssistantTaskType(str, Enum):
     REWRITE = "rewrite"
     CRITIC = "critic"
     TRANSLATE = "translate"
+    DEVELOP = "develop"
+    GENERALIST = "generalist"
 
 
 class AssistantResponse(BaseToolResponse):
@@ -43,7 +45,7 @@ class AssistantResponse(BaseToolResponse):
     target_language: Optional[str] = Field(None, description="Target language for translation")
     processing_notes: Optional[str] = Field(None, description="Additional notes about the processing")
     direct_response: bool = Field(
-        default=True, description="Flag indicating this response should be returned directly to user"
+        default=True, description="Flag indicating this response should be returned directly to user",
     )
 
 
@@ -58,7 +60,7 @@ class AssistantTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "text_assistant"
-        self.description = "Performs advanced text processing tasks including document analysis, summarization, proofreading, rewriting, critiquing, writing, and translation. Can work with regular text or PDF content when specifically requested."
+        self.description = "Performs specialized text processing tasks. Use 'analyze' for document insights and PDF analysis, 'summarize' to condense long content into key points, 'proofread' to correct errors and improve writing quality, 'rewrite' to enhance clarity and impact while preserving meaning, 'critic' for constructive feedback and improvement suggestions, 'translate' to convert text between languages, 'develop' for programming assistance and code writing, or 'generalist' for thoughtful discussion on any topic. Works with regular text or PDF content."
         self.llm_type = "intelligent"
 
         # Initialize services
@@ -79,8 +81,17 @@ class AssistantTool(BaseTool):
                     "properties": {
                         "task_type": {
                             "type": "string",
-                            "enum": ["analyze", "summarize", "proofread", "rewrite", "critic", "translate"],
-                            "description": "The type of text processing task to perform",
+                            "enum": [
+                                "analyze",
+                                "summarize",
+                                "proofread",
+                                "rewrite",
+                                "critic",
+                                "translate",
+                                "develop",
+                                "generalist",
+                            ],
+                            "description": "The type of text processing task to perform. Choose 'analyze' for document analysis and insights, 'summarize' to condense long text into key points, 'proofread' to correct errors and improve style, 'rewrite' to enhance clarity and impact, 'critic' for constructive feedback and improvement suggestions, 'translate' to convert between languages, 'develop' for programming and code assistance, or 'generalist' for thoughtful discussion on any topic.",
                         },
                         "text": {
                             "type": "string",
@@ -88,7 +99,7 @@ class AssistantTool(BaseTool):
                         },
                         "instructions": {
                             "type": "string",
-                            "description": "REQUIRED when analyzing PDF content: The specific question or task about the document. Optional for other tasks.",
+                            "description": "REQUIRED when analyzing PDF content: The specific question or task about the document. For other tasks, use to provide specific guidance (e.g., 'focus on technical accuracy' for proofreading, 'make it more formal' for rewriting, 'target audience: executives' for summarize).",
                         },
                         "source_language": {
                             "type": "string",
@@ -206,7 +217,7 @@ class AssistantTool(BaseTool):
             raise Exception(result.get("error", "Translation failed"))
 
     def _handle_analysis(
-        self, text: str, instructions: Optional[str], messages: Optional[List[Dict[str, Any]]]
+        self, text: str, instructions: Optional[str], messages: Optional[List[Dict[str, Any]]],
     ) -> AssistantResponse:
         """Handle document analysis tasks"""
 
@@ -251,7 +262,7 @@ class AssistantTool(BaseTool):
         instructions: Optional[str],
         messages: Optional[List[Dict[str, Any]]],
     ) -> AssistantResponse:
-        """Handle text processing tasks (summarize, proofread, rewrite, critic)"""
+        """Handle text processing tasks (summarize, proofread, rewrite, critic, etc.)"""
 
         # Map AssistantTaskType to TextTaskType
         text_task_map = {
@@ -259,6 +270,8 @@ class AssistantTool(BaseTool):
             AssistantTaskType.PROOFREAD: TextTaskType.PROOFREAD,
             AssistantTaskType.REWRITE: TextTaskType.REWRITE,
             AssistantTaskType.CRITIC: TextTaskType.CRITIC,
+            AssistantTaskType.DEVELOP: TextTaskType.DEVELOP,
+            AssistantTaskType.GENERALIST: TextTaskType.GENERALIST,
         }
 
         text_task_type = text_task_map.get(task_type)
@@ -351,7 +364,7 @@ class AssistantTool(BaseTool):
                 return context_pages
 
             # Filter out batch files and get main PDF files
-            main_pdf_files = [f for f in pdf_files if '_batch_' not in f.stem]
+            main_pdf_files = [f for f in pdf_files if "_batch_" not in f.stem]
 
             if main_pdf_files:
                 # Sort by modification time to get most recent main PDF
@@ -360,7 +373,7 @@ class AssistantTool(BaseTool):
                 pdf_id = latest_pdf_file.stem  # e.g., 'pdf_5990e3a1ea80'
             else:
                 # No standalone PDF files found – fall back to using batch filename to derive base ID
-                batch_files = [f for f in pdf_files if '_batch_' in f.stem]
+                batch_files = [f for f in pdf_files if "_batch_" in f.stem]
                 if not batch_files:
                     logger.warning("No PDF or batch files found in storage directory")
                     return context_pages
@@ -369,7 +382,7 @@ class AssistantTool(BaseTool):
                 batch_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
                 latest_batch_file = batch_files[0]
                 # Extract base ID before '_batch_' suffix
-                pdf_id = latest_batch_file.stem.split('_batch_')[0]
+                pdf_id = latest_batch_file.stem.split("_batch_")[0]
                 logger.info(
                     f"Derived base PDF ID '{pdf_id}' from batch file '{latest_batch_file.name}' because no standalone PDF file found."
                 )
@@ -387,7 +400,7 @@ class AssistantTool(BaseTool):
                 # Load all pages from all batches
                 all_pages = []
                 for i, batch in enumerate(batches):
-                    batch_pages = batch.get('pages', [])
+                    batch_pages = batch.get("pages", [])
                     logger.info(f"Batch {i}: {len(batch_pages)} pages")
                     all_pages.extend(batch_pages)
 

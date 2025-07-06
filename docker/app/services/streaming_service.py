@@ -139,6 +139,12 @@ class StreamingService:
                 api_params["tools"] = tools
                 api_params["tool_choice"] = tool_choice
                 api_params["parallel_tool_calls"] = True
+                # Generates more concise responses without extended chain-of-thought or thinking tokens.
+                api_params["temperature"] = 0.0
+                api_params["max_tokens"] = 500
+                del api_params["top_p"]
+                del api_params["frequency_penalty"]
+                del api_params["presence_penalty"]
 
             return client.chat.completions.create(**api_params)
 
