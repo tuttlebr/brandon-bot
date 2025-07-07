@@ -52,7 +52,7 @@ class LLMClientService:
         self._async_clients = {}  # Clear any cached async clients
         logger.info("LLM Client Service initialized")
 
-    def get_client(self, llm_type: Literal["fast", "llm", "intelligent"]) -> OpenAI:
+    def get_client(self, llm_type: Literal["fast", "llm", "intelligent", "vlm"]) -> OpenAI:
         """
         Get an OpenAI client for the specified LLM type
 
@@ -84,6 +84,8 @@ class LLMClientService:
                 client = OpenAI(api_key=self._config.api_key, base_url=self._config.llm_endpoint)
             elif llm_type == "intelligent":
                 client = OpenAI(api_key=self._config.api_key, base_url=self._config.intelligent_llm_endpoint)
+            elif llm_type == "vlm":
+                client = OpenAI(api_key=self._config.api_key, base_url=self._config.vlm_endpoint)
             else:
                 raise ValueError(f"Invalid LLM type: {llm_type}")
 
@@ -97,7 +99,7 @@ class LLMClientService:
             logger.error(f"Failed to create {llm_type} client: {e}")
             raise
 
-    def get_async_client(self, llm_type: Literal["fast", "llm", "intelligent"]) -> AsyncOpenAI:
+    def get_async_client(self, llm_type: Literal["fast", "llm", "intelligent", "vlm"]) -> AsyncOpenAI:
         """
         Get an async OpenAI client for the specified LLM type
 
@@ -129,6 +131,8 @@ class LLMClientService:
                 client = AsyncOpenAI(api_key=self._config.api_key, base_url=self._config.llm_endpoint)
             elif llm_type == "intelligent":
                 client = AsyncOpenAI(api_key=self._config.api_key, base_url=self._config.intelligent_llm_endpoint)
+            elif llm_type == "vlm":
+                client = AsyncOpenAI(api_key=self._config.api_key, base_url=self._config.vlm_endpoint)
             else:
                 raise ValueError(f"Invalid LLM type: {llm_type}")
 
@@ -142,7 +146,7 @@ class LLMClientService:
             logger.error(f"Failed to create async {llm_type} client: {e}")
             raise
 
-    def get_model_name(self, llm_type: Literal["fast", "llm", "intelligent"]) -> str:
+    def get_model_name(self, llm_type: Literal["fast", "llm", "intelligent", "vlm"]) -> str:
         """
         Get the model name for the specified LLM type
 
@@ -161,6 +165,8 @@ class LLMClientService:
             return self._config.llm_model_name
         elif llm_type == "intelligent":
             return self._config.intelligent_llm_model_name
+        elif llm_type == "vlm":
+            return self._config.vlm_model_name
         else:
             raise ValueError(f"Invalid LLM type: {llm_type}")
 

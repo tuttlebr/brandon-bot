@@ -58,7 +58,9 @@ class LLMService:
             return self.config.fast_llm_model_name
         elif model_type == "intelligent":
             return self.config.intelligent_llm_model_name
-        else:  # "llm" or any other value defaults to regular model
+        elif model_type == "vlm":
+            return self.config.vlm_model_name
+        else:
             return self.config.llm_model_name
 
     async def generate_streaming_response(
@@ -103,6 +105,9 @@ class LLMService:
                 windowed_messages, current_user_message
             )
 
+            # Filter messages to ensure LLM compatibility
+            windowed_messages = self._filter_messages_for_llm(windowed_messages)
+
             # Get tool definitions
             tools = tool_registry.get_all_definitions()
 
@@ -118,8 +123,7 @@ class LLMService:
 
             # If there are tool calls, execute them and stream the response
             if tool_calls:
-                # Log which tools were selected
-                logging.info(f"Tool calls: {tool_calls}")
+                # Log which tools were selected (without arguments to avoid logging base64 data)
                 tool_names = [tc.get("name", "unknown") for tc in tool_calls]
                 logger.info(f"Tool selection ({tool_selection_model_type} model): {', '.join(tool_names)}")
 
@@ -203,6 +207,9 @@ class LLMService:
                 # Yield a warning about truncation
                 yield "\n⚠️ **Note:** The conversation including tool responses exceeded the context limit and was truncated.\n\n"
 
+        # Filter messages to ensure LLM compatibility
+        extended_messages = self._filter_messages_for_llm(extended_messages)
+
         # Stream the final response based on tool results
         async for chunk in self.streaming_service.stream_completion(extended_messages, model, model_type):
             yield chunk
@@ -265,6 +272,36 @@ class LLMService:
                 cleaned.append({"role": msg["role"], "content": content})
 
         return cleaned
+
+    def _filter_messages_for_llm(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Filter messages to ensure they're compatible with LLM API
+
+        Args:
+            messages: List of messages
+
+        Returns:
+            Filtered messages safe for LLM
+        """
+        filtered = []
+
+        for msg in messages:
+            # Skip system messages with non-string content (like image uploads)
+            if msg.get("role") == "system":
+                content = msg.get("content")
+                if isinstance(content, dict):
+                    logger.debug(f"Filtering out system message with dict content of type: {content.get('type')}")
+                    continue
+
+            # Only include messages with string content
+            content = msg.get("content")
+            if isinstance(content, str) and content.strip():
+                filtered.append(msg)
+            elif isinstance(content, list):
+                # Handle messages with list content (for multimodal)
+                filtered.append(msg)
+
+        return filtered
 
     # Backward compatibility methods
     def _filter_think_tags(self, content: str) -> str:

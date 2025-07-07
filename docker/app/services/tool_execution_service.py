@@ -225,6 +225,40 @@ class ToolExecutionService:
                 logger.info(f"Adding user question as instructions for PDF analysis: {user_content}")
                 modified_args["instructions"] = user_content
 
+        # Add image data for analyze_image tool
+        if tool_name == "analyze_image":
+            try:
+                import streamlit as st
+
+                if hasattr(st.session_state, 'current_image_base64') and st.session_state.current_image_base64:
+                    modified_args["image_base64"] = st.session_state.current_image_base64
+                    modified_args["filename"] = getattr(st.session_state, 'current_image_filename', 'Unknown')
+                    logger.info(
+                        f"Successfully added image data to analyze_image arguments - filename: {modified_args['filename']}, data length: {len(modified_args['image_base64'])}"
+                    )
+                else:
+                    logger.warning("No image data found in session state for analyze_image tool")
+
+                    # Try to get from session controller as fallback
+                    try:
+                        from controllers.session_controller import SessionController
+
+                        session_controller = SessionController(self.config)
+                        latest_image = session_controller.get_latest_uploaded_image()
+                        if latest_image and latest_image.get('image_data'):
+                            modified_args["image_base64"] = latest_image['image_data']
+                            modified_args["filename"] = latest_image.get('filename', 'Unknown')
+                            logger.info(
+                                f"Retrieved image from session controller - filename: {modified_args['filename']}"
+                            )
+                        else:
+                            logger.warning("No image found in session controller either")
+                    except Exception as e:
+                        logger.error(f"Error accessing session controller: {e}")
+
+            except Exception as e:
+                logger.error(f"Error accessing session state for image data: {e}")
+
         return modified_args
 
     def _apply_tool_restrictions(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

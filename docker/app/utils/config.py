@@ -57,9 +57,11 @@ class FileProcessingConfig:
 
     # File size limits (in bytes)
     MAX_PDF_SIZE: int = 16 * 1024 * 1024  # 16MB
+    MAX_IMAGE_SIZE: int = 10 * 1024 * 1024  # 10MB
 
     # Supported file types
     SUPPORTED_PDF_TYPES: List[str] = field(default_factory=lambda: ['pdf'])
+    SUPPORTED_IMAGE_TYPES: List[str] = field(default_factory=lambda: ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'])
 
     # PDF Summarization settings
     PDF_SUMMARIZATION_THRESHOLD: int = 10  # Number of pages to trigger summarization
@@ -163,6 +165,8 @@ class EnvironmentConfig:
     LLM_ENDPOINT: Optional[str] = field(default_factory=lambda: os.getenv("LLM_ENDPOINT"))
     INTELLIGENT_LLM_ENDPOINT: Optional[str] = field(default_factory=lambda: os.getenv("INTELLIGENT_LLM_ENDPOINT"))
     INTELLIGENT_LLM_MODEL_NAME: Optional[str] = field(default_factory=lambda: os.getenv("INTELLIGENT_LLM_MODEL_NAME"))
+    VLM_MODEL_NAME: Optional[str] = field(default_factory=lambda: os.getenv("VLM_MODEL_NAME"))
+    VLM_ENDPOINT: Optional[str] = field(default_factory=lambda: os.getenv("VLM_ENDPOINT"))
 
     # API keys
     NVIDIA_API_KEY: str = field(default_factory=lambda: os.getenv("NVIDIA_API_KEY", "None"))

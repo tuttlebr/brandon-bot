@@ -11,17 +11,18 @@ TOOL_LLM_TYPES = {
     "extract_web_content": "fast",  # Simple API calls and formatting
     "weather": "fast",  # Simple API calls and formatting
     "news": "llm",  # Simple API calls and formatting
-    "tavily": "llm",  # Complex web search and synthesis
+    "tavily": "fast",  # Complex web search and synthesis
     "retriever": "llm",  # Semantic search and retrieval
     "pdf_summary": "llm",  # PDF summarization
     "pdf_text_processor": "llm",  # PDF text processing
     "text_assistant": "intelligent",  # Complex text processing tasks
     "image_gen": "fast",  # Complex prompt enhancement for image generation
+    "analyze_image": "vlm",  # Vision analysis requires vlm model
     "tool_selection": "llm",  # Tool selection, no reasoning - determines which tools to use for user queries
 }
 
 # Default LLM type if not specified
-DEFAULT_LLM_TYPE = "fast"
+DEFAULT_LLM_TYPE = "llm"
 
 
 def get_tool_llm_type(tool_name: str) -> str:

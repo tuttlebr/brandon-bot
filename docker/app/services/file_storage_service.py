@@ -140,6 +140,87 @@ class FileStorageService:
             logger.error(f"Failed to retrieve image {image_id}: {e}")
             return None
 
+    def store_uploaded_image(self, image_data: str, filename: str, file_type: str, session_id: str) -> str:
+        """
+        Store uploaded image externally and return reference ID
+
+        Args:
+            image_data: Base64 encoded image data
+            filename: Original image filename
+            file_type: MIME type of the image
+            session_id: Session identifier
+
+        Returns:
+            Image reference ID
+        """
+        try:
+            # Generate unique ID based on content hash
+            image_hash = hashlib.md5(image_data.encode()).hexdigest()[:12]
+            image_id = f"uploaded_img_{image_hash}"
+
+            # Check storage limits
+            self._check_storage_limits(session_id, "images")
+
+            # Save image file
+            image_path = self.images_dir / f"{image_id}.png"
+            if not image_path.exists():
+                image_bytes = base64.b64decode(image_data)
+                image_path.write_bytes(image_bytes)
+
+            # Save metadata
+            metadata = {
+                "image_id": image_id,
+                "filename": filename,
+                "file_type": file_type,
+                "session_id": session_id,
+                "file_path": str(image_path),
+                "size_bytes": len(image_data),
+                "upload_type": "user_uploaded",
+            }
+
+            metadata_path = self.metadata_dir / f"{image_id}.json"
+            metadata_path.write_text(json.dumps(metadata, indent=2))
+
+            logger.info(f"Stored uploaded image {image_id} for session {session_id}")
+            return image_id
+
+        except Exception as e:
+            logger.error(f"Failed to store uploaded image: {e}")
+            raise FileProcessingError(f"Uploaded image storage failed: {e}")
+
+    def get_uploaded_image(self, image_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve uploaded image data and metadata
+
+        Args:
+            image_id: Image reference ID
+
+        Returns:
+            Dict with image data and metadata, or None if not found
+        """
+        try:
+            # Load metadata
+            metadata_path = self.metadata_dir / f"{image_id}.json"
+            if not metadata_path.exists():
+                return None
+
+            metadata = json.loads(metadata_path.read_text())
+
+            # Load image data
+            image_path = Path(metadata["file_path"])
+            if image_path.exists():
+                image_bytes = image_path.read_bytes()
+                metadata["image_data"] = base64.b64encode(image_bytes).decode()
+            else:
+                logger.warning(f"Uploaded image file not found: {image_path}")
+                return None
+
+            return metadata
+
+        except Exception as e:
+            logger.error(f"Failed to retrieve uploaded image {image_id}: {e}")
+            return None
+
     def store_pdf(self, filename: str, pdf_data: Dict[str, Any], session_id: str) -> str:
         """
         Store PDF data externally and return reference ID

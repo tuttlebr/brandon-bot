@@ -60,7 +60,7 @@ class AssistantTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "text_assistant"
-        self.description = "ONLY use for text and document processing tasks when explicitly requested. Use 'analyze' for document insights and PDF analysis, 'summarize' to condense long content into key points, 'proofread' to correct errors and improve writing quality, 'rewrite' to enhance clarity and impact while preserving meaning, 'critic' for constructive feedback and improvement suggestions, 'translate' to convert text between languages, 'develop' for programming assistance and code writing, or 'generalist' for thoughtful discussion on any topic. DO NOT use for general questions, web searches, or information lookup - use appropriate search tools instead."
+        self.description = "ONLY use for text and document processing tasks when explicitly requested. Use 'analyze' for document insights and PDF analysis, 'summarize' to condense long content into key points, 'proofread' to correct errors and improve writing quality, 'rewrite' to enhance clarity and impact while preserving meaning, 'critic' for constructive feedback and improvement suggestions, 'translate' to convert text between languages, 'develop' for programming assistance and code writing, or 'generalist' for thoughtful discussion on any topic. DO NOT use for image analysis, general questions, web searches, or information lookup - use appropriate specialized tools for those tasks."
 
         # Initialize services
         config = ChatConfig.from_environment()

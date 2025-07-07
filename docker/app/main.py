@@ -6,7 +6,7 @@ import time
 import streamlit as st
 
 # Import the controller classes
-from controllers import FileController, MessageController, ResponseController, SessionController
+from controllers import FileController, ImageController, MessageController, ResponseController, SessionController
 from models import ChatConfig
 from services import ChatService, ImageService, LLMService
 from services.pdf_context_service import PDFContextService
@@ -52,6 +52,7 @@ class ProductionStreamlitChatApp:
             self.session_controller = SessionController(self.config_obj)
             self.message_controller = MessageController(self.config_obj, self.chat_service, self.session_controller)
             self.file_controller = FileController(self.config_obj, self.message_controller, self.session_controller)
+            self.image_controller = ImageController(self.config_obj, self.message_controller, self.session_controller)
             self.response_controller = ResponseController(
                 self.config_obj,
                 self.llm_service,
@@ -275,6 +276,95 @@ class ProductionStreamlitChatApp:
 
                     if st.button("🗑️ Remove Current PDF", help="Remove the current PDF from session",):
                         self.session_controller.clear_pdf_documents()
+                        st.rerun()
+
+            # Image Upload Section
+            st.markdown("---")
+            st.markdown("### 📷 Image Upload")
+
+            # Check image processing status
+            processing_status = getattr(st.session_state, "image_processing_status", None)
+
+            if processing_status == "processing":
+                # Show processing message
+                message = getattr(st.session_state, "image_processing_message", "🔄 Processing image...")
+                st.info(message)
+
+                # Clear processing status after brief display
+                if (
+                    not hasattr(st.session_state, "image_processing_shown")
+                    or not st.session_state.image_processing_shown
+                ):
+                    st.session_state.image_processing_shown = True
+                    time.sleep(0.01)
+                else:
+                    # Reset after showing processing
+                    st.session_state.image_processing_status = None
+                    st.session_state.image_processing_file = None
+                    st.session_state.image_processing_message = None
+                    st.session_state.image_processing_shown = False
+
+            elif processing_status == "error":
+                # Show error message
+                message = getattr(st.session_state, "image_processing_message", "❌ Processing failed")
+                st.error(message)
+
+                # Clear error status after brief display
+                if not hasattr(st.session_state, "image_error_shown") or not st.session_state.image_error_shown:
+                    st.session_state.image_error_shown = True
+                    time.sleep(0.01)
+                else:
+                    # Reset after showing error
+                    st.session_state.image_processing_status = None
+                    st.session_state.image_processing_file = None
+                    st.session_state.image_processing_message = None
+                    st.session_state.image_error_shown = False
+
+            else:
+                # Normal state - show image uploader
+                uploaded_image = st.file_uploader(
+                    "Choose image file",
+                    type=self.image_controller.get_supported_file_types(),
+                    accept_multiple_files=False,
+                    help=f"Upload an image to analyze and discuss its content (Max size: {self.image_controller.get_file_size_limit_mb()}MB)",
+                    key="image_uploader",
+                )
+
+                if uploaded_image and self.image_controller.is_new_upload(uploaded_image):
+                    try:
+                        # Mark as processing
+                        st.session_state.image_processing_status = "processing"
+                        st.session_state.image_processing_file = uploaded_image.name
+                        st.session_state.image_processing_message = f"🔄 Processing image: {uploaded_image.name}"
+
+                        # Process the image
+                        success = self.image_controller.process_image_upload(uploaded_image)
+
+                        if success:
+                            st.session_state.image_processing_status = None
+                            st.session_state.image_processing_file = None
+                            st.session_state.image_processing_message = None
+                            st.rerun()
+                        else:
+                            st.session_state.image_processing_status = "error"
+                            st.session_state.image_processing_message = (
+                                f"❌ Failed to process image: {uploaded_image.name}"
+                            )
+
+                    except Exception as e:
+                        logging.error(f"Image processing error: {e}")
+                        st.session_state.image_processing_status = "error"
+                        st.session_state.image_processing_message = f"❌ Image processing error: {str(e)}"
+
+            # Show current image status if available
+            if self.session_controller.has_uploaded_images():
+                latest_image = self.session_controller.get_latest_uploaded_image()
+                if latest_image:
+                    filename = latest_image.get("filename", "Unknown")
+                    st.success(f"✅ Current Image: {filename}")
+
+                    if st.button("🗑️ Remove Current Image", help="Remove the current image from session",):
+                        self.session_controller.clear_uploaded_images()
                         st.rerun()
 
     def run(self):

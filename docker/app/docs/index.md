@@ -1,73 +1,78 @@
-# Nano Chat Application
+# Streamlit Chat Application Documentation
 
-Welcome to the documentation for Nano - a production-ready conversational AI platform powered by NVIDIA's most advanced language models.
+Welcome to the comprehensive documentation for the Streamlit Chat Application - a production-ready conversational AI platform with multimodal capabilities.
 
 ## Overview
 
-Nano provides a sophisticated chat interface with cutting-edge AI capabilities, featuring:
+This application provides a sophisticated chat interface powered by NVIDIA's language models, featuring:
 
-- 🚀 **Real-time Streaming**: Experience fluid conversations with streaming responses
-- 📄 **Intelligent PDF Analysis**: Upload and analyze documents with context-aware processing
-- 🎨 **AI Image Generation**: Create stunning images from text descriptions
-- 🔍 **Smart Search**: Web search and semantic knowledge base retrieval
-- 🛠️ **Extensible Tool System**: Advanced tools for specialized tasks
-- 🏗️ **Production Architecture**: Built with MVC pattern and enterprise-grade design
-- 🧠 **Auto Context Injection**: Automatic PDF and conversation context awareness
+- **Multimodal Support**: Text, image, and document-based conversations
+- **11+ Specialized Tools**: From web search to image generation
+- **Smart Context Management**: Automatic conversation and PDF context injection
+- **Production Architecture**: MVC pattern with clear separation of concerns
+- **Real-time Streaming**: Smooth response delivery with progress indicators
 
 ## Key Features
 
-### 🤖 Advanced Language Models
+### 🤖 Conversational AI
+- Multiple language model support (Fast, Standard, Intelligent)
+- Real-time streaming responses
+- Context-aware conversations
+- Tool-augmented responses
 
-Nano leverages three specialized NVIDIA models optimized for different use cases:
+### 📄 Document Intelligence
+- PDF analysis with progress tracking
+- Intelligent document summarization
+- Batch processing for large documents
+- Context-aware Q&A
 
-- **Fast Model** (`meta/llama-3.1-8b-instruct`): Quick responses for simple queries
-- **Standard Model** (`meta/llama-3.1-70b-instruct`): Balanced performance for general use
-- **Intelligent Model** (`nvidia/llama-3.3-nemotron-70b-instruct`): Advanced reasoning for complex tasks
+### 🖼️ Multimodal Capabilities
+- **Image Generation**: Create AI-generated images with style control
+- **Image Analysis**: Analyze uploaded images using vision models
+- Support for various image formats
 
-### 📊 Smart Document Processing
+### 🔧 Advanced Tool System
+- Text processing and analysis
+- Web search and information retrieval
+- Weather and news updates
+- Code generation and development assistance
+- Translation services
 
-Our intelligent PDF analysis system automatically adapts to document size:
-
-- **Small Documents (≤5 pages)**: Instant full analysis
-- **Medium Documents (6-15 pages)**: Efficient batch processing
-- **Large Documents (>15 pages)**: Two-phase intelligent scanning with relevance detection
-
-### 🔧 Built-in Tool System
-
-Nano includes powerful tools that extend its capabilities:
-
-- **Text Assistant**: Advanced text processing (summarization, proofreading, translation)
-- **PDF Tools**: Document analysis and content extraction
-- **Image Generation**: AI-powered image creation with style control
-- **Web Search**: Real-time web information via Tavily
-- **News Search**: Current events and news articles
-- **Weather**: Real-time weather information
-- **Conversation Context**: Intelligent conversation analysis
-
-### 🏢 Enterprise Features
-
-- **Session Management**: Isolated user sessions with secure file handling
-- **External Storage**: Efficient file storage preventing memory issues
-- **Error Recovery**: Comprehensive error handling and graceful degradation
-- **Scalability**: Stateless design for horizontal scaling
-- **Configuration**: Centralized environment-based configuration
-- **Progress Tracking**: Real-time progress updates for long operations
-
-## System Requirements
-
-- Docker and Docker Compose
-- NVIDIA API credentials
-- 4GB+ RAM recommended
-- Python 3.10+ (for development)
-- Optional: Tavily API key for web search
+### 🏗️ Production-Ready Architecture
+- Controller-based design pattern
+- Service layer abstraction
+- Comprehensive error handling
+- Session isolation and security
 
 ## Quick Navigation
 
-- 🚀 **[Quick Start](getting-started/quickstart.md)** - Get running in 5 minutes
-- 📖 **[User Guide](user-guide/chat-interface.md)** - Learn all features
-- 🏗️ **[Architecture](architecture/overview.md)** - Technical deep dive
-- 🔧 **[Configuration](configuration/environment.md)** - Setup guide
-- 🐛 **[Troubleshooting](troubleshooting.md)** - Common issues
+### Getting Started
+- [Quick Start Guide](getting-started/quickstart.md) - Get up and running in 5 minutes
+- [Installation](getting-started/installation.md) - Detailed setup instructions
+- [First Steps](getting-started/first-steps.md) - Your first conversation
+
+### User Guides
+- [Chat Interface](user-guide/chat-interface.md) - Master the chat interface
+- [PDF Analysis](user-guide/pdf-analysis.md) - Document processing features
+- [Image Generation](user-guide/image-generation.md) - Create AI-powered images
+- [Image Analysis](user-guide/image-upload-vlm.md) - Analyze images with vision models
+- [Search Features](user-guide/search-features.md) - Web and knowledge base search
+
+### Technical Documentation
+- [Architecture Overview](architecture/overview.md) - System design and patterns
+- [Services](architecture/services.md) - Core service implementations
+- [API Reference](api/services.md) - Detailed API documentation
+
+### Configuration & Deployment
+- [Environment Variables](configuration/environment.md) - Configuration options
+- [Model Configuration](configuration/models.md) - LLM setup guide
+- [Docker Deployment](deployment/docker.md) - Production deployment
+
+## Need Help?
+
+- Check the [FAQ](faq.md) for common questions
+- Visit [Troubleshooting](troubleshooting.md) for solving issues
+- Review the [GitHub Repository](https://github.com/tuttlebr/streamlit-chatbot) for source code
 
 ## What's New
 

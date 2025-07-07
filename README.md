@@ -12,6 +12,30 @@ This application provides a sophisticated chat interface powered by NVIDIA's lan
 - Semantic search through knowledge bases
 - Production-grade architecture using controller patterns
 
+## Features
+
+### Core Capabilities
+
+- **Multimodal Chat Interface**: Support for text, images, and document-based conversations
+- **Advanced Tool System**: 11+ specialized tools for various tasks
+- **Smart Context Management**: Automatic conversation context injection
+- **Real-time Streaming**: Smooth response streaming with progress indicators
+- **Session Management**: Isolated user sessions with file storage
+
+### Available Tools
+
+1. **Text Assistant** (`text_assistant`): Comprehensive text processing including analysis, summarization, translation, and code development
+2. **Image Generation** (`generate_image`): AI-powered image creation with style control and aspect ratio options
+3. **Image Analysis** (`analyze_image`): Vision-capable LLM for analyzing uploaded images
+4. **PDF Summary** (`pdf_summary`): Intelligent document summarization
+5. **PDF Text Processor** (`pdf_text_processor`): Advanced PDF text extraction and processing
+6. **Web Search** (`tavily_internet_search`): General internet search capabilities
+7. **News Search** (`news`): Real-time news and current events search
+8. **Weather** (`weather`): Current weather information for any location
+9. **Web Extract** (`extract_web_content`): Extract and parse content from web pages
+10. **Retriever** (`retriever`): Semantic search through knowledge bases
+11. **Conversation Context** (`conversation_context`): Analyze conversation history and patterns
+
 ## Architecture
 
 The application follows a Model-View-Controller (MVC) pattern with clear separation of concerns:
@@ -125,6 +149,10 @@ LLM_MODEL_NAME=meta/llama-3.1-70b-instruct
 FAST_LLM_MODEL_NAME=meta/llama-3.1-8b-instruct
 INTELLIGENT_LLM_MODEL_NAME=nvidia/llama-3.3-nemotron-70b-instruct
 
+# Vision Language Model (for image analysis)
+VLM_ENDPOINT=https://integrate.api.nvidia.com/v1
+VLM_MODEL_NAME=nvidia/llama-3.1-nemotron-nano-vl-8b-v1
+
 # Optional Services
 IMAGE_ENDPOINT=your_image_generation_endpoint
 TAVILY_API_KEY=your_tavily_api_key
@@ -143,11 +171,13 @@ cd streamlit-chatbot
 cp .env.example .env
 # Edit .env with your configuration
 
-#!/bin/bash
-clear
-set -e  # Exit on any error
-export COMPOSE_BAKE=true
-docker run -it --rm -v ./docker:/docker --workdir /docker --entrypoint uv ghcr.io/astral-sh/uv:python3.13-bookworm-slim sync
+# Build and run
+./rebuild.sh
+```
+
+Or manually:
+
+```bash
 docker compose build app
 docker compose up app nginx -d
 docker compose logs -f app

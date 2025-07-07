@@ -45,6 +45,14 @@ class ChatConfig:
         return config.env.INTELLIGENT_LLM_ENDPOINT
 
     @property
+    def vlm_model_name(self) -> str:
+        return config.env.VLM_MODEL_NAME or "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
+
+    @property
+    def vlm_endpoint(self) -> str:
+        return config.env.VLM_ENDPOINT or config.env.LLM_ENDPOINT
+
+    @property
     def embedding_endpoint(self) -> str:
         return config.env.EMBEDDING_ENDPOINT
 

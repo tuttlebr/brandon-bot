@@ -15,6 +15,11 @@ from .extract import (
     execute_web_extract_with_dict,
     get_web_extract_tool_definition,
 )
+from .image_analysis_tool import (
+    ImageAnalysisTool,
+    execute_image_analysis_with_dict,
+    get_image_analysis_tool_definition,
+)
 from .image_gen import (
     ImageGenerationTool,
     execute_image_generation,
@@ -55,6 +60,9 @@ __all__ = [
     "get_image_generation_tool_definition",
     "execute_image_generation",
     "execute_image_generation_with_dict",
+    "ImageAnalysisTool",
+    "get_image_analysis_tool_definition",
+    "execute_image_analysis_with_dict",
     "PDFTextProcessorTool",
     "get_pdf_text_processor_tool_definition",
     "execute_pdf_text_processor_with_dict",

@@ -1,345 +1,325 @@
 # Environment Configuration
 
-Complete guide to configuring Nano Chat Application through environment variables.
+This guide covers all environment variables used by the Streamlit Chat Application.
 
-## Overview
+## Required Variables
 
-Nano uses environment variables for configuration, following the 12-factor app methodology. All configuration is centralized in the `utils/config.py` module.
+These environment variables must be set for the application to function:
 
-## Required Environment Variables
-
-These variables MUST be set for the application to start:
-
-### NVIDIA API Configuration
+### API Credentials
 
 ```bash
-# Your NVIDIA API key for accessing language models
-NVIDIA_API_KEY=nvapi-your-key-here
+# NVIDIA API key for language models
+NVIDIA_API_KEY=nvapi-xxxxxxxxxxxxxxxxxxxxx
+```
 
-# Base endpoints for different model types
+### Model Endpoints
+
+```bash
+# Standard LLM endpoint
 LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
-FAST_LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
-INTELLIGENT_LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
 
-# Model identifiers
+# Fast model endpoint (for quick responses)
+FAST_LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
+
+# Intelligent model endpoint (for complex reasoning)
+INTELLIGENT_LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
+```
+
+### Model Names
+
+```bash
+# Standard language model
 LLM_MODEL_NAME=meta/llama-3.1-70b-instruct
+
+# Fast response model
 FAST_LLM_MODEL_NAME=meta/llama-3.1-8b-instruct
+
+# Advanced reasoning model
 INTELLIGENT_LLM_MODEL_NAME=nvidia/llama-3.3-nemotron-70b-instruct
 ```
 
-## Optional Environment Variables
+## Optional Variables
 
-### Branding and UI
+### Vision Language Model (VLM)
+
+For image analysis capabilities:
 
 ```bash
-# Application title (default: "Nano")
-BOT_TITLE=Nano
+# VLM endpoint (defaults to LLM_ENDPOINT if not set)
+VLM_ENDPOINT=https://integrate.api.nvidia.com/v1
 
-# User reference term (default: "human")
-META_USER=human
-
-# Brand color in hex (default: "#76b900")
-BRAND_COLOR=#76b900
+# VLM model name (defaults to nvidia/llama-3.1-nemotron-nano-vl-8b-v1)
+VLM_MODEL_NAME=nvidia/llama-3.1-nemotron-nano-vl-8b-v1
 ```
 
 ### Image Generation
 
+For AI image creation:
+
 ```bash
-# Endpoint for image generation service
-IMAGE_ENDPOINT=https://your-image-api.com/v1/generate
+# Image generation endpoint
+IMAGE_ENDPOINT=https://your-image-generation-endpoint.com
+
+# Image generation API key (if different from NVIDIA_API_KEY)
+IMAGE_API_KEY=your-image-api-key
 ```
 
 ### Web Search
 
+For internet search capabilities:
+
 ```bash
-# Tavily API key for web search functionality
-TAVILY_API_KEY=tvly-your-api-key-here
+# Tavily API key for web search
+TAVILY_API_KEY=tvly-xxxxxxxxxxxxxxxxxxxxx
 ```
 
-### PDF Processing
+### Vector Database
+
+For semantic search and retrieval:
 
 ```bash
-# NVIDIA Ingest endpoint for PDF processing
-NVINGEST_ENDPOINT=http://nvingest:7670/v1/extract_text
-```
-
-### Vector Database (Milvus)
-
-```bash
-# Database configuration for semantic search
-DATABASE_URL=http://milvus-standalone:19530
-COLLECTION_NAME=milvus
-PARTITION_NAME=milvus
-DEFAULT_DB=milvus
-
-# Embedding configuration
+# Embedding model endpoint
 EMBEDDING_ENDPOINT=https://integrate.api.nvidia.com/v1
+
+# Embedding model name
 EMBEDDING_MODEL=nvidia/nv-embedqa-e5-v5
 
-# Reranker configuration
-RERANKER_ENDPOINT=https://integrate.api.nvidia.com/v1/ranking
-RERANKER_MODEL=nvidia/nv-rerankqa-mistral-4b-v3
+# Database configuration
+DATABASE_URL=http://localhost:19530
+DEFAULT_DB=default
+COLLECTION_NAME=documents
+```
+
+### Application Settings
+
+```bash
+# Application title
+BOT_TITLE="Streamlit Chat Assistant"
+
+# File upload limits (in MB)
+PDF_MAX_SIZE_MB=200
+IMAGE_MAX_SIZE_MB=10
+
+# Session configuration
+SESSION_TIMEOUT_MINUTES=60
+MAX_MESSAGES_PER_SESSION=1000
+
+# Memory management
+MAX_CONTEXT_TOKENS=8192
+SLIDING_WINDOW_SIZE=50
+```
+
+### UI Configuration
+
+```bash
+# Brand colors (hex values)
+BRAND_COLOR=#76B900
+
+# Avatar paths
+ASSISTANT_AVATAR_PATH=./assets/assistant_avatar.png
+USER_AVATAR_PATH=./assets/user_avatar.png
+
+# Display settings
+MESSAGES_PER_PAGE=25
+SHOW_TOOL_CONTEXT=true
 ```
 
 ### Performance Tuning
 
 ```bash
 # LLM parameters
-DEFAULT_TEMPERATURE=0.3
-DEFAULT_TOP_P=0.95
-DEFAULT_FREQUENCY_PENALTY=0.0
+DEFAULT_TEMPERATURE=0.0
+DEFAULT_TOP_P=1.0
 DEFAULT_PRESENCE_PENALTY=0.0
+DEFAULT_FREQUENCY_PENALTY=0.0
+DEFAULT_MAX_TOKENS=2048
 
-# Context window settings
-SLIDING_WINDOW_MAX_TURNS=20  # Number of conversation turns to keep
+# Streaming settings
+STREAM_CHUNK_SIZE=10
+STREAM_DELAY_MS=0
 
-# Conversation context injection
-AUTO_INJECT_CONVERSATION_CONTEXT=true
-MIN_TURNS_FOR_CONTEXT_INJECTION=1
-
-# API timeouts (in seconds)
-DEFAULT_REQUEST_TIMEOUT=3600
-LLM_REQUEST_TIMEOUT=3600
-IMAGE_REQUEST_TIMEOUT=3600
-PDF_PROCESSING_TIMEOUT=6000
+# Tool execution
+TOOL_EXECUTION_TIMEOUT=30
+MAX_PARALLEL_TOOLS=5
 ```
 
-### Storage Configuration
-
-```bash
-# File processing limits
-MAX_PDF_SIZE=16777216  # 16MB in bytes
-SUPPORTED_PDF_TYPES=pdf
-
-# Session limits
-MAX_IMAGES_IN_SESSION=50
-MAX_PDFS_IN_SESSION=3
-
-# Storage paths
-FILE_STORAGE_PATH=/tmp/chatbot_storage
-```
-
-### System Settings
+### Debug and Logging
 
 ```bash
 # Logging level (DEBUG, INFO, WARNING, ERROR)
 LOG_LEVEL=INFO
 
-# Suppress Streamlit warnings
-SUPPRESS_STREAMLIT_WARNINGS=true
+# Enable debug mode
+DEBUG_MODE=false
+
+# Tool execution logging
+LOG_TOOL_EXECUTION=true
+
+# Performance monitoring
+ENABLE_PERFORMANCE_MONITORING=false
 ```
 
-## Configuration File Examples
+## Environment File Example
 
-### Development Configuration (.env.development)
+Create a `.env` file in your project root:
 
 ```bash
-# Development settings
-NVIDIA_API_KEY=nvapi-dev-key
-BOT_TITLE=Nano Dev
-LOG_LEVEL=DEBUG
+# === REQUIRED SETTINGS ===
+# NVIDIA Configuration
+NVIDIA_API_KEY=nvapi-your-key-here
 
-# Use faster models for development
-LLM_MODEL_NAME=meta/llama-3.1-8b-instruct
-FAST_LLM_MODEL_NAME=meta/llama-3.1-8b-instruct
-INTELLIGENT_LLM_MODEL_NAME=meta/llama-3.1-70b-instruct
-
-# Local endpoints
+# Model Endpoints
 LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
 FAST_LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
 INTELLIGENT_LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
 
-# Reduced limits for faster testing
-MAX_PDF_SIZE=5242880  # 5MB
-SLIDING_WINDOW_MAX_TURNS=10
-```
-
-### Production Configuration (.env.production)
-
-```bash
-# Production settings
-NVIDIA_API_KEY=${NVIDIA_API_KEY_PROD}
-BOT_TITLE=Nano
-LOG_LEVEL=INFO
-
-# Production models
+# Model Names
 LLM_MODEL_NAME=meta/llama-3.1-70b-instruct
 FAST_LLM_MODEL_NAME=meta/llama-3.1-8b-instruct
 INTELLIGENT_LLM_MODEL_NAME=nvidia/llama-3.3-nemotron-70b-instruct
 
-# Production endpoints
-LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
-FAST_LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
-INTELLIGENT_LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
+# === OPTIONAL FEATURES ===
+# Vision Language Model
+VLM_ENDPOINT=https://integrate.api.nvidia.com/v1
+VLM_MODEL_NAME=nvidia/llama-3.1-nemotron-nano-vl-8b-v1
 
-# Production settings
-SLIDING_WINDOW_MAX_TURNS=20
-AUTO_INJECT_CONVERSATION_CONTEXT=true
-SUPPRESS_STREAMLIT_WARNINGS=true
+# Image Generation
+IMAGE_ENDPOINT=https://your-endpoint.com
+IMAGE_API_KEY=your-key
 
-# Production services
-NVINGEST_ENDPOINT=http://nvingest:7670/v1/extract_text
-DATABASE_URL=http://milvus-standalone:19530
+# Web Search
+TAVILY_API_KEY=tvly-your-key
+
+# === APPLICATION SETTINGS ===
+BOT_TITLE="My AI Assistant"
+PDF_MAX_SIZE_MB=200
+IMAGE_MAX_SIZE_MB=10
+
+# === PERFORMANCE ===
+DEFAULT_TEMPERATURE=0.0
+MAX_CONTEXT_TOKENS=8192
 ```
 
-## Using Environment Files
+## Configuration Priority
 
-### Loading Environment Files
+The application loads configuration in this order:
 
-```bash
-# Using docker-compose
-docker compose --env-file .env.production up
+1. Environment variables
+2. `.env` file
+3. Default values in `utils/config.py`
 
-# Using Python directly
-python -m python-dotenv run python main.py
+## Validation
 
-# Export to shell
-export $(cat .env | grep -v '^#' | xargs)
-```
-
-### Environment File Priority
-
-1. System environment variables (highest priority)
-2. `.env` file in project root
-3. Default values in `utils/config.py` (lowest priority)
-
-## Configuration Validation
-
-Nano validates configuration on startup:
+The application validates configuration on startup:
 
 ```python
-# The application checks for required variables
-missing_vars = config.env.validate_required_env_vars()
-if missing_vars:
-    logging.warning(f"Missing required environment variables: {', '.join(missing_vars)}")
+# Automatic validation checks:
+- Required API keys are present
+- Endpoints are valid URLs
+- Model names follow expected format
+- Numeric values are within valid ranges
 ```
 
-## Dynamic Configuration
+## Docker Configuration
 
-Some settings can be changed at runtime:
+When using Docker, pass environment variables via:
 
-### Model Selection
+### Docker Compose
 
-Users can switch models during conversation:
-- "Use the fast model" - Switches to FAST_LLM_MODEL_NAME
-- "Use the standard model" - Switches to LLM_MODEL_NAME
-- "Use intelligent mode" - Switches to INTELLIGENT_LLM_MODEL_NAME
+```yaml
+services:
+  app:
+    environment:
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+      - LLM_ENDPOINT=${LLM_ENDPOINT}
+      # ... other variables
+```
+
+### Docker Run
+
+```bash
+docker run -e NVIDIA_API_KEY=your-key \
+           -e LLM_ENDPOINT=https://endpoint \
+           your-image
+```
 
 ## Security Best Practices
 
-### 1. Never Commit Secrets
+1. **Never commit `.env` files** - Add to `.gitignore`
+2. **Use environment-specific files** - `.env.development`, `.env.production`
+3. **Rotate API keys regularly**
+4. **Use secrets management** in production (AWS Secrets Manager, etc.)
+5. **Limit API key permissions** to required scopes
 
-```bash
-# .gitignore
-.env
-.env.*
-!.env.example
+## Troubleshooting
+
+### Missing Required Variables
+
+```
+ConfigurationError: Missing required environment variable: NVIDIA_API_KEY
 ```
 
-### 2. Use Secret Management
+**Solution**: Ensure all required variables are set in your `.env` file.
 
-For production, use proper secret management:
+### Invalid Endpoints
 
-```bash
-# AWS Secrets Manager
-NVIDIA_API_KEY=$(aws secretsmanager get-secret-value \
-  --secret-id prod/nvidia-api-key \
-  --query SecretString --output text)
-
-# Kubernetes Secrets
-kubectl create secret generic app-secrets \
-  --from-literal=NVIDIA_API_KEY=$NVIDIA_API_KEY
+```
+ConfigurationError: Invalid endpoint URL: not-a-url
 ```
 
-### 3. Rotate Keys Regularly
+**Solution**: Verify all endpoints are valid HTTPS URLs.
 
-```bash
-# Update keys without downtime
-docker compose --env-file .env.new up -d --no-deps app
+### Model Not Found
+
+```
+Error: Model 'unknown-model' not found
 ```
 
-## Troubleshooting Configuration
+**Solution**: Check model names match available models from your provider.
 
-### Common Issues
+## Advanced Configuration
 
-1. **Variable Not Loading**
-   ```bash
-   # Check if variable is set
-   echo $NVIDIA_API_KEY
+### Custom Model Providers
 
-   # Check in container
-   docker compose exec app env | grep NVIDIA
-   ```
-
-2. **PDF Processing Fails**
-   ```bash
-   # Ensure NVINGEST_ENDPOINT is accessible
-   curl http://nvingest:7670/health
-   ```
-
-3. **Model Not Found**
-   ```bash
-   # Verify model names are correct
-   # Check NVIDIA API documentation for valid models
-   ```
-
-### Debug Configuration
+To use non-NVIDIA models:
 
 ```bash
-# Print all configuration
-docker compose exec app python -c "
-from utils.config import config
-print(config.__dict__)
-"
+# OpenAI Configuration
+LLM_ENDPOINT=https://api.openai.com/v1
+LLM_MODEL_NAME=gpt-4
+NVIDIA_API_KEY=sk-your-openai-key
 
-# Validate configuration
-docker compose exec app python -c "
-from utils.config import config
-config.validate_environment()
-"
+# Anthropic Configuration
+LLM_ENDPOINT=https://api.anthropic.com/v1
+LLM_MODEL_NAME=claude-3-opus
+NVIDIA_API_KEY=your-anthropic-key
 ```
 
-## Configuration Schema
+### Proxy Configuration
 
-### Complete Variable Reference
+For corporate environments:
 
-**Core Settings**
-- `NVIDIA_API_KEY` (string, required) - NVIDIA API authentication key
-- `BOT_TITLE` (string, default: "Nano") - Application name
-- `META_USER` (string, default: "human") - User reference term
+```bash
+HTTP_PROXY=http://proxy.company.com:8080
+HTTPS_PROXY=http://proxy.company.com:8080
+NO_PROXY=localhost,127.0.0.1
+```
 
-**Model Configuration**
-- `LLM_ENDPOINT` (string, required) - Main LLM endpoint URL
-- `LLM_MODEL_NAME` (string, required) - Main model identifier
-- `FAST_LLM_ENDPOINT` (string, required) - Fast model endpoint URL
-- `FAST_LLM_MODEL_NAME` (string, required) - Fast model identifier
-- `INTELLIGENT_LLM_ENDPOINT` (string, required) - Intelligent model endpoint URL
-- `INTELLIGENT_LLM_MODEL_NAME` (string, required) - Intelligent model identifier
+### Resource Limits
 
-**Optional Services**
-- `IMAGE_ENDPOINT` (string) - Image generation endpoint
-- `TAVILY_API_KEY` (string) - Tavily search API key
-- `NVINGEST_ENDPOINT` (string) - PDF processing endpoint
-- `DATABASE_URL` (string) - Milvus database URL
+```bash
+# Memory limits
+MAX_FILE_STORAGE_MB=1000
+MAX_SESSION_MEMORY_MB=500
 
-**Performance**
-- `SLIDING_WINDOW_MAX_TURNS` (int, default: 20) - Conversation history limit
-- `MAX_CONTEXT_LENGTH` (int, default: 1000000) - Maximum context size
-- `AUTO_INJECT_CONVERSATION_CONTEXT` (bool, default: true) - Auto-inject context
+# Rate limiting
+REQUESTS_PER_MINUTE=60
+TOKENS_PER_MINUTE=100000
+```
 
-**Limits**
-- `MAX_PDF_SIZE` (int, default: 16777216) - Max PDF size in bytes
-- `MAX_IMAGES_IN_SESSION` (int, default: 50) - Max images per session
-- `MAX_PDFS_IN_SESSION` (int, default: 3) - Max PDFs per session
+## See Also
 
-**PDF Batch Processing**
-- `PDF_BATCH_PROCESSING_THRESHOLD` (int, default: 50) - Pages threshold to trigger batch processing
-- `PDF_PAGES_PER_BATCH` (int, default: 20) - Maximum pages per batch
-- `PDF_CONTEXT_MAX_PAGES` (int, default: 30) - Maximum pages to include in context at once
-- `PDF_CONTEXT_MAX_CHARS` (int, default: 100000) - Maximum characters per context injection
-
-## Next Steps
-
-- Review [Model Configuration](models.md) for model-specific settings
-- See [UI Configuration](ui.md) for interface customization
-- Check [Deployment Guide](../deployment/docker.md) for production setup
+- [Model Configuration](models.md) - Detailed model setup
+- [Docker Deployment](../deployment/docker.md) - Container configuration
+- [FAQ](../faq.md) - Common configuration questions

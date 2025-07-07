@@ -51,6 +51,12 @@ def initialize_all_tools():
         image_gen = ImageGenerationTool()
         tool_registry.register(image_gen)
 
+        # Image Analysis Tool
+        from tools.image_analysis_tool import ImageAnalysisTool
+
+        image_analysis = ImageAnalysisTool()
+        tool_registry.register(image_analysis)
+
         # News Tool
         from tools.news import NewsTool
 

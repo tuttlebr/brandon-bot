@@ -1,417 +1,393 @@
 # Tools API Reference
 
-This document provides detailed API documentation for the tool system and all available tools.
+The Streamlit Chat Application includes a comprehensive tool system that extends the LLM's capabilities. This document provides detailed information about each available tool.
 
-## Tool System Overview
+## Overview
 
-The tool system extends LLM capabilities with specialized functions. Tools follow a consistent interface and can be executed in parallel or sequentially based on dependencies.
+The application includes 11 specialized tools that can be automatically invoked by the LLM based on user queries:
 
-## Base Tool Interface
+1. **Text Processing Tools**: Text assistant for various language tasks
+2. **Image Tools**: Generation and analysis of images
+3. **Document Tools**: PDF processing and summarization
+4. **Search Tools**: Web search, news, and knowledge retrieval
+5. **Utility Tools**: Weather, web extraction, and conversation analysis
 
-All tools inherit from `BaseTool`:
+## Tool Architecture
+
+### Base Tool Class
+
+All tools inherit from `BaseTool` and implement:
 
 ```python
 class BaseTool(ABC):
     def __init__(self):
         self.name: str = ""
         self.description: str = ""
-        self.llm_type: Literal["fast", "llm", "intelligent"] = "fast"
+        self.llm_type: Literal["fast", "llm", "intelligent", "vlm"] = "fast"
 
     @abstractmethod
     def execute(self, params: Dict[str, Any]) -> BaseToolResponse:
         pass
+
+    def to_openai_format(self) -> Dict[str, Any]:
+        pass
 ```
+
+### Tool Registry
+
+Tools are managed by a singleton registry that handles:
+- Tool registration and discovery
+- Execution orchestration
+- Definition management
 
 ## Available Tools
 
 ### 1. Text Assistant (`text_assistant`)
 
-Advanced text processing capabilities.
+Comprehensive text processing tool for various language tasks.
 
-```python
-class AssistantTool(BaseTool):
-    name = "text_assistant"
-    llm_type = "intelligent"
-```
-
-**Supported Tasks:**
-- `summarize` - Create concise summaries
-- `proofread` - Grammar and style corrections
-- `rewrite` - Improve clarity and flow
-- `critic` - Provide constructive feedback
-- `translate` - Language translation
+**Capabilities:**
+- **analyze**: Document insights and analysis
+- **summarize**: Condense content into key points
+- **proofread**: Grammar and style corrections
+- **rewrite**: Enhance clarity and impact
+- **critic**: Constructive feedback
+- **translate**: Language translation
+- **develop**: Programming assistance
+- **generalist**: General discussion
 
 **Parameters:**
 ```python
 {
-    "task_type": "summarize|proofread|rewrite|critic|translate",
-    "text": "Text to process",
-    "instructions": "Optional specific instructions",
-    "source_language": "For translation",
-    "target_language": "For translation"
+    "user_message": str,  # Original user request
+    "task": str,         # Task type (analyze, summarize, etc.)
+    "target_language": str,  # For translation tasks
+    "focus_areas": List[str],  # Optional focus areas
+    "formatting_requirements": str,  # Optional formatting
+    "expertise_level": str,  # casual, professional, technical
+    "additional_instructions": str  # Extra instructions
 }
 ```
 
-**Example:**
+**LLM Type:** `intelligent`
+
+### 2. Image Generation (`generate_image`)
+
+AI-powered image generation with style control.
+
+**Parameters:**
 ```python
-response = assistant_tool.execute({
-    "task_type": "summarize",
-    "text": long_article,
-    "instructions": "Focus on key findings, max 200 words"
+{
+    "user_prompt": str,      # Original request
+    "subject": str,          # Main subject
+    "style": str,           # Artistic style (default: "photorealistic")
+    "mood": str,            # Atmosphere (default: "natural")
+    "details": str,         # Additional details
+    "aspect_ratio": str,    # "square", "portrait", "landscape"
+    "cfg_scale": float,     # Guidance scale (1.5-4.5, default: 3.5)
+    "use_conversation_context": bool  # Use chat context
+}
+```
+
+**LLM Type:** `fast`
+
+### 3. Image Analysis (`analyze_image`)
+
+Vision-capable LLM for analyzing uploaded images.
+
+**Parameters:**
+```python
+{
+    "question": str  # Question about the uploaded image
+}
+```
+
+**Note:** Requires an image to be uploaded via the sidebar first.
+
+**LLM Type:** `vlm`
+
+### 4. PDF Summary (`pdf_summary`)
+
+Intelligent document summarization for uploaded PDFs.
+
+**Parameters:**
+```python
+{
+    "query": str,            # Summary focus/question
+    "summary_type": str,     # "brief", "detailed", "key-points"
+    "max_length": int,       # Maximum summary length
+    "focus_sections": List[str]  # Specific sections to focus on
+}
+```
+
+**LLM Type:** `llm`
+
+### 5. PDF Text Processor (`pdf_text_processor`)
+
+Advanced PDF text extraction and processing.
+
+**Parameters:**
+```python
+{
+    "query": str,           # Processing request
+    "page_range": str,      # e.g., "1-5", "all"
+    "processing_type": str, # "extract", "analyze", "search"
+    "search_terms": List[str]  # For search operations
+}
+```
+
+**LLM Type:** `llm`
+
+### 6. Web Search (`tavily_internet_search`)
+
+General internet search for current information.
+
+**Parameters:**
+```python
+{
+    "query": str  # Search query
+}
+```
+
+**Features:**
+- Real-time web search
+- Source attribution
+- Content summarization
+
+**LLM Type:** `fast`
+
+### 7. News Search (`news`)
+
+Specialized search for current news and events.
+
+**Parameters:**
+```python
+{
+    "query": str,          # News search query
+    "time_range": str,     # "today", "week", "month"
+    "category": str        # Optional news category
+}
+```
+
+**LLM Type:** `llm`
+
+### 8. Weather (`weather`)
+
+Current weather information for any location.
+
+**Parameters:**
+```python
+{
+    "location": str  # City name or coordinates
+}
+```
+
+**Returns:**
+- Current conditions
+- Temperature
+- Forecast summary
+
+**LLM Type:** `fast`
+
+### 9. Web Extract (`extract_web_content`)
+
+Extract and parse content from web pages.
+
+**Parameters:**
+```python
+{
+    "url": str,              # Web page URL
+    "extract_type": str,     # "text", "links", "images", "all"
+    "include_metadata": bool # Include page metadata
+}
+```
+
+**LLM Type:** `fast`
+
+### 10. Retriever (`retriever`)
+
+Semantic search through knowledge bases.
+
+**Parameters:**
+```python
+{
+    "query": str,           # Search query
+    "k": int,              # Number of results (default: 5)
+    "score_threshold": float # Minimum similarity score
+}
+```
+
+**Features:**
+- Vector similarity search
+- Context-aware retrieval
+- Relevance scoring
+
+**LLM Type:** `llm`
+
+### 11. Conversation Context (`conversation_context`)
+
+Analyze conversation history and patterns.
+
+**Parameters:**
+```python
+{
+    "query": str,          # Analysis type
+    "max_messages": int,   # Messages to analyze
+    "focus_query": str     # Specific focus area
+}
+```
+
+**Query Types:**
+- `"conversation_summary"`: Overall summary
+- `"user_intent"`: Intent analysis
+- `"key_topics"`: Topic extraction
+- `"action_items"`: Extract tasks
+
+**LLM Type:** `intelligent`
+
+## Tool Execution
+
+### Automatic Tool Selection
+
+The LLM automatically selects appropriate tools based on:
+1. User query analysis
+2. Tool descriptions and capabilities
+3. Context awareness
+4. Tool availability
+
+### Parallel Execution
+
+Multiple tools can be executed in parallel for efficiency:
+- Independent tools run simultaneously
+- Results are aggregated
+- Errors are handled gracefully
+
+### Direct Response Tools
+
+Some tools provide direct responses to users:
+- Image generation results
+- Image analysis outputs
+- Weather information
+- Search results
+
+## Error Handling
+
+### Common Error Types
+
+1. **Parameter Validation Errors**
+   - Missing required parameters
+   - Invalid parameter types
+   - Out-of-range values
+
+2. **Execution Errors**
+   - API failures
+   - Network timeouts
+   - Resource limitations
+
+3. **Tool Not Found**
+   - Invalid tool name
+   - Tool not registered
+
+### Error Response Format
+
+```python
+{
+    "success": False,
+    "error_message": str,
+    "error_type": str,
+    "tool_name": str
+}
+```
+
+## Configuration
+
+### Tool LLM Types
+
+Tools are configured to use specific LLM types:
+
+```python
+TOOL_LLM_TYPES = {
+    "text_assistant": "intelligent",
+    "generate_image": "fast",
+    "analyze_image": "vlm",
+    "pdf_summary": "llm",
+    "pdf_text_processor": "llm",
+    "tavily_internet_search": "fast",
+    "news": "llm",
+    "weather": "fast",
+    "extract_web_content": "fast",
+    "retriever": "llm",
+    "conversation_context": "intelligent"
+}
+```
+
+### Environment Variables
+
+Required for specific tools:
+
+```bash
+# For image generation
+IMAGE_ENDPOINT=your_endpoint
+
+# For web search
+TAVILY_API_KEY=your_api_key
+
+# For image analysis
+VLM_ENDPOINT=https://integrate.api.nvidia.com/v1
+VLM_MODEL_NAME=nvidia/llama-3.1-nemotron-nano-vl-8b-v1
+```
+
+## Best Practices
+
+### Tool Development
+
+1. **Clear Descriptions**: Write precise tool descriptions
+2. **Parameter Validation**: Validate all inputs
+3. **Error Messages**: Provide helpful error messages
+4. **Resource Management**: Clean up resources properly
+5. **Logging**: Log important operations
+
+### Tool Usage
+
+1. **Specific Queries**: Be clear about what you need
+2. **Tool Limitations**: Understand each tool's capabilities
+3. **Context Provision**: Provide necessary context
+4. **Error Recovery**: Handle failures gracefully
+
+## Examples
+
+### Text Processing
+```python
+# Summarize a document
+response = text_assistant.execute({
+    "user_message": "Summarize this document focusing on key findings",
+    "task": "summarize",
+    "expertise_level": "professional"
 })
 ```
 
-### 2. PDF Summary Tool (`retrieve_pdf_summary`)
-
-Generate or retrieve document summaries.
-
+### Image Generation
 ```python
-class PDFSummaryTool(BaseTool):
-    name = "retrieve_pdf_summary"
-    llm_type = "llm"
-```
-
-**Parameters:**
-```python
-{
-    "filename": "Optional specific filename",
-    "summary_type": "document|pages|all"
-}
-```
-
-### 3. PDF Text Processor (`process_pdf_text`)
-
-Process specific PDF pages with text operations.
-
-```python
-class PDFTextProcessorTool(BaseTool):
-    name = "process_pdf_text"
-    llm_type = "llm"
-```
-
-**Parameters:**
-```python
-{
-    "task_type": "summarize|proofread|rewrite|critic|translate",
-    "page_numbers": [1, 2, 3],  # Optional specific pages
-    "instructions": "Optional instructions"
-}
-```
-
-### 4. Image Generation (`generate_image`)
-
-AI-powered image creation.
-
-```python
-class ImageGenerationTool(BaseTool):
-    name = "generate_image"
-    llm_type = "fast"  # Uses fast model for prompt enhancement
-```
-
-**Parameters:**
-```python
-{
-    "user_prompt": "Original user request",
-    "subject": "Main subject of image",
-    "style": "photorealistic|digital art|oil painting|minimalist|fantasy",
-    "mood": "bright and cheerful|dark and moody|serene|dramatic",
-    "details": "Additional details",
-    "aspect_ratio": "square|portrait|landscape",
-    "cfg_scale": 3.5,  # 1.5-4.5
-    "use_conversation_context": true
-}
-```
-
-**Example:**
-```python
-response = image_tool.execute({
-    "user_prompt": "Create a sunset scene",
-    "subject": "mountain landscape",
+# Generate an image
+response = generate_image.execute({
+    "user_prompt": "Create a sunset over mountains",
+    "subject": "mountain sunset",
     "style": "photorealistic",
     "mood": "serene",
     "aspect_ratio": "landscape"
 })
 ```
 
-### 5. Web Search (`tavily_internet_search`)
-
-General web search capabilities.
-
+### Web Search
 ```python
-class TavilyTool(BaseTool):
-    name = "tavily_internet_search"
-    llm_type = "fast"
-```
-
-**Parameters:**
-```python
-{
-    "query": "Search query string"
-}
-```
-
-### 6. News Search (`tavily_news_search`)
-
-Specialized news search from trusted sources.
-
-```python
-class NewsTool(BaseTool):
-    name = "tavily_news_search"
-    llm_type = "fast"
-```
-
-**Parameters:**
-```python
-{
-    "query": "News search query"
-}
-```
-
-### 7. Weather Tool (`get_weather`)
-
-Real-time weather information.
-
-```python
-class WeatherTool(BaseTool):
-    name = "get_weather"
-    llm_type = "fast"
-```
-
-**Parameters:**
-```python
-{
-    "location": "City name or ZIP code"
-}
-```
-
-### 8. Web Extract (`extract_web_content`)
-
-Extract content from URLs.
-
-```python
-class WebExtractTool(BaseTool):
-    name = "extract_web_content"
-    llm_type = "fast"
-```
-
-**Parameters:**
-```python
-{
-    "url": "URL to extract content from"
-}
-```
-
-### 9. Retrieval Search (`retrieval_search`)
-
-Semantic search in vector database.
-
-```python
-class RetrieverTool(BaseTool):
-    name = "retrieval_search"
-    llm_type = "llm"
-```
-
-**Parameters:**
-```python
-{
-    "query": "Search query",
-    "use_reranker": true,  # Optional
-    "max_results": 10      # Optional
-}
-```
-
-### 10. Conversation Context (`conversation_context`)
-
-Analyze conversation history (internal tool).
-
-```python
-class ConversationContextTool(BaseTool):
-    name = "conversation_context"
-    llm_type = "intelligent"
-```
-
-**Parameters:**
-```python
-{
-    "query": "conversation_summary|recent_topics|user_preferences|task_continuity",
-    "max_messages": 20,
-    "include_document_content": true
-}
-```
-
-## Tool Registry
-
-Tools are managed through a central registry:
-
-```python
-from tools.registry import tool_registry
-
-# Get all tool definitions
-tools = tool_registry.get_all_definitions()
-
-# Execute a tool
-result = tool_registry.execute_tool("text_assistant", {
-    "task_type": "summarize",
-    "text": content
+# Search the web
+response = tavily_search.execute({
+    "query": "latest developments in quantum computing"
 })
-
-# Get specific tool
-tool = tool_registry.get_tool("generate_image")
 ```
 
-## Tool Response Format
+## See Also
 
-All tools return a response inheriting from `BaseToolResponse`:
-
-```python
-class BaseToolResponse(BaseModel):
-    success: bool = True
-    error_message: Optional[str] = None
-    direct_response: bool = False  # If True, return directly to user
-```
-
-**Example Response:**
-```python
-{
-    "success": true,
-    "result": "Processed content...",
-    "task_type": "summarize",
-    "processing_notes": "Summarized from 500 to 100 words",
-    "direct_response": true
-}
-```
-
-## Tool Execution Strategies
-
-Tools can be executed in different ways:
-
-### Parallel Execution
-Default for independent tools:
-```python
-tool_calls = [
-    {"name": "get_weather", "arguments": {"location": "NYC"}},
-    {"name": "tavily_news_search", "arguments": {"query": "AI news"}}
-]
-# Both execute simultaneously
-```
-
-### Sequential Execution
-For tools with dependencies:
-```python
-# conversation_context must complete before others
-tool_calls = [
-    {"name": "conversation_context", "arguments": {...}},
-    {"name": "generate_image", "arguments": {...}}
-]
-```
-
-## Creating Custom Tools
-
-To create a new tool:
-
-```python
-from tools.base import BaseTool, BaseToolResponse
-from pydantic import Field
-
-class CustomResponse(BaseToolResponse):
-    data: str = Field(description="Processed data")
-    metadata: dict = Field(description="Additional metadata")
-
-class CustomTool(BaseTool):
-    def __init__(self):
-        super().__init__()
-        self.name = "custom_tool"
-        self.description = "Description of what this tool does"
-        self.llm_type = "fast"  # or "llm" or "intelligent"
-
-    def to_openai_format(self) -> Dict[str, Any]:
-        return {
-            "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.description,
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "input": {
-                            "type": "string",
-                            "description": "Input parameter"
-                        }
-                    },
-                    "required": ["input"]
-                }
-            }
-        }
-
-    def execute(self, params: Dict[str, Any]) -> CustomResponse:
-        # Tool implementation
-        input_data = params["input"]
-
-        # Process input
-        result = process_data(input_data)
-
-        return CustomResponse(
-            success=True,
-            data=result,
-            metadata={"processed_at": datetime.now()}
-        )
-```
-
-## Tool Selection
-
-The LLM automatically selects appropriate tools based on:
-
-1. **Tool descriptions** - Clear, specific descriptions
-2. **User intent** - What the user is asking for
-3. **Context** - Current conversation state
-4. **Availability** - Which tools are registered
-
-## Error Handling
-
-Tools implement standardized error handling:
-
-```python
-try:
-    result = tool.execute(params)
-except ValidationError as e:
-    return BaseToolResponse(
-        success=False,
-        error_message=f"Invalid parameters: {e}"
-    )
-except ToolExecutionError as e:
-    return BaseToolResponse(
-        success=False,
-        error_message=f"Execution failed: {e}"
-    )
-```
-
-## Best Practices
-
-1. **Clear Descriptions**: Write specific tool descriptions
-2. **Parameter Validation**: Validate all inputs
-3. **Error Messages**: Provide helpful error messages
-4. **Appropriate LLM**: Choose the right model type
-5. **Response Format**: Follow consistent response structure
-6. **Logging**: Log tool execution for debugging
-7. **Timeout Handling**: Implement timeouts for external calls
-
-## Configuration
-
-Tool behavior can be configured:
-
-```python
-# In tool_llm_config.py
-TOOL_LLM_TYPES = {
-    "conversation_context": "intelligent",
-    "text_assistant": "intelligent",
-    "retrieval_search": "llm",
-    "weather": "fast",
-    # ... etc
-}
-```
-
-## Next Steps
-
-- See [Controllers API](controllers.md) for tool orchestration
-- Review [Services API](services.md) for underlying services
-- Check [Architecture Overview](../architecture/overview.md) for system design
+- [Services API](services.md) - Core service implementations
+- [Controllers API](controllers.md) - Controller patterns
+- [Architecture Overview](../architecture/overview.md) - System design

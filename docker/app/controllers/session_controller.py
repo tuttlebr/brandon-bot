@@ -334,3 +334,88 @@ class SessionController:
             True if PDFs are available, False otherwise
         """
         return hasattr(st.session_state, 'stored_pdfs') and len(st.session_state.stored_pdfs) > 0
+
+    def store_uploaded_image(self, image_data: str, filename: str, file_type: str) -> str:
+        """
+        Store uploaded image externally
+
+        Args:
+            image_data: Base64 encoded image data
+            filename: Name of the image file
+            file_type: MIME type of the image
+
+        Returns:
+            Unique image ID for the stored image
+        """
+        # Ensure session is initialized
+        if not hasattr(st.session_state, 'session_id'):
+            self.initialize_session_state()
+
+        # Store image externally
+        image_id = self.file_storage.store_uploaded_image(image_data, filename, file_type, st.session_state.session_id)
+
+        # Keep reference in session state
+        if 'stored_images' not in st.session_state:
+            st.session_state.stored_images = []
+        st.session_state.stored_images.append(image_id)
+
+        # Limit stored references
+        if len(st.session_state.stored_images) > config.session.MAX_IMAGES_IN_SESSION:
+            # Remove oldest images
+            removed = st.session_state.stored_images[: -config.session.MAX_IMAGES_IN_SESSION]
+            st.session_state.stored_images = st.session_state.stored_images[-config.session.MAX_IMAGES_IN_SESSION :]
+
+            # Clean up removed images
+            for image_id in removed:
+                logging.info(f"Removing old image: {image_id}")
+
+        logging.info(f"Stored uploaded image '{filename}' with ID '{image_id}'")
+        return image_id
+
+    def get_uploaded_images(self) -> dict:
+        """
+        Get all stored uploaded images from external storage
+
+        Returns:
+            Dictionary of uploaded images keyed by image ID
+        """
+        # Ensure session state is initialized
+        if not getattr(st.session_state, "initialized", False):
+            self.initialize_session_state()
+
+        images = {}
+        for image_id in getattr(st.session_state, 'stored_images', []):
+            image_data = self.file_storage.get_uploaded_image(image_id)
+            if image_data:
+                images[image_id] = image_data
+
+        return images
+
+    def get_latest_uploaded_image(self) -> dict:
+        """
+        Get the most recently uploaded image
+
+        Returns:
+            Dictionary containing image data or None if no images available
+        """
+        if not hasattr(st.session_state, 'stored_images') or not st.session_state.stored_images:
+            return None
+
+        # Get the last image ID
+        latest_image_id = st.session_state.stored_images[-1]
+        return self.file_storage.get_uploaded_image(latest_image_id)
+
+    def clear_uploaded_images(self):
+        """Clear all stored uploaded images from session state"""
+        if hasattr(st.session_state, 'stored_images'):
+            st.session_state.stored_images = []
+            logging.info("Cleared all uploaded image references from session state")
+
+    def has_uploaded_images(self) -> bool:
+        """
+        Check if there are any uploaded images stored in session state
+
+        Returns:
+            True if images are available, False otherwise
+        """
+        return hasattr(st.session_state, 'stored_images') and len(st.session_state.stored_images) > 0
