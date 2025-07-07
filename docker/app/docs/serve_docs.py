@@ -351,29 +351,44 @@ def render_markdown_simple(content: str) -> str:
     in_list = False
     in_blockquote = False
     code_language = ""
+    code_content = []
 
     for i, line in enumerate(lines):
         # Code blocks with language support
         if line.strip().startswith('```'):
             if in_code_block:
-                html_lines.append('</code></pre>')
+                # Ending a code block
+                if code_language == 'mermaid':
+                    # Render mermaid diagram
+                    html_lines.append('<div class="mermaid">')
+                    html_lines.extend(code_content)
+                    html_lines.append('</div>')
+                else:
+                    # Regular code block
+                    html_lines.append(f'<pre class="language-{code_language}"><code>')
+                    for code_line in code_content:
+                        escaped_line = code_line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                        html_lines.append(escaped_line)
+                    html_lines.append('</code></pre>')
+
                 in_code_block = False
                 code_language = ""
+                code_content = []
             else:
+                # Starting a code block
                 # Extract language if specified
                 lang_match = re.match(r'^```(\w+)', line.strip())
                 if lang_match:
                     code_language = lang_match.group(1)
-                    html_lines.append(f'<pre class="language-{code_language}"><code>')
                 else:
-                    html_lines.append('<pre><code>')
+                    code_language = ""
                 in_code_block = True
+                code_content = []
             continue
 
         if in_code_block:
-            # Escape HTML in code blocks
-            escaped_line = line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-            html_lines.append(escaped_line)
+            # Collect code block content
+            code_content.append(line)
             continue
 
         # Blockquotes
@@ -426,17 +441,24 @@ def render_markdown_simple(content: str) -> str:
             # Process the line for inline formatting
             processed_line = process_inline_formatting(line)
 
-            # Check for mermaid diagrams
-            if 'mermaid' in processed_line.lower() and 'graph' in processed_line:
-                html_lines.append(f'<div class="mermaid">{processed_line}</div>')
-            else:
-                html_lines.append(f'<p>{processed_line}</p>')
+            # Regular paragraph
+            html_lines.append(f'<p>{processed_line}</p>')
 
     # Close any open tags
     if in_list:
         html_lines.append('</ul>')
     if in_code_block:
-        html_lines.append('</code></pre>')
+        # Handle unclosed code blocks
+        if code_language == 'mermaid':
+            html_lines.append('<div class="mermaid">')
+            html_lines.extend(code_content)
+            html_lines.append('</div>')
+        else:
+            html_lines.append(f'<pre class="language-{code_language}"><code>')
+            for code_line in code_content:
+                escaped_line = code_line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                html_lines.append(escaped_line)
+            html_lines.append('</code></pre>')
     if in_blockquote:
         html_lines.append('</blockquote>')
 
