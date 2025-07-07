@@ -113,10 +113,9 @@ class ResponseController:
             prepared_messages: Prepared messages for API call
         """
         # Get the default model type from configuration
-        from tools.tool_llm_config import DEFAULT_LLM_TYPE
+        from tools.tool_llm_config import TOOL_LLM_TYPES
 
-        # Extract model name based on the default LLM type
-        model_type = DEFAULT_LLM_TYPE
+        model_type = TOOL_LLM_TYPES["tool_selection"]
         model_name = self.session_controller.get_model_name(model_type)
 
         logging.info(

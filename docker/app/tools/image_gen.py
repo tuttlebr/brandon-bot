@@ -244,7 +244,7 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
                 top_p=app_config.llm.DEFAULT_TOP_P,
                 presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,
                 frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
-                max_tokens=200,  # Keep prompts reasonable length
+                max_tokens=128,  # Keep prompts reasonable length
                 stream=False,
             )
 

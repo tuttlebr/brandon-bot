@@ -53,8 +53,6 @@ class ConversationContextTool(BaseTool):
         super().__init__()
         self.name = "conversation_context"
         self.description = "INTERNAL TOOL: Analyzes conversation history to extract specific types of context. Use ONLY when you need to analyze the conversation itself (not for answering general questions). For analyzing what has been discussed, user patterns, or tracking ongoing tasks/projects. DO NOT use for answering user questions directly - use other appropriate tools for that."
-        # Use fast model for quick context analysis
-        self.llm_type = "fast"
 
     def to_openai_format(self) -> Dict[str, Any]:
         """
@@ -94,7 +92,7 @@ class ConversationContextTool(BaseTool):
                             "default": True,
                         },
                     },
-                    "required": ["query"],
+                    "required": ["query", "max_messages"],
                 },
             },
         }

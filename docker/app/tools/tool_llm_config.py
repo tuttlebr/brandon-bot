@@ -10,8 +10,8 @@ TOOL_LLM_TYPES = {
     "conversation_context": "intelligent",  # Quick context analysis
     "extract_web_content": "fast",  # Simple API calls and formatting
     "weather": "fast",  # Simple API calls and formatting
-    "news": "intelligent",  # Simple API calls and formatting
-    "tavily": "intelligent",  # Complex web search and synthesis
+    "news": "llm",  # Simple API calls and formatting
+    "tavily": "llm",  # Complex web search and synthesis
     "retriever": "llm",  # Semantic search and retrieval
     "pdf_summary": "llm",  # PDF summarization
     "pdf_text_processor": "llm",  # PDF text processing
@@ -21,7 +21,7 @@ TOOL_LLM_TYPES = {
 }
 
 # Default LLM type if not specified
-DEFAULT_LLM_TYPE = "llm"
+DEFAULT_LLM_TYPE = "fast"
 
 
 def get_tool_llm_type(tool_name: str) -> str:
