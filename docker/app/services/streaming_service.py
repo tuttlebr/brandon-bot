@@ -83,7 +83,7 @@ class StreamingService:
 
             if tools:
                 api_params["tools"] = tools
-                api_params["tool_choice"] = "auto"
+                api_params["tool_choice"] = "required"
                 api_params["parallel_tool_calls"] = True
 
             # Create streaming response
@@ -104,7 +104,7 @@ class StreamingService:
         model: str,
         model_type: str = "fast",
         tools: Optional[List[Dict[str, Any]]] = None,
-        tool_choice: Optional[str] = "auto",
+        tool_choice: Optional[str] = "required",
         **kwargs,
     ) -> Any:
         """

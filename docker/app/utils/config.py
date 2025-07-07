@@ -72,7 +72,7 @@ class FileProcessingConfig:
     PDF_BATCH_PROCESSING_THRESHOLD: int = 50  # Number of pages to trigger batch processing
     PDF_PAGES_PER_BATCH: int = 50  # Maximum pages to process per batch (increased from 20)
     PDF_CONTEXT_MAX_PAGES: int = 100  # Maximum pages to include in context at once (increased from 30)
-    PDF_CONTEXT_MAX_CHARS: int = 200000  # Maximum characters per context injection (increased from 100000)
+    PDF_CONTEXT_MAX_CHARS: int = 100000  # Maximum characters per context injection (increased from 100000)
 
 
 @dataclass
@@ -103,7 +103,6 @@ class LLMConfig:
     MAX_CONTEXT_TOKENS: int = field(
         default_factory=lambda: int(os.getenv("MAX_CONTEXT_TOKENS", "128000"))
     )  # Maximum context length for LLM (tokens)
-    MAX_CONTEXT_LENGTH: int = 1000000  # Maximum context length for LLM (characters) - deprecated, use MAX_CONTEXT_TOKENS
 
     # Conversation context injection
     AUTO_INJECT_CONVERSATION_CONTEXT: bool = True  # Automatically inject conversation context
@@ -295,4 +294,5 @@ logging.basicConfig(
     level=getattr(logging, config.system.LOG_LEVEL.upper()),
     format="%(asctime)s %(levelname)s %(filename)s:%(lineno)d %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[logging.StreamHandler(), logging.FileHandler("/tmp/chatbot_storage/chatbot.log", mode="a"),],
 )

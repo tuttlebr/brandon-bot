@@ -135,8 +135,12 @@ class PDFTextProcessorTool(BaseTool):
         if page_numbers:
             pages_to_process = [p for p in page_numbers if 0 < p <= total_pages]
         else:
-            # For batch PDFs without specific pages, process first 100 pages max (increased from 30)
-            pages_to_process = list(range(1, min(101, total_pages + 1)))
+            # For batch PDFs without specific pages, process the complete document
+            pages_to_process = list(range(1, total_pages + 1))
+            if total_pages > 100:
+                logger.warning(f"Processing a large document with {total_pages} pages. This may take some time.")
+            else:
+                logger.info(f"Processing complete document ({total_pages} pages)")
 
         if not pages_to_process:
             return PDFTextProcessorResponse(
@@ -167,6 +171,17 @@ class PDFTextProcessorTool(BaseTool):
         # Format the response
         pages_desc = self._format_page_range(pages_to_process)
         task_desc = self._get_task_description(task_type)
+
+        # Add note about document processing coverage
+        if len(pages_to_process) == total_pages:
+            result += (
+                f"\n\n**Note:** Processed the complete document ({len(pages_to_process)} of {total_pages} pages)."
+            )
+        elif len(pages_to_process) < total_pages:
+            result += (
+                f"\n\n**Note:** Processed {len(pages_to_process)} of {total_pages} total pages. "
+                f"To process other pages, please specify the page numbers."
+            )
 
         return PDFTextProcessorResponse(
             success=True,
@@ -347,7 +362,7 @@ class PDFTextProcessorTool(BaseTool):
         target_language: Optional[str],
     ) -> PDFTextProcessorResponse:
         """
-        Process a batch-processed PDF
+        Process a batch-processed PDF using hierarchical chunking
 
         Args:
             pdf_data: PDF metadata with batch information
@@ -373,8 +388,12 @@ class PDFTextProcessorTool(BaseTool):
         if page_numbers:
             pages_to_process = [p for p in page_numbers if 0 < p <= total_pages]
         else:
-            # For batch PDFs without specific pages, process first 100 pages max (increased from 30)
-            pages_to_process = list(range(1, min(101, total_pages + 1)))
+            # For batch PDFs without specific pages, process the complete document
+            pages_to_process = list(range(1, total_pages + 1))
+            if total_pages > 100:
+                logger.warning(f"Processing a large document with {total_pages} pages. This may take some time.")
+            else:
+                logger.info(f"Processing complete document ({total_pages} pages)")
 
         if not pages_to_process:
             return PDFTextProcessorResponse(
@@ -387,38 +406,21 @@ class PDFTextProcessorTool(BaseTool):
                 direct_response=True,
             )
 
-        # Load the required pages from batches
-        extracted_text = self._extract_batch_pages_text(file_storage, pdf_id, pages_to_process)
-
-        if not extracted_text:
-            return PDFTextProcessorResponse(
-                success=False,
-                filename=filename,
-                task_type=task_type,
-                pages_processed=pages_to_process,
-                result="",
-                message="Unable to extract text from the specified pages.",
-                direct_response=True,
-            )
-
-        # Check if we need to chunk
-        if len(extracted_text) > MAX_CHARS_PER_CHUNK or len(pages_to_process) > MAX_PAGES_PER_CHUNK:
-            # Process in chunks
-            result = self._process_in_chunks(
-                task_type, extracted_text, pages_to_process, instructions, source_language, target_language
-            )
-            chunks_processed = len(self._create_chunks(extracted_text, pages_to_process))
-        else:
-            # Process all at once
-            result = self._process_text(task_type, extracted_text, instructions, source_language, target_language)
-            chunks_processed = 1
+        # Process using hierarchical chunking
+        result = self._process_batch_pdf_hierarchically(
+            file_storage, pdf_id, pages_to_process, task_type, instructions, source_language, target_language
+        )
 
         # Format the response
         pages_desc = self._format_page_range(pages_to_process)
         task_desc = self._get_task_description(task_type)
 
-        # Add note about batch processing
-        if len(pages_to_process) < total_pages:
+        # Add note about document processing coverage
+        if len(pages_to_process) == total_pages:
+            result += (
+                f"\n\n**Note:** Processed the complete document ({len(pages_to_process)} of {total_pages} pages)."
+            )
+        elif len(pages_to_process) < total_pages:
             result += (
                 f"\n\n**Note:** Processed {len(pages_to_process)} of {total_pages} total pages. "
                 f"To process other pages, please specify the page numbers."
@@ -430,25 +432,37 @@ class PDFTextProcessorTool(BaseTool):
             task_type=task_type,
             pages_processed=pages_to_process,
             result=result,
-            chunks_processed=chunks_processed,
+            chunks_processed=1,  # We'll track this differently for hierarchical processing
             message=f"## {task_desc} of {filename} ({pages_desc})\n\n{result}",
             direct_response=True,
         )
 
-    def _extract_batch_pages_text(self, file_storage, pdf_id: str, page_numbers: List[int]) -> str:
+    def _process_batch_pdf_hierarchically(
+        self,
+        file_storage,
+        pdf_id: str,
+        page_numbers: List[int],
+        task_type: str,
+        instructions: str,
+        source_language: Optional[str],
+        target_language: Optional[str],
+    ) -> str:
         """
-        Extract text from specific pages in a batch-processed PDF
+        Process batch PDF using hierarchical chunking to avoid token limits
 
         Args:
             file_storage: File storage service instance
             pdf_id: PDF reference ID
-            page_numbers: List of page numbers to extract
+            page_numbers: List of page numbers to process
+            task_type: Type of text processing
+            instructions: Additional instructions
+            source_language: Source language for translation
+            target_language: Target language for translation
 
         Returns:
-            Extracted text
+            Processed result
         """
-        pages_per_batch = config.file_processing.PDF_PAGES_PER_BATCH  # Use config instead of hardcoded value
-        text_parts = []
+        pages_per_batch = config.file_processing.PDF_PAGES_PER_BATCH
 
         # Group pages by batch
         pages_by_batch = {}
@@ -458,26 +472,198 @@ class PDFTextProcessorTool(BaseTool):
                 pages_by_batch[batch_num] = []
             pages_by_batch[batch_num].append(page_num)
 
-        # Load and extract text from each batch
+        # Process each batch individually
+        batch_results = []
         for batch_num, batch_pages in sorted(pages_by_batch.items()):
-            batch_id = f"{pdf_id}_batch_{batch_num}"
-            batch_path = file_storage.pdfs_dir / f"{batch_id}.json"
+            batch_result = self._process_single_batch(
+                file_storage, pdf_id, batch_num, batch_pages, task_type, instructions, source_language, target_language
+            )
+            if batch_result:
+                batch_results.append(batch_result)
 
-            if batch_path.exists():
-                import json
+        if not batch_results:
+            return "No content could be processed from the specified pages."
 
-                batch_data = json.loads(batch_path.read_text())
-                batch_page_list = batch_data.get("pages", [])
+        # If we have multiple batch results, combine them hierarchically
+        if len(batch_results) > 1:
+            return self._combine_batch_results(batch_results, task_type, instructions)
+        else:
+            return batch_results[0]
 
-                for page_num in batch_pages:
-                    page_idx_in_batch = (page_num - 1) % pages_per_batch
-                    if page_idx_in_batch < len(batch_page_list):
-                        page_data = batch_page_list[page_idx_in_batch]
-                        page_text = page_data.get("text", "")
-                        if page_text:
-                            text_parts.append(f"[Page {page_num}]\n{page_text}")
+    def _process_single_batch(
+        self,
+        file_storage,
+        pdf_id: str,
+        batch_num: int,
+        batch_pages: List[int],
+        task_type: str,
+        instructions: str,
+        source_language: Optional[str],
+        target_language: Optional[str],
+    ) -> Optional[str]:
+        """
+        Process a single batch of pages
+
+        Args:
+            file_storage: File storage service instance
+            pdf_id: PDF reference ID
+            batch_num: Batch number
+            batch_pages: List of page numbers in this batch
+            task_type: Type of text processing
+            instructions: Additional instructions
+            source_language: Source language for translation
+            target_language: Target language for translation
+
+        Returns:
+            Processed result or None if failed
+        """
+        try:
+            # Extract text from this batch
+            batch_text = self._extract_batch_text(file_storage, pdf_id, batch_num, batch_pages)
+
+            if not batch_text:
+                return None
+
+            # Check if this batch is too large for direct processing
+            estimated_tokens = len(batch_text) // 4  # Rough token estimation
+            if estimated_tokens > 80000:  # Conservative limit
+                # Split batch into smaller chunks
+                return self._process_large_batch_chunks(
+                    batch_text, batch_pages, task_type, instructions, source_language, target_language
+                )
+
+            # Process the batch directly
+            return self._process_text(task_type, batch_text, instructions, source_language, target_language)
+
+        except Exception as e:
+            logger.error(f"Error processing batch {batch_num}: {e}")
+            return f"Batch {batch_num + 1} processing failed due to error: {str(e)}"
+
+    def _extract_batch_text(self, file_storage, pdf_id: str, batch_num: int, batch_pages: List[int]) -> str:
+        """
+        Extract text from a specific batch
+
+        Args:
+            file_storage: File storage service instance
+            pdf_id: PDF reference ID
+            batch_num: Batch number
+            batch_pages: List of page numbers in this batch
+
+        Returns:
+            Extracted text
+        """
+        batch_id = f"{pdf_id}_batch_{batch_num}"
+        batch_path = file_storage.pdfs_dir / f"{batch_id}.json"
+
+        if not batch_path.exists():
+            return ""
+
+        import json
+
+        batch_data = json.loads(batch_path.read_text())
+        batch_page_list = batch_data.get("pages", [])
+        pages_per_batch = config.file_processing.PDF_PAGES_PER_BATCH
+
+        text_parts = []
+        for page_num in batch_pages:
+            page_idx_in_batch = (page_num - 1) % pages_per_batch
+            if page_idx_in_batch < len(batch_page_list):
+                page_data = batch_page_list[page_idx_in_batch]
+                page_text = page_data.get("text", "")
+                if page_text:
+                    text_parts.append(f"[Page {page_num}]\n{page_text}")
 
         return "\n\n".join(text_parts)
+
+    def _process_large_batch_chunks(
+        self,
+        batch_text: str,
+        batch_pages: List[int],
+        task_type: str,
+        instructions: str,
+        source_language: Optional[str],
+        target_language: Optional[str],
+    ) -> str:
+        """
+        Process a large batch by splitting into smaller chunks
+
+        Args:
+            batch_text: Text from the batch
+            batch_pages: List of page numbers in this batch
+            task_type: Type of text processing
+            instructions: Additional instructions
+            source_language: Source language for translation
+            target_language: Target language for translation
+
+        Returns:
+            Combined processed result
+        """
+        # Split text into smaller chunks (approximately 50K characters each)
+        chunk_size = 50000
+        chunks = []
+
+        for i in range(0, len(batch_text), chunk_size):
+            chunk = batch_text[i : i + chunk_size]
+            chunks.append(chunk)
+
+        # Process each chunk
+        chunk_results = []
+        for i, chunk in enumerate(chunks):
+            try:
+                chunk_instructions = f"{instructions} (Processing chunk {i+1} of {len(chunks)})"
+                chunk_result = self._process_text(
+                    task_type, chunk, chunk_instructions, source_language, target_language
+                )
+                chunk_results.append(chunk_result)
+            except Exception as e:
+                logger.error(f"Error processing chunk {i+1}: {e}")
+                chunk_results.append(f"Chunk {i+1} processing failed due to error: {str(e)}")
+
+        # Combine chunk results
+        if chunk_results:
+            return "\n\n---\n\n".join(chunk_results)
+        else:
+            return "No content could be processed from this batch."
+
+    def _combine_batch_results(self, batch_results: List[str], task_type: str, instructions: str) -> str:
+        """
+        Combine multiple batch results into a final result
+
+        Args:
+            batch_results: List of batch processing results
+            task_type: Type of text processing
+            instructions: Original instructions
+
+        Returns:
+            Combined result
+        """
+        try:
+            # Combine all batch results
+            combined_text = "\n\n---\n\n".join(batch_results)
+
+            # Create final processing instructions
+            if task_type == "summarize":
+                final_instructions = (
+                    f"Create a comprehensive summary based on these processed sections. "
+                    f"Combine the information into a cohesive whole. {instructions}"
+                )
+            elif task_type == "translate":
+                final_instructions = (
+                    f"Translate the combined content. Ensure consistency across all sections. {instructions}"
+                )
+            else:
+                final_instructions = (
+                    f"Process the combined content from all sections. "
+                    f"Ensure consistency and coherence across the entire document. {instructions}"
+                )
+
+            # Process the combined results
+            return self._process_text(task_type, combined_text, final_instructions, None, None)
+
+        except Exception as e:
+            logger.error(f"Error combining batch results: {e}")
+            # Fallback: return concatenated results
+            return "\n\n---\n\n".join(batch_results)
 
 
 # Create global instance

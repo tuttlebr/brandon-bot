@@ -329,7 +329,7 @@ class PDFSummaryTool(BaseTool):
 
     def _summarize_batch_processed_pdf(self, pdf_data: Dict[str, Any], summary_type: str) -> PDFSummaryResponse:
         """
-        Handle summarization of batch-processed PDFs
+        Handle summarization of batch-processed PDFs using hierarchical chunking
 
         Args:
             pdf_data: PDF metadata with batch information
@@ -348,13 +348,11 @@ class PDFSummaryTool(BaseTool):
 
         file_storage = FileStorageService()
 
-        # For batch-processed PDFs, we'll summarize the first few batches
-        max_batches_to_summarize = min(3, total_batches)  # Summarize up to 3 batches
-
-        combined_text = []
+        # Step 1: Process each batch individually to create batch summaries
+        batch_summaries = []
         pages_included = 0
 
-        for batch_num in range(max_batches_to_summarize):
+        for batch_num in range(total_batches):
             batch_id = f"{pdf_id}_batch_{batch_num}"
             batch_path = file_storage.pdfs_dir / f"{batch_id}.json"
 
@@ -362,14 +360,14 @@ class PDFSummaryTool(BaseTool):
                 batch_data = json.loads(batch_path.read_text())
                 batch_pages = batch_data.get("pages", [])
 
-                for page in batch_pages[: config.file_processing.PDF_PAGES_PER_BATCH]:
-                    page_text = page.get("text", "").strip()
-                    if page_text:
-                        page_num = page.get("page", pages_included + 1)
-                        combined_text.append(f"Page {page_num}:\n{page_text}")
-                        pages_included += 1
+                if batch_pages:
+                    # Create batch-level summary
+                    batch_summary = self._summarize_batch_pages(batch_pages, batch_num, summary_type)
+                    if batch_summary:
+                        batch_summaries.append(batch_summary)
+                        pages_included += len(batch_pages)
 
-        if not combined_text:
+        if not batch_summaries:
             return PDFSummaryResponse(
                 success=False,
                 filename=filename,
@@ -378,56 +376,225 @@ class PDFSummaryTool(BaseTool):
                 direct_response=True,
             )
 
-        # Prepare summary request
-        full_text = "\n\n".join(combined_text)
+        # Step 2: If we have multiple batch summaries, combine them hierarchically
+        if len(batch_summaries) > 1:
+            final_summary = self._combine_batch_summaries(batch_summaries, filename, summary_type)
+        else:
+            final_summary = batch_summaries[0]
 
-        if summary_type == "detailed":
-            instructions = (
-                f"Create a comprehensive, detailed summary of this document. "
-                f"Include all major sections, key findings, methodologies, and conclusions. "
-                f"Note: This summary is based on the first {pages_included} pages of a {total_pages}-page document."
+        # Add note about complete document coverage
+        if pages_included == total_pages:
+            final_summary += (
+                f"\n\n**Note:** This summary covers the complete document ({pages_included} of {total_pages} pages). "
+                f"The document was processed in {total_batches} batches for memory efficiency."
             )
-        else:  # brief
-            instructions = (
-                f"Create a concise summary highlighting the main purpose and key points of this document. "
-                f"Keep it under 300 words. "
-                f"Note: This summary is based on the first {pages_included} pages of a {total_pages}-page document."
-            )
-
-        # Use assistant tool for summarization
-        summary_params = {
-            "task_type": "summarize",
-            "text": full_text,
-            "instructions": instructions,
-        }
-
-        from tools.assistant import execute_assistant_with_dict
-
-        summary_result = execute_assistant_with_dict(summary_params)
-
-        # Format response
-        summary_text = summary_result.result if hasattr(summary_result, 'result') else str(summary_result)
-
-        # Add note about partial document
-        if pages_included < total_pages:
-            summary_text += (
-                f"\n\n**Note:** This summary is based on {pages_included} of {total_pages} total pages. "
+        else:
+            final_summary += (
+                f"\n\n**Note:** This summary covers {pages_included} of {total_pages} total pages. "
                 f"The document was processed in {total_batches} batches for memory efficiency. "
                 f"For specific information from other sections, please ask about particular topics or page ranges."
             )
 
-        formatted_summary = f"## {summary_type.title()} Summary of {filename}\n\n{summary_text}"
+        formatted_summary = f"## {summary_type.title()} Summary of {filename}\n\n{final_summary}"
 
         return PDFSummaryResponse(
             success=True,
             filename=filename,
             summary_type=summary_type,
-            summary=summary_text,
+            summary=final_summary,
             pages_summarized=pages_included,
             total_pages=total_pages,
             message=formatted_summary,
             direct_response=True,
         )
+
+    def _summarize_batch_pages(
+        self, batch_pages: List[Dict[str, Any]], batch_num: int, summary_type: str
+    ) -> Optional[str]:
+        """
+        Summarize a single batch of pages
+
+        Args:
+            batch_pages: List of page data for this batch
+            batch_num: Batch number for context
+            summary_type: Type of summary requested
+
+        Returns:
+            Summary text or None if failed
+        """
+        try:
+            # Combine text from this batch only
+            batch_text_parts = []
+            for page in batch_pages:
+                page_text = page.get("text", "").strip()
+                if page_text:
+                    page_num = page.get("page", "Unknown")
+                    batch_text_parts.append(f"Page {page_num}:\n{page_text}")
+
+            if not batch_text_parts:
+                return None
+
+            batch_text = "\n\n".join(batch_text_parts)
+
+            # Check if this batch is too large for direct processing
+            estimated_tokens = len(batch_text) // 4  # Rough token estimation
+            if estimated_tokens > 100000:  # Conservative limit
+                # Split batch into smaller chunks
+                return self._summarize_large_batch(batch_pages, batch_num, summary_type)
+
+            # Create batch-level summary
+            if summary_type == "detailed":
+                instructions = (
+                    f"Create a detailed summary of this batch of pages from a larger document. "
+                    f"Include key information, main topics, and important details. "
+                    f"This is batch {batch_num + 1} of the document."
+                )
+            else:  # brief
+                instructions = (
+                    f"Create a concise summary of this batch of pages. "
+                    f"Focus on main points and key information. "
+                    f"Keep it under 200 words. This is batch {batch_num + 1} of the document."
+                )
+
+            # Use assistant tool for summarization
+            summary_params = {
+                "task_type": "summarize",
+                "text": batch_text,
+                "instructions": instructions,
+            }
+
+            from tools.assistant import execute_assistant_with_dict
+
+            summary_result = execute_assistant_with_dict(summary_params)
+            return summary_result.result if hasattr(summary_result, 'result') else str(summary_result)
+
+        except Exception as e:
+            logger.error(f"Error summarizing batch {batch_num}: {e}")
+            return f"Batch {batch_num + 1} summary unavailable due to processing error."
+
+    def _summarize_large_batch(self, batch_pages: List[Dict[str, Any]], batch_num: int, summary_type: str) -> str:
+        """
+        Handle summarization of large batches by splitting into smaller chunks
+
+        Args:
+            batch_pages: List of page data for this batch
+            batch_num: Batch number for context
+            summary_type: Type of summary requested
+
+        Returns:
+            Combined summary text
+        """
+        # Split batch into smaller chunks (5 pages per chunk)
+        chunk_size = 5
+        chunk_summaries = []
+
+        for i in range(0, len(batch_pages), chunk_size):
+            chunk_pages = batch_pages[i : i + chunk_size]
+
+            # Create chunk-level summary
+            chunk_text_parts = []
+            for page in chunk_pages:
+                page_text = page.get("text", "").strip()
+                if page_text:
+                    page_num = page.get("page", "Unknown")
+                    chunk_text_parts.append(f"Page {page_num}:\n{page_text}")
+
+            if chunk_text_parts:
+                chunk_text = "\n\n".join(chunk_text_parts)
+
+                instructions = (
+                    f"Create a brief summary of these pages from batch {batch_num + 1}. "
+                    f"Focus on key information and main points."
+                )
+
+                summary_params = {
+                    "task_type": "summarize",
+                    "text": chunk_text,
+                    "instructions": instructions,
+                }
+
+                try:
+                    from tools.assistant import execute_assistant_with_dict
+
+                    summary_result = execute_assistant_with_dict(summary_params)
+                    chunk_summary = summary_result.result if hasattr(summary_result, 'result') else str(summary_result)
+                    chunk_summaries.append(chunk_summary)
+                except Exception as e:
+                    logger.error(f"Error summarizing chunk in batch {batch_num}: {e}")
+                    chunk_summaries.append(f"Chunk summary unavailable due to processing error.")
+
+        # Combine chunk summaries into batch summary
+        if chunk_summaries:
+            combined_chunks = "\n\n".join(chunk_summaries)
+
+            instructions = (
+                f"Combine these chunk summaries from batch {batch_num + 1} into a cohesive batch summary. "
+                f"Maintain key information while eliminating redundancy."
+            )
+
+            summary_params = {
+                "task_type": "summarize",
+                "text": combined_chunks,
+                "instructions": instructions,
+            }
+
+            try:
+                from tools.assistant import execute_assistant_with_dict
+
+                summary_result = execute_assistant_with_dict(summary_params)
+                return summary_result.result if hasattr(summary_result, 'result') else str(summary_result)
+            except Exception as e:
+                logger.error(f"Error combining chunk summaries for batch {batch_num}: {e}")
+                return f"Batch {batch_num + 1} summary unavailable due to processing error."
+
+        return f"Batch {batch_num + 1} summary unavailable."
+
+    def _combine_batch_summaries(self, batch_summaries: List[str], filename: str, summary_type: str) -> str:
+        """
+        Combine multiple batch summaries into a final document summary
+
+        Args:
+            batch_summaries: List of batch summary texts
+            filename: Document filename
+            summary_type: Type of summary requested
+
+        Returns:
+            Final combined summary
+        """
+        try:
+            # Combine all batch summaries
+            combined_summaries = "\n\n---\n\n".join(batch_summaries)
+
+            # Create final summary instructions
+            if summary_type == "detailed":
+                instructions = (
+                    f"Create a comprehensive, detailed summary of the entire document '{filename}' "
+                    f"based on these batch summaries. Include all major sections, key findings, "
+                    f"methodologies, and conclusions. Synthesize the information into a cohesive whole."
+                )
+            else:  # brief
+                instructions = (
+                    f"Create a concise summary of the entire document '{filename}' "
+                    f"based on these batch summaries. Highlight the main purpose and key points. "
+                    f"Keep it under 300 words."
+                )
+
+            # Use assistant tool for final summarization
+            summary_params = {
+                "task_type": "summarize",
+                "text": combined_summaries,
+                "instructions": instructions,
+            }
+
+            from tools.assistant import execute_assistant_with_dict
+
+            summary_result = execute_assistant_with_dict(summary_params)
+            return summary_result.result if hasattr(summary_result, 'result') else str(summary_result)
+
+        except Exception as e:
+            logger.error(f"Error combining batch summaries: {e}")
+            # Fallback: return concatenated summaries
+            return "\n\n---\n\n".join(batch_summaries)
 
     def debug_pdf_processing(self, params: Dict[str, Any]) -> PDFSummaryResponse:
         """

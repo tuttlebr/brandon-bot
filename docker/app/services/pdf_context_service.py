@@ -396,17 +396,23 @@ class PDFContextService:
         max_chars = config.file_processing.PDF_CONTEXT_MAX_CHARS
         pages_included = 0
 
-        for page in pages[:max_chars]:  # Limit pages upfront
+        # Process all pages and let the character limit handle truncation for context injection.
+        # The analysis tools will process the full document regardless.
+        total_pages = len(pages)
+        pages_to_process = pages
+        logger.info(f"Preparing to process all {total_pages} pages for regular PDF context.")
+
+        for page in pages_to_process:
             page_num = page.get('page', pages_included + 1)
             page_text = page.get('text', '').strip()
 
             if page_text:
                 # Check if adding this page would exceed our character limit
                 if current_chars + len(page_text) > max_chars and pages_included > 0:
-                    remaining_pages = len(pages) - pages_included
+                    remaining_pages = len(pages_to_process) - pages_included
                     if remaining_pages > 0:
                         content_parts.append(
-                            f"\n[... {remaining_pages} more pages available but not included to optimize memory usage ...]"
+                            f"\n[... {remaining_pages} more pages available. The analysis tools will process the complete document ...]"
                         )
                     break
 
@@ -421,8 +427,8 @@ class PDFContextService:
 
         if pages_included < len(pages):
             content_parts.append(
-                f"\nNote: Showing {pages_included} of {len(pages)} pages. "
-                f"For specific information from other pages, please mention the page numbers in your question."
+                f"\nNote: Showing {pages_included} of {len(pages)} pages for context. "
+                f"The analysis tools will process the complete document."
             )
 
         return content_parts
@@ -462,16 +468,17 @@ class PDFContextService:
                 else:  # Single page
                     page_numbers.append(int(match[0]))
 
-        # If no specific pages mentioned, load a reasonable subset for context injection
-        # The analysis tools will handle the full document through their own batch processing
+        # If no specific pages mentioned, load all pages for analysis.
         if not page_numbers:
-            # Load first 50 pages for context injection (fits within LLM limits)
-            # The analysis tools will process the full document in their own batches
-            default_pages = min(50, pdf_data.get('total_pages', 50))
-            page_numbers = list(range(1, default_pages + 1))
-            logger.info(
-                f"No specific pages mentioned in query, loading first {len(page_numbers)} pages for context injection. Full document will be processed by analysis tools."
-            )
+            # For batch-processed PDFs, we load all pages for analysis.
+            total_pages = pdf_data.get('total_pages', 0)
+            page_numbers = list(range(1, total_pages + 1))
+            if total_pages > 100:
+                logger.warning(f"Loading all {total_pages} pages for a large document. Analysis may take some time.")
+            else:
+                logger.info(
+                    f"No specific pages mentioned, loading all {total_pages} pages for comprehensive analysis."
+                )
 
         # Remove duplicates and sort
         page_numbers = sorted(set(page_numbers))
@@ -513,8 +520,16 @@ class PDFContextService:
                 return content_parts
 
         current_chars = 0
-        # Use reasonable character limit to fit within LLM context window
-        max_chars = config.file_processing.PDF_CONTEXT_MAX_CHARS
+        # For batch-processed PDFs, be more permissive with character limits
+        # since the analysis tools can handle complete documents through their own batch processing
+        is_batch_processed = pdf_data.get('batch_processed', False)
+        if is_batch_processed:
+            # Allow more content for batch-processed PDFs since analysis tools handle complete documents
+            max_chars = config.file_processing.PDF_CONTEXT_MAX_CHARS * 2  # Double the limit for batch-processed
+            logger.info(f"Using increased character limit ({max_chars}) for batch-processed PDF")
+        else:
+            # Use standard limit for regular PDFs
+            max_chars = config.file_processing.PDF_CONTEXT_MAX_CHARS
         pages_included = 0
 
         for page in loaded_pages:
@@ -523,9 +538,16 @@ class PDFContextService:
 
             if page_text:
                 if current_chars + len(page_text) > max_chars and pages_included > 0:
-                    content_parts.append(
-                        f"\n[... Additional pages available but truncated to optimize memory usage ...]"
-                    )
+                    if is_batch_processed:
+                        # For batch-processed PDFs, note that analysis tools will process the complete document
+                        content_parts.append(
+                            f"\n[... Additional pages available. The analysis tools will process the complete document through batch processing ...]"
+                        )
+                    else:
+                        # For regular PDFs, use the standard truncation message
+                        content_parts.append(
+                            f"\n[... Additional pages available but truncated to optimize memory usage ...]"
+                        )
                     break
 
                 content_parts.append(f"\n### Page {page_num}")
@@ -543,9 +565,14 @@ class PDFContextService:
                 content_parts.append(f"and {len(page_numbers) - 10} more...")
 
             if pages_included < len(loaded_pages):
-                content_parts.append(
-                    f"\n**Note:** Loaded {pages_included} of {len(loaded_pages)} requested pages due to character limits."
-                )
+                if is_batch_processed:
+                    content_parts.append(
+                        f"\n**Note:** Loaded {pages_included} of {len(loaded_pages)} requested pages for context. The analysis tools will process the complete document through batch processing."
+                    )
+                else:
+                    content_parts.append(
+                        f"\n**Note:** Loaded {pages_included} of {len(loaded_pages)} requested pages due to character limits."
+                    )
 
         return content_parts
 

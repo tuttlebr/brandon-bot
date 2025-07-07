@@ -108,7 +108,6 @@ DATABASE_URL=http://milvus-standalone:19530
 ```bash
 # Performance Tuning
 SLIDING_WINDOW_MAX_TURNS=20
-MAX_CONTEXT_LENGTH=1000000
 
 # File Limits
 MAX_PDF_SIZE=16777216  # 16MB

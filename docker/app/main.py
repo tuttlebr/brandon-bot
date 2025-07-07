@@ -301,12 +301,7 @@ class ProductionStreamlitChatApp:
 
 def main():
     """Main function to run the production-ready Streamlit app"""
-    # Configure logging for production
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[logging.StreamHandler(), logging.FileHandler("/tmp/chatbot.log", mode="a"),],
-    )
+    # Logging is already configured in config.py
 
     # Initialize app startup settings (including warning suppression)
     from utils.startup import initialize_app

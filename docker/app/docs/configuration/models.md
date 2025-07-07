@@ -181,7 +181,6 @@ For long conversations:
 ```bash
 # Configure sliding window
 SLIDING_WINDOW_MAX_TURNS=20
-MAX_CONTEXT_LENGTH=1000000
 ```
 
 ### Context Compression

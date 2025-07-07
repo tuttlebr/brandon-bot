@@ -110,7 +110,7 @@ class LLMService:
             tool_selection_model_type = get_tool_llm_type("tool_selection")
             tool_selection_model = self._get_model_for_type(tool_selection_model_type)
             response = self.streaming_service.sync_completion(
-                windowed_messages, tool_selection_model, tool_selection_model_type, tools=tools, tool_choice="auto"
+                windowed_messages, tool_selection_model, tool_selection_model_type, tools=tools, tool_choice="required"
             )
 
             # Parse response for content and tool calls

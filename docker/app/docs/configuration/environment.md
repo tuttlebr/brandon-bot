@@ -92,7 +92,6 @@ DEFAULT_PRESENCE_PENALTY=0.0
 
 # Context window settings
 SLIDING_WINDOW_MAX_TURNS=20  # Number of conversation turns to keep
-MAX_CONTEXT_LENGTH=1000000   # Maximum context length in characters
 
 # Conversation context injection
 AUTO_INJECT_CONVERSATION_CONTEXT=true
