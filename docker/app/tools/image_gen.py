@@ -61,6 +61,7 @@ class ImageGenerationTool(BaseTool):
         super().__init__()
         self.name = "generate_image"
         self.description = "ONLY use when explicitly asked to create, generate, or make an image, picture, photo, artwork, or visual content. Creates AI-generated images based on text descriptions, supporting various artistic styles, moods, and aspect ratios. DO NOT use for general questions, information lookup, or non-image requests."
+        self.supported_contexts = ['image_generation']
 
     def to_openai_format(self) -> Dict[str, Any]:
         """

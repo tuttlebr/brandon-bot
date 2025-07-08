@@ -6,7 +6,7 @@ ensuring consistent implementation and behavior across all tools.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel
 
@@ -39,6 +39,8 @@ class BaseTool(ABC):
         # Options: "fast", "llm", "intelligent"
         # Default to "fast" for efficiency, tools can override
         self.llm_type: Literal["fast", "llm", "intelligent"] = "fast"
+        # Contexts this tool supports (for system prompt context mapping)
+        self.supported_contexts: List[str] = []
 
     def get_definition(self) -> Dict[str, Any]:
         """
@@ -64,7 +66,6 @@ class BaseTool(ABC):
         Returns:
             A response object inheriting from BaseToolResponse
         """
-        pass
 
     def validate_params(self, params: Dict[str, Any], required: list) -> None:
         """

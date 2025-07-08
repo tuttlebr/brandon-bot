@@ -39,6 +39,7 @@ class TavilyTool(BaseTool):
         super().__init__()
         self.name = "tavily_internet_search"
         self.description = "General web search tool for finding current information, facts, definitions, how-to guides, product reviews, and general knowledge from across the internet. Use this for: research topics, technical information, product details, educational content, or any general web search. Avoid using for breaking news or recent events - use the news search tool instead."
+        self.supported_contexts = ['research']
 
     def to_openai_format(self) -> Dict[str, Any]:
         """

@@ -68,6 +68,34 @@ class ToolRegistry:
         """
         return self._tools.get(name)
 
+    def get_tool_by_context(self, context: str) -> Optional[BaseTool]:
+        """
+        Get a tool that supports the given context
+
+        Args:
+            context: Context name to find a tool for
+
+        Returns:
+            Tool instance that supports this context or None if not found
+        """
+        for tool in self._tools.values():
+            if hasattr(tool, 'supported_contexts') and context in tool.supported_contexts:
+                return tool
+        return None
+
+    def get_all_supported_contexts(self) -> List[str]:
+        """
+        Get all unique contexts supported by registered tools
+
+        Returns:
+            List of unique context names
+        """
+        contexts = set()
+        for tool in self._tools.values():
+            if hasattr(tool, 'supported_contexts'):
+                contexts.update(tool.supported_contexts)
+        return sorted(list(contexts))
+
     def execute_tool(self, name: str, params: Dict[str, Any]) -> Any:
         """
         Execute a tool by name

@@ -34,13 +34,24 @@ repos:
             "--ws",
             "--skip=third_party",
           ]
-  # - repo: https://github.com/lovesegfault/beautysh
-  #   rev: v6.2.1
-  #   hooks:
-  #     - id: beautysh
-  #       name: beautysh (bash)
-  #       args: ["--indent-size=2", "--force-function-style=fnpar"]
+  - repo: https://github.com/lovesegfault/beautysh
+    rev: v6.2.1
+    hooks:
+      - id: beautysh
+        name: beautysh (bash)
+        args: ["--indent-size=2", "--force-function-style=fnpar"]
   - repo: https://github.com/tuttlebr/nv-pre-commit
     rev: v0.0.5 # Use the ref you want to point at
     hooks:
       - id: detect-nv-keys
+  - repo: https://github.com/PyCQA/autoflake
+    rev: v2.3.1 # Use the latest version available
+    hooks:
+      - id: autoflake
+        args:
+          [
+            --remove-all-unused-imports,
+            --in-place,
+            --remove-unused-variables,
+            --ignore-init-module-imports,
+          ]

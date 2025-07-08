@@ -61,6 +61,7 @@ class AssistantTool(BaseTool):
         super().__init__()
         self.name = "text_assistant"
         self.description = "ONLY use for text and document processing tasks when explicitly requested. Use 'analyze' for document insights and PDF analysis, 'summarize' to condense long content into key points, 'proofread' to correct errors and improve writing quality, 'rewrite' to enhance clarity and impact while preserving meaning, 'critic' for constructive feedback and improvement suggestions, 'translate' to convert text between languages, 'develop' for programming assistance and code writing, or 'generalist' for thoughtful discussion on any topic. DO NOT use for image analysis, general questions, web searches, or information lookup - use appropriate specialized tools for those tasks."
+        self.supported_contexts = ['translation', 'text_processing', 'code_generation']
 
         # Initialize services
         config = ChatConfig.from_environment()
@@ -353,7 +354,7 @@ class AssistantTool(BaseTool):
             from models.chat_config import ChatConfig
             from services.file_storage_service import FileStorageService
 
-            config = ChatConfig.from_environment()
+            ChatConfig.from_environment()
             file_storage = FileStorageService()
 
             # Get all PDF files and find the most recent one
