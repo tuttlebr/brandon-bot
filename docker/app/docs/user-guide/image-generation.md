@@ -25,6 +25,7 @@ See [Environment Configuration](../configuration/environment.md) for details.
 ## Best Practices
 
 ### Be Descriptive
+
 - Include details about style, colors, mood
 - Specify the setting and atmosphere
 - Mention specific elements you want
@@ -32,12 +33,15 @@ See [Environment Configuration](../configuration/environment.md) for details.
 ### Example Prompts
 
 **Simple**:
+
 - "A red rose in a garden"
 
 **Detailed**:
+
 - "A vibrant red rose with morning dew drops, surrounded by green leaves in a sunny garden, photorealistic style"
 
 **Artistic**:
+
 - "Abstract representation of joy using warm colors and flowing shapes, modern art style"
 
 ## Image Specifications
@@ -55,11 +59,13 @@ See [Environment Configuration](../configuration/environment.md) for details.
 ## Troubleshooting
 
 ### No Image Generated
+
 - Check API configuration
 - Verify endpoint is accessible
 - Review error messages
 
 ### Poor Quality Results
+
 - Add more descriptive details
 - Specify art style or technique
 - Try different phrasings

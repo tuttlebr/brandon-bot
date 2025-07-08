@@ -12,7 +12,9 @@ from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 # Initialize FastAPI app
-app = FastAPI(title="Nemotron Chat Documentation", docs_url=None, redoc_url=None, openapi_url=None)
+app = FastAPI(
+    title="Nemotron Chat Documentation", docs_url=None, redoc_url=None, openapi_url=None
+)
 
 # Documentation root directory
 DOCS_ROOT = Path(__file__).parent
@@ -367,7 +369,11 @@ def render_markdown_simple(content: str) -> str:
                     # Regular code block
                     html_lines.append(f'<pre class="language-{code_language}"><code>')
                     for code_line in code_content:
-                        escaped_line = code_line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                        escaped_line = (
+                            code_line.replace('&', '&amp;')
+                            .replace('<', '&lt;')
+                            .replace('>', '&gt;')
+                        )
                         html_lines.append(escaped_line)
                     html_lines.append('</code></pre>')
 
@@ -456,7 +462,11 @@ def render_markdown_simple(content: str) -> str:
         else:
             html_lines.append(f'<pre class="language-{code_language}"><code>')
             for code_line in code_content:
-                escaped_line = code_line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                escaped_line = (
+                    code_line.replace('&', '&amp;')
+                    .replace('<', '&lt;')
+                    .replace('>', '&gt;')
+                )
                 html_lines.append(escaped_line)
             html_lines.append('</code></pre>')
     if in_blockquote:
@@ -540,6 +550,7 @@ def get_nav_html() -> str:
             <li><a href="/docs/api">🔧 API Reference</a></li>
             <li><a href="/docs/configuration">⚙️ Configuration</a></li>
             <li><a href="/docs/deployment">🚢 Deployment</a></li>
+            <li><a href="/docs/developer">👨‍💻 Developer</a></li>
             <li><a href="/docs/faq">❓ FAQ</a></li>
             <li><a href="/docs/troubleshooting">🐛 Troubleshooting</a></li>
         </ul>
@@ -556,12 +567,15 @@ def get_section_pages() -> Dict[str, List[str]]:
             "pdf-analysis",
             "pdf_context_switching",
             "image-generation",
+            "image-upload-vlm",
             "search-features",
+            "system_prompt_pattern",
         ],
         "architecture": ["overview", "services"],
         "api": ["services", "controllers", "tools", "streaming"],
         "configuration": ["environment", "models"],
         "deployment": ["docker"],
+        "developer": ["batch-processing"],
     }
     return sections
 
@@ -576,17 +590,17 @@ def get_section_content(section: str) -> str:
             <div class="feature-card">
                 <h3>🚀 Quick Start</h3>
                 <p>Get Nemotron running in 5 minutes with Docker.</p>
-                <a href="/docs/quickstart">View Guide →</a>
+                <a href="/docs/getting-started/quickstart">View Guide →</a>
             </div>
             <div class="feature-card">
                 <h3>📦 Installation</h3>
                 <p>Detailed installation instructions for all platforms.</p>
-                <a href="/docs/installation">View Guide →</a>
+                <a href="/docs/getting-started/installation">View Guide →</a>
             </div>
             <div class="feature-card">
                 <h3>👋 First Steps</h3>
                 <p>Your first conversation with Nemotron.</p>
-                <a href="/docs/first-steps">View Guide →</a>
+                <a href="/docs/getting-started/first-steps">View Guide →</a>
             </div>
         </div>
         """,
@@ -597,17 +611,32 @@ def get_section_content(section: str) -> str:
             <div class="feature-card">
                 <h3>💬 Chat Interface</h3>
                 <p>Master the conversation features.</p>
-                <a href="/docs/chat-interface">Learn More →</a>
+                <a href="/docs/user-guide/chat-interface">Learn More →</a>
             </div>
             <div class="feature-card">
                 <h3>📄 PDF Analysis</h3>
                 <p>Analyze documents intelligently.</p>
-                <a href="/docs/pdf-analysis">Learn More →</a>
+                <a href="/docs/user-guide/pdf-analysis">Learn More →</a>
             </div>
             <div class="feature-card">
                 <h3>🎨 Image Generation</h3>
                 <p>Create images with AI.</p>
-                <a href="/docs/image-generation">Learn More →</a>
+                <a href="/docs/user-guide/image-generation">Learn More →</a>
+            </div>
+            <div class="feature-card">
+                <h3>📷 Image Analysis</h3>
+                <p>Analyze uploaded images with vision models.</p>
+                <a href="/docs/user-guide/image-upload-vlm">Learn More →</a>
+            </div>
+            <div class="feature-card">
+                <h3>🔍 Search Features</h3>
+                <p>Web search and information retrieval.</p>
+                <a href="/docs/user-guide/search-features">Learn More →</a>
+            </div>
+            <div class="feature-card">
+                <h3>⚙️ System Prompts</h3>
+                <p>Advanced prompt management patterns.</p>
+                <a href="/docs/user-guide/system_prompt_pattern">Learn More →</a>
             </div>
         </div>
         """,
@@ -644,8 +673,17 @@ def get_section_content(section: str) -> str:
             <li><a href="/docs/deployment/docker">Docker Deployment</a> - Container deployment guide</li>
         </ul>
         """,
+        "developer": """
+        <h1>Developer Guide</h1>
+        <p>Advanced development topics and implementation details.</p>
+        <ul>
+            <li><a href="/docs/developer/batch-processing">Batch Processing</a> - PDF batch processing implementation</li>
+        </ul>
+        """,
     }
-    return section_overviews.get(section, f"<h1>{section.title()}</h1><p>Documentation section.</p>")
+    return section_overviews.get(
+        section, f"<h1>{section.title()}</h1><p>Documentation section.</p>"
+    )
 
 
 # Root redirect
@@ -684,39 +722,42 @@ def get_home_content():
         <div class="feature-card">
             <h3>🚀 Getting Started</h3>
             <ul>
-                <li><a href="/docs/quickstart">Quick Start Guide</a> - Get up and running in 5 minutes</li>
-                <li><a href="/docs/installation">Installation Guide</a> - Detailed setup instructions</li>
-                <li><a href="/docs/first-steps">First Steps</a> - Your first chat session</li>
+                <li><a href="/docs/getting-started/quickstart">Quick Start Guide</a> - Get up and running in 5 minutes</li>
+                <li><a href="/docs/getting-started/installation">Installation Guide</a> - Detailed setup instructions</li>
+                <li><a href="/docs/getting-started/first-steps">First Steps</a> - Your first chat session</li>
             </ul>
         </div>
 
         <div class="feature-card">
             <h3>💡 Key Features</h3>
             <ul>
-                <li><a href="/docs/chat-interface">Chat Interface</a> - Natural conversations with AI</li>
-                <li><a href="/docs/pdf-analysis">PDF Analysis</a> - Intelligent document processing</li>
-                <li><a href="/docs/image-generation">Image Generation</a> - Create images with AI</li>
-                <li><a href="/docs/search-features">Search Tools</a> - Web and knowledge search</li>
+                <li><a href="/docs/user-guide/chat-interface">Chat Interface</a> - Natural conversations with AI</li>
+                <li><a href="/docs/user-guide/pdf-analysis">PDF Analysis</a> - Intelligent document processing</li>
+                <li><a href="/docs/user-guide/image-generation">Image Generation</a> - Create images with AI</li>
+                <li><a href="/docs/user-guide/image-upload-vlm">Image Analysis</a> - Analyze uploaded images</li>
+                <li><a href="/docs/user-guide/search-features">Search Tools</a> - Web and knowledge search</li>
             </ul>
         </div>
 
         <div class="feature-card">
             <h3>🔧 Technical Docs</h3>
             <ul>
-                <li><a href="/docs/architecture">Architecture Overview</a> - System design</li>
-                <li><a href="/docs/api">API Reference</a> - Service and controller APIs</li>
-                <li><a href="/docs/configuration">Configuration</a> - Environment setup</li>
+                <li><a href="/docs/architecture/overview">Architecture Overview</a> - System design</li>
+                <li><a href="/docs/api/services">API Reference</a> - Service and controller APIs</li>
+                <li><a href="/docs/configuration/environment">Configuration</a> - Environment setup</li>
+                <li><a href="/docs/developer/batch-processing">Batch Processing</a> - Advanced PDF handling</li>
             </ul>
         </div>
     </div>
 
     <div class="section">
-        <h2>🤖 About Nemotron</h2>
-        <p>Nemotron is powered by NVIDIA's state-of-the-art language models, offering three specialized models for different use cases:</p>
+        <h2>🤖 NVIDIA Nemotron</h2>
+        <p>Build enterprise agentic AI with benchmark-winning open reasoning and multimodal foundation models. This app is powered by NVIDIA's state-of-the-art language models, offering specialized models for different use cases:</p>
         <ul>
-            <li><strong>Fast Model</strong> - Quick responses for simple queries</li>
-            <li><strong>Standard Model</strong> - Balanced performance for general use</li>
-            <li><strong>Intelligent Model</strong> - Advanced reasoning for complex tasks</li>
+            <li><strong>llama-3.1-nemotron-nano-8b-v1 (fast)</strong> - Leading reasoning and agentic AI accuracy model for PC and edge.</li>
+            <li><strong>llama-3.3-nemotron-super-49b-v1 (llm)</strong> - High efficiency model with leading accuracy for reasoning, tool calling, chat, and instruction following.</li>
+            <li><strong>llama-3.1-nemotron-ultra-253b-v1 (ultra)</strong> - Superior inference efficiency with highest accuracy for scientific and complex math reasoning, coding, tool calling, and instruction following.</li>
+            <li><strong>llama-3.1-nemotron-nano-vl-8b-v1 (vlm)</strong> - Multi-modal vision-language model that understands text/img and creates informative responses</li>
         </ul>
     </div>
     """
@@ -730,7 +771,9 @@ async def section_page(section: str):
 
     if section in sections:
         content = get_section_content(section)
-        return HTMLResponse(content=create_page(section.title(), content, get_nav_html()))
+        return HTMLResponse(
+            content=create_page(section.title(), content, get_nav_html())
+        )
     else:
         # Try to find as a standalone page
         return await get_page(section)
@@ -753,18 +796,29 @@ async def get_section_page(section: str, page_name: str):
     <p>The page "{section}/{page_name}" was not found.</p>
     <p><a href="/docs/">Return to documentation home</a></p>
     """
-    return HTMLResponse(content=create_page("Not Found", content, get_nav_html()), status_code=404)
+    return HTMLResponse(
+        content=create_page("Not Found", content, get_nav_html()), status_code=404
+    )
 
 
 @app.get("/docs/{page_name}")
 async def get_page(page_name: str):
     """Get a standalone documentation page"""
-    # Direct file in docs root
+    # First try direct file in docs root
     file_path = DOCS_ROOT / f"{page_name}.md"
     if file_path.exists():
         content = render_markdown_simple(file_path.read_text())
         title = page_name.replace('-', ' ').replace('_', ' ').title()
         return HTMLResponse(content=create_page(title, content, get_nav_html()))
+
+    # If not found in root, search through all subdirectories
+    for subdir in DOCS_ROOT.iterdir():
+        if subdir.is_dir():
+            potential_file = subdir / f"{page_name}.md"
+            if potential_file.exists():
+                content = render_markdown_simple(potential_file.read_text())
+                title = page_name.replace('-', ' ').replace('_', ' ').title()
+                return HTMLResponse(content=create_page(title, content, get_nav_html()))
 
     # 404 page
     content = f"""
@@ -772,7 +826,9 @@ async def get_page(page_name: str):
     <p>The page "{page_name}" was not found.</p>
     <p><a href="/docs/">Return to documentation home</a></p>
     """
-    return HTMLResponse(content=create_page("Not Found", content, get_nav_html()), status_code=404)
+    return HTMLResponse(
+        content=create_page("Not Found", content, get_nav_html()), status_code=404
+    )
 
 
 # API endpoints
@@ -787,7 +843,13 @@ async def api_toc():
             {
                 "title": section.replace('-', ' ').title(),
                 "path": section,
-                "pages": [{"title": page.replace('-', ' ').replace('_', ' ').title(), "path": page} for page in pages],
+                "pages": [
+                    {
+                        "title": page.replace('-', ' ').replace('_', ' ').title(),
+                        "path": page,
+                    }
+                    for page in pages
+                ],
             }
         )
 
@@ -823,9 +885,15 @@ async def api_search(q: str = ""):
                         results.append(
                             {
                                 "file": str(md_file.relative_to(DOCS_ROOT)),
-                                "title": md_file.stem.replace('-', ' ').replace('_', ' ').title(),
+                                "title": md_file.stem.replace('-', ' ')
+                                .replace('_', ' ')
+                                .title(),
                                 "line": i + 1,
-                                "context": context[:200] + "..." if len(context) > 200 else context,
+                                "context": (
+                                    context[:200] + "..."
+                                    if len(context) > 200
+                                    else context
+                                ),
                                 "url": f"/docs/{str(md_file.relative_to(DOCS_ROOT)).replace('.md', '')}",
                             }
                         )
@@ -855,7 +923,9 @@ async def api_all_pages():
             {
                 "path": str(rel_path).replace('.md', ''),
                 "title": md_file.stem.replace('-', ' ').replace('_', ' ').title(),
-                "section": rel_path.parent.name if rel_path.parent.name != '.' else 'root',
+                "section": (
+                    rel_path.parent.name if rel_path.parent.name != '.' else 'root'
+                ),
             }
         )
 

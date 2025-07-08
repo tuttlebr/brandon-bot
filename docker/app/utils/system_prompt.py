@@ -163,7 +163,9 @@ Remember to maintain your core personality and conversational style while perfor
                 parameters = function_def.get("parameters", {})
 
                 # Build detailed instructions
-                instructions = [f"You are using the {tool.name} tool capabilities for {context} tasks."]
+                instructions = [
+                    f"You are using the {tool.name} tool capabilities for {context} tasks."
+                ]
                 instructions.append("")
                 instructions.append(description)
                 instructions.append("")
@@ -176,7 +178,9 @@ Remember to maintain your core personality and conversational style while perfor
                         param_type = param_info.get("type", "")
                         required = param_name in parameters.get("required", [])
                         req_text = " (required)" if required else " (optional)"
-                        instructions.append(f"- {param_name} ({param_type}){req_text}: {param_desc}")
+                        instructions.append(
+                            f"- {param_name} ({param_type}){req_text}: {param_desc}"
+                        )
                     instructions.append("")
 
                 instructions.append(
@@ -189,7 +193,9 @@ Remember to maintain your core personality and conversational style while perfor
                 return f"You are performing {context} tasks. Remember to maintain your core personality and conversational style."
 
         except Exception as e:
-            logging.warning(f"Could not get detailed tool definition for context {context}: {e}")
+            logging.warning(
+                f"Could not get detailed tool definition for context {context}: {e}"
+            )
             # Fallback instructions
             return f"You are performing {context} tasks. Remember to maintain your core personality and conversational style."
 
@@ -336,7 +342,9 @@ If a person seems to have questionable intentions - especially towards vulnerabl
 
             # If tools list is empty, try to initialize tools
             if not tools_text.strip():
-                logging.warning("No tools found in registry, attempting to initialize tools")
+                logging.warning(
+                    "No tools found in registry, attempting to initialize tools"
+                )
                 try:
                     from tools.initialize_tools import initialize_all_tools
 
@@ -347,14 +355,18 @@ If a person seems to have questionable intentions - especially towards vulnerabl
 
             # If we still have no tools, return fallback
             if not tools_text.strip():
-                logging.warning("Still no tools after initialization attempt, using fallback")
+                logging.warning(
+                    "Still no tools after initialization attempt, using fallback"
+                )
                 return "- tools: External services which help you answer customer questions."
 
             return tools_text
         except Exception as e:
             logging.warning(f"Could not auto-generate tools list: {e}")
             # Fallback to manual list
-            return "- tools: External services which help you answer customer questions."
+            return (
+                "- tools: External services which help you answer customer questions."
+            )
 
     def clear_cache(self):
         """Clear the cached system prompt"""
@@ -443,7 +455,8 @@ def greeting_prompt(time_data=None):
     import random
 
     hour_greetings = hourly_greetings.get(
-        current_hour, [f"Hello there, {friendly_term}!", f"Good to see you, {friendly_term}!"],
+        current_hour,
+        [f"Hello there, {friendly_term}!", f"Good to see you, {friendly_term}!"],
     )
     return random.choice(hour_greetings)
 

@@ -94,7 +94,9 @@ class DocumentProcessor:
             return "large"
 
     @staticmethod
-    def format_pages_for_analysis(pages: List[Dict[str, Any]], max_chars_per_page: Optional[int] = None) -> str:
+    def format_pages_for_analysis(
+        pages: List[Dict[str, Any]], max_chars_per_page: Optional[int] = None
+    ) -> str:
         """
         Format pages into text suitable for analysis
 
@@ -121,7 +123,9 @@ class DocumentProcessor:
         return "\n\n".join(formatted_pages)
 
     @staticmethod
-    def extract_page_numbers_from_text(text: str, valid_range: Optional[tuple] = None) -> List[int]:
+    def extract_page_numbers_from_text(
+        text: str, valid_range: Optional[tuple] = None
+    ) -> List[int]:
         """
         Extract page numbers mentioned in text
 

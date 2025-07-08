@@ -79,7 +79,10 @@ class ToolRegistry:
             Tool instance that supports this context or None if not found
         """
         for tool in self._tools.values():
-            if hasattr(tool, 'supported_contexts') and context in tool.supported_contexts:
+            if (
+                hasattr(tool, 'supported_contexts')
+                and context in tool.supported_contexts
+            ):
                 return tool
         return None
 
@@ -136,7 +139,9 @@ class ToolRegistry:
         Returns:
             Formatted string of available tools
         """
-        logger.debug(f"Generating tools list text. Registry has {len(self._tools)} tools registered.")
+        logger.debug(
+            f"Generating tools list text. Registry has {len(self._tools)} tools registered."
+        )
         tools_text = []
         for name, tool in self._tools.items():
             logger.debug(f"Adding tool to list: {name} - {tool.description}")

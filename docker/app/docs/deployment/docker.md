@@ -172,10 +172,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2'
+          cpus: "2"
           memory: 4G
         reservations:
-          cpus: '1'
+          cpus: "1"
           memory: 2G
 ```
 
@@ -283,6 +283,7 @@ docker inspect app | jq '.[0].State.Health'
 ### Common Issues
 
 1. **Container Won't Start**
+
    ```bash
    # Check logs
    docker compose logs app
@@ -292,6 +293,7 @@ docker inspect app | jq '.[0].State.Health'
    ```
 
 2. **Network Issues**
+
    ```bash
    # Test connectivity
    docker compose exec app ping milvus-standalone
@@ -342,7 +344,7 @@ Adjust resource limits in docker-compose.yaml:
 deploy:
   resources:
     limits:
-      cpus: '4'
+      cpus: "4"
       memory: 8G
 ```
 

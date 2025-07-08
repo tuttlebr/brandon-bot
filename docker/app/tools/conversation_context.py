@@ -32,10 +32,15 @@ class ConversationContextResponse(BaseToolResponse):
     user_intent: Optional[str] = Field(None, description="Identified user intent")
     conversation_type: Optional[str] = Field(None, description="Type of conversation")
     key_topics: Optional[List[str]] = Field(None, description="Key topics identified")
-    has_document: bool = Field(default=False, description="Whether a document is being discussed")
-    document_info: Optional[str] = Field(None, description="Information about the document if present")
+    has_document: bool = Field(
+        default=False, description="Whether a document is being discussed"
+    )
+    document_info: Optional[str] = Field(
+        None, description="Information about the document if present"
+    )
     direct_response: bool = Field(
-        default=True, description="Flag indicating this response should be returned directly to user",
+        default=True,
+        description="Flag indicating this response should be returned directly to user",
     )
     success: bool = Field(default=True, description="Success status")
     error_message: Optional[str] = Field(None, description="Error message if failed")
@@ -97,7 +102,9 @@ class ConversationContextTool(BaseTool):
             },
         }
 
-    def _get_system_prompt(self, context_type: ContextType, focus_query: Optional[str] = None) -> str:
+    def _get_system_prompt(
+        self, context_type: ContextType, focus_query: Optional[str] = None
+    ) -> str:
         """Get the appropriate system prompt for context analysis"""
 
         base_prompts = {
@@ -127,7 +134,9 @@ Track the creative project's vision, scope, and goals. Document the evolution of
 Summarize key points, themes, and main arguments from the document. Identify the document's structure and organization. Extract critical information, facts, and conclusions. Relate content to user queries and conversation context. Note any action items or recommendations. Identify connections between document content and conversation topics.""",
         }
 
-        prompt = base_prompts.get(context_type, base_prompts[ContextType.CONVERSATION_SUMMARY])
+        prompt = base_prompts.get(
+            context_type, base_prompts[ContextType.CONVERSATION_SUMMARY]
+        )
 
         if focus_query:
             prompt += f"\n\nSpecial focus: Pay particular attention to anything related to: {focus_query}"
@@ -144,7 +153,9 @@ Summarize key points, themes, and main arguments from the document. Identify the
     ) -> ConversationContextResponse:
         """Analyze conversation messages to generate context"""
 
-        logger.info(f"Analyzing {len(messages)} messages for context type: {context_type}")
+        logger.info(
+            f"Analyzing {len(messages)} messages for context type: {context_type}"
+        )
 
         try:
             # Get the appropriate client and model based on this tool's LLM type
@@ -172,9 +183,7 @@ Summarize key points, themes, and main arguments from the document. Identify the
                 else:
                     user_message = f"Analyze the conversation for document-related queries and provide guidance (no document content found):\n\n{conversation_text}"
             elif context_type == ContextType.CREATIVE_DIRECTOR:
-                user_message = (
-                    f"Analyze this creative project conversation for continuity and guidance:\n\n{conversation_text}"
-                )
+                user_message = f"Analyze this creative project conversation for continuity and guidance:\n\n{conversation_text}"
             else:  # CONVERSATION_SUMMARY
                 user_message = f"Provide a concise summary of this conversation:\n\n{conversation_text}"
 
@@ -186,7 +195,9 @@ Summarize key points, themes, and main arguments from the document. Identify the
                 {"role": "user", "content": user_message},
             ]
 
-            logger.debug(f"Making context analysis request with model: {model_name} (type: {self.llm_type})")
+            logger.debug(
+                f"Making context analysis request with model: {model_name} (type: {self.llm_type})"
+            )
 
             response = client.chat.completions.create(
                 model=model_name,
@@ -213,9 +224,11 @@ Summarize key points, themes, and main arguments from the document. Identify the
                 conversation_type=context_type,
                 key_topics=key_topics,
                 has_document=pdf_data is not None,
-                document_info=pdf_data.get("info", "No additional document information")
-                if pdf_data
-                else "No additional document information",
+                document_info=(
+                    pdf_data.get("info", "No additional document information")
+                    if pdf_data
+                    else "No additional document information"
+                ),
             )
 
         except Exception as e:
@@ -262,11 +275,15 @@ Summarize key points, themes, and main arguments from the document. Identify the
         import re
 
         # Remove context markers
-        content = re.sub(r"<START_CONTEXT>.*?<END_CONTEXT>", "", content, flags=re.DOTALL)
+        content = re.sub(
+            r"<START_CONTEXT>.*?<END_CONTEXT>", "", content, flags=re.DOTALL
+        )
         # Remove thinking tags
         content = strip_think_tags(content)
         # Remove tool call instructions
-        content = re.sub(r"<TOOLCALL.*?</TOOLCALL>", "", content, flags=re.DOTALL | re.IGNORECASE)
+        content = re.sub(
+            r"<TOOLCALL.*?</TOOLCALL>", "", content, flags=re.DOTALL | re.IGNORECASE
+        )
 
         return content.strip()
 
@@ -304,7 +321,9 @@ Summarize key points, themes, and main arguments from the document. Identify the
         topics = [t.strip() for t in topics if t.strip() and len(t.strip()) > 3]
         return list(dict.fromkeys(topics))[:5]  # Remove duplicates, limit to 5
 
-    def _extract_user_intent(self, result: str, messages: List[Dict[str, Any]]) -> Optional[str]:
+    def _extract_user_intent(
+        self, result: str, messages: List[Dict[str, Any]]
+    ) -> Optional[str]:
         """Try to extract current user intent from analysis and recent messages"""
 
         # Look at the most recent user message for clues
@@ -313,19 +332,32 @@ Summarize key points, themes, and main arguments from the document. Identify the
                 content = str(msg.get("content", ""))
 
                 # Simple intent detection patterns
-                if any(word in content.lower() for word in ["help", "how", "can you", "what is"]):
+                if any(
+                    word in content.lower()
+                    for word in ["help", "how", "can you", "what is"]
+                ):
                     return "seeking_information"
-                elif any(word in content.lower() for word in ["create", "generate", "make", "write"]):
+                elif any(
+                    word in content.lower()
+                    for word in ["create", "generate", "make", "write"]
+                ):
                     return "creation_request"
-                elif any(word in content.lower() for word in ["fix", "error", "problem", "issue"]):
+                elif any(
+                    word in content.lower()
+                    for word in ["fix", "error", "problem", "issue"]
+                ):
                     return "problem_solving"
-                elif any(word in content.lower() for word in ["find", "search", "look for"]):
+                elif any(
+                    word in content.lower() for word in ["find", "search", "look for"]
+                ):
                     return "information_search"
                 break
 
         return None
 
-    def _get_document_content(self, messages: List[Dict[str, Any]], pdf_data: Dict[str, Any] = None) -> Optional[str]:
+    def _get_document_content(
+        self, messages: List[Dict[str, Any]], pdf_data: Dict[str, Any] = None
+    ) -> Optional[str]:
         """Extract document content from provided PDF data or messages as fallback"""
 
         # Use provided PDF data if available
@@ -347,17 +379,24 @@ Summarize key points, themes, and main arguments from the document. Identify the
         """
         if pdf_data:
             # Limit to first 5 pages for context analysis
-            limited_data = {'pages': pdf_data.get('pages', [])[:5], 'filename': pdf_data.get('filename')}
+            limited_data = {
+                'pages': pdf_data.get('pages', [])[:5],
+                'filename': pdf_data.get('filename'),
+            }
             # Get text but limit each page to 1000 chars
             pages_text = []
             for page in limited_data['pages']:
                 page_text = page.get('text', '')
                 if page_text:
-                    pages_text.append(f"Page {page.get('page', '?')}: {page_text[:1000]}...")
+                    pages_text.append(
+                        f"Page {page.get('page', '?')}: {page_text[:1000]}..."
+                    )
             return "\n\n".join(pages_text) if pages_text else None
         return None
 
-    def _get_pdf_content_from_messages(self, messages: List[Dict[str, Any]]) -> Optional[str]:
+    def _get_pdf_content_from_messages(
+        self, messages: List[Dict[str, Any]]
+    ) -> Optional[str]:
         """
         Extract PDF content from messages (including injected system messages)
 
@@ -370,13 +409,18 @@ Summarize key points, themes, and main arguments from the document. Identify the
         pdf_data = PDFDataExtractor.extract_from_messages(messages)
         if pdf_data:
             # Limit to first 5 pages for context analysis
-            limited_data = {'pages': pdf_data.get('pages', [])[:5], 'filename': pdf_data.get('filename')}
+            limited_data = {
+                'pages': pdf_data.get('pages', [])[:5],
+                'filename': pdf_data.get('filename'),
+            }
             # Get text but limit each page to 1000 chars
             pages_text = []
             for page in limited_data['pages']:
                 page_text = page.get('text', '')
                 if page_text:
-                    pages_text.append(f"Page {page.get('page', '?')}: {page_text[:1000]}...")
+                    pages_text.append(
+                        f"Page {page.get('page', '?')}: {page_text[:1000]}..."
+                    )
             return "\n\n".join(pages_text) if pages_text else None
         return None
 
@@ -404,7 +448,9 @@ Summarize key points, themes, and main arguments from the document. Identify the
         try:
             context_enum = ContextType(params["query"].lower())
         except ValueError:
-            raise ValueError(f"Invalid query: {params['query']}. Must be one of: {[t.value for t in ContextType]}")
+            raise ValueError(
+                f"Invalid query: {params['query']}. Must be one of: {[t.value for t in ContextType]}"
+            )
 
         # Limit messages to the requested count, excluding system messages
         filtered_messages = []
@@ -417,12 +463,18 @@ Summarize key points, themes, and main arguments from the document. Identify the
         # Reverse back to chronological order
         filtered_messages.reverse()
 
-        logger.debug(f"Context analysis: {params['query']}, {len(filtered_messages)} messages")
+        logger.debug(
+            f"Context analysis: {params['query']}, {len(filtered_messages)} messages"
+        )
 
         # Create config from environment
         config = ChatConfig.from_environment()
         return self._analyze_conversation_context(
-            context_enum, filtered_messages, config, params.get("focus_query"), params.get("pdf_data")
+            context_enum,
+            filtered_messages,
+            config,
+            params.get("focus_query"),
+            params.get("pdf_data"),
         )
 
 
@@ -435,6 +487,8 @@ def get_conversation_context_tool_definition() -> Dict[str, Any]:
     return conversation_context_tool.to_openai_format()
 
 
-def execute_conversation_context_with_dict(params: Dict[str, Any],) -> ConversationContextResponse:
+def execute_conversation_context_with_dict(
+    params: Dict[str, Any],
+) -> ConversationContextResponse:
     """Execute conversation context analysis with parameters as dictionary"""
     return conversation_context_tool.run_with_dict(params)

@@ -123,7 +123,9 @@ class StreamingService:
         """
         client = self.get_client(model_type, async_client=False)
 
-        logger.debug(f"Sync completion with model_type: {model_type}, model: {model}, tool_choice: {tool_choice}")
+        logger.debug(
+            f"Sync completion with model_type: {model_type}, model: {model}, tool_choice: {tool_choice}"
+        )
 
         try:
             # Prepare API parameters
@@ -152,7 +154,9 @@ class StreamingService:
             logger.error(f"Completion error: {e}")
             raise StreamingError(f"Failed to get completion: {e}")
 
-    async def simple_stream(self, prompt: str, model_type: str = "fast") -> AsyncGenerator[str, None]:
+    async def simple_stream(
+        self, prompt: str, model_type: str = "fast"
+    ) -> AsyncGenerator[str, None]:
         """
         Simple streaming for basic prompts
 

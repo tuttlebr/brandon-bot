@@ -18,7 +18,10 @@ class FileController:
     """Controller for handling file operations, primarily PDF processing"""
 
     def __init__(
-        self, config_obj: ChatConfig, message_controller: MessageController, session_controller=None,
+        self,
+        config_obj: ChatConfig,
+        message_controller: MessageController,
+        session_controller=None,
     ):
         """
         Initialize the file controller
@@ -104,7 +107,9 @@ class FileController:
             # Make request to PDF processing server using configured endpoint and timeout
             nvingest_endpoint = config.env.NVINGEST_ENDPOINT
             if not nvingest_endpoint:
-                return False, {"error": "PDF processing service not configured (NVINGEST_ENDPOINT not set)"}
+                return False, {
+                    "error": "PDF processing service not configured (NVINGEST_ENDPOINT not set)"
+                }
 
             with open(temp_file_path, "rb") as pdf_file:
                 files = {"file": pdf_file}
@@ -119,7 +124,9 @@ class FileController:
 
             # Validate response structure
             if not isinstance(pdf_data, dict) or "pages" not in pdf_data:
-                return False, {"error": "Invalid response format from PDF processing server"}
+                return False, {
+                    "error": "Invalid response format from PDF processing server"
+                }
 
             pages = pdf_data.get("pages", [])
             if not pages:
@@ -141,7 +148,9 @@ class FileController:
             elif e.response.status_code == 413:
                 error_msg = "The PDF file is too large for the processing server."
             else:
-                error_msg = f"PDF processing failed with server error: {e.response.status_code}"
+                error_msg = (
+                    f"PDF processing failed with server error: {e.response.status_code}"
+                )
             logging.error(f"PDF processing HTTP error: {e}")
             return False, {"error": error_msg}
 
@@ -167,7 +176,9 @@ class FileController:
         with st.chat_message("user", avatar=self.config_obj.user_avatar):
             st.markdown(f"📄 **Uploaded PDF:** {filename}")
 
-    def _make_resilient_request(self, url: str, files: dict, base_timeout: int = None) -> requests.Response:
+    def _make_resilient_request(
+        self, url: str, files: dict, base_timeout: int = None
+    ) -> requests.Response:
         """
         Make a long-running HTTP request with specified timeout
 
@@ -205,24 +216,33 @@ class FileController:
 
         # Check if batch processing is needed
         if self.batch_processor.should_batch_process(total_pages):
-            logging.info(f"Large PDF detected ({total_pages} pages), using batch processing")
+            logging.info(
+                f"Large PDF detected ({total_pages} pages), using batch processing"
+            )
             self._handle_batch_processing(filename, pdf_data)
         else:
             # Normal processing for smaller PDFs
             if self.session_controller:
                 pdf_id = self.session_controller.store_pdf_document(filename, pdf_data)
-                logging.info(f"Stored PDF '{filename}' with ID '{pdf_id}' in session state")
+                logging.info(
+                    f"Stored PDF '{filename}' with ID '{pdf_id}' in session state"
+                )
 
                 # Add PDF content availability to message history
                 self._add_pdf_content_to_history(filename, pdf_data, pdf_id)
 
                 # Verify storage in session state
-                if hasattr(st.session_state, "stored_pdfs") and pdf_id in st.session_state.stored_pdfs:
+                if (
+                    hasattr(st.session_state, "stored_pdfs")
+                    and pdf_id in st.session_state.stored_pdfs
+                ):
                     logging.info(
                         f"✅ Verified PDF '{pdf_id}' is in session state stored_pdfs list: {st.session_state.stored_pdfs}"
                     )
                 else:
-                    logging.error(f"❌ PDF '{pdf_id}' NOT found in session state stored_pdfs list")
+                    logging.error(
+                        f"❌ PDF '{pdf_id}' NOT found in session state stored_pdfs list"
+                    )
 
             else:
                 # Log warning but don't add complex tool responses
@@ -257,9 +277,15 @@ class FileController:
         file_storage = FileStorageService()
 
         for batch_num, (start_idx, end_idx) in enumerate(batches):
-            batch_data = self.batch_processor.process_batch(pdf_data, (start_idx, end_idx))
-            batch_id = file_storage.store_pdf_batch(filename, batch_data, st.session_state.session_id, batch_num)
-            logging.info(f"Stored batch {batch_num + 1}/{len(batches)} with ID: {batch_id}")
+            batch_data = self.batch_processor.process_batch(
+                pdf_data, (start_idx, end_idx)
+            )
+            batch_id = file_storage.store_pdf_batch(
+                filename, batch_data, st.session_state.session_id, batch_num
+            )
+            logging.info(
+                f"Stored batch {batch_num + 1}/{len(batches)} with ID: {batch_id}"
+            )
 
         # Store PDF reference in session state
         if self.session_controller:
@@ -277,9 +303,13 @@ class FileController:
             }
 
             # Add notification to message history
-            self._add_batch_processed_notification(filename, total_pages, len(batches), pdf_id)
+            self._add_batch_processed_notification(
+                filename, total_pages, len(batches), pdf_id
+            )
 
-    def _add_batch_processed_notification(self, filename: str, total_pages: int, total_batches: int, pdf_id: str):
+    def _add_batch_processed_notification(
+        self, filename: str, total_pages: int, total_batches: int, pdf_id: str
+    ):
         """
         Add notification about batch processed PDF to message history
 
@@ -309,7 +339,9 @@ class FileController:
             }
 
             # Add to message history via message controller
-            self.message_controller.safe_add_message_to_history("system", pdf_availability_message["content"])
+            self.message_controller.safe_add_message_to_history(
+                "system", pdf_availability_message["content"]
+            )
 
             # Add user-friendly notification
             user_notification = (
@@ -321,9 +353,13 @@ class FileController:
             with st.chat_message("assistant", avatar=self.config_obj.assistant_avatar):
                 st.markdown(user_notification)
 
-            self.message_controller.safe_add_message_to_history("assistant", user_notification)
+            self.message_controller.safe_add_message_to_history(
+                "assistant", user_notification
+            )
 
-            logging.info(f"Added batch processing notification to message history for '{filename}'")
+            logging.info(
+                f"Added batch processing notification to message history for '{filename}'"
+            )
 
         except Exception as e:
             logging.error(f"Error adding batch processing notification to history: {e}")
@@ -359,9 +395,13 @@ class FileController:
             }
 
             # Add to message history via message controller
-            self.message_controller.safe_add_message_to_history("system", pdf_availability_message["content"])
+            self.message_controller.safe_add_message_to_history(
+                "system", pdf_availability_message["content"]
+            )
 
-            logging.info(f"Added PDF availability notification to message history for '{filename}'")
+            logging.info(
+                f"Added PDF availability notification to message history for '{filename}'"
+            )
 
         except Exception as e:
             logging.error(f"Error adding PDF content to history: {e}")
@@ -409,7 +449,9 @@ class FileController:
             logging.info(f"Starting async summarization for PDF: {filename}")
 
             # Perform recursive summarization
-            enhanced_pdf_data = await self.pdf_summarization_service.summarize_pdf_recursive(pdf_data)
+            enhanced_pdf_data = (
+                await self.pdf_summarization_service.summarize_pdf_recursive(pdf_data)
+            )
 
             # Update the stored PDF data with summaries
             # Note: We need to be careful with session state in background threads
@@ -426,7 +468,9 @@ class FileController:
                         f"which will help me respond more quickly to your questions.\n\n"
                         f"💡 You can ask me to 'show the summary of the document' to see the AI-generated overview."
                     )
-                    self.message_controller.safe_add_message_to_history("assistant", summary_complete_msg)
+                    self.message_controller.safe_add_message_to_history(
+                        "assistant", summary_complete_msg
+                    )
 
                 except Exception as e:
                     logging.error(f"Error updating PDF data with summary: {e}")
@@ -458,11 +502,18 @@ class FileController:
             # 3. Use Redis or another external store
 
             # For now, we'll update if we can safely access the session state
-            if hasattr(st.session_state, "uploaded_pdfs") and pdf_id in st.session_state.uploaded_pdfs:
+            if (
+                hasattr(st.session_state, "uploaded_pdfs")
+                and pdf_id in st.session_state.uploaded_pdfs
+            ):
                 st.session_state.uploaded_pdfs[pdf_id] = enhanced_pdf_data
-                logging.info(f"Updated PDF '{enhanced_pdf_data.get('filename')}' with summarization data")
+                logging.info(
+                    f"Updated PDF '{enhanced_pdf_data.get('filename')}' with summarization data"
+                )
             else:
-                logging.warning(f"Could not update PDF {pdf_id} - session state not accessible")
+                logging.warning(
+                    f"Could not update PDF {pdf_id} - session state not accessible"
+                )
 
         except Exception as e:
             logging.error(f"Error in _update_pdf_with_summary: {e}")
@@ -474,7 +525,9 @@ class FileController:
         Args:
             error_result: Error information dictionary
         """
-        error_msg = f"❌ **PDF Processing Error:** {error_result.get('error', 'Unknown error')}"
+        error_msg = (
+            f"❌ **PDF Processing Error:** {error_result.get('error', 'Unknown error')}"
+        )
         self._display_error_message(error_msg)
 
     def _display_error_message(self, error_msg: str):
@@ -504,7 +557,9 @@ class FileController:
             hasattr(st.session_state, "currently_processing_pdf")
             and st.session_state.currently_processing_pdf == uploaded_file.name
         ):
-            logging.info(f"PDF '{uploaded_file.name}' is already being processed, skipping duplicate processing")
+            logging.info(
+                f"PDF '{uploaded_file.name}' is already being processed, skipping duplicate processing"
+            )
             return False
 
         # Check if this file was already processed successfully

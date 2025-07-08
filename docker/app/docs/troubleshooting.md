@@ -27,6 +27,7 @@ sudo lsof -i :8050
 ### Application Won't Start
 
 #### Symptoms
+
 - Cannot access `http://localhost:8080`
 - Docker container exits immediately
 - Error messages in logs
@@ -34,6 +35,7 @@ sudo lsof -i :8050
 #### Solutions
 
 1. **Check Docker Status**
+
    ```bash
    # Ensure Docker daemon is running
    sudo systemctl status docker
@@ -43,6 +45,7 @@ sudo lsof -i :8050
    ```
 
 2. **Verify Environment Variables**
+
    ```bash
    # Check if .env file exists
    ls -la .env
@@ -52,6 +55,7 @@ sudo lsof -i :8050
    ```
 
 3. **Port Conflicts**
+
    ```bash
    # Kill processes using the ports
    sudo kill -9 $(sudo lsof -t -i:8080)
@@ -73,6 +77,7 @@ sudo lsof -i :8050
 ### NVIDIA API Errors
 
 #### Symptoms
+
 - "API key is invalid" error
 - "Rate limit exceeded" message
 - Model not found errors
@@ -80,6 +85,7 @@ sudo lsof -i :8050
 #### Solutions
 
 1. **Verify API Key**
+
    ```bash
    # Test API key directly
    curl -H "Authorization: Bearer $NVIDIA_API_KEY" \
@@ -88,6 +94,7 @@ sudo lsof -i :8050
 
 2. **Check Model Names**
    Ensure model names in `.env` match available models:
+
    ```
    LLM_MODEL_NAME=meta/llama-3.1-70b-instruct
    FAST_LLM_MODEL_NAME=meta/llama-3.1-8b-instruct
@@ -102,6 +109,7 @@ sudo lsof -i :8050
 ### PDF Upload Issues
 
 #### Symptoms
+
 - PDF upload fails
 - "File too large" error
 - Processing hangs indefinitely
@@ -110,6 +118,7 @@ sudo lsof -i :8050
 
 1. **Check File Size**
    Default limit is 200MB. For larger files:
+
    ```bash
    # Update docker-compose.yaml
    environment:
@@ -117,6 +126,7 @@ sudo lsof -i :8050
    ```
 
 2. **Verify PDF Format**
+
    ```bash
    # Check if PDF is valid
    file your_document.pdf
@@ -125,6 +135,7 @@ sudo lsof -i :8050
    ```
 
 3. **Memory Issues**
+
    ```bash
    # Increase Docker memory allocation
    # Docker Desktop: Settings > Resources > Memory
@@ -141,6 +152,7 @@ sudo lsof -i :8050
 ### Chat Interface Issues
 
 #### Symptoms
+
 - Messages not sending
 - Responses cut off
 - Interface frozen
@@ -153,6 +165,7 @@ sudo lsof -i :8050
    - Disable browser extensions
 
 2. **Session State Issues**
+
    ```python
    # Add to your code for debugging
    import streamlit as st
@@ -170,6 +183,7 @@ sudo lsof -i :8050
 ### Performance Issues
 
 #### Symptoms
+
 - Slow response times
 - High CPU/memory usage
 - Timeouts
@@ -177,6 +191,7 @@ sudo lsof -i :8050
 #### Solutions
 
 1. **Optimize Model Selection**
+
    ```python
    # Use fast model for simple queries
    "Please use the fast model"
@@ -186,6 +201,7 @@ sudo lsof -i :8050
    ```
 
 2. **Resource Monitoring**
+
    ```bash
    # Monitor container resources
    docker stats app
@@ -208,30 +224,37 @@ sudo lsof -i :8050
 ### Common Error Messages
 
 **"Configuration error: NVIDIA_API_KEY not found"**
+
 - **Cause**: Missing environment variable
 - **Solution**: Add `NVIDIA_API_KEY` to `.env` file
 
 **"Rate limit exceeded"**
+
 - **Cause**: Too many API requests
 - **Solution**: Wait 60 seconds, use fast model
 
 **"Failed to process PDF"**
+
 - **Cause**: Corrupted or unsupported PDF
 - **Solution**: Try a different PDF, check format
 
 **"Connection refused"**
+
 - **Cause**: Service not running
 - **Solution**: Run `docker compose up -d`
 
 **"Out of memory"**
+
 - **Cause**: Large file or response
 - **Solution**: Increase Docker memory limits
 
 **"Model not found"**
+
 - **Cause**: Invalid model name
 - **Solution**: Check model name in configuration
 
 **"WebSocket connection failed"**
+
 - **Cause**: Network or proxy issue
 - **Solution**: Check firewall, try direct connection
 
@@ -295,6 +318,7 @@ def health_check():
 ### Network Issues
 
 1. **DNS Resolution**
+
    ```bash
    # Test DNS
    nslookup integrate.api.nvidia.com
@@ -314,6 +338,7 @@ def health_check():
 ### Memory Leaks
 
 1. **Monitor Memory Usage**
+
    ```python
    import psutil
    import os
@@ -331,6 +356,7 @@ def health_check():
 ### Database/Storage Issues
 
 1. **Clear Session Storage**
+
    ```bash
    # Remove session files
    docker compose exec app rm -rf /tmp/sessions/*
@@ -347,6 +373,7 @@ def health_check():
 ### Before Asking for Help
 
 1. **Collect Information**
+
    ```bash
    # System info
    uname -a
@@ -387,6 +414,7 @@ def health_check():
 ### Regular Maintenance
 
 1. **Update Dependencies**
+
    ```bash
    # Update Docker images
    docker compose pull

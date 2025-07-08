@@ -14,7 +14,10 @@ class ImageController:
     """Controller for handling image upload operations"""
 
     def __init__(
-        self, config_obj: ChatConfig, message_controller: MessageController, session_controller=None,
+        self,
+        config_obj: ChatConfig,
+        message_controller: MessageController,
+        session_controller=None,
     ):
         """
         Initialize the image controller
@@ -72,7 +75,9 @@ class ImageController:
             Tuple of (success: bool, result: dict)
         """
         # Create temporary file with configured suffix
-        with tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded_file.type.split('/')[-1]}") as temp_file:
+        with tempfile.NamedTemporaryFile(
+            delete=False, suffix=f".{uploaded_file.type.split('/')[-1]}"
+        ) as temp_file:
             temp_file.write(uploaded_file.read())
             temp_file_path = temp_file.name
 
@@ -129,7 +134,9 @@ class ImageController:
             # Store image in session controller
             if self.session_controller:
                 image_id = self.session_controller.store_uploaded_image(
-                    image_data["image_data"], image_data["filename"], image_data["file_type"],
+                    image_data["image_data"],
+                    image_data["filename"],
+                    image_data["file_type"],
                 )
 
                 # Get the stored image data to retrieve the file path
@@ -137,7 +144,9 @@ class ImageController:
                 if stored_image_data and "file_path" in stored_image_data:
                     # Add the file path to the image_data dict
                     image_data["file_object"] = stored_image_data["file_path"]
-                    logging.info(f"Added file path to image_data: {stored_image_data['file_path']}")
+                    logging.info(
+                        f"Added file path to image_data: {stored_image_data['file_path']}"
+                    )
                 else:
                     logging.warning("Could not retrieve file path for stored image")
 
@@ -152,7 +161,9 @@ class ImageController:
 
                 # Add user notification message (without base64 data)
                 user_message = f"📷 Uploaded image: **{filename}**"
-                self.message_controller.safe_add_message_to_history("user", user_message)
+                self.message_controller.safe_add_message_to_history(
+                    "user", user_message
+                )
 
                 # Display the user message
                 with st.chat_message("user", avatar=self.config_obj.user_avatar):
@@ -160,10 +171,14 @@ class ImageController:
 
                 # Add assistant response
                 assistant_message = f"I've received your image **{filename}**. What would you like to know about it?"
-                self.message_controller.safe_add_message_to_history("assistant", assistant_message)
+                self.message_controller.safe_add_message_to_history(
+                    "assistant", assistant_message
+                )
 
                 # Display the assistant message
-                with st.chat_message("assistant", avatar=self.config_obj.assistant_avatar):
+                with st.chat_message(
+                    "assistant", avatar=self.config_obj.assistant_avatar
+                ):
                     st.markdown(assistant_message)
 
                 # Mark file as processed
@@ -215,7 +230,9 @@ class ImageController:
             hasattr(st.session_state, "currently_processing_image")
             and st.session_state.currently_processing_image == uploaded_file.name
         ):
-            logging.info(f"Image '{uploaded_file.name}' is already being processed, skipping duplicate processing")
+            logging.info(
+                f"Image '{uploaded_file.name}' is already being processed, skipping duplicate processing"
+            )
             return False
 
         # Check if this file was already processed successfully

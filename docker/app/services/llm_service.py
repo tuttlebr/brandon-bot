@@ -64,7 +64,10 @@ class LLMService:
             return self.config.llm_model_name
 
     async def generate_streaming_response(
-        self, messages: List[Dict[str, Any]], model: str, model_type: str = DEFAULT_LLM_TYPE
+        self,
+        messages: List[Dict[str, Any]],
+        model: str,
+        model_type: str = DEFAULT_LLM_TYPE,
     ) -> AsyncGenerator[str, str]:
         """
         Generate streaming response with tool support
@@ -86,8 +89,12 @@ class LLMService:
             estimated_tokens = self._count_message_tokens(windowed_messages)
 
             if estimated_tokens > max_tokens:
-                logger.warning(f"Message tokens ({estimated_tokens}) exceed limit ({max_tokens}). Truncating...")
-                windowed_messages, was_truncated = self._truncate_messages(windowed_messages, max_tokens)
+                logger.warning(
+                    f"Message tokens ({estimated_tokens}) exceed limit ({max_tokens}). Truncating..."
+                )
+                windowed_messages, was_truncated = self._truncate_messages(
+                    windowed_messages, max_tokens
+                )
 
                 if was_truncated:
                     # Yield a warning message to the user
@@ -101,8 +108,10 @@ class LLMService:
                     break
 
             # Inject conversation context automatically
-            windowed_messages = self.conversation_context_service.inject_conversation_context(
-                windowed_messages, current_user_message
+            windowed_messages = (
+                self.conversation_context_service.inject_conversation_context(
+                    windowed_messages, current_user_message
+                )
             )
 
             # Filter messages to ensure LLM compatibility
@@ -115,7 +124,11 @@ class LLMService:
             tool_selection_model_type = get_tool_llm_type("tool_selection")
             tool_selection_model = self._get_model_for_type(tool_selection_model_type)
             response = self.streaming_service.sync_completion(
-                windowed_messages, tool_selection_model, tool_selection_model_type, tools=tools, tool_choice="required"
+                windowed_messages,
+                tool_selection_model,
+                tool_selection_model_type,
+                tools=tools,
+                tool_choice="required",
             )
 
             # Parse response for content and tool calls
@@ -125,10 +138,14 @@ class LLMService:
             if tool_calls:
                 # Log which tools were selected (without arguments to avoid logging base64 data)
                 tool_names = [tc.get("name", "unknown") for tc in tool_calls]
-                logger.info(f"Tool selection ({tool_selection_model_type} model): {', '.join(tool_names)}")
+                logger.info(
+                    f"Tool selection ({tool_selection_model_type} model): {', '.join(tool_names)}"
+                )
 
                 # Stream chunks from tool handling
-                async for chunk in self._handle_tool_calls(tool_calls, windowed_messages, model, model_type):
+                async for chunk in self._handle_tool_calls(
+                    tool_calls, windowed_messages, model, model_type
+                ):
                     yield chunk
 
             else:
@@ -147,18 +164,27 @@ class LLMService:
                 yield f"Error: {str(e)}"
 
     async def _handle_tool_calls(
-        self, tool_calls: List[Dict[str, Any]], messages: List[Dict[str, Any]], model: str, model_type: str
+        self,
+        tool_calls: List[Dict[str, Any]],
+        messages: List[Dict[str, Any]],
+        model: str,
+        model_type: str,
     ) -> AsyncGenerator[str, None]:
         """Handle tool calls and generate streaming response"""
         # Determine execution strategy
         strategy = self.tool_execution_service.determine_execution_strategy(tool_calls)
 
         # Get current user message
-        current_user_message = next((msg for msg in reversed(messages) if msg.get("role") == "user"), None)
+        current_user_message = next(
+            (msg for msg in reversed(messages) if msg.get("role") == "user"), None
+        )
 
         # Execute tools
         tool_responses = await self.tool_execution_service.execute_tools(
-            tool_calls, strategy=strategy, current_user_message=current_user_message, messages=messages
+            tool_calls,
+            strategy=strategy,
+            current_user_message=current_user_message,
+            messages=messages,
         )
 
         # Store for context extraction
@@ -190,7 +216,9 @@ class LLMService:
         # for the final response generation, especially after PDF-related tool calls
         if current_user_message:
             # Use forced context injection after tool execution to ensure PDF content is available
-            extended_messages = self.pdf_context_service.inject_pdf_context_forced(extended_messages)
+            extended_messages = self.pdf_context_service.inject_pdf_context_forced(
+                extended_messages
+            )
             logger.info("Re-injected PDF context after tool execution")
 
         # Check token count after adding tool responses and truncate if necessary
@@ -201,7 +229,9 @@ class LLMService:
             logger.warning(
                 f"Messages with tool responses ({estimated_tokens} tokens) exceed limit ({max_tokens}). Truncating..."
             )
-            extended_messages, was_truncated = self._truncate_messages(extended_messages, max_tokens)
+            extended_messages, was_truncated = self._truncate_messages(
+                extended_messages, max_tokens
+            )
 
             if was_truncated:
                 # Yield a warning about truncation
@@ -211,7 +241,9 @@ class LLMService:
         extended_messages = self._filter_messages_for_llm(extended_messages)
 
         # Stream the final response based on tool results
-        async for chunk in self.streaming_service.stream_completion(extended_messages, model, model_type):
+        async for chunk in self.streaming_service.stream_completion(
+            extended_messages, model, model_type
+        ):
             yield chunk
 
     def _apply_sliding_window(
@@ -227,13 +259,17 @@ class LLMService:
         # Keep system and tool messages (important context)
         system_messages = [msg for msg in messages if msg.get("role") == "system"]
         tool_messages = [msg for msg in messages if msg.get("role") == "tool"]
-        conversation_messages = [msg for msg in messages if msg.get("role") not in ["system", "tool"]]
+        conversation_messages = [
+            msg for msg in messages if msg.get("role") not in ["system", "tool"]
+        ]
 
         # CRITICAL FIX: Only apply sliding window for very long conversations
         # For typical conversations (< 50 messages), keep full context
         # This prevents context loss in normal usage
         if len(conversation_messages) <= 50:  # ~25 turns of conversation
-            logger.debug(f"Keeping full conversation context ({len(conversation_messages)} messages)")
+            logger.debug(
+                f"Keeping full conversation context ({len(conversation_messages)} messages)"
+            )
             return system_messages + tool_messages + conversation_messages
 
         # For longer conversations, keep more context than before
@@ -250,7 +286,9 @@ class LLMService:
         # Return with system and tool messages preserved
         return system_messages + tool_messages + conversation_messages
 
-    def _validate_and_clean_messages(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _validate_and_clean_messages(
+        self, messages: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """Validate and clean messages"""
         cleaned = []
 
@@ -273,7 +311,9 @@ class LLMService:
 
         return cleaned
 
-    def _filter_messages_for_llm(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _filter_messages_for_llm(
+        self, messages: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """
         Filter messages to ensure they're compatible with LLM API
 
@@ -290,7 +330,9 @@ class LLMService:
             if msg.get("role") == "system":
                 content = msg.get("content")
                 if isinstance(content, dict):
-                    logger.debug(f"Filtering out system message with dict content of type: {content.get('type')}")
+                    logger.debug(
+                        f"Filtering out system message with dict content of type: {content.get('type')}"
+                    )
                     continue
 
             # Only include messages with string content
@@ -352,7 +394,9 @@ class LLMService:
 
         return total_tokens
 
-    def _truncate_messages(self, messages: List[Dict[str, Any]], max_tokens: int) -> tuple[List[Dict[str, Any]], bool]:
+    def _truncate_messages(
+        self, messages: List[Dict[str, Any]], max_tokens: int
+    ) -> tuple[List[Dict[str, Any]], bool]:
         """
         Truncate messages to fit within token limit
 
@@ -388,20 +432,29 @@ class LLMService:
 
         # Reserve some tokens for the response
         response_buffer = 4000  # Reserve 4k tokens for response
-        available_tokens = max_tokens - system_tokens - latest_user_tokens - response_buffer
+        available_tokens = (
+            max_tokens - system_tokens - latest_user_tokens - response_buffer
+        )
 
         if available_tokens <= 0:
             # Even with just system + latest user message, we're over limit
             # Truncate the user message content
-            logger.warning(f"Message exceeds token limit even with minimal context. Truncating user message.")
+            logger.warning(
+                f"Message exceeds token limit even with minimal context. Truncating user message."
+            )
             truncated_content = latest_user_msg["content"]
-            while self._estimate_tokens(truncated_content) > (max_tokens - system_tokens - response_buffer - 100):
+            while self._estimate_tokens(truncated_content) > (
+                max_tokens - system_tokens - response_buffer - 100
+            ):
                 # Remove 25% of the content
-                truncated_content = truncated_content[: int(len(truncated_content) * 0.75)]
+                truncated_content = truncated_content[
+                    : int(len(truncated_content) * 0.75)
+                ]
 
             latest_user_msg = {
                 **latest_user_msg,
-                "content": truncated_content + "\n\n[Note: Message truncated due to length]",
+                "content": truncated_content
+                + "\n\n[Note: Message truncated due to length]",
             }
             return system_messages + [latest_user_msg], True
 

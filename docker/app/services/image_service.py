@@ -64,7 +64,9 @@ class ImageService:
 
         extracted_prompt = prompt
         for pattern in trigger_removals:
-            extracted_prompt = re.sub(pattern, '', extracted_prompt, flags=re.IGNORECASE)
+            extracted_prompt = re.sub(
+                pattern, '', extracted_prompt, flags=re.IGNORECASE
+            )
 
         # Clean up extra whitespace and punctuation
         extracted_prompt = re.sub(r'\s+', ' ', extracted_prompt).strip()
@@ -76,7 +78,9 @@ class ImageService:
 
         return extracted_prompt
 
-    def generate_image_response(self, image_prompt: str) -> Tuple[Optional[Image.Image], str]:
+    def generate_image_response(
+        self, image_prompt: str
+    ) -> Tuple[Optional[Image.Image], str]:
         """
         Generate an image using the image generation service
 
@@ -88,19 +92,30 @@ class ImageService:
         """
         # Check if image endpoint is configured
         if not self.config.image_endpoint:
-            return None, "Image generation is not configured. Please set the IMAGE_ENDPOINT environment variable."
+            return (
+                None,
+                "Image generation is not configured. Please set the IMAGE_ENDPOINT environment variable.",
+            )
 
         try:
             # Generate image using the image generation service
             generated_image = generate_image(
-                invoke_url=self.config.image_endpoint, prompt=image_prompt, mode="base", return_bytes_io=True,
+                invoke_url=self.config.image_endpoint,
+                prompt=image_prompt,
+                mode="base",
+                return_bytes_io=True,
             )
 
             if generated_image:
-                confirmation_msg = f"I've generated an image based on your request: '{image_prompt}'"
+                confirmation_msg = (
+                    f"I've generated an image based on your request: '{image_prompt}'"
+                )
                 return generated_image, ""
             else:
-                return None, "I apologize, but I wasn't able to generate an image at this time."
+                return (
+                    None,
+                    "I apologize, but I wasn't able to generate an image at this time.",
+                )
 
         except Exception as e:
             logging.error(f"Image generation failed: {e}")

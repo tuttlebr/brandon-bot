@@ -32,7 +32,9 @@ class PDFTextProcessorResponse(BaseToolResponse):
     result: str = Field(description="Processed result")
     chunks_processed: int = Field(default=1, description="Number of chunks processed")
     message: str = Field(description="Status message")
-    direct_response: bool = Field(default=True, description="This provides a direct response to the user")
+    direct_response: bool = Field(
+        default=True, description="This provides a direct response to the user"
+    )
 
 
 class PDFTextProcessorTool(BaseTool):
@@ -61,7 +63,14 @@ class PDFTextProcessorTool(BaseTool):
                     "properties": {
                         "task_type": {
                             "type": "string",
-                            "enum": ["summarize", "proofread", "rewrite", "critic", "writer", "translate"],
+                            "enum": [
+                                "summarize",
+                                "proofread",
+                                "rewrite",
+                                "critic",
+                                "writer",
+                                "translate",
+                            ],
                             "description": "The type of text processing task to perform",
                         },
                         "page_numbers": {
@@ -129,7 +138,12 @@ class PDFTextProcessorTool(BaseTool):
         # Check if this is a batch-processed PDF
         if pdf_data.get("batch_processed", False):
             return self._process_batch_pdf(
-                pdf_data, task_type, page_numbers, instructions, source_language, target_language
+                pdf_data,
+                task_type,
+                page_numbers,
+                instructions,
+                source_language,
+                target_language,
             )
 
         # Determine which pages to process
@@ -139,7 +153,9 @@ class PDFTextProcessorTool(BaseTool):
             # For batch PDFs without specific pages, process the complete document
             pages_to_process = list(range(1, total_pages + 1))
             if total_pages > 100:
-                logger.warning(f"Processing a large document with {total_pages} pages. This may take some time.")
+                logger.warning(
+                    f"Processing a large document with {total_pages} pages. This may take some time."
+                )
             else:
                 logger.info(f"Processing complete document ({total_pages} pages)")
 
@@ -158,15 +174,31 @@ class PDFTextProcessorTool(BaseTool):
         extracted_text = self._extract_pages_text(pages, pages_to_process)
 
         # Check if we need to chunk
-        if len(extracted_text) > MAX_CHARS_PER_CHUNK or len(pages_to_process) > MAX_PAGES_PER_CHUNK:
+        if (
+            len(extracted_text) > MAX_CHARS_PER_CHUNK
+            or len(pages_to_process) > MAX_PAGES_PER_CHUNK
+        ):
             # Process in chunks
             result = self._process_in_chunks(
-                task_type, extracted_text, pages_to_process, instructions, source_language, target_language
+                task_type,
+                extracted_text,
+                pages_to_process,
+                instructions,
+                source_language,
+                target_language,
             )
-            chunks_processed = len(self._create_chunks(extracted_text, pages_to_process))
+            chunks_processed = len(
+                self._create_chunks(extracted_text, pages_to_process)
+            )
         else:
             # Process all at once
-            result = self._process_text(task_type, extracted_text, instructions, source_language, target_language)
+            result = self._process_text(
+                task_type,
+                extracted_text,
+                instructions,
+                source_language,
+                target_language,
+            )
             chunks_processed = 1
 
         # Format the response
@@ -175,9 +207,7 @@ class PDFTextProcessorTool(BaseTool):
 
         # Add note about document processing coverage
         if len(pages_to_process) == total_pages:
-            result += (
-                f"\n\n**Note:** Processed the complete document ({len(pages_to_process)} of {total_pages} pages)."
-            )
+            result += f"\n\n**Note:** Processed the complete document ({len(pages_to_process)} of {total_pages} pages)."
         elif len(pages_to_process) < total_pages:
             result += (
                 f"\n\n**Note:** Processed {len(pages_to_process)} of {total_pages} total pages. "
@@ -195,7 +225,9 @@ class PDFTextProcessorTool(BaseTool):
             direct_response=True,
         )
 
-    def _extract_pages_text(self, pages: List[Dict[str, Any]], page_numbers: List[int]) -> str:
+    def _extract_pages_text(
+        self, pages: List[Dict[str, Any]], page_numbers: List[int]
+    ) -> str:
         """Extract text from specified pages"""
         text_parts = []
         for page_num in page_numbers:
@@ -205,7 +237,9 @@ class PDFTextProcessorTool(BaseTool):
                     text_parts.append(f"[Page {page_num}]\n{page_text}")
         return "\n\n".join(text_parts)
 
-    def _create_chunks(self, text: str, page_numbers: List[int]) -> List[Dict[str, Any]]:
+    def _create_chunks(
+        self, text: str, page_numbers: List[int]
+    ) -> List[Dict[str, Any]]:
         """Create chunks from text, respecting page boundaries when possible"""
         chunks = []
         current_chunk = ""
@@ -229,7 +263,8 @@ class PDFTextProcessorTool(BaseTool):
 
             # Check if adding this page would exceed chunk size
             if current_chunk and (
-                len(current_chunk) + len(content) > MAX_CHARS_PER_CHUNK or len(current_pages) >= MAX_PAGES_PER_CHUNK
+                len(current_chunk) + len(content) > MAX_CHARS_PER_CHUNK
+                or len(current_pages) >= MAX_PAGES_PER_CHUNK
             ):
                 # Save current chunk
                 chunks.append({"text": current_chunk, "pages": current_pages.copy()})
@@ -268,13 +303,23 @@ class PDFTextProcessorTool(BaseTool):
             chunk_instruction = instructions
             if len(chunks) > 1:
                 pages_desc = self._format_page_range(chunk["pages"])
-                chunk_instruction = f"Process this chunk (pages {pages_desc}). {instructions}"
+                chunk_instruction = (
+                    f"Process this chunk (pages {pages_desc}). {instructions}"
+                )
 
-            result = self._process_text(task_type, chunk["text"], chunk_instruction, source_language, target_language)
+            result = self._process_text(
+                task_type,
+                chunk["text"],
+                chunk_instruction,
+                source_language,
+                target_language,
+            )
 
             # For chunked processing, add chunk header
             if len(chunks) > 1:
-                chunk_results.append(f"### Pages {self._format_page_range(chunk['pages'])}\n{result}")
+                chunk_results.append(
+                    f"### Pages {self._format_page_range(chunk['pages'])}\n{result}"
+                )
             else:
                 chunk_results.append(result)
 
@@ -283,7 +328,11 @@ class PDFTextProcessorTool(BaseTool):
             # For summaries, combine and create final summary
             combined = "\n\n".join(chunk_results)
             final_summary = self._process_text(
-                "summarize", combined, "Create a cohesive summary from these section summaries", None, None
+                "summarize",
+                combined,
+                "Create a cohesive summary from these section summaries",
+                None,
+                None,
             )
             return final_summary
         else:
@@ -301,7 +350,11 @@ class PDFTextProcessorTool(BaseTool):
         """Process text using the assistant tool"""
         try:
             # Prepare parameters for assistant tool
-            assistant_params = {"task_type": task_type, "text": text, "instructions": instructions}
+            assistant_params = {
+                "task_type": task_type,
+                "text": text,
+                "instructions": instructions,
+            }
 
             if source_language:
                 assistant_params["source_language"] = source_language
@@ -335,7 +388,9 @@ class PDFTextProcessorTool(BaseTool):
             return f"pages {page_numbers[0]}-{page_numbers[-1]}"
         else:
             # Non-consecutive
-            return f"pages {', '.join(map(str, page_numbers[:-1]))} and {page_numbers[-1]}"
+            return (
+                f"pages {', '.join(map(str, page_numbers[:-1]))} and {page_numbers[-1]}"
+            )
 
     def _get_task_description(self, task_type: str) -> str:
         """Get human-readable task description"""
@@ -349,7 +404,9 @@ class PDFTextProcessorTool(BaseTool):
         }
         return descriptions.get(task_type, "Processed Text")
 
-    def _get_pdf_data_from_messages(self, messages: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    def _get_pdf_data_from_messages(
+        self, messages: List[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
         """Extract PDF data from injected system messages"""
         return PDFDataExtractor.extract_from_messages(messages)
 
@@ -392,7 +449,9 @@ class PDFTextProcessorTool(BaseTool):
             # For batch PDFs without specific pages, process the complete document
             pages_to_process = list(range(1, total_pages + 1))
             if total_pages > 100:
-                logger.warning(f"Processing a large document with {total_pages} pages. This may take some time.")
+                logger.warning(
+                    f"Processing a large document with {total_pages} pages. This may take some time."
+                )
             else:
                 logger.info(f"Processing complete document ({total_pages} pages)")
 
@@ -409,7 +468,13 @@ class PDFTextProcessorTool(BaseTool):
 
         # Process using hierarchical chunking
         result = self._process_batch_pdf_hierarchically(
-            file_storage, pdf_id, pages_to_process, task_type, instructions, source_language, target_language
+            file_storage,
+            pdf_id,
+            pages_to_process,
+            task_type,
+            instructions,
+            source_language,
+            target_language,
         )
 
         # Format the response
@@ -418,9 +483,7 @@ class PDFTextProcessorTool(BaseTool):
 
         # Add note about document processing coverage
         if len(pages_to_process) == total_pages:
-            result += (
-                f"\n\n**Note:** Processed the complete document ({len(pages_to_process)} of {total_pages} pages)."
-            )
+            result += f"\n\n**Note:** Processed the complete document ({len(pages_to_process)} of {total_pages} pages)."
         elif len(pages_to_process) < total_pages:
             result += (
                 f"\n\n**Note:** Processed {len(pages_to_process)} of {total_pages} total pages. "
@@ -477,7 +540,14 @@ class PDFTextProcessorTool(BaseTool):
         batch_results = []
         for batch_num, batch_pages in sorted(pages_by_batch.items()):
             batch_result = self._process_single_batch(
-                file_storage, pdf_id, batch_num, batch_pages, task_type, instructions, source_language, target_language
+                file_storage,
+                pdf_id,
+                batch_num,
+                batch_pages,
+                task_type,
+                instructions,
+                source_language,
+                target_language,
             )
             if batch_result:
                 batch_results.append(batch_result)
@@ -520,7 +590,9 @@ class PDFTextProcessorTool(BaseTool):
         """
         try:
             # Extract text from this batch
-            batch_text = self._extract_batch_text(file_storage, pdf_id, batch_num, batch_pages)
+            batch_text = self._extract_batch_text(
+                file_storage, pdf_id, batch_num, batch_pages
+            )
 
             if not batch_text:
                 return None
@@ -530,17 +602,26 @@ class PDFTextProcessorTool(BaseTool):
             if estimated_tokens > 80000:  # Conservative limit
                 # Split batch into smaller chunks
                 return self._process_large_batch_chunks(
-                    batch_text, batch_pages, task_type, instructions, source_language, target_language
+                    batch_text,
+                    batch_pages,
+                    task_type,
+                    instructions,
+                    source_language,
+                    target_language,
                 )
 
             # Process the batch directly
-            return self._process_text(task_type, batch_text, instructions, source_language, target_language)
+            return self._process_text(
+                task_type, batch_text, instructions, source_language, target_language
+            )
 
         except Exception as e:
             logger.error(f"Error processing batch {batch_num}: {e}")
             return f"Batch {batch_num + 1} processing failed due to error: {str(e)}"
 
-    def _extract_batch_text(self, file_storage, pdf_id: str, batch_num: int, batch_pages: List[int]) -> str:
+    def _extract_batch_text(
+        self, file_storage, pdf_id: str, batch_num: int, batch_pages: List[int]
+    ) -> str:
         """
         Extract text from a specific batch
 
@@ -611,14 +692,22 @@ class PDFTextProcessorTool(BaseTool):
         chunk_results = []
         for i, chunk in enumerate(chunks):
             try:
-                chunk_instructions = f"{instructions} (Processing chunk {i+1} of {len(chunks)})"
+                chunk_instructions = (
+                    f"{instructions} (Processing chunk {i+1} of {len(chunks)})"
+                )
                 chunk_result = self._process_text(
-                    task_type, chunk, chunk_instructions, source_language, target_language
+                    task_type,
+                    chunk,
+                    chunk_instructions,
+                    source_language,
+                    target_language,
                 )
                 chunk_results.append(chunk_result)
             except Exception as e:
                 logger.error(f"Error processing chunk {i+1}: {e}")
-                chunk_results.append(f"Chunk {i+1} processing failed due to error: {str(e)}")
+                chunk_results.append(
+                    f"Chunk {i+1} processing failed due to error: {str(e)}"
+                )
 
         # Combine chunk results
         if chunk_results:
@@ -626,7 +715,9 @@ class PDFTextProcessorTool(BaseTool):
         else:
             return "No content could be processed from this batch."
 
-    def _combine_batch_results(self, batch_results: List[str], task_type: str, instructions: str) -> str:
+    def _combine_batch_results(
+        self, batch_results: List[str], task_type: str, instructions: str
+    ) -> str:
         """
         Combine multiple batch results into a final result
 
@@ -649,9 +740,7 @@ class PDFTextProcessorTool(BaseTool):
                     f"Combine the information into a cohesive whole. {instructions}"
                 )
             elif task_type == "translate":
-                final_instructions = (
-                    f"Translate the combined content. Ensure consistency across all sections. {instructions}"
-                )
+                final_instructions = f"Translate the combined content. Ensure consistency across all sections. {instructions}"
             else:
                 final_instructions = (
                     f"Process the combined content from all sections. "
@@ -659,7 +748,9 @@ class PDFTextProcessorTool(BaseTool):
                 )
 
             # Process the combined results
-            return self._process_text(task_type, combined_text, final_instructions, None, None)
+            return self._process_text(
+                task_type, combined_text, final_instructions, None, None
+            )
 
         except Exception as e:
             logger.error(f"Error combining batch results: {e}")
@@ -676,6 +767,8 @@ def get_pdf_text_processor_tool_definition() -> Dict[str, Any]:
     return pdf_text_processor_tool.to_openai_format()
 
 
-def execute_pdf_text_processor_with_dict(params: Dict[str, Any]) -> PDFTextProcessorResponse:
+def execute_pdf_text_processor_with_dict(
+    params: Dict[str, Any],
+) -> PDFTextProcessorResponse:
     """Execute PDF text processor with parameters as dictionary"""
     return pdf_text_processor_tool.run_with_dict(params)

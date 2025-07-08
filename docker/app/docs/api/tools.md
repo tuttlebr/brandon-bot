@@ -36,6 +36,7 @@ class BaseTool(ABC):
 ### Tool Registry
 
 Tools are managed by a singleton registry that handles:
+
 - Tool registration and discovery
 - Execution orchestration
 - Definition management
@@ -47,6 +48,7 @@ Tools are managed by a singleton registry that handles:
 Comprehensive text processing tool for various language tasks.
 
 **Capabilities:**
+
 - **analyze**: Document insights and analysis
 - **summarize**: Condense content into key points
 - **proofread**: Grammar and style corrections
@@ -57,6 +59,7 @@ Comprehensive text processing tool for various language tasks.
 - **generalist**: General discussion
 
 **Parameters:**
+
 ```python
 {
     "user_message": str,  # Original user request
@@ -76,6 +79,7 @@ Comprehensive text processing tool for various language tasks.
 AI-powered image generation with style control.
 
 **Parameters:**
+
 ```python
 {
     "user_prompt": str,      # Original request
@@ -96,6 +100,7 @@ AI-powered image generation with style control.
 Vision-capable LLM for analyzing uploaded images.
 
 **Parameters:**
+
 ```python
 {
     "question": str  # Question about the uploaded image
@@ -111,6 +116,7 @@ Vision-capable LLM for analyzing uploaded images.
 Intelligent document summarization for uploaded PDFs.
 
 **Parameters:**
+
 ```python
 {
     "query": str,            # Summary focus/question
@@ -127,6 +133,7 @@ Intelligent document summarization for uploaded PDFs.
 Advanced PDF text extraction and processing.
 
 **Parameters:**
+
 ```python
 {
     "query": str,           # Processing request
@@ -143,6 +150,7 @@ Advanced PDF text extraction and processing.
 General internet search for current information.
 
 **Parameters:**
+
 ```python
 {
     "query": str  # Search query
@@ -150,6 +158,7 @@ General internet search for current information.
 ```
 
 **Features:**
+
 - Real-time web search
 - Source attribution
 - Content summarization
@@ -161,6 +170,7 @@ General internet search for current information.
 Specialized search for current news and events.
 
 **Parameters:**
+
 ```python
 {
     "query": str,          # News search query
@@ -176,6 +186,7 @@ Specialized search for current news and events.
 Current weather information for any location.
 
 **Parameters:**
+
 ```python
 {
     "location": str  # City name or coordinates
@@ -183,6 +194,7 @@ Current weather information for any location.
 ```
 
 **Returns:**
+
 - Current conditions
 - Temperature
 - Forecast summary
@@ -194,6 +206,7 @@ Current weather information for any location.
 Extract and parse content from web pages.
 
 **Parameters:**
+
 ```python
 {
     "url": str,              # Web page URL
@@ -209,6 +222,7 @@ Extract and parse content from web pages.
 Semantic search through knowledge bases.
 
 **Parameters:**
+
 ```python
 {
     "query": str,           # Search query
@@ -218,6 +232,7 @@ Semantic search through knowledge bases.
 ```
 
 **Features:**
+
 - Vector similarity search
 - Context-aware retrieval
 - Relevance scoring
@@ -229,6 +244,7 @@ Semantic search through knowledge bases.
 Analyze conversation history and patterns.
 
 **Parameters:**
+
 ```python
 {
     "query": str,          # Analysis type
@@ -238,6 +254,7 @@ Analyze conversation history and patterns.
 ```
 
 **Query Types:**
+
 - `"conversation_summary"`: Overall summary
 - `"user_intent"`: Intent analysis
 - `"key_topics"`: Topic extraction
@@ -250,6 +267,7 @@ Analyze conversation history and patterns.
 ### Automatic Tool Selection
 
 The LLM automatically selects appropriate tools based on:
+
 1. User query analysis
 2. Tool descriptions and capabilities
 3. Context awareness
@@ -258,6 +276,7 @@ The LLM automatically selects appropriate tools based on:
 ### Parallel Execution
 
 Multiple tools can be executed in parallel for efficiency:
+
 - Independent tools run simultaneously
 - Results are aggregated
 - Errors are handled gracefully
@@ -265,6 +284,7 @@ Multiple tools can be executed in parallel for efficiency:
 ### Direct Response Tools
 
 Some tools provide direct responses to users:
+
 - Image generation results
 - Image analysis outputs
 - Weather information
@@ -357,6 +377,7 @@ VLM_MODEL_NAME=nvidia/llama-3.1-nemotron-nano-vl-8b-v1
 ## Examples
 
 ### Text Processing
+
 ```python
 # Summarize a document
 response = text_assistant.execute({
@@ -367,6 +388,7 @@ response = text_assistant.execute({
 ```
 
 ### Image Generation
+
 ```python
 # Generate an image
 response = generate_image.execute({
@@ -379,6 +401,7 @@ response = generate_image.execute({
 ```
 
 ### Web Search
+
 ```python
 # Search the web
 response = tavily_search.execute({

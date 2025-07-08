@@ -23,6 +23,7 @@ Simply type your message in the input box at the bottom and press Enter or click
 The chat interface provides natural conversation with an AI assistant powered by NVIDIA's language models.
 
 **Example prompts:**
+
 - "Explain quantum computing in simple terms"
 - "Help me write a Python function to sort a list"
 - "What are the benefits of renewable energy?"
@@ -48,6 +49,7 @@ Switch between different AI models based on your needs:
 - **Intelligent Model**: Advanced reasoning for complex tasks
 
 To switch models, simply say:
+
 - "Use the fast model"
 - "Switch to intelligent mode"
 - "Use standard model"
@@ -70,7 +72,7 @@ AI: Here's a complete React component for a todo list:
 The interface supports rich markdown formatting:
 
 - **Bold text**
-- *Italic text*
+- _Italic text_
 - `Code snippets`
 - Lists and tables
 - Mathematical expressions: $E = mc^2$
@@ -78,6 +80,7 @@ The interface supports rich markdown formatting:
 ### Long Conversations
 
 For lengthy discussions:
+
 - The interface automatically manages scrolling
 - Previous messages remain accessible
 - Context is maintained throughout
@@ -93,6 +96,7 @@ Upload and analyze PDF documents directly:
 3. Ask questions about the document
 
 **Example queries:**
+
 - "Summarize this document"
 - "What are the key findings?"
 - "Extract all dates mentioned"
@@ -120,22 +124,27 @@ AI: [Searches and provides current information]
 ### 1. Be Specific
 
 Instead of:
+
 > "Tell me about Python"
 
 Try:
+
 > "Explain Python decorators with examples"
 
 ### 2. Provide Context
 
 Instead of:
+
 > "Fix this code"
 
 Try:
+
 > "Fix this Python code that should calculate factorial but returns wrong results: [code]"
 
 ### 3. Use Follow-up Questions
 
 Build on previous responses:
+
 - "Can you explain that in more detail?"
 - "How does that compare to [alternative]?"
 - "Can you provide a practical example?"
@@ -143,6 +152,7 @@ Build on previous responses:
 ### 4. Specify Output Format
 
 Request specific formats:
+
 - "Explain in bullet points"
 - "Provide a step-by-step guide"
 - "Create a comparison table"
@@ -159,6 +169,7 @@ Request specific formats:
 ### Message Display
 
 Each message shows:
+
 - **Avatar**: Distinguishes user and AI messages
 - **Content**: The message text with formatting
 - **Timestamp**: When the message was sent (hover to see)
@@ -172,6 +183,7 @@ Each message shows:
 ### Sidebar Controls
 
 The sidebar contains:
+
 - PDF upload functionality
 - Session information
 - Settings and options
@@ -188,6 +200,7 @@ The sidebar contains:
 ### 2. Complex Queries
 
 For complex requests:
+
 1. Break them into smaller parts
 2. Build understanding step by step
 3. Verify each step before proceeding
@@ -195,6 +208,7 @@ For complex requests:
 ### 3. Error Recovery
 
 If you encounter errors:
+
 - Check your internet connection
 - Verify the service is running
 - Try a simpler query first
@@ -264,6 +278,7 @@ You: What insights can you draw?
 ## Getting Help
 
 If you need assistance:
+
 1. Check the troubleshooting section
 2. Review the FAQ
 3. Contact support

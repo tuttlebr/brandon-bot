@@ -77,13 +77,20 @@ class TranslationService:
         try:
             client = llm_client_service.get_client(self.llm_type)
             model_name = llm_client_service.get_model_name(self.llm_type)
-            system_prompt = self._get_translation_prompt(source_language, target_language)
+            system_prompt = self._get_translation_prompt(
+                source_language, target_language
+            )
 
             # Build messages
             if messages:
-                final_messages = self._build_messages_with_context(messages, system_prompt, text)
+                final_messages = self._build_messages_with_context(
+                    messages, system_prompt, text
+                )
             else:
-                final_messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": text}]
+                final_messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": text},
+                ]
 
             logger.debug(f"Translating text to {target_language} using {model_name}")
 
@@ -110,23 +117,30 @@ class TranslationService:
             logger.error(f"Error translating text: {e}")
             return {"success": False, "error": str(e)}
 
-    def _get_translation_prompt(self, source_language: Optional[str], target_language: str) -> str:
+    def _get_translation_prompt(
+        self, source_language: Optional[str], target_language: str
+    ) -> str:
         """Get translation system prompt"""
         from utils.system_prompt import get_context_system_prompt
 
         # Use the new context-aware system prompt
         return get_context_system_prompt(
-            context='translation', target_language=target_language, source_language=source_language
+            context='translation',
+            target_language=target_language,
+            source_language=source_language,
         )
 
-    def _build_messages_with_context(self, messages: List[Dict], system_prompt: str, text: str) -> List[Dict]:
+    def _build_messages_with_context(
+        self, messages: List[Dict], system_prompt: str, text: str
+    ) -> List[Dict]:
         """Build messages with proper context injection"""
 
         # Filter out existing translation system messages
         filtered_messages = [
             msg
             for msg in messages
-            if msg.get("role") != "system" or "translating" not in msg.get("content", "").lower()
+            if msg.get("role") != "system"
+            or "translating" not in msg.get("content", "").lower()
         ]
 
         return [{"role": "system", "content": system_prompt}] + filtered_messages

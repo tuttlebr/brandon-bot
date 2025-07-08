@@ -48,7 +48,9 @@ class EmbeddingCreator:
     def create_passage(self, input_text: str) -> Dict[str, Any]:
         """Create embedding for a passage"""
         return self.embed_model.embeddings.create(
-            input=input_text, model=self.model, extra_body={"input_type": "passage", "truncate": "END"},
+            input=input_text,
+            model=self.model,
+            extra_body={"input_type": "passage", "truncate": "END"},
         )
 
     def create_query(self, input_text: str) -> Dict[str, Any]:
@@ -92,7 +94,10 @@ class SimilaritySearch:
         return {
             "metric_type": "L2",
             "index_type": "FLAT",
-            "params": {"radius": self.config.radius, "range_filter": self.config.range_filter,},
+            "params": {
+                "radius": self.config.radius,
+                "range_filter": self.config.range_filter,
+            },
         }
 
     def _initialize_client(self) -> MilvusClient:
@@ -120,9 +125,13 @@ class SimilaritySearch:
 
         return results
 
-    def reranker(self, query: str, embedding_response: List[Dict[str, Any]]) -> Optional[List[Dict[str, Any]]]:
+    def reranker(
+        self, query: str, embedding_response: List[Dict[str, Any]]
+    ) -> Optional[List[Dict[str, Any]]]:
         """Rerank search results using external reranker service"""
-        payload = self._prepare_reranker_payload(query, embedding_response, config.env.RERANKER_MODEL)
+        payload = self._prepare_reranker_payload(
+            query, embedding_response, config.env.RERANKER_MODEL
+        )
 
         if not payload["passages"]:
             return None
@@ -131,20 +140,30 @@ class SimilaritySearch:
             reranker_response = self._call_reranker_service(
                 payload, config.env.RERANKER_ENDPOINT, config.env.NVIDIA_API_KEY
             )
-            combined_results = self._combine_results(embedding_response, reranker_response)
+            combined_results = self._combine_results(
+                embedding_response, reranker_response
+            )
 
             # Check if we have valid results before trying to remove outliers
             if not combined_results or not combined_results[0]:
-                logging.warning("No valid results after combining with reranker response")
+                logging.warning(
+                    "No valid results after combining with reranker response"
+                )
                 return None
 
             # Check if results have logit values
-            results_with_logits = [r for r in combined_results[0] if "logit" in r and r["logit"] is not None]
+            results_with_logits = [
+                r
+                for r in combined_results[0]
+                if "logit" in r and r["logit"] is not None
+            ]
             if not results_with_logits:
                 logging.warning("No results with valid logit scores after reranking")
                 return None
 
-            validated_results, stats = self._remove_outliers(results_with_logits, std_threshold=0.85, key="logit")
+            validated_results, stats = self._remove_outliers(
+                results_with_logits, std_threshold=0.85, key="logit"
+            )
             limit = int(self.config.topk * 0.5)
             return [validated_results[:limit]]
         except Exception as e:
@@ -166,7 +185,9 @@ class SimilaritySearch:
             "truncate": "END",
         }
 
-    def _call_reranker_service(self, payload: Dict[str, Any], endpoint: str, api_key: str) -> Dict[str, Any]:
+    def _call_reranker_service(
+        self, payload: Dict[str, Any], endpoint: str, api_key: str
+    ) -> Dict[str, Any]:
         """Call reranker service with prepared payload"""
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -181,7 +202,9 @@ class SimilaritySearch:
             return response.json()
 
     def _combine_results(
-        self, embedding_response: List[Dict[str, Any]], reranker_response: Dict[str, Any],
+        self,
+        embedding_response: List[Dict[str, Any]],
+        reranker_response: Dict[str, Any],
     ) -> List[Dict[str, Any]]:
         """Combine embedding and reranker results"""
         # Check if reranker response has the expected structure
@@ -206,12 +229,17 @@ class SimilaritySearch:
 
             embedding_response[0][index].update({"logit": logit, "index": index})
 
-        rerankable_results = [result for result in embedding_response[0] if "logit" in result]
+        rerankable_results = [
+            result for result in embedding_response[0] if "logit" in result
+        ]
 
         return [rerankable_results]
 
     def _remove_outliers(
-        self, data: Union[List[float], List[Dict[str, Any]]], std_threshold: float = 1.0, key: Optional[str] = None,
+        self,
+        data: Union[List[float], List[Dict[str, Any]]],
+        std_threshold: float = 1.0,
+        key: Optional[str] = None,
     ) -> Tuple[Union[List[float], List[Dict[str, Any]]], Dict[str, Any]]:
         """
         Removes outliers from either a list of scores or a list of dictionaries containing scores
@@ -236,7 +264,9 @@ class SimilaritySearch:
             return data, {"error": "Input data is empty"}
 
         # Debug logging
-        logging.debug(f"_remove_outliers called with {len(data)} items, key='{key}', std_threshold={std_threshold}")
+        logging.debug(
+            f"_remove_outliers called with {len(data)} items, key='{key}', std_threshold={std_threshold}"
+        )
         if data and len(data) > 0:
             logging.debug(f"First item type: {type(data[0])}, First item: {data[0]}")
 
@@ -251,16 +281,22 @@ class SimilaritySearch:
                     for item in data:
                         if key not in item:
                             logging.error(f"Key '{key}' not found in item: {item}")
-                            return data, {"error": f"Key '{key}' not found in data dictionary"}
+                            return data, {
+                                "error": f"Key '{key}' not found in data dictionary"
+                            }
 
                         value = item[key]
                         # Check if value is numeric (int, float) and not None/NaN
-                        if value is None or (isinstance(value, float) and np.isnan(value)):
+                        if value is None or (
+                            isinstance(value, float) and np.isnan(value)
+                        ):
                             logging.warning(f"Skipping non-numeric value: {value}")
                             continue
 
                         if not isinstance(value, (int, float)):
-                            logging.debug(f"Skipping non-numeric value of type {type(value)}: {value}")
+                            logging.debug(
+                                f"Skipping non-numeric value of type {type(value)}: {value}"
+                            )
                             continue
 
                         raw_scores.append(float(value))
@@ -285,17 +321,22 @@ class SimilaritySearch:
                     # Validate and clean raw data
                     cleaned_data = []
                     for value in data:
-                        if value is None or (isinstance(value, float) and np.isnan(value)):
+                        if value is None or (
+                            isinstance(value, float) and np.isnan(value)
+                        ):
                             logging.warning(f"Skipping non-numeric value: {value}")
                             continue
                         if not isinstance(value, (int, float)):
-                            logging.debug(f"Skipping non-numeric value of type {type(value)}: {value}")
+                            logging.debug(
+                                f"Skipping non-numeric value of type {type(value)}: {value}"
+                            )
                             continue
                         cleaned_data.append(float(value))
 
                     if not cleaned_data:
                         logging.error(
-                            "No valid numeric values found in cleaned_data: %s", cleaned_data,
+                            "No valid numeric values found in cleaned_data: %s",
+                            cleaned_data,
                         )
                         return data, {"error": "No valid numeric values found"}
 
@@ -306,7 +347,9 @@ class SimilaritySearch:
 
             # Verify we have a valid numeric array
             if not np.issubdtype(scores.dtype, np.number):
-                logging.error("All values must be numeric. Found non-numeric values in data.")
+                logging.error(
+                    "All values must be numeric. Found non-numeric values in data."
+                )
                 return data, {"error": "Non-numeric values found in data"}
 
             if len(scores) == 0:
@@ -346,13 +389,27 @@ class SimilaritySearch:
                     {
                         "filtered_count": len(filtered_scores),
                         "removed_count": original_count - len(filtered_scores),
-                        "filtered_min": (float(np.min(filtered_scores)) if len(filtered_scores) > 0 else None),
-                        "filtered_max": (float(np.max(filtered_scores)) if len(filtered_scores) > 0 else None),
-                        "filtered_mean": (float(np.mean(filtered_scores)) if len(filtered_scores) > 0 else None),
+                        "filtered_min": (
+                            float(np.min(filtered_scores))
+                            if len(filtered_scores) > 0
+                            else None
+                        ),
+                        "filtered_max": (
+                            float(np.max(filtered_scores))
+                            if len(filtered_scores) > 0
+                            else None
+                        ),
+                        "filtered_mean": (
+                            float(np.mean(filtered_scores))
+                            if len(filtered_scores) > 0
+                            else None
+                        ),
                     }
                 )
 
-                logging.info(f"Removed {stats['removed_count']} values above cutoff {cutoff:.2f}")
+                logging.info(
+                    f"Removed {stats['removed_count']} values above cutoff {cutoff:.2f}"
+                )
                 return filtered_scores.tolist()[:5], stats
 
             # If we're working with dictionaries
@@ -366,9 +423,21 @@ class SimilaritySearch:
                         {
                             "filtered_count": len(filtered_data),
                             "removed_count": original_count - len(filtered_data),
-                            "filtered_min": (float(np.min(filtered_scores)) if len(filtered_data) > 0 else None),
-                            "filtered_max": (float(np.max(filtered_scores)) if len(filtered_data) > 0 else None),
-                            "filtered_mean": (float(np.mean(filtered_scores)) if len(filtered_data) > 0 else None),
+                            "filtered_min": (
+                                float(np.min(filtered_scores))
+                                if len(filtered_data) > 0
+                                else None
+                            ),
+                            "filtered_max": (
+                                float(np.max(filtered_scores))
+                                if len(filtered_data) > 0
+                                else None
+                            ),
+                            "filtered_mean": (
+                                float(np.mean(filtered_scores))
+                                if len(filtered_data) > 0
+                                else None
+                            ),
                         }
                     )
                 else:
@@ -382,7 +451,9 @@ class SimilaritySearch:
                         }
                     )
 
-                logging.info(f"Removed {stats['removed_count']} values above cutoff {cutoff:.2f}")
+                logging.info(
+                    f"Removed {stats['removed_count']} values above cutoff {cutoff:.2f}"
+                )
                 return filtered_data, stats
 
         except Exception as e:
@@ -415,7 +486,9 @@ class SimilaritySearch:
         text = entity["text"].replace(title, "").strip()
         source = entity["source"].strip()
         creation_date = entity["creation_date"].strip()
-        base_text = f"<small>{index}. [{title}]({source}), " f"_'{text}'_, {creation_date}"
+        base_text = (
+            f"<small>{index}. [{title}]({source}), " f"_'{text}'_, {creation_date}"
+        )
 
         return f"{base_text}</small>"
 
@@ -437,10 +510,14 @@ class RetrievalResponse(BaseToolResponse):
     """Complete response from retrieval search"""
 
     query: str = Field(description="The original search query")
-    results: List[SearchResult] = Field(default_factory=list, description="List of search results")
+    results: List[SearchResult] = Field(
+        default_factory=list, description="List of search results"
+    )
     total_results: int = Field(description="Total number of results found")
     reranked: bool = Field(default=False, description="Whether results were reranked")
-    formatted_results: str = Field(default="", description="Formatted results for display")
+    formatted_results: str = Field(
+        default="", description="Formatted results for display"
+    )
 
 
 class RetrieverTool(BaseTool):
@@ -453,7 +530,9 @@ class RetrieverTool(BaseTool):
 
         # Initialize embedding creator and similarity search using centralized config
         self.embedding_creator = EmbeddingCreator(
-            base_url=config.env.EMBEDDING_ENDPOINT, api_key=config.env.NVIDIA_API_KEY, model=config.env.EMBEDDING_MODEL
+            base_url=config.env.EMBEDDING_ENDPOINT,
+            api_key=config.env.NVIDIA_API_KEY,
+            model=config.env.EMBEDDING_MODEL,
         )
 
         self.similarity_search = SimilaritySearch(
@@ -478,7 +557,10 @@ class RetrieverTool(BaseTool):
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "query": {"type": "string", "description": "The search query to find relevant documents",}
+                        "query": {
+                            "type": "string",
+                            "description": "The search query to find relevant documents",
+                        }
                     },
                     "required": ["query"],
                 },
@@ -489,7 +571,9 @@ class RetrieverTool(BaseTool):
         """Execute the tool with given parameters"""
         return self.run_with_dict(params)
 
-    def search_documents(self, query: str, use_reranker: bool = True, max_results: int = 10) -> RetrievalResponse:
+    def search_documents(
+        self, query: str, use_reranker: bool = True, max_results: int = 10
+    ) -> RetrievalResponse:
         """
         Search documents using vector similarity with optional reranking
 
@@ -518,14 +602,20 @@ class RetrieverTool(BaseTool):
             if not search_results or not search_results[0]:
                 logger.warning("No search results found")
                 return RetrievalResponse(
-                    query=query, results=[], total_results=0, reranked=False, formatted_results="",
+                    query=query,
+                    results=[],
+                    total_results=0,
+                    reranked=False,
+                    formatted_results="",
                 )
 
             # Apply reranking if requested
             reranked_results = None
             if use_reranker:
                 logger.debug("Applying reranker to search results")
-                reranked_results = self.similarity_search.reranker(query, search_results)
+                reranked_results = self.similarity_search.reranker(
+                    query, search_results
+                )
 
             # Use reranked results if available, otherwise use original results
             final_results = reranked_results if reranked_results else search_results
@@ -557,7 +647,9 @@ class RetrieverTool(BaseTool):
                 formatted_results=formatted_results,
             )
 
-            logger.info(f"Search completed successfully. Found {len(results)} results (reranked: {response.reranked})")
+            logger.info(
+                f"Search completed successfully. Found {len(results)} results (reranked: {response.reranked})"
+            )
             return response
 
         except Exception as e:
@@ -565,7 +657,11 @@ class RetrieverTool(BaseTool):
             raise Exception(f"Retrieval search failed: {str(e)}")
 
     def _run(
-        self, query: str = None, use_reranker: bool = True, max_results: int = 10, **kwargs,
+        self,
+        query: str = None,
+        use_reranker: bool = True,
+        max_results: int = 10,
+        **kwargs,
     ) -> RetrievalResponse:
         """
         Execute a retrieval search with the given query.
@@ -634,7 +730,9 @@ def get_retrieval_tool_definition() -> Dict[str, Any]:
     return retrieval_tool.to_openai_format()
 
 
-def execute_retrieval_search(query: str, use_reranker: bool = True, max_results: int = 10) -> RetrievalResponse:
+def execute_retrieval_search(
+    query: str, use_reranker: bool = True, max_results: int = 10
+) -> RetrievalResponse:
     """
     Execute a retrieval search with the given query
 

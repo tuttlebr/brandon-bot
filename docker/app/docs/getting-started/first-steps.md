@@ -13,19 +13,25 @@ Once the application is running:
 ## Basic Features to Try
 
 ### 1. Simple Questions
+
 Start with basic queries:
+
 - "Hello, how are you?"
 - "What can you help me with?"
 - "Explain quantum computing"
 
 ### 2. Code Generation
+
 Ask for code help:
+
 - "Write a Python function to sort a list"
 - "Create a React component"
 - "Debug this code: [paste your code]"
 
 ### 3. Document Upload
+
 Try the PDF analysis:
+
 1. Click the PDF upload in the sidebar
 2. Upload a document
 3. Ask questions about it

@@ -39,13 +39,24 @@ class AssistantResponse(BaseToolResponse):
     original_text: str = Field(description="The original input text")
     task_type: AssistantTaskType = Field(description="The type of task performed")
     result: str = Field(description="The processed result")
-    improvements: Optional[List[str]] = Field(None, description="List of improvements made (for proofreading)")
-    summary_length: Optional[int] = Field(None, description="Length of summary in words (for summarizing)")
-    source_language: Optional[str] = Field(None, description="Source language for translation")
-    target_language: Optional[str] = Field(None, description="Target language for translation")
-    processing_notes: Optional[str] = Field(None, description="Additional notes about the processing")
+    improvements: Optional[List[str]] = Field(
+        None, description="List of improvements made (for proofreading)"
+    )
+    summary_length: Optional[int] = Field(
+        None, description="Length of summary in words (for summarizing)"
+    )
+    source_language: Optional[str] = Field(
+        None, description="Source language for translation"
+    )
+    target_language: Optional[str] = Field(
+        None, description="Target language for translation"
+    )
+    processing_notes: Optional[str] = Field(
+        None, description="Additional notes about the processing"
+    )
     direct_response: bool = Field(
-        default=True, description="Flag indicating this response should be returned directly to user",
+        default=True,
+        description="Flag indicating this response should be returned directly to user",
     )
 
 
@@ -150,20 +161,26 @@ class AssistantTool(BaseTool):
         try:
             task_enum = AssistantTaskType(task_type.lower())
         except ValueError:
-            raise ValueError(f"Invalid task_type: {task_type}. Must be one of: {[t.value for t in AssistantTaskType]}")
+            raise ValueError(
+                f"Invalid task_type: {task_type}. Must be one of: {[t.value for t in AssistantTaskType]}"
+            )
 
         # Extract PDF content if needed
         text = self._prepare_text_with_context(text, messages)
 
         # Route to appropriate service
         if task_enum == AssistantTaskType.TRANSLATE:
-            return self._handle_translation(text, source_language, target_language, messages)
+            return self._handle_translation(
+                text, source_language, target_language, messages
+            )
         elif task_enum == AssistantTaskType.ANALYZE:
             return self._handle_analysis(text, instructions, messages)
         else:
             return self._handle_text_processing(task_enum, text, instructions, messages)
 
-    def _prepare_text_with_context(self, text: str, messages: Optional[List[Dict[str, Any]]]) -> str:
+    def _prepare_text_with_context(
+        self, text: str, messages: Optional[List[Dict[str, Any]]]
+    ) -> str:
         """Prepare text with any injected context from messages or session"""
 
         # Check for PDF content in messages
@@ -171,14 +188,22 @@ class AssistantTool(BaseTool):
             logger.debug(f"Checking {len(messages)} messages for PDF content")
             pdf_data = PDFDataExtractor.extract_from_messages(messages)
             if pdf_data:
-                logger.info(f"Found PDF data: {pdf_data.get('filename')} with {len(pdf_data.get('pages', []))} pages")
+                logger.info(
+                    f"Found PDF data: {pdf_data.get('filename')} with {len(pdf_data.get('pages', []))} pages"
+                )
                 pdf_text = PDFDataExtractor.extract_text_from_pdf_data(pdf_data)
                 if pdf_text:
                     logger.info(f"Extracted {len(pdf_text)} characters of PDF text")
                     # Replace generic references with actual content
                     text_lower = text.lower()
-                    if text_lower in ["the pdf", "the document"] or "pdf" in text_lower or "document" in text_lower:
-                        logger.info("Replacing generic PDF reference with actual content")
+                    if (
+                        text_lower in ["the pdf", "the document"]
+                        or "pdf" in text_lower
+                        or "document" in text_lower
+                    ):
+                        logger.info(
+                            "Replacing generic PDF reference with actual content"
+                        )
                         return pdf_text
                     else:
                         # Append as additional context
@@ -202,7 +227,9 @@ class AssistantTool(BaseTool):
         if not target_language:
             raise ValueError("target_language is required for translation tasks")
 
-        result = self.translator.translate_text(text, target_language, source_language, messages)
+        result = self.translator.translate_text(
+            text, target_language, source_language, messages
+        )
 
         if result["success"]:
             return AssistantResponse(
@@ -217,7 +244,10 @@ class AssistantTool(BaseTool):
             raise Exception(result.get("error", "Translation failed"))
 
     def _handle_analysis(
-        self, text: str, instructions: Optional[str], messages: Optional[List[Dict[str, Any]]],
+        self,
+        text: str,
+        instructions: Optional[str],
+        messages: Optional[List[Dict[str, Any]]],
     ) -> AssistantResponse:
         """Handle document analysis tasks"""
 
@@ -233,17 +263,25 @@ class AssistantTool(BaseTool):
                         f"Loaded complete document with {len(complete_pages)} pages for comprehensive analysis"
                     )
                     pdf_data = {"pages": complete_pages, "filename": "Document"}
-                    result = self.document_analyzer.analyze_pdf_pages(complete_pages, instructions, "Document")
+                    result = self.document_analyzer.analyze_pdf_pages(
+                        complete_pages, instructions, "Document"
+                    )
                 else:
                     # Fallback to context pages
                     pdf_data = {"pages": pages, "filename": "Document"}
-                    result = self.document_analyzer.analyze_pdf_pages(pages, instructions, "Document")
+                    result = self.document_analyzer.analyze_pdf_pages(
+                        pages, instructions, "Document"
+                    )
             else:
                 # Fallback to regular document analysis
-                result = self.document_analyzer.analyze_document(text, instructions or "Analyze this document")
+                result = self.document_analyzer.analyze_document(
+                    text, instructions or "Analyze this document"
+                )
         else:
             # Regular document analysis
-            result = self.document_analyzer.analyze_document(text, instructions or "Analyze this text")
+            result = self.document_analyzer.analyze_document(
+                text, instructions or "Analyze this text"
+            )
 
         if result["success"]:
             return AssistantResponse(
@@ -278,7 +316,9 @@ class AssistantTool(BaseTool):
         if not text_task_type:
             raise ValueError(f"Unsupported text processing task: {task_type}")
 
-        result = self.text_processor.process_text(text_task_type, text, instructions, messages)
+        result = self.text_processor.process_text(
+            text_task_type, text, instructions, messages
+        )
 
         if result["success"]:
             # Extract task-specific metadata
@@ -319,7 +359,9 @@ class AssistantTool(BaseTool):
             if line.startswith("[Page ") and line.endswith("]"):
                 # Save previous page
                 if current_page is not None and current_text:
-                    pages.append({"page": current_page, "text": "\n".join(current_text).strip()})
+                    pages.append(
+                        {"page": current_page, "text": "\n".join(current_text).strip()}
+                    )
 
                 # Start new page
                 try:
@@ -335,11 +377,15 @@ class AssistantTool(BaseTool):
 
         # Save final page
         if current_page is not None and current_text:
-            pages.append({"page": current_page, "text": "\n".join(current_text).strip()})
+            pages.append(
+                {"page": current_page, "text": "\n".join(current_text).strip()}
+            )
 
         return pages
 
-    def _load_complete_document_for_analysis(self, context_pages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _load_complete_document_for_analysis(
+        self, context_pages: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """
         Load the complete document from batch files for comprehensive analysis
 
@@ -392,7 +438,9 @@ class AssistantTool(BaseTool):
             # Get all batches for this PDF
             batches = file_storage.get_pdf_batches(pdf_id)
             logger.info(f"Attempting to load batches for PDF ID: {pdf_id}")
-            logger.info(f"Available batch files: {[f.name for f in pdf_files if 'batch' in f.name]}")
+            logger.info(
+                f"Available batch files: {[f.name for f in pdf_files if 'batch' in f.name]}"
+            )
 
             if batches:
                 logger.info(f"Found {len(batches)} batches for comprehensive analysis")
@@ -404,13 +452,19 @@ class AssistantTool(BaseTool):
                     logger.info(f"Batch {i}: {len(batch_pages)} pages")
                     all_pages.extend(batch_pages)
 
-                logger.info(f"Successfully loaded {len(all_pages)} pages from batches for comprehensive analysis")
+                logger.info(
+                    f"Successfully loaded {len(all_pages)} pages from batches for comprehensive analysis"
+                )
 
                 # Verify we have a substantial number of pages for comprehensive analysis
                 if len(all_pages) < 100:
-                    logger.warning(f"Only loaded {len(all_pages)} pages - this may not be comprehensive analysis")
+                    logger.warning(
+                        f"Only loaded {len(all_pages)} pages - this may not be comprehensive analysis"
+                    )
                 else:
-                    logger.info(f"✓ Comprehensive analysis confirmed: {len(all_pages)} pages loaded")
+                    logger.info(
+                        f"✓ Comprehensive analysis confirmed: {len(all_pages)} pages loaded"
+                    )
 
                 return all_pages
             else:

@@ -17,7 +17,9 @@ class UIConfig:
     """UI-related configuration constants"""
 
     # Spinner and loading indicators
-    SPINNER_ICONS: List[str] = field(default_factory=lambda: ["🤖", "🧠", "🤔", "🤓", "⚡"])
+    SPINNER_ICONS: List[str] = field(
+        default_factory=lambda: ["🤖", "🧠", "🤔", "🤓", "⚡"]
+    )
 
     # Display limits and formatting
     MAX_PROMPT_DISPLAY_LENGTH: int = 4096
@@ -61,20 +63,36 @@ class FileProcessingConfig:
 
     # Supported file types
     SUPPORTED_PDF_TYPES: List[str] = field(default_factory=lambda: ['pdf'])
-    SUPPORTED_IMAGE_TYPES: List[str] = field(default_factory=lambda: ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'])
+    SUPPORTED_IMAGE_TYPES: List[str] = field(
+        default_factory=lambda: ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp']
+    )
 
     # PDF Summarization settings
     PDF_SUMMARIZATION_THRESHOLD: int = 10  # Number of pages to trigger summarization
-    PDF_SUMMARIZATION_BATCH_SIZE: int = 10  # Pages per batch for summarization (increased from 5)
+    PDF_SUMMARIZATION_BATCH_SIZE: int = (
+        10  # Pages per batch for summarization (increased from 5)
+    )
     PDF_SUMMARY_MAX_LENGTH: int = 800  # Max words per page summary (increased from 500)
-    PDF_SUMMARIZATION_ENABLED: bool = True  # Enabled - summarization should be user-driven
-    PDF_SUMMARIZATION_USE_ASYNC: bool = True  # Use async (True) or sync (False) processing
+    PDF_SUMMARIZATION_ENABLED: bool = (
+        True  # Enabled - summarization should be user-driven
+    )
+    PDF_SUMMARIZATION_USE_ASYNC: bool = (
+        True  # Use async (True) or sync (False) processing
+    )
 
     # PDF Batch Processing settings
-    PDF_BATCH_PROCESSING_THRESHOLD: int = 50  # Number of pages to trigger batch processing
-    PDF_PAGES_PER_BATCH: int = 50  # Maximum pages to process per batch (increased from 20)
-    PDF_CONTEXT_MAX_PAGES: int = 100  # Maximum pages to include in context at once (increased from 30)
-    PDF_CONTEXT_MAX_CHARS: int = 100000  # Maximum characters per context injection (increased from 100000)
+    PDF_BATCH_PROCESSING_THRESHOLD: int = (
+        50  # Number of pages to trigger batch processing
+    )
+    PDF_PAGES_PER_BATCH: int = (
+        50  # Maximum pages to process per batch (increased from 20)
+    )
+    PDF_CONTEXT_MAX_PAGES: int = (
+        100  # Maximum pages to include in context at once (increased from 30)
+    )
+    PDF_CONTEXT_MAX_CHARS: int = (
+        100000  # Maximum characters per context injection (increased from 100000)
+    )
 
 
 @dataclass
@@ -107,7 +125,9 @@ class LLMConfig:
     )  # Maximum context length for LLM (tokens)
 
     # Conversation context injection
-    AUTO_INJECT_CONVERSATION_CONTEXT: bool = True  # Automatically inject conversation context
+    AUTO_INJECT_CONVERSATION_CONTEXT: bool = (
+        True  # Automatically inject conversation context
+    )
     MIN_TURNS_FOR_CONTEXT_INJECTION: int = 1  # Minimum turns before injecting context
 
 
@@ -146,7 +166,8 @@ class SystemConfig:
     # Logging configuration
     LOG_LEVEL: str = field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
     SUPPRESS_STREAMLIT_WARNINGS: bool = field(
-        default_factory=lambda: os.getenv("SUPPRESS_STREAMLIT_WARNINGS", "true").lower() == "true"
+        default_factory=lambda: os.getenv("SUPPRESS_STREAMLIT_WARNINGS", "true").lower()
+        == "true"
     )
 
 
@@ -159,38 +180,76 @@ class EnvironmentConfig:
     META_USER: str = field(default_factory=lambda: os.getenv("META_USER", "human"))
 
     # Model endpoints and names
-    FAST_LLM_MODEL_NAME: Optional[str] = field(default_factory=lambda: os.getenv("FAST_LLM_MODEL_NAME"))
-    FAST_LLM_ENDPOINT: Optional[str] = field(default_factory=lambda: os.getenv("FAST_LLM_ENDPOINT"))
-    LLM_MODEL_NAME: Optional[str] = field(default_factory=lambda: os.getenv("LLM_MODEL_NAME"))
-    LLM_ENDPOINT: Optional[str] = field(default_factory=lambda: os.getenv("LLM_ENDPOINT"))
-    INTELLIGENT_LLM_ENDPOINT: Optional[str] = field(default_factory=lambda: os.getenv("INTELLIGENT_LLM_ENDPOINT"))
-    INTELLIGENT_LLM_MODEL_NAME: Optional[str] = field(default_factory=lambda: os.getenv("INTELLIGENT_LLM_MODEL_NAME"))
-    VLM_MODEL_NAME: Optional[str] = field(default_factory=lambda: os.getenv("VLM_MODEL_NAME"))
-    VLM_ENDPOINT: Optional[str] = field(default_factory=lambda: os.getenv("VLM_ENDPOINT"))
+    FAST_LLM_MODEL_NAME: Optional[str] = field(
+        default_factory=lambda: os.getenv("FAST_LLM_MODEL_NAME")
+    )
+    FAST_LLM_ENDPOINT: Optional[str] = field(
+        default_factory=lambda: os.getenv("FAST_LLM_ENDPOINT")
+    )
+    LLM_MODEL_NAME: Optional[str] = field(
+        default_factory=lambda: os.getenv("LLM_MODEL_NAME")
+    )
+    LLM_ENDPOINT: Optional[str] = field(
+        default_factory=lambda: os.getenv("LLM_ENDPOINT")
+    )
+    INTELLIGENT_LLM_ENDPOINT: Optional[str] = field(
+        default_factory=lambda: os.getenv("INTELLIGENT_LLM_ENDPOINT")
+    )
+    INTELLIGENT_LLM_MODEL_NAME: Optional[str] = field(
+        default_factory=lambda: os.getenv("INTELLIGENT_LLM_MODEL_NAME")
+    )
+    VLM_MODEL_NAME: Optional[str] = field(
+        default_factory=lambda: os.getenv("VLM_MODEL_NAME")
+    )
+    VLM_ENDPOINT: Optional[str] = field(
+        default_factory=lambda: os.getenv("VLM_ENDPOINT")
+    )
 
     # API keys
-    NVIDIA_API_KEY: str = field(default_factory=lambda: os.getenv("NVIDIA_API_KEY", "None"))
-    TAVILY_API_KEY: Optional[str] = field(default_factory=lambda: os.getenv("TAVILY_API_KEY"))
+    NVIDIA_API_KEY: str = field(
+        default_factory=lambda: os.getenv("NVIDIA_API_KEY", "None")
+    )
+    TAVILY_API_KEY: Optional[str] = field(
+        default_factory=lambda: os.getenv("TAVILY_API_KEY")
+    )
 
     # Embedding configuration
-    EMBEDDING_ENDPOINT: Optional[str] = field(default_factory=lambda: os.getenv("EMBEDDING_ENDPOINT"))
-    EMBEDDING_MODEL: Optional[str] = field(default_factory=lambda: os.getenv("EMBEDDING_MODEL"))
+    EMBEDDING_ENDPOINT: Optional[str] = field(
+        default_factory=lambda: os.getenv("EMBEDDING_ENDPOINT")
+    )
+    EMBEDDING_MODEL: Optional[str] = field(
+        default_factory=lambda: os.getenv("EMBEDDING_MODEL")
+    )
 
     # Database configuration
-    DATABASE_URL: Optional[str] = field(default_factory=lambda: os.getenv("DATABASE_URL"))
-    COLLECTION_NAME: str = field(default_factory=lambda: os.getenv("COLLECTION_NAME", "milvus"))
-    PARTITION_NAME: str = field(default_factory=lambda: os.getenv("PARTITION_NAME", "milvus"))
+    DATABASE_URL: Optional[str] = field(
+        default_factory=lambda: os.getenv("DATABASE_URL")
+    )
+    COLLECTION_NAME: str = field(
+        default_factory=lambda: os.getenv("COLLECTION_NAME", "milvus")
+    )
+    PARTITION_NAME: str = field(
+        default_factory=lambda: os.getenv("PARTITION_NAME", "milvus")
+    )
     DEFAULT_DB: str = field(default_factory=lambda: os.getenv("DEFAULT_DB", "milvus"))
 
     # Reranker configuration
-    RERANKER_ENDPOINT: Optional[str] = field(default_factory=lambda: os.getenv("RERANKER_ENDPOINT"))
-    RERANKER_MODEL: Optional[str] = field(default_factory=lambda: os.getenv("RERANKER_MODEL"))
+    RERANKER_ENDPOINT: Optional[str] = field(
+        default_factory=lambda: os.getenv("RERANKER_ENDPOINT")
+    )
+    RERANKER_MODEL: Optional[str] = field(
+        default_factory=lambda: os.getenv("RERANKER_MODEL")
+    )
 
     # Image generation
-    IMAGE_ENDPOINT: Optional[str] = field(default_factory=lambda: os.getenv("IMAGE_ENDPOINT"))
+    IMAGE_ENDPOINT: Optional[str] = field(
+        default_factory=lambda: os.getenv("IMAGE_ENDPOINT")
+    )
 
     # PDF processing
-    NVINGEST_ENDPOINT: Optional[str] = field(default_factory=lambda: os.getenv("NVINGEST_ENDPOINT"))
+    NVINGEST_ENDPOINT: Optional[str] = field(
+        default_factory=lambda: os.getenv("NVINGEST_ENDPOINT")
+    )
 
     def validate_required_env_vars(self) -> List[str]:
         """
@@ -236,7 +295,9 @@ class AppConfig:
         # Validate environment variables
         missing_vars = self.env.validate_required_env_vars()
         if missing_vars:
-            logging.warning(f"Missing required environment variables: {', '.join(missing_vars)}")
+            logging.warning(
+                f"Missing required environment variables: {', '.join(missing_vars)}"
+            )
 
     def get_llm_parameters(self) -> Dict[str, Any]:
         """
@@ -279,10 +340,14 @@ class AppConfig:
         """
         missing_vars = self.env.validate_required_env_vars()
         if missing_vars:
-            raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
+            raise ValueError(
+                f"Missing required environment variables: {', '.join(missing_vars)}"
+            )
 
         # Additional validation for specific endpoints
-        if self.env.NVINGEST_ENDPOINT and not self.env.NVINGEST_ENDPOINT.startswith(('http://', 'https://')):
+        if self.env.NVINGEST_ENDPOINT and not self.env.NVINGEST_ENDPOINT.startswith(
+            ('http://', 'https://')
+        ):
             raise ValueError("NVINGEST_ENDPOINT must be a valid HTTP/HTTPS URL")
 
         logging.info("Environment configuration validation completed successfully")
@@ -298,5 +363,8 @@ logging.basicConfig(
     level=getattr(logging, config.system.LOG_LEVEL.upper()),
     format="%(asctime)s %(levelname)s %(filename)s:%(lineno)d %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
-    handlers=[logging.StreamHandler(), logging.FileHandler("/tmp/chatbot_storage/chatbot.log", mode="a"),],
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler("/tmp/chatbot_storage/chatbot.log", mode="a"),
+    ],
 )

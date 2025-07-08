@@ -40,7 +40,9 @@ class ResponseParsingService:
             custom_tool_calls = self._extract_custom_tool_calls(content)
 
             # Normalize all tool calls
-            all_tool_calls = self._normalize_tool_calls(openai_tool_calls, custom_tool_calls)
+            all_tool_calls = self._normalize_tool_calls(
+                openai_tool_calls, custom_tool_calls
+            )
 
             # Clean content if custom tool calls were found
             if custom_tool_calls:
@@ -88,10 +90,16 @@ class ResponseParsingService:
         for match in matches:
             try:
                 # Parse JSON array
-                parsed = json.loads(f"[{match}]" if not match.startswith("[") else match)
+                parsed = json.loads(
+                    f"[{match}]" if not match.startswith("[") else match
+                )
                 if isinstance(parsed, list):
                     for item in parsed:
-                        if isinstance(item, dict) and 'name' in item and 'arguments' in item:
+                        if (
+                            isinstance(item, dict)
+                            and 'name' in item
+                            and 'arguments' in item
+                        ):
                             tool_calls.append(item)
             except json.JSONDecodeError as e:
                 logger.warning(f"Failed to parse custom tool call: {e}")
@@ -107,13 +115,23 @@ class ResponseParsingService:
         # Add OpenAI calls
         for call in openai_calls:
             normalized.append(
-                {'name': call['name'], 'arguments': call['arguments'], 'source': 'openai', 'id': call.get('id')}
+                {
+                    'name': call['name'],
+                    'arguments': call['arguments'],
+                    'source': 'openai',
+                    'id': call.get('id'),
+                }
             )
 
         # Add custom calls
         for call in custom_calls:
             normalized.append(
-                {'name': call['name'], 'arguments': call.get('arguments', {}), 'source': 'custom', 'id': None}
+                {
+                    'name': call['name'],
+                    'arguments': call.get('arguments', {}),
+                    'source': 'custom',
+                    'id': None,
+                }
             )
 
         return normalized
@@ -124,7 +142,10 @@ class ResponseParsingService:
             return content
 
         # Remove tool call patterns
-        patterns = [r'<TOOLCALL[^>]*?\[.*?\]</TOOLCALL>', r'<toolcall[^>]*?\[.*?\]</toolcall>']
+        patterns = [
+            r'<TOOLCALL[^>]*?\[.*?\]</TOOLCALL>',
+            r'<toolcall[^>]*?\[.*?\]</toolcall>',
+        ]
 
         cleaned = content
         for pattern in patterns:

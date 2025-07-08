@@ -24,7 +24,9 @@ class ExtractResult(BaseToolResponse):
     content: str = Field(description="Extracted content in markdown format")
     raw_content: Optional[str] = Field(None, description="Raw content if available")
     success: bool = Field(default=True, description="Whether extraction was successful")
-    error_message: Optional[str] = Field(None, description="Error message if extraction failed")
+    error_message: Optional[str] = Field(
+        None, description="Error message if extraction failed"
+    )
     response_time: float = Field(description="Response time for the extraction")
 
 
@@ -109,7 +111,9 @@ class WebExtractTool(BaseTool):
         except Exception:
             return False
 
-    def _check_user_provided_url(self, url: str, messages: List[Dict[str, Any]]) -> bool:
+    def _check_user_provided_url(
+        self, url: str, messages: List[Dict[str, Any]]
+    ) -> bool:
         """
         Check if the URL was provided by the user (not by tools or system)
 
@@ -224,7 +228,9 @@ class WebExtractTool(BaseTool):
             response = requests.post(self.extract_url, headers=headers, json=payload)
             response.raise_for_status()
 
-            logger.debug(f"Batch extract API request successful (HTTP {response.status_code})")
+            logger.debug(
+                f"Batch extract API request successful (HTTP {response.status_code})"
+            )
 
             # Parse the response
             data = response.json()
@@ -234,7 +240,9 @@ class WebExtractTool(BaseTool):
 
             # Process successful extractions
             if data.get("results"):
-                successful_extractions = {result.get("url"): result for result in data["results"]}
+                successful_extractions = {
+                    result.get("url"): result for result in data["results"]
+                }
 
                 for url in urls:
                     if url in successful_extractions:
@@ -317,7 +325,9 @@ class WebExtractTool(BaseTool):
                 for url in urls
             ]
 
-    def extract_url_content(self, url: str, messages: Optional[List[Dict[str, Any]]] = None) -> ExtractResult:
+    def extract_url_content(
+        self, url: str, messages: Optional[List[Dict[str, Any]]] = None
+    ) -> ExtractResult:
         """
         Extract content from a URL using Tavily Extract API
 
@@ -392,7 +402,9 @@ class WebExtractTool(BaseTool):
             response = requests.post(self.extract_url, headers=headers, json=payload)
             response.raise_for_status()
 
-            logger.debug(f"Extract API request successful (HTTP {response.status_code})")
+            logger.debug(
+                f"Extract API request successful (HTTP {response.status_code})"
+            )
 
             # Parse the response
             data = response.json()
@@ -532,7 +544,9 @@ def get_web_extract_tool_definition() -> Dict[str, Any]:
     return web_extract_tool.to_openai_format()
 
 
-def execute_web_extract(url: str, messages: Optional[List[Dict[str, Any]]] = None) -> ExtractResult:
+def execute_web_extract(
+    url: str, messages: Optional[List[Dict[str, Any]]] = None
+) -> ExtractResult:
     """
     Execute web content extraction
 
@@ -559,7 +573,9 @@ def execute_web_extract_with_dict(params: Dict[str, Any]) -> ExtractResult:
     return web_extract_tool.run_with_dict(params)
 
 
-def execute_web_extract_batch(urls: List[str], messages: Optional[List[Dict[str, Any]]] = None) -> List[ExtractResult]:
+def execute_web_extract_batch(
+    urls: List[str], messages: Optional[List[Dict[str, Any]]] = None
+) -> List[ExtractResult]:
     """
     Execute batch web content extraction
 

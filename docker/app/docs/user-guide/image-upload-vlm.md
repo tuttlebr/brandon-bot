@@ -5,6 +5,7 @@ The Streamlit Chat Application includes powerful image analysis capabilities usi
 ## Overview
 
 The image analysis feature uses NVIDIA's vision-capable language models to:
+
 - Describe image content
 - Answer specific questions about images
 - Identify objects, people, and scenes
@@ -31,22 +32,26 @@ The image analysis feature uses NVIDIA's vision-capable language models to:
 Once your image is uploaded, you can ask various types of questions:
 
 #### General Description
+
 - "What do you see in this image?"
 - "Describe this image in detail"
 - "What's happening in this picture?"
 
 #### Specific Analysis
+
 - "What objects are visible in this image?"
 - "What is the main subject of this photo?"
 - "Describe the colors and lighting"
 - "What's the mood or atmosphere?"
 
 #### Technical Questions
+
 - "Is this a diagram? What does it show?"
 - "What type of chart is this?"
 - "Explain this technical illustration"
 
 #### Creative Questions
+
 - "Is this an illustration or a photograph?"
 - "What art style is this?"
 - "What story does this image tell?"
@@ -54,17 +59,20 @@ Once your image is uploaded, you can ask various types of questions:
 ## Features
 
 ### Session Persistence
+
 - Images remain available throughout your chat session
 - You can ask multiple questions about the same image
 - Upload a new image to replace the current one
 
 ### Intelligent Analysis
+
 - The VLM provides detailed, context-aware responses
 - Understands complex scenes and relationships
 - Can identify text within images
 - Recognizes technical diagrams and charts
 
 ### Privacy and Security
+
 - Images are stored only in your session
 - Automatic cleanup when session ends
 - No permanent storage of uploaded images
@@ -137,16 +145,19 @@ IMAGE_MAX_SIZE_MB=10  # Maximum upload size in MB
 ## Troubleshooting
 
 ### Image Won't Upload
+
 - Check file size (under 10MB)
 - Verify file format is supported
 - Try a different browser if issues persist
 
 ### Analysis Not Working
+
 - Ensure image uploaded successfully
 - Check for confirmation message
 - Try re-uploading the image
 
 ### Slow Response
+
 - Larger images take more time
 - Complex scenes require more processing
 - Network speed affects upload time
@@ -154,6 +165,7 @@ IMAGE_MAX_SIZE_MB=10  # Maximum upload size in MB
 ## Examples
 
 ### Example 1: Product Analysis
+
 ```
 User: [Uploads product photo]
 User: "What product is this and what are its key features?"
@@ -161,6 +173,7 @@ Assistant: "This appears to be a wireless mechanical keyboard with..."
 ```
 
 ### Example 2: Technical Diagram
+
 ```
 User: [Uploads circuit diagram]
 User: "Explain this circuit diagram"
@@ -168,6 +181,7 @@ Assistant: "This is a basic LED circuit showing..."
 ```
 
 ### Example 3: Art Analysis
+
 ```
 User: [Uploads painting]
 User: "What art style is this and what period might it be from?"

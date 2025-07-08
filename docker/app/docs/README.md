@@ -128,6 +128,7 @@ mkdocs serve
 ## Advantages of Each Approach
 
 ### Simple Server (simple_docs_server.py)
+
 - ✅ Minimal dependencies (3 packages)
 - ✅ No build step required
 - ✅ Fast startup
@@ -136,6 +137,7 @@ mkdocs serve
 - ✅ Works immediately
 
 ### Full MkDocs
+
 - ✅ More features and themes
 - ✅ Better for large documentation
 - ✅ Plugin ecosystem
@@ -190,6 +192,7 @@ location /docs {
 ## Support
 
 For issues or questions:
+
 1. Check the troubleshooting guide
 2. Review the architecture documentation
 3. Submit an issue on GitHub

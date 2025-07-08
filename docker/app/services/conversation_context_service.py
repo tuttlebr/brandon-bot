@@ -45,7 +45,9 @@ class ConversationContextService:
             return False
 
         # Always inject context if we have more than just system messages
-        conversation_messages = [msg for msg in messages if msg.get("role") not in ["system", "tool"]]
+        conversation_messages = [
+            msg for msg in messages if msg.get("role") not in ["system", "tool"]
+        ]
 
         # Calculate number of turns (2 messages = 1 turn)
         num_turns = len(conversation_messages) // 2
@@ -53,7 +55,9 @@ class ConversationContextService:
         # Inject context if we have at least the minimum required turns
         return num_turns >= config.llm.MIN_TURNS_FOR_CONTEXT_INJECTION
 
-    def inject_conversation_context(self, messages: List[Dict[str, Any]], user_message: str) -> List[Dict[str, Any]]:
+    def inject_conversation_context(
+        self, messages: List[Dict[str, Any]], user_message: str
+    ) -> List[Dict[str, Any]]:
         """
         Inject conversation context into messages for LLM processing
 
@@ -66,12 +70,16 @@ class ConversationContextService:
         """
         # Check if we should inject context
         if not self.should_inject_context(messages):
-            logger.debug("Conversation context injection not needed - insufficient messages")
+            logger.debug(
+                "Conversation context injection not needed - insufficient messages"
+            )
             return messages
 
         # Check if context has already been injected (avoid duplicates)
         for msg in messages:
-            if msg.get("role") == "system" and "## Conversation Context" in msg.get("content", ""):
+            if msg.get("role") == "system" and "## Conversation Context" in msg.get(
+                "content", ""
+            ):
                 logger.debug("Conversation context already present, skipping injection")
                 return messages
 
@@ -85,7 +93,9 @@ class ConversationContextService:
             return messages
 
         # Create system message with conversation context
-        context_system_message = self._create_context_system_message(context_summary, len(messages))
+        context_system_message = self._create_context_system_message(
+            context_summary, len(messages)
+        )
 
         # Create a new message list with context injected
         enhanced_messages = []
@@ -103,10 +113,14 @@ class ConversationContextService:
             if msg.get("role") != "system":
                 enhanced_messages.append(msg)
 
-        logger.info(f"Injected conversation context summary ({len(context_summary)} chars)")
+        logger.info(
+            f"Injected conversation context summary ({len(context_summary)} chars)"
+        )
         return enhanced_messages
 
-    def _get_conversation_summary(self, messages: List[Dict[str, Any]], user_message: str) -> Optional[str]:
+    def _get_conversation_summary(
+        self, messages: List[Dict[str, Any]], user_message: str
+    ) -> Optional[str]:
         """
         Generate a conversation summary using the conversation context tool
 
@@ -122,7 +136,9 @@ class ConversationContextService:
             max_turns = config.llm.SLIDING_WINDOW_MAX_TURNS
 
             # Filter conversation messages (exclude system/tool messages)
-            conversation_messages = [msg for msg in messages if msg.get("role") not in ["system", "tool"]]
+            conversation_messages = [
+                msg for msg in messages if msg.get("role") not in ["system", "tool"]
+            ]
 
             # Apply max turns limit (convert turns to messages: 1 turn = 2 messages)
             max_messages = max_turns * 2
@@ -145,14 +161,18 @@ class ConversationContextService:
             if response and response.success:
                 return response.analysis
             else:
-                logger.error(f"Context analysis failed: {response.error_message if response else 'Unknown error'}")
+                logger.error(
+                    f"Context analysis failed: {response.error_message if response else 'Unknown error'}"
+                )
                 return None
 
         except Exception as e:
             logger.error(f"Error generating conversation summary: {e}")
             return None
 
-    def _create_context_system_message(self, context_summary: str, total_messages: int) -> Dict[str, str]:
+    def _create_context_system_message(
+        self, context_summary: str, total_messages: int
+    ) -> Dict[str, str]:
         """
         Create a system message containing conversation context
 

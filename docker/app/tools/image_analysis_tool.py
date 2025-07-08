@@ -21,7 +21,9 @@ class ImageAnalysisResponse(BaseToolResponse):
     analysis: str = Field(description="Analysis result")
     question: str = Field(description="Question asked about the image")
     message: str = Field(description="Status message")
-    direct_response: bool = Field(default=True, description="This provides a direct response to the user")
+    direct_response: bool = Field(
+        default=True, description="This provides a direct response to the user"
+    )
 
 
 class ImageAnalysisTool(BaseTool):
@@ -43,7 +45,10 @@ class ImageAnalysisTool(BaseTool):
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "question": {"type": "string", "description": "The question to ask about the uploaded image",}
+                        "question": {
+                            "type": "string",
+                            "description": "The question to ask about the uploaded image",
+                        }
                     },
                     "required": ["question"],
                 },
@@ -62,7 +67,10 @@ class ImageAnalysisTool(BaseTool):
         if not image_base64:
             import streamlit as st
 
-            if not hasattr(st.session_state, 'current_image_base64') or not st.session_state.current_image_base64:
+            if (
+                not hasattr(st.session_state, 'current_image_base64')
+                or not st.session_state.current_image_base64
+            ):
                 return ImageAnalysisResponse(
                     success=False,
                     filename="Unknown",
@@ -121,18 +129,27 @@ class ImageAnalysisTool(BaseTool):
             config_obj = ChatConfig.from_environment()
 
             # Use VLM endpoint and model
-            client = OpenAI(api_key=config_obj.api_key, base_url=config_obj.vlm_endpoint)
+            client = OpenAI(
+                api_key=config_obj.api_key, base_url=config_obj.vlm_endpoint
+            )
 
             model_name = config_obj.vlm_model_name
 
-            logger.info(f"Using VLM model: {model_name} at endpoint: {config_obj.vlm_endpoint}")
+            logger.info(
+                f"Using VLM model: {model_name} at endpoint: {config_obj.vlm_endpoint}"
+            )
 
             # Create one-shot message with image and question
             messages = [
                 {
                     "role": "user",
                     "content": [
-                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{image_base64}"}},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{image_base64}"
+                            },
+                        },
                         {"type": "text", "text": question},
                     ],
                 }
@@ -140,7 +157,11 @@ class ImageAnalysisTool(BaseTool):
 
             # Make one-shot VLM call
             response = client.chat.completions.create(
-                model=model_name, messages=messages, temperature=1.0, top_p=0.01, stream=False
+                model=model_name,
+                messages=messages,
+                temperature=1.0,
+                top_p=0.01,
+                stream=False,
             )
 
             return response.choices[0].message.content.strip()

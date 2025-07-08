@@ -13,22 +13,36 @@ class CurrentWeather(BaseModel):
     """Current weather conditions"""
 
     temperature: float = Field(description="Current temperature in Fahrenheit")
-    relative_humidity: Optional[float] = Field(None, description="Current relative humidity in %")
+    relative_humidity: Optional[float] = Field(
+        None, description="Current relative humidity in %"
+    )
     wind_speed: float = Field(description="Current wind speed in km/h")
     weather_code: Optional[int] = Field(None, description="Weather condition code")
     is_day: Optional[bool] = Field(None, description="Whether it's day or night")
-    precipitation_probability: Optional[float] = Field(None, description="Precipitation probability in %")
+    precipitation_probability: Optional[float] = Field(
+        None, description="Precipitation probability in %"
+    )
 
 
 class HourlyWeather(BaseModel):
     """Hourly weather forecast"""
 
     time: List[str] = Field(default_factory=list, description="Hourly timestamps")
-    temperature: List[float] = Field(default_factory=list, description="Hourly temperatures in Fahrenheit")
-    relative_humidity: List[float] = Field(default_factory=list, description="Hourly relative humidity in %")
-    wind_speed: List[float] = Field(default_factory=list, description="Hourly wind speed in km/h")
-    weather_code: List[int] = Field(default_factory=list, description="Hourly weather condition code")
-    is_day: List[bool] = Field(default_factory=list, description="Hourly whether it's day or night")
+    temperature: List[float] = Field(
+        default_factory=list, description="Hourly temperatures in Fahrenheit"
+    )
+    relative_humidity: List[float] = Field(
+        default_factory=list, description="Hourly relative humidity in %"
+    )
+    wind_speed: List[float] = Field(
+        default_factory=list, description="Hourly wind speed in km/h"
+    )
+    weather_code: List[int] = Field(
+        default_factory=list, description="Hourly weather condition code"
+    )
+    is_day: List[bool] = Field(
+        default_factory=list, description="Hourly whether it's day or night"
+    )
     precipitation_probability: List[float] = Field(
         default_factory=list, description="Hourly precipitation probability in %"
     )
@@ -178,7 +192,9 @@ class WeatherTool(BaseTool):
             logger.error(f"Geocoding API request failed: {e}")
             raise requests.RequestException(f"Failed to geocode location: {str(e)}")
 
-    def get_weather(self, location: str, include_hourly: bool = True) -> WeatherResponse:
+    def get_weather(
+        self, location: str, include_hourly: bool = True
+    ) -> WeatherResponse:
         """
         Get weather information for a given location
 
@@ -211,9 +227,9 @@ class WeatherTool(BaseTool):
         }
 
         if include_hourly:
-            params[
-                "hourly"
-            ] = "temperature_2m,wind_speed_10m,relative_humidity_2m,weather_code,precipitation_probability,is_day"
+            params["hourly"] = (
+                "temperature_2m,wind_speed_10m,relative_humidity_2m,weather_code,precipitation_probability,is_day"
+            )
             params["forecast_days"] = 14  # Only include today's hourly forecast
 
         try:
@@ -234,7 +250,11 @@ class WeatherTool(BaseTool):
                 relative_humidity=current_data.get("relative_humidity_2m"),
                 weather_code=current_data.get("weather_code"),
                 precipitation_probability=current_data.get("precipitation_probability"),
-                is_day=(current_data.get("is_day") == 1 if current_data.get("is_day") is not None else None),
+                is_day=(
+                    current_data.get("is_day") == 1
+                    if current_data.get("is_day") is not None
+                    else None
+                ),
             )
 
             # Parse hourly weather if requested
@@ -243,10 +263,15 @@ class WeatherTool(BaseTool):
                 hourly_data = data["hourly"]
                 hourly_weather = HourlyWeather(
                     time=hourly_data.get("time", []),
-                    temperature=[self._celcius_to_fahrenheit(temp) for temp in hourly_data.get("temperature_2m", [])],
+                    temperature=[
+                        self._celcius_to_fahrenheit(temp)
+                        for temp in hourly_data.get("temperature_2m", [])
+                    ],
                     relative_humidity=hourly_data.get("relative_humidity_2m", []),
                     wind_speed=hourly_data.get("wind_speed_10m", []),
-                    precipitation_probability=hourly_data.get("precipitation_probability", []),
+                    precipitation_probability=hourly_data.get(
+                        "precipitation_probability", []
+                    ),
                     weather_code=hourly_data.get("weather_code", []),
                     is_day=hourly_data.get("is_day", []),
                 )
@@ -327,7 +352,9 @@ def get_weather_tool_definition() -> Dict[str, Any]:
     return weather_tool.to_openai_format()
 
 
-def execute_weather_search(location: str, include_hourly: bool = False) -> WeatherResponse:
+def execute_weather_search(
+    location: str, include_hourly: bool = False
+) -> WeatherResponse:
     """
     Execute a weather lookup with the given location
 

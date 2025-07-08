@@ -26,7 +26,22 @@ DATA_URI_FORMAT = "data:{};base64,{}"
 BASE64_PREFIX_PATTERN = r"^data:image/.+;base64,"
 
 # Allowed values for width and height
-ALLOWED_DIMENSIONS = [512, 576, 640, 704, 768, 832, 896, 960, 1024, 1088, 1152, 1216, 1280, 1344]
+ALLOWED_DIMENSIONS = [
+    512,
+    576,
+    640,
+    704,
+    768,
+    832,
+    896,
+    960,
+    1024,
+    1088,
+    1152,
+    1216,
+    1280,
+    1344,
+]
 
 # Allowed modes for image generation
 ALLOWED_MODES = ["base"]
@@ -161,7 +176,9 @@ def generate_image(
         request_data = ImageProcessingRequest(**params)
 
         # Make the request using the model's json method
-        response = requests.post(invoke_url, json=request_data.model_dump(), headers=HTTP_HEADERS)
+        response = requests.post(
+            invoke_url, json=request_data.model_dump(), headers=HTTP_HEADERS
+        )
 
         # Raise HTTP errors
         response.raise_for_status()
@@ -209,7 +226,9 @@ def pil_image_to_base64(pil_image: Image.Image, format: str = DEFAULT_FORMAT) ->
         return img_base64
     except Exception as e:
         logger.error(f"Error converting PIL image to base64: {str(e)}")
-        raise ImageProcessingError(f"Failed to convert image to base64: {str(e)}") from e
+        raise ImageProcessingError(
+            f"Failed to convert image to base64: {str(e)}"
+        ) from e
 
 
 def base64_to_pil_image(base64_str: str) -> Optional[Image.Image]:

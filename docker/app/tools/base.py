@@ -53,7 +53,9 @@ class BaseTool(ABC):
         if hasattr(self, 'to_openai_format'):
             return self.to_openai_format()
         else:
-            raise NotImplementedError("Tool must implement either to_openai_format() or override get_definition()")
+            raise NotImplementedError(
+                "Tool must implement either to_openai_format() or override get_definition()"
+            )
 
     @abstractmethod
     def execute(self, params: Dict[str, Any]) -> BaseToolResponse:

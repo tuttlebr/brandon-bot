@@ -7,16 +7,19 @@ This guide covers how to configure and use different language models in the Stre
 The application supports three model categories:
 
 ### 1. Fast Models (`FAST_LLM_MODEL_NAME`)
+
 - Used for: Quick responses, simple queries, tool selection
 - Examples: `meta/llama-3.1-8b-instruct`, `mistralai/mistral-7b-instruct-v0.3`
 - Characteristics: Lower latency, lower cost, good for routing
 
 ### 2. Standard Models (`LLM_MODEL_NAME`)
+
 - Used for: General conversations, standard queries
 - Examples: `meta/llama-3.1-70b-instruct`, `mistralai/mixtral-8x7b-instruct-v0.1`
 - Characteristics: Balanced performance and quality
 
 ### 3. Intelligent Models (`INTELLIGENT_LLM_MODEL_NAME`)
+
 - Used for: Complex reasoning, document analysis, code generation
 - Examples: `nvidia/llama-3.3-nemotron-70b-instruct`, `google/gemma-2-27b-it`
 - Characteristics: Highest quality, slower response times
@@ -100,14 +103,17 @@ def select_model(query: str, context: Dict) -> str:
 ### NVIDIA Models
 
 **Fast Models (8K Context)**
+
 - `meta/llama-3.1-8b-instruct` - Quick responses, routing
 - `mistralai/mistral-7b-instruct-v0.3` - Long context (32K), fast performance
 
 **Standard Models (8K Context)**
+
 - `meta/llama-3.1-70b-instruct` - General conversation
 - `mistralai/mixtral-8x7b-instruct-v0.1` - Balanced performance (32K context)
 
 **Intelligent Models (16K Context)**
+
 - `nvidia/llama-3.3-nemotron-70b-instruct` - Complex reasoning, advanced tasks
 
 ### Custom Model Support
@@ -115,6 +121,7 @@ def select_model(query: str, context: Dict) -> str:
 To add support for a custom model:
 
 1. Add model configuration:
+
 ```python
 CUSTOM_MODEL_CONFIG = {
     "model_name": "custom/model-name",
@@ -126,6 +133,7 @@ CUSTOM_MODEL_CONFIG = {
 ```
 
 2. Register with model service:
+
 ```python
 from services.llm_service import LLMService
 
@@ -136,25 +144,33 @@ llm_service.register_model(CUSTOM_MODEL_CONFIG)
 ## Model Parameters
 
 ### Temperature
+
 Controls randomness in responses:
+
 - `0.0`: Deterministic, focused
 - `0.7`: Balanced (default)
 - `1.0`: Creative, varied
 
 ### Top-P (Nucleus Sampling)
+
 Controls diversity:
+
 - `0.1`: Very focused
 - `0.95`: Balanced (default)
 - `1.0`: Maximum diversity
 
 ### Max Tokens
+
 Maximum response length:
+
 - Fast models: 1000-2000
 - Standard models: 2000-4000
 - Intelligent models: 4000-16000
 
 ### Frequency/Presence Penalty
+
 Controls repetition:
+
 - `0.0`: No penalty (default)
 - `1.0`: Strong penalty
 - `2.0`: Maximum penalty
@@ -267,12 +283,14 @@ print(f"Estimated cost: ${usage['cost']}")
 ### Common Issues
 
 1. **Model Not Available**
+
    ```python
    Error: Model 'xyz' not found
    Solution: Check model name and availability
    ```
 
 2. **Context Length Exceeded**
+
    ```python
    Error: Context length (X) exceeds limit (Y)
    Solution: Enable sliding window or compression

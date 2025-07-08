@@ -20,12 +20,15 @@ class LLMService:
 Converts chat messages to LLM-compatible format.
 
 **Parameters:**
+
 - `messages`: List of message dictionaries with 'role' and 'content'
 
 **Returns:**
+
 - List of formatted messages for LLM API
 
 **Example:**
+
 ```python
 messages = [
     {"role": "user", "content": "Hello"},
@@ -39,13 +42,16 @@ formatted = llm_service.create_llm_messages(messages)
 Generates streaming response from LLM.
 
 **Parameters:**
+
 - `messages`: Formatted messages for LLM
 - `model_type`: One of "fast", "llm", or "intelligent"
 
 **Returns:**
+
 - Generator yielding response chunks
 
 **Example:**
+
 ```python
 for chunk in llm_service.generate_streaming_response(messages, "fast"):
     print(chunk, end="")
@@ -56,9 +62,11 @@ for chunk in llm_service.generate_streaming_response(messages, "fast"):
 Processes and executes tool calls from LLM.
 
 **Parameters:**
+
 - `tool_calls`: List of tool call specifications
 
 **Returns:**
+
 - List of tool execution results
 
 ## ChatService
@@ -79,13 +87,16 @@ class ChatService:
 Processes and validates chat messages.
 
 **Parameters:**
+
 - `message`: The message content
 - `role`: Message role ("user" or "assistant")
 
 **Returns:**
+
 - Processed message dictionary
 
 **Example:**
+
 ```python
 processed = chat_service.process_message("Hello!", "user")
 ```
@@ -95,9 +106,11 @@ processed = chat_service.process_message("Hello!", "user")
 Formats message for UI display.
 
 **Parameters:**
+
 - `message`: Message dictionary
 
 **Returns:**
+
 - Formatted message string
 
 ## PDFContextService
@@ -118,13 +131,16 @@ class PDFContextService:
 Injects relevant PDF context into messages.
 
 **Parameters:**
+
 - `messages`: Current conversation messages
 - `query`: User query to match against PDF content
 
 **Returns:**
+
 - Messages with injected PDF context
 
 **Example:**
+
 ```python
 enhanced_messages = pdf_context_service.inject_pdf_context(
     messages,
@@ -137,6 +153,7 @@ enhanced_messages = pdf_context_service.inject_pdf_context(
 Gets formatted PDF information for display.
 
 **Returns:**
+
 - Formatted string with PDF details or None
 
 ## PDFAnalysisService
@@ -157,14 +174,17 @@ class PDFAnalysisService:
 Performs intelligent analysis of PDF documents.
 
 **Parameters:**
+
 - `pdf_document`: PDF document dictionary with pages
 - `query`: Analysis query
 - `update_progress`: Progress callback function
 
 **Returns:**
+
 - Analysis result string
 
 **Example:**
+
 ```python
 def progress_callback(progress, message):
     print(f"{progress}%: {message}")
@@ -181,11 +201,13 @@ result = pdf_service.analyze_pdf_intelligent(
 Extracts query-relevant pages from document.
 
 **Parameters:**
+
 - `pages`: List of page dictionaries
 - `query`: Search query
 - `max_pages`: Maximum pages to return
 
 **Returns:**
+
 - List of relevant pages
 
 ## StreamingService
@@ -206,13 +228,16 @@ class StreamingService:
 Streams response chunks to UI container.
 
 **Parameters:**
+
 - `response_generator`: Generator yielding response chunks
 - `container`: Streamlit container for output
 
 **Returns:**
+
 - Complete response text
 
 **Example:**
+
 ```python
 container = st.empty()
 full_response = streaming_service.stream_response(
@@ -239,12 +264,15 @@ class ToolExecutionService:
 Executes multiple tools in parallel.
 
 **Parameters:**
+
 - `tool_calls`: List of tool call specifications
 
 **Returns:**
+
 - List of execution results
 
 **Example:**
+
 ```python
 tool_calls = [
     {"name": "search", "arguments": {"query": "AI trends"}},
@@ -258,9 +286,11 @@ results = tool_service.execute_tools_parallel(tool_calls)
 Determines if tool result should be returned directly.
 
 **Parameters:**
+
 - `tool_name`: Name of the tool
 
 **Returns:**
+
 - Boolean indicating direct return
 
 ## FileStorageService
@@ -281,14 +311,17 @@ class FileStorageService:
 Stores file in external storage.
 
 **Parameters:**
+
 - `file_data`: File content as bytes
 - `filename`: Original filename
 - `session_id`: User session identifier
 
 **Returns:**
+
 - Storage path or identifier
 
 **Example:**
+
 ```python
 path = storage_service.store_file(
     pdf_bytes,
@@ -302,10 +335,12 @@ path = storage_service.store_file(
 Retrieves file from storage.
 
 **Parameters:**
+
 - `file_path`: Storage path
 - `session_id`: User session identifier
 
 **Returns:**
+
 - File bytes or None if not found
 
 ##### `cleanup_session_files(session_id: str) -> int`
@@ -313,9 +348,11 @@ Retrieves file from storage.
 Removes all files for a session.
 
 **Parameters:**
+
 - `session_id`: User session identifier
 
 **Returns:**
+
 - Number of files removed
 
 ## ImageService
@@ -336,13 +373,16 @@ class ImageService:
 Generates image from text prompt.
 
 **Parameters:**
+
 - `prompt`: Text description for image
 - `size`: Image dimensions
 
 **Returns:**
+
 - Base64 encoded image or None
 
 **Example:**
+
 ```python
 image_b64 = image_service.generate_image(
     "A serene mountain landscape at sunset",

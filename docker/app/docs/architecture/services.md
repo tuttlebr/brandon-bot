@@ -52,16 +52,19 @@ class StreamingService:
 ### 1. Core Services
 
 #### LLMService
+
 - Manages LLM client connections
 - Handles model selection and switching
 - Implements retry logic and error handling
 
 #### ChatService
+
 - Orchestrates conversation flow
 - Manages message history
 - Coordinates with tools and streaming
 
 #### StreamingService
+
 - Handles real-time response streaming
 - Manages backpressure
 - Implements chunking strategies
@@ -69,16 +72,19 @@ class StreamingService:
 ### 2. Document Services
 
 #### PDFAnalysisService
+
 - Extracts text from PDFs
 - Performs document analysis
 - Generates summaries
 
 #### PDFContextService
+
 - Manages PDF context switching
 - Maintains document state
 - Handles multi-document queries
 
 #### DocumentAnalyzerService
+
 - Analyzes document structure
 - Extracts metadata
 - Identifies key sections
@@ -86,16 +92,19 @@ class StreamingService:
 ### 3. Processing Services
 
 #### TextProcessorService
+
 - Text cleaning and normalization
 - Token counting and splitting
 - Format conversion
 
 #### ResponseParsingService
+
 - Parses LLM responses
 - Extracts structured data
 - Handles tool calls
 
 #### TranslationService
+
 - Multi-language support
 - Context-aware translation
 - Language detection
@@ -103,11 +112,13 @@ class StreamingService:
 ### 4. Storage Services
 
 #### FileStorageService
+
 - Manages file uploads
 - Handles file persistence
 - Implements cleanup policies
 
 #### ConversationContextService
+
 - Stores conversation history
 - Manages context windows
 - Implements compression
@@ -115,11 +126,13 @@ class StreamingService:
 ### 5. Integration Services
 
 #### ToolExecutionService
+
 - Executes registered tools
 - Manages tool dependencies
 - Handles parallel execution
 
 #### ImageService
+
 - Image generation integration
 - Image processing
 - Format conversion

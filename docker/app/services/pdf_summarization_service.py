@@ -48,7 +48,9 @@ class PDFSummarizationService:
             total_pages = len(pages)
             filename = pdf_data.get('filename', 'Unknown')
 
-            logger.info(f"Starting recursive summarization for {filename} ({total_pages} pages)")
+            logger.info(
+                f"Starting recursive summarization for {filename} ({total_pages} pages)"
+            )
 
             if total_pages == 0:
                 return pdf_data
@@ -58,12 +60,16 @@ class PDFSummarizationService:
 
             # Phase 2: Create intermediate summaries if needed (for very large documents)
             if len(page_summaries) > 10:
-                intermediate_summaries = await self._create_intermediate_summaries(page_summaries)
+                intermediate_summaries = await self._create_intermediate_summaries(
+                    page_summaries
+                )
             else:
                 intermediate_summaries = page_summaries
 
             # Phase 3: Create final document summary
-            final_summary = await self._create_final_summary(intermediate_summaries, filename)
+            final_summary = await self._create_final_summary(
+                intermediate_summaries, filename
+            )
 
             # Add summaries to the PDF data
             enhanced_pdf_data = pdf_data.copy()
@@ -79,7 +85,9 @@ class PDFSummarizationService:
             # Return original data if summarization fails
             return pdf_data
 
-    async def _summarize_pages_in_batches(self, pages: List[Dict], filename: str) -> List[Dict]:
+    async def _summarize_pages_in_batches(
+        self, pages: List[Dict], filename: str
+    ) -> List[Dict]:
         """
         Summarize pages in batches to avoid memory issues
 
@@ -90,11 +98,17 @@ class PDFSummarizationService:
         Returns:
             List of page summaries
         """
-        batch_processor = BatchProcessor(batch_size=self.batch_size, delay_between_batches=0.5)
+        batch_processor = BatchProcessor(
+            batch_size=self.batch_size, delay_between_batches=0.5
+        )
 
-        async def summarize_batch(batch_pages: List[Dict], start_idx: int, end_idx: int) -> Dict:
+        async def summarize_batch(
+            batch_pages: List[Dict], start_idx: int, end_idx: int
+        ) -> Dict:
             """Summarize a single batch of pages"""
-            logger.info(f"Processing pages {start_idx+1}-{end_idx} of {len(pages)} for {filename}")
+            logger.info(
+                f"Processing pages {start_idx+1}-{end_idx} of {len(pages)} for {filename}"
+            )
 
             # Use DocumentProcessor to format pages
             batch_text = DocumentProcessor.format_pages_for_analysis(batch_pages)
@@ -111,7 +125,10 @@ class PDFSummarizationService:
 
                 loop = asyncio.get_event_loop()
                 summary_result = await loop.run_in_executor(
-                    self.executor, run_with_streamlit_context, execute_assistant_with_dict, summary_params
+                    self.executor,
+                    run_with_streamlit_context,
+                    execute_assistant_with_dict,
+                    summary_params,
                 )
 
                 return {
@@ -132,7 +149,9 @@ class PDFSummarizationService:
         summaries = await batch_processor.process_in_batches(pages, summarize_batch)
         return [s for s in summaries if s is not None]
 
-    async def _create_intermediate_summaries(self, page_summaries: List[Dict]) -> List[Dict]:
+    async def _create_intermediate_summaries(
+        self, page_summaries: List[Dict]
+    ) -> List[Dict]:
         """
         Create intermediate summaries for very large documents
 
@@ -150,7 +169,9 @@ class PDFSummarizationService:
             batch_summaries = page_summaries[i:batch_end]
 
             # Combine summaries
-            combined_text = "\n\n".join([f"Section {s['page_range']}:\n{s['summary']}" for s in batch_summaries])
+            combined_text = "\n\n".join(
+                [f"Section {s['page_range']}:\n{s['summary']}" for s in batch_summaries]
+            )
 
             try:
                 summary_params = {
@@ -164,11 +185,17 @@ class PDFSummarizationService:
 
                 loop = asyncio.get_event_loop()
                 summary_result = await loop.run_in_executor(
-                    self.executor, run_with_streamlit_context, execute_assistant_with_dict, summary_params
+                    self.executor,
+                    run_with_streamlit_context,
+                    execute_assistant_with_dict,
+                    summary_params,
                 )
 
                 intermediate_summaries.append(
-                    {"sections_covered": [s['page_range'] for s in batch_summaries], "summary": summary_result.result}
+                    {
+                        "sections_covered": [s['page_range'] for s in batch_summaries],
+                        "summary": summary_result.result,
+                    }
                 )
 
             except Exception as e:
@@ -208,7 +235,10 @@ class PDFSummarizationService:
 
             loop = asyncio.get_event_loop()
             summary_result = await loop.run_in_executor(
-                self.executor, run_with_streamlit_context, execute_assistant_with_dict, summary_params
+                self.executor,
+                run_with_streamlit_context,
+                execute_assistant_with_dict,
+                summary_params,
             )
 
             return summary_result.result

@@ -25,31 +25,39 @@ class SessionController:
 #### Key Methods
 
 ##### `initialize_session_state()`
+
 Initializes all session state variables on first run.
 
 **Example:**
+
 ```python
 session_controller = SessionController(config)
 session_controller.initialize_session_state()
 ```
 
 ##### `store_pdf_document(filename: str, pdf_data: dict) -> str`
+
 Stores PDF document reference in session state.
 
 **Parameters:**
+
 - `filename`: Name of the PDF file
 - `pdf_data`: Processed PDF data dictionary
 
 **Returns:**
+
 - PDF reference ID
 
 ##### `get_model_name(model_type: str = "fast") -> str`
+
 Gets the configured model name for the specified type.
 
 **Parameters:**
+
 - `model_type`: One of "fast", "llm", or "intelligent"
 
 **Returns:**
+
 - Model name string
 
 ## MessageController
@@ -67,27 +75,34 @@ class MessageController:
 #### Key Methods
 
 ##### `validate_prompt(prompt: str) -> bool`
+
 Validates user input before processing.
 
 **Parameters:**
+
 - `prompt`: User input string
 
 **Returns:**
+
 - Boolean indicating if prompt is valid
 
 **Validation checks:**
+
 - Non-empty
 - Within length limits
 - No tool call instructions
 
 ##### `safe_add_message_to_history(role: str, content: Any) -> bool`
+
 Safely adds a message to chat history with validation.
 
 **Parameters:**
+
 - `role`: Message role ("user" or "assistant")
 - `content`: Message content (string or dict)
 
 **Returns:**
+
 - Success status
 
 ## FileController
@@ -106,15 +121,19 @@ class FileController:
 #### Key Methods
 
 ##### `process_pdf_upload(uploaded_file) -> bool`
+
 Processes uploaded PDF files through the pipeline.
 
 **Parameters:**
+
 - `uploaded_file`: Streamlit UploadedFile object
 
 **Returns:**
+
 - Success status
 
 **Processing steps:**
+
 1. Validation (size, type)
 2. Duplicate detection
 3. API processing
@@ -122,12 +141,15 @@ Processes uploaded PDF files through the pipeline.
 5. Optional summarization
 
 ##### `is_new_upload(uploaded_file) -> bool`
+
 Checks if file is a new upload or re-upload.
 
 **Parameters:**
+
 - `uploaded_file`: Streamlit UploadedFile object
 
 **Returns:**
+
 - True if new upload
 
 ## ResponseController
@@ -147,21 +169,26 @@ class ResponseController:
 #### Key Methods
 
 ##### `generate_and_display_response(prepared_messages: List[Dict[str, Any]])`
+
 Main method for generating and displaying AI responses.
 
 **Parameters:**
+
 - `prepared_messages`: Formatted messages for LLM
 
 **Features:**
+
 - Streaming response display
 - Tool execution handling
 - Image generation detection
 - Error recovery
 
 ##### `_check_for_image_generation_response() -> Dict[str, Any]`
+
 Detects and extracts image generation results from responses.
 
 **Returns:**
+
 - Image response data or empty dict
 
 ## Usage Examples

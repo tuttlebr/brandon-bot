@@ -17,7 +17,9 @@ class PDFDataExtractor:
     """Utility class for extracting PDF data from messages and other sources"""
 
     @staticmethod
-    def extract_from_messages(messages: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    def extract_from_messages(
+        messages: List[Dict[str, Any]],
+    ) -> Optional[Dict[str, Any]]:
         """
         Extract PDF data from message history
 
@@ -41,16 +43,22 @@ class PDFDataExtractor:
                     data = json.loads(content)
                     if data.get("type") == "pdf_data" and data.get("pages"):
                         # Found PDF data in system message
-                        logger.debug(f"Found PDF data in system message: {data.get('filename')}")
+                        logger.debug(
+                            f"Found PDF data in system message: {data.get('filename')}"
+                        )
                         return {
                             "filename": data.get("filename", "Unknown"),
                             "pages": data.get("pages", []),
                             "pdf_id": data.get("pdf_id"),
-                            "total_pages": data.get("total_pages", len(data.get("pages", []))),
+                            "total_pages": data.get(
+                                "total_pages", len(data.get("pages", []))
+                            ),
                         }
                     # Check for batch-processed PDF
                     elif data.get("type") == "pdf_data" and data.get("batch_processed"):
-                        logger.debug(f"Found batch-processed PDF in system message: {data.get('filename')}")
+                        logger.debug(
+                            f"Found batch-processed PDF in system message: {data.get('filename')}"
+                        )
                         return {
                             "filename": data.get("filename", "Unknown"),
                             "pdf_id": data.get("pdf_id"),
@@ -64,10 +72,15 @@ class PDFDataExtractor:
                     pass
 
                 # Try to parse as context message format (PDF content with markers)
-                if "---BEGIN PDF CONTENT---" in content and "---END PDF CONTENT---" in content:
+                if (
+                    "---BEGIN PDF CONTENT---" in content
+                    and "---END PDF CONTENT---" in content
+                ):
                     pdf_data = PDFDataExtractor._parse_pdf_context_message(content)
                     if pdf_data:
-                        logger.debug(f"Found PDF data in context message: {pdf_data.get('filename')}")
+                        logger.debug(
+                            f"Found PDF data in context message: {pdf_data.get('filename')}"
+                        )
                         return pdf_data
 
         logger.debug("No PDF data found in system messages")
@@ -98,7 +111,9 @@ class PDFDataExtractor:
             filename = data.get("filename", "Unknown")
 
             if pages:
-                logger.info(f"Extracted PDF data from JSON: {filename} with {len(pages)} pages")
+                logger.info(
+                    f"Extracted PDF data from JSON: {filename} with {len(pages)} pages"
+                )
                 return {"filename": filename, "pages": pages}
         except Exception as e:
             logger.error(f"Error parsing JSON PDF data: {e}")
@@ -128,12 +143,22 @@ class PDFDataExtractor:
                     in_pdf_content = False
                     # Save last page if any
                     if current_page is not None and current_page_text:
-                        pages.append({"page": current_page, "text": '\n'.join(current_page_text).strip()})
+                        pages.append(
+                            {
+                                "page": current_page,
+                                "text": '\n'.join(current_page_text).strip(),
+                            }
+                        )
                 elif in_pdf_content:
                     if line.startswith("### Page "):
                         # Save previous page if any
                         if current_page is not None and current_page_text:
-                            pages.append({"page": current_page, "text": '\n'.join(current_page_text).strip()})
+                            pages.append(
+                                {
+                                    "page": current_page,
+                                    "text": '\n'.join(current_page_text).strip(),
+                                }
+                            )
                         # Start new page
                         try:
                             current_page = int(line.replace("### Page ", "").strip())
@@ -144,7 +169,9 @@ class PDFDataExtractor:
                         current_page_text.append(line)
 
             if pages:
-                logger.info(f"Extracted PDF data from context message: {filename} with {len(pages)} pages")
+                logger.info(
+                    f"Extracted PDF data from context message: {filename} with {len(pages)} pages"
+                )
                 return {"filename": filename or "Unknown", "pages": pages}
 
         except Exception as e:
@@ -153,7 +180,9 @@ class PDFDataExtractor:
         return None
 
     @staticmethod
-    def extract_text_from_pdf_data(pdf_data: Dict[str, Any], max_pages: Optional[int] = None) -> Optional[str]:
+    def extract_text_from_pdf_data(
+        pdf_data: Dict[str, Any], max_pages: Optional[int] = None
+    ) -> Optional[str]:
         """
         Extract text content from PDF data
 

@@ -138,6 +138,7 @@ def suppress_streamlit_warnings():
     This should be used sparingly and only when you're sure the warnings
     are benign (e.g., in background tasks that don't interact with UI)
     """
+
     # Create a custom filter to suppress specific warnings
     class StreamlitContextFilter(logging.Filter):
         def filter(self, record):

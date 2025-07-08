@@ -29,16 +29,25 @@ class SessionController:
             st.session_state.initialized = True
 
             # Conditionally create a unique session ID if it doesn't exist
-            if not hasattr(st.session_state, 'session_id') or not st.session_state.session_id:
+            if (
+                not hasattr(st.session_state, 'session_id')
+                or not st.session_state.session_id
+            ):
                 import random
                 import time
 
-                st.session_state.session_id = f"session_{int(time.time() * 1000)}_{random.randint(1000, 9999)}"
+                st.session_state.session_id = (
+                    f"session_{int(time.time() * 1000)}_{random.randint(1000, 9999)}"
+                )
 
             st.session_state.fast_llm_model_name = self.config_obj.fast_llm_model_name
             st.session_state.llm_model_name = self.config_obj.llm_model_name
-            st.session_state.intelligent_llm_model_name = self.config_obj.intelligent_llm_model_name
-            st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
+            st.session_state.intelligent_llm_model_name = (
+                self.config_obj.intelligent_llm_model_name
+            )
+            st.session_state.messages = [
+                {"role": "system", "content": get_system_prompt()}
+            ]
             st.session_state.current_page = config.ui.CURRENT_PAGE_DEFAULT
             st.session_state.processing = False
 
@@ -50,7 +59,9 @@ class SessionController:
             if not hasattr(st.session_state, 'stored_pdfs'):
                 st.session_state.stored_pdfs = []  # List of PDF IDs
 
-            logging.info(f"Initialized new session state for session: {st.session_state.session_id}")
+            logging.info(
+                f"Initialized new session state for session: {st.session_state.session_id}"
+            )
 
     def cleanup_session(self):
         """Clean up all session data including external files"""
@@ -96,7 +107,9 @@ class SessionController:
         if hasattr(st.session_state, 'last_tool_context'):
             st.session_state.last_tool_context = None
 
-    def store_generated_image(self, image_data: str, enhanced_prompt: str, original_prompt: str) -> str:
+    def store_generated_image(
+        self, image_data: str, enhanced_prompt: str, original_prompt: str
+    ) -> str:
         """
         Store generated image externally and return image ID
 
@@ -124,7 +137,9 @@ class SessionController:
 
         # Limit stored references
         if len(st.session_state.stored_images) > config.session.MAX_IMAGES_IN_SESSION:
-            st.session_state.stored_images = st.session_state.stored_images[-config.session.MAX_IMAGES_IN_SESSION :]
+            st.session_state.stored_images = st.session_state.stored_images[
+                -config.session.MAX_IMAGES_IN_SESSION :
+            ]
 
         return image_id
 
@@ -158,11 +173,16 @@ class SessionController:
         model_mapping = {
             "fast": ("fast_llm_model_name", self.config_obj.fast_llm_model_name),
             "llm": ("llm_model_name", self.config_obj.llm_model_name),
-            "intelligent": ("intelligent_llm_model_name", self.config_obj.intelligent_llm_model_name),
+            "intelligent": (
+                "intelligent_llm_model_name",
+                self.config_obj.intelligent_llm_model_name,
+            ),
         }
 
         if model_type not in model_mapping:
-            logging.warning(f"Unknown model type '{model_type}', defaulting to fast model")
+            logging.warning(
+                f"Unknown model type '{model_type}', defaulting to fast model"
+            )
             model_type = "fast"
 
         session_key, config_fallback = model_mapping[model_type]
@@ -233,7 +253,9 @@ class SessionController:
             self.initialize_session_state()
 
         # Store PDF externally
-        pdf_id = self.file_storage.store_pdf(filename, pdf_data, st.session_state.session_id)
+        pdf_id = self.file_storage.store_pdf(
+            filename, pdf_data, st.session_state.session_id
+        )
 
         # Keep reference in session state
         if 'stored_pdfs' not in st.session_state:
@@ -243,8 +265,12 @@ class SessionController:
         # Limit stored references
         if len(st.session_state.stored_pdfs) > config.session.MAX_PDFS_IN_SESSION:
             # Remove oldest PDFs
-            removed = st.session_state.stored_pdfs[: -config.session.MAX_PDFS_IN_SESSION]
-            st.session_state.stored_pdfs = st.session_state.stored_pdfs[-config.session.MAX_PDFS_IN_SESSION :]
+            removed = st.session_state.stored_pdfs[
+                : -config.session.MAX_PDFS_IN_SESSION
+            ]
+            st.session_state.stored_pdfs = st.session_state.stored_pdfs[
+                -config.session.MAX_PDFS_IN_SESSION :
+            ]
 
             # Clean up removed PDFs
             for pdf_id in removed:
@@ -296,7 +322,10 @@ class SessionController:
         Returns:
             Dictionary containing PDF data or None if no PDFs available
         """
-        if not hasattr(st.session_state, 'stored_pdfs') or not st.session_state.stored_pdfs:
+        if (
+            not hasattr(st.session_state, 'stored_pdfs')
+            or not st.session_state.stored_pdfs
+        ):
             return None
 
         # Get the last PDF ID
@@ -333,9 +362,14 @@ class SessionController:
         Returns:
             True if PDFs are available, False otherwise
         """
-        return hasattr(st.session_state, 'stored_pdfs') and len(st.session_state.stored_pdfs) > 0
+        return (
+            hasattr(st.session_state, 'stored_pdfs')
+            and len(st.session_state.stored_pdfs) > 0
+        )
 
-    def store_uploaded_image(self, image_data: str, filename: str, file_type: str) -> str:
+    def store_uploaded_image(
+        self, image_data: str, filename: str, file_type: str
+    ) -> str:
         """
         Store uploaded image externally
 
@@ -352,7 +386,9 @@ class SessionController:
             self.initialize_session_state()
 
         # Store image externally
-        image_id = self.file_storage.store_uploaded_image(image_data, filename, file_type, st.session_state.session_id)
+        image_id = self.file_storage.store_uploaded_image(
+            image_data, filename, file_type, st.session_state.session_id
+        )
 
         # Keep reference in session state
         if 'stored_images' not in st.session_state:
@@ -362,8 +398,12 @@ class SessionController:
         # Limit stored references
         if len(st.session_state.stored_images) > config.session.MAX_IMAGES_IN_SESSION:
             # Remove oldest images
-            removed = st.session_state.stored_images[: -config.session.MAX_IMAGES_IN_SESSION]
-            st.session_state.stored_images = st.session_state.stored_images[-config.session.MAX_IMAGES_IN_SESSION :]
+            removed = st.session_state.stored_images[
+                : -config.session.MAX_IMAGES_IN_SESSION
+            ]
+            st.session_state.stored_images = st.session_state.stored_images[
+                -config.session.MAX_IMAGES_IN_SESSION :
+            ]
 
             # Clean up removed images
             for image_id in removed:
@@ -398,7 +438,10 @@ class SessionController:
         Returns:
             Dictionary containing image data or None if no images available
         """
-        if not hasattr(st.session_state, 'stored_images') or not st.session_state.stored_images:
+        if (
+            not hasattr(st.session_state, 'stored_images')
+            or not st.session_state.stored_images
+        ):
             return None
 
         # Get the last image ID
@@ -418,4 +461,7 @@ class SessionController:
         Returns:
             True if images are available, False otherwise
         """
-        return hasattr(st.session_state, 'stored_images') and len(st.session_state.stored_images) > 0
+        return (
+            hasattr(st.session_state, 'stored_images')
+            and len(st.session_state.stored_images) > 0
+        )

@@ -12,7 +12,9 @@ from utils.text_processing import strip_think_tags
 class MessageController:
     """Controller for handling message processing and validation"""
 
-    def __init__(self, config_obj: ChatConfig, chat_service: ChatService, session_controller=None):
+    def __init__(
+        self, config_obj: ChatConfig, chat_service: ChatService, session_controller=None
+    ):
         """
         Initialize the message controller
 
@@ -25,7 +27,9 @@ class MessageController:
         self.chat_service = chat_service
         self.session_controller = session_controller
         # Compile pattern once for performance
-        self._toolcall_pattern = re.compile(r'<TOOLCALL(?:[-"\s])*\[.*?\]</TOOLCALL>', re.DOTALL | re.IGNORECASE)
+        self._toolcall_pattern = re.compile(
+            r'<TOOLCALL(?:[-"\s])*\[.*?\]</TOOLCALL>', re.DOTALL | re.IGNORECASE
+        )
 
     def validate_prompt(self, prompt: str) -> bool:
         """
@@ -62,7 +66,9 @@ class MessageController:
         # Only do regex if the quick check passes
         return bool(self._toolcall_pattern.search(content))
 
-    def clean_chat_history_of_tool_calls(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def clean_chat_history_of_tool_calls(
+        self, messages: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """
         Clean existing chat history to remove any messages containing tool call instructions
 
@@ -97,7 +103,9 @@ class MessageController:
             cleaned_messages.append(message)
 
         if len(cleaned_messages) != original_count:
-            logging.info(f"Cleaned chat history: {original_count} -> {len(cleaned_messages)} messages")
+            logging.info(
+                f"Cleaned chat history: {original_count} -> {len(cleaned_messages)} messages"
+            )
 
         return cleaned_messages
 
@@ -116,7 +124,9 @@ class MessageController:
         if isinstance(content, str):
             # String content - validate it's not empty and doesn't contain tool calls
             if not content or not content.strip():
-                logging.warning(f"Attempted to add empty {role} message to chat history, skipping")
+                logging.warning(
+                    f"Attempted to add empty {role} message to chat history, skipping"
+                )
                 return False
 
             # Check for tool call instructions (but allow tool responses)
@@ -131,12 +141,16 @@ class MessageController:
         elif isinstance(content, dict):
             # Dict content (like image messages) - ensure it has meaningful data
             if not content:
-                logging.warning(f"Attempted to add empty dict {role} message to chat history, skipping")
+                logging.warning(
+                    f"Attempted to add empty dict {role} message to chat history, skipping"
+                )
                 return False
         else:
             # Other content types - ensure they're truthy
             if not content:
-                logging.warning(f"Attempted to add empty {role} message to chat history, skipping")
+                logging.warning(
+                    f"Attempted to add empty {role} message to chat history, skipping"
+                )
                 return False
 
         # Add the validated message to history using session controller if available
@@ -166,7 +180,11 @@ class MessageController:
         else:
             # Fallback to direct access
             if hasattr(st.session_state, "messages"):
-                st.session_state.messages = self.chat_service.drop_verbose_messages_context(st.session_state.messages)
+                st.session_state.messages = (
+                    self.chat_service.drop_verbose_messages_context(
+                        st.session_state.messages
+                    )
+                )
 
         # Use the safe method to add the message
         self.safe_add_message_to_history(role, text)
@@ -187,7 +205,9 @@ class MessageController:
             return prompt[:max_length] + "..."
         return prompt
 
-    def prepare_messages_for_processing(self, messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def prepare_messages_for_processing(
+        self, messages: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """
         Prepare messages for LLM processing by cleaning and validating
 
@@ -201,7 +221,9 @@ class MessageController:
         cleaned_messages = self.clean_chat_history_of_tool_calls(messages)
 
         # Clean previous chat history from context
-        cleaned_messages = self.chat_service.clean_chat_history_context(cleaned_messages)
+        cleaned_messages = self.chat_service.clean_chat_history_context(
+            cleaned_messages
+        )
 
         # Prepare messages for API
         return self.chat_service.prepare_messages_for_api(cleaned_messages)

@@ -5,7 +5,13 @@ import time
 import streamlit as st
 
 # Import the controller classes
-from controllers import FileController, ImageController, MessageController, ResponseController, SessionController
+from controllers import (
+    FileController,
+    ImageController,
+    MessageController,
+    ResponseController,
+    SessionController,
+)
 from models import ChatConfig
 from services import ChatService, ImageService, LLMService
 from services.pdf_context_service import PDFContextService
@@ -49,9 +55,15 @@ class ProductionStreamlitChatApp:
 
             # Initialize controllers with dependency injection
             self.session_controller = SessionController(self.config_obj)
-            self.message_controller = MessageController(self.config_obj, self.chat_service, self.session_controller)
-            self.file_controller = FileController(self.config_obj, self.message_controller, self.session_controller)
-            self.image_controller = ImageController(self.config_obj, self.message_controller, self.session_controller)
+            self.message_controller = MessageController(
+                self.config_obj, self.chat_service, self.session_controller
+            )
+            self.file_controller = FileController(
+                self.config_obj, self.message_controller, self.session_controller
+            )
+            self.image_controller = ImageController(
+                self.config_obj, self.message_controller, self.session_controller
+            )
             self.response_controller = ResponseController(
                 self.config_obj,
                 self.llm_service,
@@ -103,7 +115,9 @@ class ProductionStreamlitChatApp:
 
             # Validate prompt using controller with proper error handling
             if not self.message_controller.validate_prompt(prompt):
-                st.error("Invalid input detected. Please try again with a different message.")
+                st.error(
+                    "Invalid input detected. Please try again with a different message."
+                )
                 self.session_controller.set_processing_state(False)
                 return
 
@@ -117,16 +131,24 @@ class ProductionStreamlitChatApp:
 
             # Prepare messages for processing using controller
             messages = self.session_controller.get_messages()
-            prepared_messages = self.message_controller.prepare_messages_for_processing(messages)
+            prepared_messages = self.message_controller.prepare_messages_for_processing(
+                messages
+            )
 
             # Inject PDF context if available
-            prepared_messages = self.pdf_context_service.inject_pdf_context(prepared_messages, prompt)
+            prepared_messages = self.pdf_context_service.inject_pdf_context(
+                prepared_messages, prompt
+            )
 
             # Generate and display response using controller with centralized spinner
             random_icon = random.choice(config.ui.SPINNER_ICONS)
             cleanup_fn = None
             with st.spinner(f"{random_icon} _Typing..._", show_time=False):
-                cleanup_fn = self.response_controller.generate_response_with_cleanup_separation(prepared_messages)
+                cleanup_fn = (
+                    self.response_controller.generate_response_with_cleanup_separation(
+                        prepared_messages
+                    )
+                )
 
             # Execute cleanup after spinner closes to avoid delay
             if cleanup_fn:
@@ -146,7 +168,10 @@ class ProductionStreamlitChatApp:
         """
         Fragment to show real-time PDF analysis progress
         """
-        if hasattr(st.session_state, "pdf_analysis_progress") and st.session_state.pdf_analysis_progress:
+        if (
+            hasattr(st.session_state, "pdf_analysis_progress")
+            and st.session_state.pdf_analysis_progress
+        ):
             progress_info = st.session_state.pdf_analysis_progress
 
             if progress_info.get("status") in ["starting", "analyzing"]:
@@ -184,11 +209,16 @@ class ProductionStreamlitChatApp:
 
         elif processing_status == "completed":
             # Show completion message
-            message = getattr(st.session_state, "pdf_processing_message", "✅ Processing completed")
+            message = getattr(
+                st.session_state, "pdf_processing_message", "✅ Processing completed"
+            )
             st.success(message)
 
             # Clear processing status after brief display
-            if not hasattr(st.session_state, "completion_shown") or not st.session_state.completion_shown:
+            if (
+                not hasattr(st.session_state, "completion_shown")
+                or not st.session_state.completion_shown
+            ):
                 st.session_state.completion_shown = True
                 time.sleep(0.01)
             else:
@@ -200,11 +230,16 @@ class ProductionStreamlitChatApp:
 
         elif processing_status == "error":
             # Show error message
-            message = getattr(st.session_state, "pdf_processing_message", "❌ Processing failed")
+            message = getattr(
+                st.session_state, "pdf_processing_message", "❌ Processing failed"
+            )
             st.error(message)
 
             # Clear error status after brief display
-            if not hasattr(st.session_state, "error_shown") or not st.session_state.error_shown:
+            if (
+                not hasattr(st.session_state, "error_shown")
+                or not st.session_state.error_shown
+            ):
                 st.session_state.error_shown = True
                 time.sleep(0.01)
             else:
@@ -225,7 +260,10 @@ class ProductionStreamlitChatApp:
             )
 
             # Handle new uploads - process synchronously within fragment
-            if uploaded_file is not None and not self.session_controller.is_processing():
+            if (
+                uploaded_file is not None
+                and not self.session_controller.is_processing()
+            ):
                 if self.file_controller.is_new_upload(uploaded_file):
                     # Mark as processing immediately
                     st.session_state.pdf_processing_status = "processing"
@@ -235,29 +273,39 @@ class ProductionStreamlitChatApp:
                     # Process PDF synchronously with spinner
                     with st.spinner(f"Processing {uploaded_file.name}..."):
                         try:
-                            logging.debug(f"Starting synchronous PDF processing for: {uploaded_file.name}")
+                            logging.debug(
+                                f"Starting synchronous PDF processing for: {uploaded_file.name}"
+                            )
 
                             # Use file controller for processing - this is blocking
-                            success = self.file_controller.process_pdf_upload(uploaded_file)
+                            success = self.file_controller.process_pdf_upload(
+                                uploaded_file
+                            )
 
                             if success:
-                                self.file_controller.mark_file_as_processed(uploaded_file.name)
-                                st.session_state.pdf_processing_status = "completed"
-                                st.session_state.pdf_processing_message = (
-                                    f"✅ Successfully processed PDF: {uploaded_file.name}"
+                                self.file_controller.mark_file_as_processed(
+                                    uploaded_file.name
                                 )
-                                logging.debug(f"Synchronous PDF processing completed for: {uploaded_file.name}")
+                                st.session_state.pdf_processing_status = "completed"
+                                st.session_state.pdf_processing_message = f"✅ Successfully processed PDF: {uploaded_file.name}"
+                                logging.debug(
+                                    f"Synchronous PDF processing completed for: {uploaded_file.name}"
+                                )
                             else:
                                 st.session_state.pdf_processing_status = "error"
                                 st.session_state.pdf_processing_message = (
                                     f"❌ Failed to process PDF: {uploaded_file.name}"
                                 )
-                                logging.error(f"Synchronous PDF processing failed for: {uploaded_file.name}")
+                                logging.error(
+                                    f"Synchronous PDF processing failed for: {uploaded_file.name}"
+                                )
 
                         except Exception as e:
                             logging.error(f"Synchronous PDF processing error: {e}")
                             st.session_state.pdf_processing_status = "error"
-                            st.session_state.pdf_processing_message = f"❌ PDF processing error: {str(e)}"
+                            st.session_state.pdf_processing_message = (
+                                f"❌ PDF processing error: {str(e)}"
+                            )
 
             # Show current PDF status if available
             if self.session_controller.has_pdf_documents():
@@ -272,7 +320,10 @@ class ProductionStreamlitChatApp:
                             "💡 This is a large document. You can ask me to 'summarize the PDF' for a quick overview!"
                         )
 
-                    if st.button("🗑️ Remove Current PDF", help="Remove the current PDF from session",):
+                    if st.button(
+                        "🗑️ Remove Current PDF",
+                        help="Remove the current PDF from session",
+                    ):
                         self.session_controller.clear_pdf_documents()
                         st.rerun()
 
@@ -281,11 +332,17 @@ class ProductionStreamlitChatApp:
             st.markdown("### 📷 Image Upload")
 
             # Check image processing status
-            processing_status = getattr(st.session_state, "image_processing_status", None)
+            processing_status = getattr(
+                st.session_state, "image_processing_status", None
+            )
 
             if processing_status == "processing":
                 # Show processing message
-                message = getattr(st.session_state, "image_processing_message", "🔄 Processing image...")
+                message = getattr(
+                    st.session_state,
+                    "image_processing_message",
+                    "🔄 Processing image...",
+                )
                 st.info(message)
 
                 # Clear processing status after brief display
@@ -304,11 +361,16 @@ class ProductionStreamlitChatApp:
 
             elif processing_status == "error":
                 # Show error message
-                message = getattr(st.session_state, "image_processing_message", "❌ Processing failed")
+                message = getattr(
+                    st.session_state, "image_processing_message", "❌ Processing failed"
+                )
                 st.error(message)
 
                 # Clear error status after brief display
-                if not hasattr(st.session_state, "image_error_shown") or not st.session_state.image_error_shown:
+                if (
+                    not hasattr(st.session_state, "image_error_shown")
+                    or not st.session_state.image_error_shown
+                ):
                     st.session_state.image_error_shown = True
                     time.sleep(0.01)
                 else:
@@ -328,15 +390,21 @@ class ProductionStreamlitChatApp:
                     key="image_uploader",
                 )
 
-                if uploaded_image and self.image_controller.is_new_upload(uploaded_image):
+                if uploaded_image and self.image_controller.is_new_upload(
+                    uploaded_image
+                ):
                     try:
                         # Mark as processing
                         st.session_state.image_processing_status = "processing"
                         st.session_state.image_processing_file = uploaded_image.name
-                        st.session_state.image_processing_message = f"🔄 Processing image: {uploaded_image.name}"
+                        st.session_state.image_processing_message = (
+                            f"🔄 Processing image: {uploaded_image.name}"
+                        )
 
                         # Process the image
-                        success = self.image_controller.process_image_upload(uploaded_image)
+                        success = self.image_controller.process_image_upload(
+                            uploaded_image
+                        )
 
                         if success:
                             st.session_state.image_processing_status = None
@@ -352,7 +420,9 @@ class ProductionStreamlitChatApp:
                     except Exception as e:
                         logging.error(f"Image processing error: {e}")
                         st.session_state.image_processing_status = "error"
-                        st.session_state.image_processing_message = f"❌ Image processing error: {str(e)}"
+                        st.session_state.image_processing_message = (
+                            f"❌ Image processing error: {str(e)}"
+                        )
 
             # Show current image status if available
             if self.session_controller.has_uploaded_images():
@@ -362,7 +432,10 @@ class ProductionStreamlitChatApp:
                     st.success(f"✅ Current Image: {filename}")
                     st.image(latest_image["file_path"])
 
-                    if st.button("🗑️ Remove Current Image", help="Remove the current image from session",):
+                    if st.button(
+                        "🗑️ Remove Current Image",
+                        help="Remove the current image from session",
+                    ):
                         self.session_controller.clear_uploaded_images()
                         st.rerun()
 
@@ -407,7 +480,9 @@ def main():
         st.stop()
     except Exception as e:
         logging.error(f"Unexpected validation error: {e}")
-        st.error("Failed to validate configuration. Please check your environment variables.")
+        st.error(
+            "Failed to validate configuration. Please check your environment variables."
+        )
         st.stop()
 
     # Create and run the production application

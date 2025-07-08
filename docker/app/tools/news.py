@@ -17,7 +17,9 @@ class SearchResult(BaseModel):
     content: str
     score: float
     raw_content: Optional[str] = None
-    extracted_content: Optional[str] = Field(None, description="Extracted content from URL")
+    extracted_content: Optional[str] = Field(
+        None, description="Extracted content from URL"
+    )
 
 
 class TavilyResponse(BaseToolResponse):
@@ -28,7 +30,9 @@ class TavilyResponse(BaseToolResponse):
     answer: Optional[str] = None
     images: List[str] = Field(default_factory=list)
     results: List[SearchResult] = Field(default_factory=list)
-    formatted_results: str = Field(default="", description="Formatted results for display")
+    formatted_results: str = Field(
+        default="", description="Formatted results for display"
+    )
     response_time: float
 
 
@@ -69,7 +73,9 @@ class NewsTool(BaseTool):
         """Execute the tool with given parameters"""
         return self.run_with_dict(params)
 
-    def _extract_content_for_results(self, results: List[SearchResult]) -> List[SearchResult]:
+    def _extract_content_for_results(
+        self, results: List[SearchResult]
+    ) -> List[SearchResult]:
         """
         Extract content for high-scoring results using batch extraction
 
@@ -86,7 +92,9 @@ class NewsTool(BaseTool):
             logger.debug("No high-scoring results to extract content from")
             return results
 
-        logger.info(f"Extracting content for {len(high_scoring_results)} high-scoring results")
+        logger.info(
+            f"Extracting content for {len(high_scoring_results)} high-scoring results"
+        )
 
         # Import extract tool
         from tools.extract import execute_web_extract_batch
@@ -97,14 +105,18 @@ class NewsTool(BaseTool):
 
             # Perform batch extraction
             extract_results = execute_web_extract_batch(urls)
-            logger.info(f"Batch extraction completed. {len(extract_results)} successful extractions")
+            logger.info(
+                f"Batch extraction completed. {len(extract_results)} successful extractions"
+            )
 
             # Create a mapping of URL to extracted content
             url_to_content = {}
             for extract_result in extract_results:
                 if extract_result.success and extract_result.content:
                     url_to_content[extract_result.url] = extract_result.content
-                    logger.debug(f"Successfully extracted content from {extract_result.url}")
+                    logger.debug(
+                        f"Successfully extracted content from {extract_result.url}"
+                    )
                 else:
                     logger.warning(
                         f"Failed to extract content from {extract_result.url}: {extract_result.error_message}"
@@ -115,7 +127,9 @@ class NewsTool(BaseTool):
                 if result.url in url_to_content:
                     result.extracted_content = url_to_content[result.url]
 
-            logger.info(f"Batch extraction completed. {len(url_to_content)} successful extractions")
+            logger.info(
+                f"Batch extraction completed. {len(url_to_content)} successful extractions"
+            )
 
         except Exception as e:
             logger.error(f"Error in batch extraction: {e}")
@@ -245,28 +259,38 @@ class NewsTool(BaseTool):
         }
 
         try:
-            logger.debug(f"Making API request to Tavily news search for query: '{query}'")
+            logger.debug(
+                f"Making API request to Tavily news search for query: '{query}'"
+            )
 
             # Make the API request
             response = requests.post(url, headers=headers, json=search_params)
             response.raise_for_status()  # Raises an HTTPError for bad responses
 
-            logger.debug(f"Tavily news API request successful (HTTP {response.status_code})")
+            logger.debug(
+                f"Tavily news API request successful (HTTP {response.status_code})"
+            )
 
             # Parse the JSON response and validate with Pydantic
             response_data = response.json()
             tavily_response = TavilyResponse(**response_data)
 
             # Extract content for high-scoring results
-            tavily_response.results = self._extract_content_for_results(tavily_response.results)
+            tavily_response.results = self._extract_content_for_results(
+                tavily_response.results
+            )
 
             # Format the results for display
-            tavily_response.formatted_results = self.format_results(tavily_response.results)
+            tavily_response.formatted_results = self.format_results(
+                tavily_response.results
+            )
 
             logger.info(
                 f"Search completed successfully. Found {len(tavily_response.results)} results in {tavily_response.response_time:.2f}s"
             )
-            logger.debug(f"Search results: {[result.title for result in tavily_response.results]}")
+            logger.debug(
+                f"Search results: {[result.title for result in tavily_response.results]}"
+            )
 
             return tavily_response
 

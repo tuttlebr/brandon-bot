@@ -16,7 +16,7 @@ Before you begin, ensure you have:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/streamlit-chatbot.git
+git clone https://github.com/tuttlebr/streamlit-chatbot.git
 cd streamlit-chatbot
 ```
 
@@ -92,12 +92,14 @@ Try these sample prompts to explore the features:
 ### Using Different Models
 
 You can switch between models by asking:
+
 - "Use the fast model" - For quick responses
 - "Use the intelligent model" - For complex reasoning
 
 ### Adjusting Memory
 
 The application maintains conversation history. To clear it:
+
 - Refresh the page
 - Or click "Clear Chat" if available
 
@@ -111,6 +113,7 @@ The application maintains conversation history. To clear it:
 ## Troubleshooting Quick Fixes
 
 ### Application Won't Start
+
 ```bash
 # Check if ports are in use
 sudo lsof -i :8080
@@ -121,11 +124,13 @@ docker compose down
 ```
 
 ### NVIDIA API Errors
+
 - Verify your API key is correct
 - Check your API quota at NVIDIA dashboard
 - Ensure the model names are correct
 
 ### PDF Upload Issues
+
 - Check file size (default limit: 200MB)
 - Ensure PDF is not corrupted
 - Try with a smaller PDF first

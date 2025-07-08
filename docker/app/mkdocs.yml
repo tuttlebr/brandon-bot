@@ -19,7 +19,9 @@ nav:
       - PDF Analysis: user-guide/pdf-analysis.md
       - PDF Context Switching: user-guide/pdf_context_switching.md
       - Image Generation: user-guide/image-generation.md
+      - Image Upload & Analysis: user-guide/image-upload-vlm.md
       - Search Features: user-guide/search-features.md
+      - System Prompt Pattern: user-guide/system_prompt_pattern.md
   - Architecture:
       - Overview: architecture/overview.md
       - Services: architecture/services.md
@@ -33,6 +35,8 @@ nav:
       - Model Configuration: configuration/models.md
   - Deployment:
       - Docker Setup: deployment/docker.md
+  - Developer:
+      - Batch Processing: developer/batch-processing.md
   - FAQ: faq.md
   - Troubleshooting: troubleshooting.md
 

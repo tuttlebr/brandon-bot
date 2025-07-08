@@ -5,6 +5,7 @@
 ### What is the Streamlit Chat Application?
 
 The Streamlit Chat Application is a production-ready conversational AI application that provides:
+
 - Advanced language model integration (NVIDIA, OpenAI)
 - PDF document analysis and context-aware Q&A
 - Image generation capabilities
@@ -15,11 +16,13 @@ The Streamlit Chat Application is a production-ready conversational AI applicati
 ### What are the system requirements?
 
 **Minimum Requirements:**
+
 - 4GB RAM
 - 10GB disk space
 - Docker (for containerized deployment)
 
 **Recommended:**
+
 - 8GB+ RAM
 - 20GB+ disk space
 - GPU support for faster inference (optional)
@@ -27,6 +30,7 @@ The Streamlit Chat Application is a production-ready conversational AI applicati
 ### Which language models are supported?
 
 The application supports multiple model providers:
+
 - **NVIDIA NIM**: LLaMA, Mistral, Nemotron models
 - **Vision Models**: NVIDIA VLM models for image analysis
 - **OpenAI**: GPT-3.5, GPT-4 (with configuration)
@@ -47,12 +51,14 @@ The application supports multiple model providers:
 Common causes and solutions:
 
 1. **Network issues**:
+
    ```bash
    # Use buildkit for better caching
    DOCKER_BUILDKIT=1 docker compose build
    ```
 
 2. **Memory limitations**:
+
    ```bash
    # Increase Docker memory limit
    docker system prune -a  # Clean up first
@@ -105,6 +111,7 @@ Check these common issues:
 ### How do I enable image generation?
 
 1. Add image endpoint to `.env`:
+
    ```bash
    IMAGE_ENDPOINT=https://api.segmind.com/v1/sdxl1.0-txt2img
    ```
@@ -155,6 +162,7 @@ VLM_MODEL_NAME=nvidia/llama-3.1-nemotron-nano-vl-8b-v1
 ### Can I analyze multiple images at once?
 
 Currently, the application supports one image at a time per session. To analyze a new image:
+
 1. Upload the new image (it replaces the previous one)
 2. Ask your questions about the new image
 
@@ -177,6 +185,7 @@ The application includes 11 specialized tools:
 ### How do tools get selected automatically?
 
 The LLM analyzes your query and automatically selects appropriate tools based on:
+
 - Keywords in your question
 - Context of the conversation
 - Tool descriptions and capabilities
@@ -185,6 +194,7 @@ The LLM analyzes your query and automatically selects appropriate tools based on
 ### Can I use multiple PDFs simultaneously?
 
 Yes! The application supports:
+
 - Uploading multiple PDFs
 - Switching context between documents
 - Asking questions across documents
@@ -193,6 +203,7 @@ Yes! The application supports:
 ### How do I clear the chat history?
 
 Three options:
+
 1. Click "Clear Chat" button in the sidebar
 2. Refresh the page (F5)
 3. Start a new session (close and reopen tab)
@@ -213,6 +224,7 @@ Response time depends on:
 3. **Context length**: Longer conversations take more time
 
 **Optimization tips:**
+
 - Use fast models for simple queries
 - Clear old messages periodically
 - Enable response caching
@@ -220,12 +232,14 @@ Response time depends on:
 ### How can I reduce token usage/costs?
 
 1. **Use appropriate models**:
+
    ```python
    # For simple queries
    FAST_LLM_MODEL_NAME=meta/llama-3.1-8b-instruct
    ```
 
 2. **Enable sliding window**:
+
    ```bash
    SLIDING_WINDOW_MAX_TURNS=10
    ```
@@ -237,12 +251,14 @@ Response time depends on:
 ### Memory usage is high. What can I do?
 
 1. **Limit concurrent uploads**:
+
    ```bash
    MAX_IMAGES_IN_SESSION=20
    MAX_PDF_SIZE=8388608  # 8MB
    ```
 
 2. **Enable garbage collection**:
+
    ```python
    ENABLE_GC=true
    GC_INTERVAL=300  # seconds
@@ -262,11 +278,13 @@ Response time depends on:
 ### "Model not found" error
 
 This happens when:
+
 - Model name is misspelled
 - Model is not available in your region
 - API endpoint is incorrect
 
 Solution:
+
 ```bash
 # List available models
 curl -H "Authorization: Bearer $NVIDIA_API_KEY" \
@@ -288,11 +306,13 @@ curl -H "Authorization: Bearer $NVIDIA_API_KEY" \
 ### Docker container keeps restarting
 
 Check logs:
+
 ```bash
 docker compose logs app -f
 ```
 
 Common fixes:
+
 - Ensure all required env vars are set
 - Check file permissions
 - Verify Docker resources (memory/CPU)
@@ -314,6 +334,7 @@ Common fixes:
 ### PDF analysis is slow
 
 Large PDFs take time to process. For documents over 50 pages:
+
 - Initial processing may take 1-2 minutes
 - Progress updates show completion status
 - Once processed, subsequent queries are faster
@@ -328,6 +349,7 @@ Large PDFs take time to process. For documents over 50 pages:
 ### Memory issues with large files
 
 If experiencing crashes:
+
 1. Reduce PDF size limit: `PDF_MAX_SIZE_MB=100`
 2. Lower image size limit: `IMAGE_MAX_SIZE_MB=5`
 3. Increase Docker memory allocation
@@ -338,6 +360,7 @@ If experiencing crashes:
 ### How do I add a custom tool?
 
 1. Create tool class:
+
 ```python
 # tools/custom_tool.py
 from tools.base import BaseTool
@@ -357,12 +380,14 @@ class CustomTool(BaseTool):
 ### Can I use a different vector database?
 
 Yes, the application supports:
+
 - Milvus (default)
 - ChromaDB
 - Pinecone
 - Weaviate
 
 Configure in `.env`:
+
 ```bash
 VECTOR_DB_TYPE=chroma
 VECTOR_DB_URL=http://localhost:8000
@@ -388,6 +413,7 @@ def check_auth():
 ### Can I deploy to production?
 
 Yes! See [Deployment Guide](deployment/docker.md) for:
+
 - Docker Compose production setup
 - Kubernetes deployment
 - Cloud provider guides (AWS, GCP, Azure)
@@ -397,6 +423,7 @@ Yes! See [Deployment Guide](deployment/docker.md) for:
 ### How do I use different model providers?
 
 Configure endpoints and model names:
+
 ```bash
 # OpenAI
 LLM_ENDPOINT=https://api.openai.com/v1
@@ -410,6 +437,7 @@ LLM_MODEL_NAME=claude-3-opus
 ### Can I customize the UI?
 
 Yes, through configuration:
+
 ```bash
 BRAND_COLOR=#your-color
 BOT_TITLE="Your Bot Name"
@@ -431,6 +459,7 @@ ASSISTANT_AVATAR_PATH=./your-avatar.png
 ### Is my data stored?
 
 By default:
+
 - Chat history: Session only (cleared on refresh)
 - Uploaded files: Temporary storage (auto-deleted)
 - No permanent storage unless configured
@@ -438,6 +467,7 @@ By default:
 ### Can I use this offline?
 
 Partial offline support:
+
 - UI runs offline
 - Requires internet for:
   - LLM API calls
@@ -447,6 +477,7 @@ Partial offline support:
 ### How do I export chat history?
 
 Add export functionality:
+
 ```python
 # In sidebar
 if st.button("Export Chat"):
@@ -490,6 +521,7 @@ See [Contributing Guide](development/contributing.md)
 ### "RuntimeError: Session state key already exists"
 
 Clear session state:
+
 ```python
 for key in list(st.session_state.keys()):
     del st.session_state[key]
@@ -507,6 +539,7 @@ for key in list(st.session_state.keys()):
 ### "CUDA out of memory"
 
 If using GPU:
+
 1. Reduce batch size
 2. Use smaller models
 3. Clear GPU cache:

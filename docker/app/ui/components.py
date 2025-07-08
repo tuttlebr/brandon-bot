@@ -49,13 +49,19 @@ class ChatHistoryComponent:
         for i, message in enumerate(display_messages[start_idx:end_idx]):
             with st.chat_message(
                 message["role"],
-                avatar=(self.config.user_avatar if message["role"] == "user" else self.config.assistant_avatar),
+                avatar=(
+                    self.config.user_avatar
+                    if message["role"] == "user"
+                    else self.config.assistant_avatar
+                ),
             ):
                 chat_message = ChatMessage(message["role"], message["content"])
 
                 # Check if this is an image message
                 if chat_message.is_image_message():
-                    image_id, enhanced_prompt, original_prompt = chat_message.get_image_data()
+                    image_id, enhanced_prompt, original_prompt = (
+                        chat_message.get_image_data()
+                    )
 
                     # Retrieve image from file storage
                     if image_id:
@@ -69,12 +75,22 @@ class ChatHistoryComponent:
                                 # Convert base64 back to PIL Image for display
                                 image = base64_to_pil_image(image_data)
                                 if image:
-                                    st.image(image, caption=f"{enhanced_prompt}", use_container_width=True)
+                                    st.image(
+                                        image,
+                                        caption=f"{enhanced_prompt}",
+                                        use_container_width=True,
+                                    )
                                 else:
-                                    logging.error(f"Failed to convert image data for image_id: {image_id}")
-                                    st.info("🖼️ Image could not be displayed (conversion error)")
+                                    logging.error(
+                                        f"Failed to convert image data for image_id: {image_id}"
+                                    )
+                                    st.info(
+                                        "🖼️ Image could not be displayed (conversion error)"
+                                    )
                             else:
-                                logging.warning(f"Image not found in storage: {image_id}")
+                                logging.warning(
+                                    f"Image not found in storage: {image_id}"
+                                )
                                 st.info("🖼️ Image not available (may have been removed)")
 
                         except Exception as e:
@@ -98,9 +114,13 @@ class ChatHistoryComponent:
                 if (
                     message["role"] == "assistant"
                     and i == len(display_messages[start_idx:end_idx]) - 1
-                    and hasattr(st.session_state, 'last_tool_context')  # Last message in current page
+                    and hasattr(
+                        st.session_state, 'last_tool_context'
+                    )  # Last message in current page
                     and st.session_state.last_tool_context
-                    and not st.session_state.get("processing", False)  # Don't show during active processing
+                    and not st.session_state.get(
+                        "processing", False
+                    )  # Don't show during active processing
                 ):
                     self.display_context_expander(st.session_state.last_tool_context)
 
@@ -138,7 +158,12 @@ class ChatHistoryComponent:
             context: Context information to display
         """
         if context:
-            with st.expander("📋 View Tool Data Sources (for verification)", expanded=False):
+            with st.expander(
+                "📋 View Tool Data Sources (for verification)", expanded=False
+            ):
                 st.markdown(
-                    extract_context_regex(context).replace("$", "\\$").replace("\\${", "${"), unsafe_allow_html=True,
+                    extract_context_regex(context)
+                    .replace("$", "\\$")
+                    .replace("\\${", "${"),
+                    unsafe_allow_html=True,
                 )

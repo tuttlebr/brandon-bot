@@ -66,8 +66,12 @@ class TextProcessorService:
             max_tokens = 100000  # Conservative limit to stay well under model limits
 
             if estimated_tokens > max_tokens:
-                logger.warning(f"Text too large ({estimated_tokens} estimated tokens), processing in chunks")
-                return self._process_large_text_chunked(task_type, text, instructions, messages)
+                logger.warning(
+                    f"Text too large ({estimated_tokens} estimated tokens), processing in chunks"
+                )
+                return self._process_large_text_chunked(
+                    task_type, text, instructions, messages
+                )
 
             client = llm_client_service.get_client(self.llm_type)
             model_name = llm_client_service.get_model_name(self.llm_type)
@@ -75,7 +79,9 @@ class TextProcessorService:
 
             # Build messages
             if messages:
-                final_messages = self._build_messages_with_context(messages, system_prompt, text)
+                final_messages = self._build_messages_with_context(
+                    messages, system_prompt, text
+                )
             else:
                 final_messages = [
                     {"role": "system", "content": system_prompt},
@@ -145,7 +151,9 @@ class TextProcessorService:
                         if instructions
                         else f"Processing section {i+1} of {len(chunks)}"
                     )
-                    chunk_result = self._process_single_chunk(task_type, chunk, chunk_instructions, messages)
+                    chunk_result = self._process_single_chunk(
+                        task_type, chunk, chunk_instructions, messages
+                    )
                     if chunk_result["success"]:
                         chunk_results.append(chunk_result["result"])
                     else:
@@ -154,10 +162,15 @@ class TextProcessorService:
                         )
                 except Exception as e:
                     logger.error(f"Error processing chunk {i+1}: {e}")
-                    chunk_results.append(f"Section {i+1} processing failed due to error: {str(e)}")
+                    chunk_results.append(
+                        f"Section {i+1} processing failed due to error: {str(e)}"
+                    )
 
             if not chunk_results:
-                return {"success": False, "error": "No content could be processed from the text."}
+                return {
+                    "success": False,
+                    "error": "No content could be processed from the text.",
+                }
 
             # Combine chunk results based on task type
             if task_type == TextTaskType.SUMMARIZE:
@@ -165,14 +178,20 @@ class TextProcessorService:
             elif task_type == TextTaskType.TRANSLATE:
                 return self._combine_translations(chunk_results)
             else:
-                return self._combine_general_results(chunk_results, task_type, instructions)
+                return self._combine_general_results(
+                    chunk_results, task_type, instructions
+                )
 
         except Exception as e:
             logger.error(f"Error in chunked text processing: {e}")
             return {"success": False, "error": str(e), "task_type": task_type}
 
     def _process_single_chunk(
-        self, task_type: TextTaskType, chunk_text: str, instructions: Optional[str], messages: Optional[List[Dict]],
+        self,
+        task_type: TextTaskType,
+        chunk_text: str,
+        instructions: Optional[str],
+        messages: Optional[List[Dict]],
     ) -> Dict[str, any]:
         """
         Process a single chunk of text
@@ -193,7 +212,9 @@ class TextProcessorService:
 
             # Build messages
             if messages:
-                final_messages = self._build_messages_with_context(messages, system_prompt, chunk_text)
+                final_messages = self._build_messages_with_context(
+                    messages, system_prompt, chunk_text
+                )
             else:
                 final_messages = [
                     {"role": "system", "content": system_prompt},
@@ -222,7 +243,9 @@ class TextProcessorService:
             logger.error(f"Error processing chunk: {e}")
             return {"success": False, "error": str(e), "task_type": task_type}
 
-    def _combine_summaries(self, chunk_results: List[str], instructions: Optional[str]) -> Dict[str, any]:
+    def _combine_summaries(
+        self, chunk_results: List[str], instructions: Optional[str]
+    ) -> Dict[str, any]:
         """Combine multiple summaries into a final summary"""
         try:
             combined_text = "\n\n---\n\n".join(chunk_results)
@@ -232,10 +255,16 @@ class TextProcessorService:
                 f"Combine the information into a cohesive whole. {instructions or ''}"
             )
 
-            return self._process_single_chunk(TextTaskType.SUMMARIZE, combined_text, synthesis_instructions, None)
+            return self._process_single_chunk(
+                TextTaskType.SUMMARIZE, combined_text, synthesis_instructions, None
+            )
         except Exception as e:
             logger.error(f"Error combining summaries: {e}")
-            return {"success": False, "error": str(e), "task_type": TextTaskType.SUMMARIZE}
+            return {
+                "success": False,
+                "error": str(e),
+                "task_type": TextTaskType.SUMMARIZE,
+            }
 
     def _combine_translations(self, chunk_results: List[str]) -> Dict[str, any]:
         """Combine multiple translations into a final translation"""
@@ -250,10 +279,17 @@ class TextProcessorService:
             }
         except Exception as e:
             logger.error(f"Error combining translations: {e}")
-            return {"success": False, "error": str(e), "task_type": TextTaskType.TRANSLATE}
+            return {
+                "success": False,
+                "error": str(e),
+                "task_type": TextTaskType.TRANSLATE,
+            }
 
     def _combine_general_results(
-        self, chunk_results: List[str], task_type: TextTaskType, instructions: Optional[str]
+        self,
+        chunk_results: List[str],
+        task_type: TextTaskType,
+        instructions: Optional[str],
     ) -> Dict[str, any]:
         """Combine results for general text processing tasks"""
         try:
@@ -264,21 +300,29 @@ class TextProcessorService:
                 f"Ensure consistency and coherence across the entire document. {instructions or ''}"
             )
 
-            return self._process_single_chunk(task_type, combined_text, synthesis_instructions, None)
+            return self._process_single_chunk(
+                task_type, combined_text, synthesis_instructions, None
+            )
         except Exception as e:
             logger.error(f"Error combining general results: {e}")
             return {"success": False, "error": str(e), "task_type": task_type}
 
-    def _get_system_prompt(self, task_type: TextTaskType, instructions: Optional[str] = None) -> str:
+    def _get_system_prompt(
+        self, task_type: TextTaskType, instructions: Optional[str] = None
+    ) -> str:
         """Get the appropriate system prompt for text processing tasks"""
         from utils.system_prompt import get_context_system_prompt
 
         # Use the new context-aware system prompt
         return get_context_system_prompt(
-            context='text_processing', task_type=task_type.value, instructions=instructions
+            context='text_processing',
+            task_type=task_type.value,
+            instructions=instructions,
         )
 
-    def _build_messages_with_context(self, messages: List[Dict], system_prompt: str, text: str) -> List[Dict]:
+    def _build_messages_with_context(
+        self, messages: List[Dict], system_prompt: str, text: str
+    ) -> List[Dict]:
         """Build messages with proper context injection"""
 
         # Filter out existing system messages with task prompts
@@ -286,7 +330,9 @@ class TextProcessorService:
             msg
             for msg in messages
             if msg.get("role") != "system"
-            or not any(task.value in msg.get("content", "").lower() for task in TextTaskType)
+            or not any(
+                task.value in msg.get("content", "").lower() for task in TextTaskType
+            )
         ]
 
         # Check for injected context in text
@@ -303,7 +349,9 @@ class TextProcessorService:
 
         return [{"role": "system", "content": system_prompt}] + filtered_messages
 
-    def _get_processing_notes(self, task_type: TextTaskType, original: str, result: str) -> str:
+    def _get_processing_notes(
+        self, task_type: TextTaskType, original: str, result: str
+    ) -> str:
         """Generate processing notes for the task"""
 
         if task_type == TextTaskType.SUMMARIZE:

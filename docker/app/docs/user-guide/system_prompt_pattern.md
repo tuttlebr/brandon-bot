@@ -131,6 +131,7 @@ code_prompt = get_context_system_prompt('code_generation')
 ### For Existing Services
 
 1. **Replace direct prompt generation**:
+
    ```python
    # Old way
    prompt = f"""You are a translator..."""
@@ -141,6 +142,7 @@ code_prompt = get_context_system_prompt('code_generation')
    ```
 
 2. **Update service methods**:
+
    ```python
    # Old way
    def _get_system_prompt(self, task_type):
@@ -173,6 +175,7 @@ system_prompt_manager._cache_ttl_seconds = 600  # 10 minutes
 To add a new context:
 
 1. **Add context instructions** in `_get_context_instructions()`:
+
    ```python
    'new_context': f"""You are performing {kwargs.get('task', 'specialized')} tasks.
 

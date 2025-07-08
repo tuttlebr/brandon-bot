@@ -29,7 +29,9 @@ class PDFAnalysisService:
             config_obj: Configuration for the service
         """
         self.config = config_obj
-        self.batch_size = config.file_processing.PDF_SUMMARIZATION_BATCH_SIZE  # Reuse batch size
+        self.batch_size = (
+            config.file_processing.PDF_SUMMARIZATION_BATCH_SIZE
+        )  # Reuse batch size
         self.executor = get_shared_executor()
 
     async def analyze_pdf_for_query(self, pdf_data: Dict, user_query: str) -> str:
@@ -53,16 +55,24 @@ class PDFAnalysisService:
             )
 
             if total_pages == 0:
-                return "The document appears to be empty or contains no extractable text."
+                return (
+                    "The document appears to be empty or contains no extractable text."
+                )
 
             # For batch-processed PDFs, load the complete document
             if pdf_data.get('batch_processed', False):
-                logger.info(f"Loading complete document from batches for comprehensive analysis")
-                complete_pages = await self._load_complete_document_from_batches(pdf_data)
+                logger.info(
+                    f"Loading complete document from batches for comprehensive analysis"
+                )
+                complete_pages = await self._load_complete_document_from_batches(
+                    pdf_data
+                )
                 if complete_pages:
                     pages = complete_pages
                     total_pages = len(pages)
-                    logger.info(f"Loaded {total_pages} pages from batches for comprehensive analysis")
+                    logger.info(
+                        f"Loaded {total_pages} pages from batches for comprehensive analysis"
+                    )
 
             # Use DocumentProcessor to categorize and route appropriately
             doc_size = DocumentProcessor.categorize_document_size(total_pages)
@@ -72,13 +82,17 @@ class PDFAnalysisService:
             elif doc_size == "medium":
                 return await self._analyze_document_batched(pages, user_query, filename)
             else:  # large
-                return await self._analyze_document_intelligent(pages, user_query, filename)
+                return await self._analyze_document_intelligent(
+                    pages, user_query, filename
+                )
 
         except Exception as e:
             logger.error(f"Error in PDF analysis: {e}")
             return f"I encountered an error while analyzing the document: {str(e)}"
 
-    async def _analyze_document_simple(self, pages: List[Dict], user_query: str, filename: str) -> str:
+    async def _analyze_document_simple(
+        self, pages: List[Dict], user_query: str, filename: str
+    ) -> str:
         """Analyze small documents in a single pass"""
         try:
             # Use DocumentProcessor to format pages
@@ -95,7 +109,10 @@ class PDFAnalysisService:
 
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(
-                self.executor, run_with_streamlit_context, execute_assistant_with_dict, analysis_params
+                self.executor,
+                run_with_streamlit_context,
+                execute_assistant_with_dict,
+                analysis_params,
             )
 
             return result.result
@@ -104,7 +121,9 @@ class PDFAnalysisService:
             logger.error(f"Error analyzing document: {e}")
             return f"Error analyzing document: {str(e)}"
 
-    async def _analyze_document_batched(self, pages: List[Dict], user_query: str, filename: str) -> str:
+    async def _analyze_document_batched(
+        self, pages: List[Dict], user_query: str, filename: str
+    ) -> str:
         """Analyze medium documents using batch processing"""
         try:
             # Adjust batch size to process more pages per batch
@@ -113,7 +132,9 @@ class PDFAnalysisService:
                 delay_between_batches=0.3,  # 10 pages per batch or half the document
             )
 
-            async def analyze_batch(batch_pages: List[Dict], start_idx: int, end_idx: int) -> Dict:
+            async def analyze_batch(
+                batch_pages: List[Dict], start_idx: int, end_idx: int
+            ) -> Dict:
                 """Analyze a single batch of pages"""
                 batch_text = DocumentProcessor.format_pages_for_analysis(batch_pages)
 
@@ -128,28 +149,42 @@ class PDFAnalysisService:
 
                 loop = asyncio.get_event_loop()
                 result = await loop.run_in_executor(
-                    self.executor, run_with_streamlit_context, execute_assistant_with_dict, analysis_params
+                    self.executor,
+                    run_with_streamlit_context,
+                    execute_assistant_with_dict,
+                    analysis_params,
                 )
 
-                return {"page_range": f"{start_idx+1}-{end_idx}", "analysis": result.result}
+                return {
+                    "page_range": f"{start_idx+1}-{end_idx}",
+                    "analysis": result.result,
+                }
 
             # Process pages in batches
-            batch_results = await batch_processor.process_in_batches(pages, analyze_batch)
+            batch_results = await batch_processor.process_in_batches(
+                pages, analyze_batch
+            )
 
             # Filter out None results (from errors)
             valid_results = [r for r in batch_results if r is not None]
 
             # Combine batch results into final answer
-            return await self._synthesize_batch_results(valid_results, user_query, filename)
+            return await self._synthesize_batch_results(
+                valid_results, user_query, filename
+            )
 
         except Exception as e:
             logger.error(f"Error analyzing document: {e}")
             return f"Error analyzing document: {str(e)}"
 
-    async def _analyze_document_intelligent(self, pages: List[Dict], user_query: str, filename: str) -> str:
+    async def _analyze_document_intelligent(
+        self, pages: List[Dict], user_query: str, filename: str
+    ) -> str:
         """Analyze large documents by processing ALL pages in detail"""
         try:
-            logger.info(f"Starting comprehensive analysis of all {len(pages)} pages for '{filename}'")
+            logger.info(
+                f"Starting comprehensive analysis of all {len(pages)} pages for '{filename}'"
+            )
 
             # Use batched analysis for ALL pages (not just relevant ones)
             return await self._analyze_document_batched(pages, user_query, filename)
@@ -158,14 +193,18 @@ class PDFAnalysisService:
             logger.error(f"Error analyzing document: {e}")
             return f"Error analyzing document: {str(e)}"
 
-    async def _find_relevant_pages(self, pages: List[Dict], user_query: str, filename: str) -> List[Dict]:
+    async def _find_relevant_pages(
+        self, pages: List[Dict], user_query: str, filename: str
+    ) -> List[Dict]:
         """Find pages potentially relevant to the user query"""
         try:
             batch_size = 20
             overlap = 5
             total_pages = len(pages)
 
-            async def scan_batch(batch_pages: List[Dict], start_idx: int, end_idx: int) -> List[int]:
+            async def scan_batch(
+                batch_pages: List[Dict], start_idx: int, end_idx: int
+            ) -> List[int]:
                 # Create summaries using DocumentProcessor
                 page_summaries = []
                 for page in batch_pages:
@@ -189,7 +228,10 @@ class PDFAnalysisService:
 
                 loop = asyncio.get_event_loop()
                 result = await loop.run_in_executor(
-                    self.executor, run_with_streamlit_context, execute_assistant_with_dict, relevance_params
+                    self.executor,
+                    run_with_streamlit_context,
+                    execute_assistant_with_dict,
+                    relevance_params,
                 )
 
                 return DocumentProcessor.extract_page_numbers_from_text(
@@ -198,7 +240,9 @@ class PDFAnalysisService:
 
             # Create overlapping batches
             batch_starts = list(range(0, total_pages, batch_size - overlap))
-            batch_ranges = [(start, min(start + batch_size, total_pages)) for start in batch_starts]
+            batch_ranges = [
+                (start, min(start + batch_size, total_pages)) for start in batch_starts
+            ]
             batch_results = []
             for start, end in batch_ranges:
                 batch = pages[start:end]
@@ -228,32 +272,44 @@ class PDFAnalysisService:
             # Fallback: return first 10 pages
             return pages[:10]
 
-    async def _analyze_relevant_pages(self, relevant_pages: List[Dict], user_query: str, filename: str) -> str:
+    async def _analyze_relevant_pages(
+        self, relevant_pages: List[Dict], user_query: str, filename: str
+    ) -> str:
         """Analyze the relevant pages found during scanning"""
         try:
             # Determine if we can analyze all at once or need batching
             if len(relevant_pages) <= 5:
                 # Simple analysis for few pages
-                return await self._analyze_document_simple(relevant_pages, user_query, filename)
+                return await self._analyze_document_simple(
+                    relevant_pages, user_query, filename
+                )
             else:
                 # Use batched analysis for many relevant pages
-                return await self._analyze_document_batched(relevant_pages, user_query, filename)
+                return await self._analyze_document_batched(
+                    relevant_pages, user_query, filename
+                )
 
         except Exception as e:
             logger.error(f"Error analyzing relevant pages: {e}")
             return f"Error during analysis: {str(e)}"
 
-    async def _synthesize_batch_results(self, batch_results: List[Dict], user_query: str, filename: str) -> str:
+    async def _synthesize_batch_results(
+        self, batch_results: List[Dict], user_query: str, filename: str
+    ) -> str:
         """Synthesize results from multiple batch analyses"""
         try:
             # Format batch results for synthesis
             formatted_results = []
             for result in batch_results:
                 if 'page_range' in result:
-                    formatted_results.append(f"Analysis of pages {result['page_range']}:\n{result['analysis']}")
+                    formatted_results.append(
+                        f"Analysis of pages {result['page_range']}:\n{result['analysis']}"
+                    )
                 elif 'pages' in result:
                     page_list = ', '.join(map(str, result['pages']))
-                    formatted_results.append(f"Pages {page_list}:\n{result['analysis']}")
+                    formatted_results.append(
+                        f"Pages {page_list}:\n{result['analysis']}"
+                    )
                 else:
                     formatted_results.append(result['analysis'])
 
@@ -270,7 +326,10 @@ class PDFAnalysisService:
 
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(
-                self.executor, run_with_streamlit_context, execute_assistant_with_dict, synthesis_params
+                self.executor,
+                run_with_streamlit_context,
+                execute_assistant_with_dict,
+                synthesis_params,
             )
 
             return result.result
@@ -278,7 +337,9 @@ class PDFAnalysisService:
         except Exception as e:
             logger.error(f"Error synthesizing results: {e}")
             # Fallback: return all individual results
-            return "\n\n".join([result.get('analysis', '') for result in batch_results if result])
+            return "\n\n".join(
+                [result.get('analysis', '') for result in batch_results if result]
+            )
 
     async def _load_complete_document_from_batches(self, pdf_data: Dict) -> List[Dict]:
         """

@@ -63,7 +63,9 @@ class ResponseController:
         except Exception as e:
             self._handle_response_error(e)
 
-    def generate_and_display_response_no_spinner(self, prepared_messages: List[Dict[str, Any]]):
+    def generate_and_display_response_no_spinner(
+        self, prepared_messages: List[Dict[str, Any]]
+    ):
         """
         Generate and display streaming response from LLM without spinner (spinner handled elsewhere)
 
@@ -80,7 +82,9 @@ class ResponseController:
         except Exception as e:
             self._handle_response_error(e)
 
-    def generate_response_with_cleanup_separation(self, prepared_messages: List[Dict[str, Any]]):
+    def generate_response_with_cleanup_separation(
+        self, prepared_messages: List[Dict[str, Any]]
+    ):
         """
         Generate and display streaming response, returning cleanup function for later execution
         This allows the spinner to close immediately after response is displayed
@@ -134,13 +138,19 @@ class ResponseController:
                 # Use asyncio.run for simpler async handling
                 full_response = asyncio.run(
                     self._async_stream_response(
-                        prepared_messages, model_name, model_type, message_placeholder, response_chunks
+                        prepared_messages,
+                        model_name,
+                        model_type,
+                        message_placeholder,
+                        response_chunks,
                     )
                 )
 
             except Exception as e:
                 logging.error(f"Error in streaming: {e}")
-                error_message = "I apologize, but I encountered an error generating the response."
+                error_message = (
+                    "I apologize, but I encountered an error generating the response."
+                )
                 message_placeholder.markdown(error_message)
                 full_response = error_message
 
@@ -152,7 +162,9 @@ class ResponseController:
                 message_placeholder.empty()
                 self._display_image_generation_response(image_response)
                 self._handle_tool_context()
-                full_response = ""  # No text response to add to history for image generation
+                full_response = (
+                    ""  # No text response to add to history for image generation
+                )
             else:
                 # Handle tool context for text response
                 self._handle_tool_context()
@@ -186,7 +198,9 @@ class ResponseController:
 
         try:
             # Stream response from LLM service with consistent model type
-            async for chunk in self.llm_service.generate_streaming_response(prepared_messages, model_name, model_type):
+            async for chunk in self.llm_service.generate_streaming_response(
+                prepared_messages, model_name, model_type
+            ):
                 response_chunks.append(chunk)
                 full_response += chunk
 
@@ -229,12 +243,18 @@ class ResponseController:
         """
         logging.debug("Checking for image generation response")
 
-        if not hasattr(self.llm_service, 'last_tool_responses') or not self.llm_service.last_tool_responses:
+        if (
+            not hasattr(self.llm_service, 'last_tool_responses')
+            or not self.llm_service.last_tool_responses
+        ):
             logging.debug("No tool responses found")
             return {}
 
         for tool_response in self.llm_service.last_tool_responses:
-            if tool_response.get("role") == "direct_response" and tool_response.get("tool_name") == "generate_image":
+            if (
+                tool_response.get("role") == "direct_response"
+                and tool_response.get("tool_name") == "generate_image"
+            ):
                 logging.debug("Found image generation tool response")
                 try:
                     tool_result = tool_response.get("tool_result")
@@ -243,9 +263,15 @@ class ResponseController:
                         response_data = {
                             "success": tool_result.success,
                             "image_data": getattr(tool_result, 'image_data', None),
-                            "original_prompt": getattr(tool_result, 'original_prompt', ''),
-                            "enhanced_prompt": getattr(tool_result, 'enhanced_prompt', ''),
-                            "error_message": getattr(tool_result, 'error_message', None),
+                            "original_prompt": getattr(
+                                tool_result, 'original_prompt', ''
+                            ),
+                            "enhanced_prompt": getattr(
+                                tool_result, 'enhanced_prompt', ''
+                            ),
+                            "error_message": getattr(
+                                tool_result, 'error_message', None
+                            ),
                         }
 
                         if response_data["success"] and response_data["image_data"]:
@@ -254,7 +280,9 @@ class ResponseController:
                             return response_data
 
                 except Exception as e:
-                    logging.error(f"Error extracting image generation tool response: {e}")
+                    logging.error(
+                        f"Error extracting image generation tool response: {e}"
+                    )
                     continue
 
         return {}
@@ -304,7 +332,9 @@ class ResponseController:
             st.image(generated_image, caption=enhanced_prompt, use_container_width=True)
 
             # Store image in session state
-            image_id = self.session_controller.store_generated_image(image_data, enhanced_prompt, original_prompt)
+            image_id = self.session_controller.store_generated_image(
+                image_data, enhanced_prompt, original_prompt
+            )
 
             # Create history message
             history_message = {
@@ -316,12 +346,18 @@ class ResponseController:
             }
 
             if enhanced_prompt != original_prompt and original_prompt:
-                history_message["text"] += f"\n\n*Enhanced from original request: \"{original_prompt}\"*"
+                history_message[
+                    "text"
+                ] += f"\n\n*Enhanced from original request: \"{original_prompt}\"*"
 
             # Add image metadata to chat history
-            self.message_controller.safe_add_message_to_history("assistant", history_message)
+            self.message_controller.safe_add_message_to_history(
+                "assistant", history_message
+            )
 
-            logging.debug(f"Successfully displayed generated image with prompt: {enhanced_prompt}")
+            logging.debug(
+                f"Successfully displayed generated image with prompt: {enhanced_prompt}"
+            )
         else:
             error_msg = "Generated image but failed to display it properly."
             logging.error("Failed to convert base64 to PIL image")
@@ -337,7 +373,9 @@ class ResponseController:
         """
         error_message = image_response.get("error_message", "Failed to generate image.")
         st.markdown(f"**Image Generation Error:** {error_message}")
-        self.message_controller.safe_add_message_to_history("assistant", f"Image generation failed: {error_message}")
+        self.message_controller.safe_add_message_to_history(
+            "assistant", f"Image generation failed: {error_message}"
+        )
 
         # Show the enhanced prompt that was attempted
         enhanced_prompt = image_response.get("enhanced_prompt", "")
@@ -361,7 +399,10 @@ class ResponseController:
         Returns:
             Formatted context string from tool responses, empty if none found
         """
-        if not hasattr(self.llm_service, 'last_tool_responses') or not self.llm_service.last_tool_responses:
+        if (
+            not hasattr(self.llm_service, 'last_tool_responses')
+            or not self.llm_service.last_tool_responses
+        ):
             return ""
 
         tool_contexts = []
@@ -450,7 +491,11 @@ class ResponseController:
             return f"**Weather data for {location}** (Current: {temp}°F)"
 
         # Handle PDF content retrieval
-        if "filename" in tool_data and "content" in tool_data and isinstance(tool_data.get("content"), list):
+        if (
+            "filename" in tool_data
+            and "content" in tool_data
+            and isinstance(tool_data.get("content"), list)
+        ):
             return self._format_pdf_content_context(tool_data)
 
         # Generic fallback
@@ -481,7 +526,9 @@ class ResponseController:
         if content:
             context_parts = [f"**PDF Content Retrieved from:** {filename}"]
             if pages_requested:
-                context_parts.append(f"**Pages:** {', '.join(map(str, pages_requested))}")
+                context_parts.append(
+                    f"**Pages:** {', '.join(map(str, pages_requested))}"
+                )
 
             # Show retrieved content (truncated for readability) using config
             max_pages = config.tool_context.MAX_PAGES_IN_CONTEXT
@@ -503,7 +550,9 @@ class ResponseController:
 
             return "\n\n".join(context_parts)
         else:
-            return f"**PDF Query Result:** {tool_data.get('message', 'No content found')}"
+            return (
+                f"**PDF Query Result:** {tool_data.get('message', 'No content found')}"
+            )
 
     def _handle_response_error(self, error: Exception):
         """
@@ -515,7 +564,8 @@ class ResponseController:
         error_msg = f"Error generating response: ```json\n{error}\n```"
         logging.error(error_msg)
         self.message_controller.update_chat_history(
-            "I apologize, but I encountered an error while generating a response.", "assistant"
+            "I apologize, but I encountered an error while generating a response.",
+            "assistant",
         )
         self.session_controller.set_processing_state(False)
         st.rerun()

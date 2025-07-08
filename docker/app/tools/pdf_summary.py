@@ -29,10 +29,16 @@ class PDFSummaryResponse(BaseToolResponse):
     success: bool = Field(description="Whether the retrieval was successful")
     filename: str = Field(description="Name of the PDF file")
     summary_type: str = Field(description="Type of summary retrieved")
-    document_summary: Optional[str] = Field(None, description="Overall document summary")
-    page_summaries: Optional[List[Dict[str, Any]]] = Field(None, description="Page-level summaries")
+    document_summary: Optional[str] = Field(
+        None, description="Overall document summary"
+    )
+    page_summaries: Optional[List[Dict[str, Any]]] = Field(
+        None, description="Page-level summaries"
+    )
     message: str = Field(description="Status message")
-    direct_response: bool = Field(default=True, description="This provides a direct response to the user")
+    direct_response: bool = Field(
+        default=True, description="This provides a direct response to the user"
+    )
 
 
 class PDFSummaryTool(BaseTool):
@@ -124,7 +130,9 @@ class PDFSummaryTool(BaseTool):
                     logger.info("Retrieved PDF data from context service")
                     pdf_id = "latest"
             except Exception as e:
-                logger.debug(f"Could not access PDF context service (expected in thread context): {e}")
+                logger.debug(
+                    f"Could not access PDF context service (expected in thread context): {e}"
+                )
 
         # Create pdf_documents dict for compatibility
         pdf_documents = {pdf_id: pdf_data} if pdf_data else {}
@@ -162,7 +170,11 @@ class PDFSummaryTool(BaseTool):
                     success=False,
                     filename=filename or "Unknown",
                     summary_type=summary_type,
-                    message=f"PDF document '{filename}' not found." if filename else "No PDF documents available.",
+                    message=(
+                        f"PDF document '{filename}' not found."
+                        if filename
+                        else "No PDF documents available."
+                    ),
                     direct_response=True,
                 )
 
@@ -185,7 +197,9 @@ class PDFSummaryTool(BaseTool):
             total_pages = len(pdf_data.get("pages", []))
 
             # For large documents, generate summary on-demand using async recursive summarization
-            logger.info(f"Generating on-demand summary for {actual_filename} ({total_pages} pages)")
+            logger.info(
+                f"Generating on-demand summary for {actual_filename} ({total_pages} pages)"
+            )
 
             try:
                 # Initialize summarization service if needed
@@ -194,7 +208,9 @@ class PDFSummaryTool(BaseTool):
                     self.summarization_service = PDFSummarizationService(config)
 
                 # Log progress message (UI operations should be handled by the caller)
-                logger.info(f"Generating comprehensive summary for {actual_filename} ({total_pages} pages)...")
+                logger.info(
+                    f"Generating comprehensive summary for {actual_filename} ({total_pages} pages)..."
+                )
 
                 # Use async recursive summarization for full document processing
                 # Create a new event loop for async operations
@@ -217,10 +233,14 @@ class PDFSummaryTool(BaseTool):
                     file_storage = FileStorageService()
 
                     if file_storage.update_pdf(pdf_id, enhanced_pdf_data):
-                        logger.info(f"Updated PDF '{actual_filename}' with comprehensive summarization data")
+                        logger.info(
+                            f"Updated PDF '{actual_filename}' with comprehensive summarization data"
+                        )
                         pdf_data = enhanced_pdf_data
                     else:
-                        logger.error(f"Failed to update PDF '{actual_filename}' in storage")
+                        logger.error(
+                            f"Failed to update PDF '{actual_filename}' in storage"
+                        )
                 else:
                     # For directly passed PDFs, just update the local copy
                     logger.info(
@@ -324,11 +344,15 @@ class PDFSummaryTool(BaseTool):
 
         return "\n".join(formatted)
 
-    def _get_pdf_data_from_messages(self, messages: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    def _get_pdf_data_from_messages(
+        self, messages: List[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
         """Extract PDF data from injected system messages"""
         return PDFDataExtractor.extract_from_messages(messages)
 
-    def _summarize_batch_processed_pdf(self, pdf_data: Dict[str, Any], summary_type: str) -> PDFSummaryResponse:
+    def _summarize_batch_processed_pdf(
+        self, pdf_data: Dict[str, Any], summary_type: str
+    ) -> PDFSummaryResponse:
         """
         Handle summarization of batch-processed PDFs using hierarchical chunking
 
@@ -363,7 +387,9 @@ class PDFSummaryTool(BaseTool):
 
                 if batch_pages:
                     # Create batch-level summary
-                    batch_summary = self._summarize_batch_pages(batch_pages, batch_num, summary_type)
+                    batch_summary = self._summarize_batch_pages(
+                        batch_pages, batch_num, summary_type
+                    )
                     if batch_summary:
                         batch_summaries.append(batch_summary)
                         pages_included += len(batch_pages)
@@ -379,7 +405,9 @@ class PDFSummaryTool(BaseTool):
 
         # Step 2: If we have multiple batch summaries, combine them hierarchically
         if len(batch_summaries) > 1:
-            final_summary = self._combine_batch_summaries(batch_summaries, filename, summary_type)
+            final_summary = self._combine_batch_summaries(
+                batch_summaries, filename, summary_type
+            )
         else:
             final_summary = batch_summaries[0]
 
@@ -396,7 +424,9 @@ class PDFSummaryTool(BaseTool):
                 f"For specific information from other sections, please ask about particular topics or page ranges."
             )
 
-        formatted_summary = f"## {summary_type.title()} Summary of {filename}\n\n{final_summary}"
+        formatted_summary = (
+            f"## {summary_type.title()} Summary of {filename}\n\n{final_summary}"
+        )
 
         return PDFSummaryResponse(
             success=True,
@@ -467,13 +497,19 @@ class PDFSummaryTool(BaseTool):
             from tools.assistant import execute_assistant_with_dict
 
             summary_result = execute_assistant_with_dict(summary_params)
-            return summary_result.result if hasattr(summary_result, 'result') else str(summary_result)
+            return (
+                summary_result.result
+                if hasattr(summary_result, 'result')
+                else str(summary_result)
+            )
 
         except Exception as e:
             logger.error(f"Error summarizing batch {batch_num}: {e}")
             return f"Batch {batch_num + 1} summary unavailable due to processing error."
 
-    def _summarize_large_batch(self, batch_pages: List[Dict[str, Any]], batch_num: int, summary_type: str) -> str:
+    def _summarize_large_batch(
+        self, batch_pages: List[Dict[str, Any]], batch_num: int, summary_type: str
+    ) -> str:
         """
         Handle summarization of large batches by splitting into smaller chunks
 
@@ -518,11 +554,17 @@ class PDFSummaryTool(BaseTool):
                     from tools.assistant import execute_assistant_with_dict
 
                     summary_result = execute_assistant_with_dict(summary_params)
-                    chunk_summary = summary_result.result if hasattr(summary_result, 'result') else str(summary_result)
+                    chunk_summary = (
+                        summary_result.result
+                        if hasattr(summary_result, 'result')
+                        else str(summary_result)
+                    )
                     chunk_summaries.append(chunk_summary)
                 except Exception as e:
                     logger.error(f"Error summarizing chunk in batch {batch_num}: {e}")
-                    chunk_summaries.append(f"Chunk summary unavailable due to processing error.")
+                    chunk_summaries.append(
+                        f"Chunk summary unavailable due to processing error."
+                    )
 
         # Combine chunk summaries into batch summary
         if chunk_summaries:
@@ -543,14 +585,22 @@ class PDFSummaryTool(BaseTool):
                 from tools.assistant import execute_assistant_with_dict
 
                 summary_result = execute_assistant_with_dict(summary_params)
-                return summary_result.result if hasattr(summary_result, 'result') else str(summary_result)
+                return (
+                    summary_result.result
+                    if hasattr(summary_result, 'result')
+                    else str(summary_result)
+                )
             except Exception as e:
-                logger.error(f"Error combining chunk summaries for batch {batch_num}: {e}")
+                logger.error(
+                    f"Error combining chunk summaries for batch {batch_num}: {e}"
+                )
                 return f"Batch {batch_num + 1} summary unavailable due to processing error."
 
         return f"Batch {batch_num + 1} summary unavailable."
 
-    def _combine_batch_summaries(self, batch_summaries: List[str], filename: str, summary_type: str) -> str:
+    def _combine_batch_summaries(
+        self, batch_summaries: List[str], filename: str, summary_type: str
+    ) -> str:
         """
         Combine multiple batch summaries into a final document summary
 
@@ -590,7 +640,11 @@ class PDFSummaryTool(BaseTool):
             from tools.assistant import execute_assistant_with_dict
 
             summary_result = execute_assistant_with_dict(summary_params)
-            return summary_result.result if hasattr(summary_result, 'result') else str(summary_result)
+            return (
+                summary_result.result
+                if hasattr(summary_result, 'result')
+                else str(summary_result)
+            )
 
         except Exception as e:
             logger.error(f"Error combining batch summaries: {e}")

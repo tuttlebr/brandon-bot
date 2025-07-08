@@ -5,7 +5,9 @@ from utils.text_processing import strip_think_tags
 class ChatMessage:
     """Class to handle chat message operations"""
 
-    def __init__(self, role: str, content: Union[str, List[Dict[str, Any]], Dict[str, Any]]):
+    def __init__(
+        self, role: str, content: Union[str, List[Dict[str, Any]], Dict[str, Any]]
+    ):
         """
         Initialize a chat message
 

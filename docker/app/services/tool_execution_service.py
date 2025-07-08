@@ -58,9 +58,13 @@ class ToolExecutionService:
         tool_calls = self._apply_tool_restrictions(tool_calls)
 
         if strategy == "sequential":
-            responses = await self._execute_sequential(tool_calls, current_user_message, messages)
+            responses = await self._execute_sequential(
+                tool_calls, current_user_message, messages
+            )
         else:
-            responses = await self._execute_parallel(tool_calls, current_user_message, messages)
+            responses = await self._execute_parallel(
+                tool_calls, current_user_message, messages
+            )
 
         self.last_tool_responses = responses
         return responses
@@ -87,7 +91,12 @@ class ToolExecutionService:
                 tool_name = tool_calls[i].get("name", "unknown")
                 logger.error(f"Tool {tool_name} failed: {result}")
                 responses.append(
-                    {"role": "tool", "content": f"Error: {str(result)}", "tool_name": tool_name, "error": True}
+                    {
+                        "role": "tool",
+                        "content": f"Error: {str(result)}",
+                        "tool_name": tool_name,
+                        "error": True,
+                    }
                 )
             else:
                 responses.append(result)
@@ -106,7 +115,9 @@ class ToolExecutionService:
         responses = []
         for i, tool_call in enumerate(tool_calls):
             try:
-                result = await self._execute_single_tool(tool_call, current_user_message, messages)
+                result = await self._execute_single_tool(
+                    tool_call, current_user_message, messages
+                )
                 result["execution_order"] = i + 1
                 responses.append(result)
 
@@ -143,14 +154,20 @@ class ToolExecutionService:
             raise ToolExecutionError("unknown", "Tool name not provided")
 
         # Apply tool-specific modifications
-        modified_args = await self._apply_tool_modifications(tool_name, tool_args, current_user_message, messages)
+        modified_args = await self._apply_tool_modifications(
+            tool_name, tool_args, current_user_message, messages
+        )
 
         # Execute tool through registry with Streamlit context preserved
         loop = asyncio.get_event_loop()
 
         # Execute in thread pool with context preservation
         result = await loop.run_in_executor(
-            self.executor, run_with_streamlit_context, tool_registry.execute_tool, tool_name, modified_args
+            self.executor,
+            run_with_streamlit_context,
+            tool_registry.execute_tool,
+            tool_name,
+            modified_args,
         )
 
         # Format response
@@ -221,8 +238,14 @@ class ToolExecutionService:
 
             # If text refers to PDF content but no instructions provided, use user's question as instructions
             text_arg = modified_args.get("text", "").lower()
-            if ("pdf" in text_arg or "document" in text_arg) and "instructions" not in modified_args and user_content:
-                logger.info(f"Adding user question as instructions for PDF analysis: {user_content}")
+            if (
+                ("pdf" in text_arg or "document" in text_arg)
+                and "instructions" not in modified_args
+                and user_content
+            ):
+                logger.info(
+                    f"Adding user question as instructions for PDF analysis: {user_content}"
+                )
                 modified_args["instructions"] = user_content
 
         # Add image data for analyze_image tool
@@ -230,14 +253,23 @@ class ToolExecutionService:
             try:
                 import streamlit as st
 
-                if hasattr(st.session_state, 'current_image_base64') and st.session_state.current_image_base64:
-                    modified_args["image_base64"] = st.session_state.current_image_base64
-                    modified_args["filename"] = getattr(st.session_state, 'current_image_filename', 'Unknown')
+                if (
+                    hasattr(st.session_state, 'current_image_base64')
+                    and st.session_state.current_image_base64
+                ):
+                    modified_args["image_base64"] = (
+                        st.session_state.current_image_base64
+                    )
+                    modified_args["filename"] = getattr(
+                        st.session_state, 'current_image_filename', 'Unknown'
+                    )
                     logger.info(
                         f"Successfully added image data to analyze_image arguments - filename: {modified_args['filename']}, data length: {len(modified_args['image_base64'])}"
                     )
                 else:
-                    logger.warning("No image data found in session state for analyze_image tool")
+                    logger.warning(
+                        "No image data found in session state for analyze_image tool"
+                    )
 
                     # Try to get from session controller as fallback
                     try:
@@ -247,12 +279,16 @@ class ToolExecutionService:
                         latest_image = session_controller.get_latest_uploaded_image()
                         if latest_image and latest_image.get('image_data'):
                             modified_args["image_base64"] = latest_image['image_data']
-                            modified_args["filename"] = latest_image.get('filename', 'Unknown')
+                            modified_args["filename"] = latest_image.get(
+                                'filename', 'Unknown'
+                            )
                             logger.info(
                                 f"Retrieved image from session controller - filename: {modified_args['filename']}"
                             )
                         else:
-                            logger.warning("No image found in session controller either")
+                            logger.warning(
+                                "No image found in session controller either"
+                            )
                     except Exception as e:
                         logger.error(f"Error accessing session controller: {e}")
 
@@ -261,7 +297,9 @@ class ToolExecutionService:
 
         return modified_args
 
-    def _apply_tool_restrictions(self, tool_calls: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _apply_tool_restrictions(
+        self, tool_calls: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """Apply tool-specific restrictions"""
         # With automatic PDF injection, we no longer need special PDF tool restrictions
         return tool_calls

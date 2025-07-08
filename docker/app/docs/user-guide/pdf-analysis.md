@@ -23,16 +23,19 @@ The Streamlit Chat Application provides powerful PDF document analysis capabilit
 The system automatically selects the best strategy based on document size:
 
 ### Small Documents (≤5 pages)
+
 - Instant full analysis
 - All content processed at once
 - Fastest response times
 
 ### Medium Documents (6-50 pages)
+
 - Standard processing approach
 - Full document loaded into memory
 - Efficient for most use cases
 
 ### Large Documents (>50 pages)
+
 - **Automatic Batch Processing** (NEW)
 - Document split into 20-page batches
 - Memory-efficient storage and retrieval
@@ -76,16 +79,19 @@ For best results with large documents:
 Once your PDF is uploaded, try these types of questions:
 
 ### Summary Requests
+
 - "Summarize this document"
 - "What are the key points?"
 - "Give me the main takeaways"
 
 ### Specific Information
+
 - "What does the document say about [topic]?"
 - "Find all mentions of [keyword]"
 - "Extract all dates mentioned"
 
 ### Analysis Tasks
+
 - "What are the conclusions?"
 - "Identify any risks mentioned"
 - "List all recommendations"
@@ -101,6 +107,7 @@ Once your PDF is uploaded, try these types of questions:
 ## Progress Tracking
 
 For large documents, you'll see:
+
 - Progress percentage
 - Current processing phase
 - Estimated time remaining
@@ -109,16 +116,19 @@ For large documents, you'll see:
 ## Troubleshooting
 
 ### PDF Won't Upload
+
 - Check file size (default limit: 200MB)
 - Ensure PDF is not corrupted
 - Try a different PDF first
 
 ### Slow Processing
+
 - Large documents take more time
 - Complex PDFs with images may process slower
 - Check system resources
 
 ### Inaccurate Results
+
 - Ensure PDF has selectable text (not scanned images)
 - Be more specific in your queries
 - Try breaking complex questions into parts
@@ -126,14 +136,17 @@ For large documents, you'll see:
 ## Advanced Features
 
 ### Multiple PDFs
+
 - Upload a new PDF to replace the current one
 - Previous PDF context is cleared automatically
 
 ### Context Persistence
+
 - PDF content remains available throughout your session
 - Ask multiple questions without re-uploading
 
 ### Intelligent Context Injection
+
 - Relevant PDF sections are automatically included when you ask questions
 - No need to specify "in the PDF" - the system knows
 

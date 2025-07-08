@@ -37,7 +37,9 @@ def get_dimensions_from_aspect_ratio(aspect_ratio: str) -> Tuple[int, int]:
         ValueError: If aspect_ratio is not recognized
     """
     if aspect_ratio not in ASPECT_RATIO_MAPPINGS:
-        raise ValueError(f"Invalid aspect ratio '{aspect_ratio}'. Must be one of: {', '.join(ALLOWED_ASPECT_RATIOS)}")
+        raise ValueError(
+            f"Invalid aspect ratio '{aspect_ratio}'. Must be one of: {', '.join(ALLOWED_ASPECT_RATIOS)}"
+        )
 
     return ASPECT_RATIO_MAPPINGS[aspect_ratio]
 
@@ -49,9 +51,15 @@ class ImageGenerationResponse(BaseToolResponse):
     image_data: Optional[str] = Field(None, description="Base64 encoded image data")
     original_prompt: str = Field(description="Original user prompt")
     enhanced_prompt: str = Field(description="Enhanced prompt used for generation")
-    error_message: Optional[str] = Field(None, description="Error message if generation failed")
-    direct_response: bool = Field(False, description="Whether this is a direct response")
-    result: Optional[str] = Field(None, description="JSON string representation of the response")
+    error_message: Optional[str] = Field(
+        None, description="Error message if generation failed"
+    )
+    direct_response: bool = Field(
+        False, description="Whether this is a direct response"
+    )
+    result: Optional[str] = Field(
+        None, description="JSON string representation of the response"
+    )
 
 
 class ImageGenerationTool(BaseTool):
@@ -124,7 +132,9 @@ class ImageGenerationTool(BaseTool):
             },
         }
 
-    def _get_conversation_context(self, messages: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    def _get_conversation_context(
+        self, messages: List[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
         """
         Get conversation context for image generation using conversation_context tool
 
@@ -153,7 +163,9 @@ class ImageGenerationTool(BaseTool):
             if context_response and context_response.success:
                 summary = context_response.analysis
 
-            logger.info(f"Retrieved context - summary: {len(summary) if summary else 0} chars")
+            logger.info(
+                f"Retrieved context - summary: {len(summary) if summary else 0} chars"
+            )
 
             return {"summary": summary}
 
@@ -191,7 +203,9 @@ class ImageGenerationTool(BaseTool):
 
         try:
             # Initialize fast LLM client for prompt enhancement
-            fast_client = OpenAI(api_key=config.api_key, base_url=config.fast_llm_endpoint)
+            fast_client = OpenAI(
+                api_key=config.api_key, base_url=config.fast_llm_endpoint
+            )
 
             # Build context information
             context_info = ""
@@ -253,8 +267,12 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
 
             # Fallback validation - ensure we got a reasonable response
             if not enhanced_prompt or len(enhanced_prompt) < 20:
-                logger.warning("LLM enhancement produced insufficient result, falling back to basic enhancement")
-                return self._basic_prompt_fallback(user_prompt, subject, style, mood, details, conversation_context)
+                logger.warning(
+                    "LLM enhancement produced insufficient result, falling back to basic enhancement"
+                )
+                return self._basic_prompt_fallback(
+                    user_prompt, subject, style, mood, details, conversation_context
+                )
 
             logger.debug(f"LLM Enhanced prompt: '{user_prompt}' -> '{enhanced_prompt}'")
             return enhanced_prompt
@@ -262,7 +280,9 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
         except Exception as e:
             logger.error(f"Error in LLM prompt enhancement: {e}")
             # Fallback to basic enhancement if LLM fails
-            return self._basic_prompt_fallback(user_prompt, subject, style, mood, details, conversation_context)
+            return self._basic_prompt_fallback(
+                user_prompt, subject, style, mood, details, conversation_context
+            )
 
     def _basic_prompt_fallback(
         self,
@@ -328,17 +348,26 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
                         "natural",
                     ]
                 ]
-                enhanced_parts.extend(visual_keywords[:2])  # Add up to 2 relevant keywords
+                enhanced_parts.extend(
+                    visual_keywords[:2]
+                )  # Add up to 2 relevant keywords
 
         # Add quality enhancers for better results
         quality_enhancers = ["high quality", "detailed", "sharp focus", "professional"]
         enhanced_prompt = ", ".join(enhanced_parts + quality_enhancers)
 
-        logger.info(f"Basic fallback enhanced prompt: '{user_prompt}' -> '{enhanced_prompt}'")
+        logger.info(
+            f"Basic fallback enhanced prompt: '{user_prompt}' -> '{enhanced_prompt}'"
+        )
         return enhanced_prompt
 
     def _generate_image_with_config(
-        self, enhanced_prompt: str, config: ChatConfig, width: int = 512, height: int = 512, cfg_scale: float = 3.5,
+        self,
+        enhanced_prompt: str,
+        config: ChatConfig,
+        width: int = 512,
+        height: int = 512,
+        cfg_scale: float = 3.5,
     ) -> Optional[Image.Image]:
         """
         Generate image using the enhanced prompt and configuration
@@ -420,7 +449,9 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
         try:
             width, height = get_dimensions_from_aspect_ratio(aspect_ratio)
         except ValueError as e:
-            logger.warning(f"Invalid aspect ratio '{aspect_ratio}', defaulting to 'square': {e}")
+            logger.warning(
+                f"Invalid aspect ratio '{aspect_ratio}', defaulting to 'square': {e}"
+            )
             width, height = get_dimensions_from_aspect_ratio("square")
             aspect_ratio = "square"
 
@@ -450,10 +481,14 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
             }
             import json
 
-            return ImageGenerationResponse(**response_dict, result=json.dumps(response_dict))
+            return ImageGenerationResponse(
+                **response_dict, result=json.dumps(response_dict)
+            )
 
         # Generate the image
-        generated_image = self._generate_image_with_config(enhanced_prompt, config, width, height, cfg_scale)
+        generated_image = self._generate_image_with_config(
+            enhanced_prompt, config, width, height, cfg_scale
+        )
 
         if generated_image:
             # Handle the returned image data (it's already base64 string when return_bytes_io=False)
@@ -477,7 +512,9 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
                 if use_conversation_context and conversation_context:
                     result_dict["used_conversation_context"] = True
                     summary = conversation_context.get("summary", "")
-                    result_dict["context_summary"] = summary[:200] + "..." if len(summary) > 200 else summary
+                    result_dict["context_summary"] = (
+                        summary[:200] + "..." if len(summary) > 200 else summary
+                    )
                 else:
                     result_dict["used_conversation_context"] = False
 
@@ -502,7 +539,9 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
                 }
                 import json
 
-                return ImageGenerationResponse(**response_dict, result=json.dumps(response_dict))
+                return ImageGenerationResponse(
+                    **response_dict, result=json.dumps(response_dict)
+                )
         else:
             response_dict = {
                 "success": False,
@@ -513,7 +552,9 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
             }
             import json
 
-            return ImageGenerationResponse(**response_dict, result=json.dumps(response_dict))
+            return ImageGenerationResponse(
+                **response_dict, result=json.dumps(response_dict)
+            )
 
     def run_with_dict(self, params: Dict[str, Any]) -> ImageGenerationResponse:
         """
@@ -622,7 +663,9 @@ def execute_image_generation(
     )
 
 
-def execute_image_generation_with_dict(params: Dict[str, Any],) -> ImageGenerationResponse:
+def execute_image_generation_with_dict(
+    params: Dict[str, Any],
+) -> ImageGenerationResponse:
     """
     Execute image generation with parameters provided as a dictionary
 

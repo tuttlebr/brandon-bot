@@ -60,7 +60,13 @@ class FileStorageService:
             logger.error(f"Failed to create storage directories: {e}")
             raise FileProcessingError(f"Storage initialization failed: {e}")
 
-    def store_image(self, image_data: str, enhanced_prompt: str, original_prompt: str, session_id: str) -> str:
+    def store_image(
+        self,
+        image_data: str,
+        enhanced_prompt: str,
+        original_prompt: str,
+        session_id: str,
+    ) -> str:
         """
         Store image externally and return reference ID
 
@@ -140,7 +146,9 @@ class FileStorageService:
             logger.error(f"Failed to retrieve image {image_id}: {e}")
             return None
 
-    def store_uploaded_image(self, image_data: str, filename: str, file_type: str, session_id: str) -> str:
+    def store_uploaded_image(
+        self, image_data: str, filename: str, file_type: str, session_id: str
+    ) -> str:
         """
         Store uploaded image externally and return reference ID
 
@@ -221,7 +229,9 @@ class FileStorageService:
             logger.error(f"Failed to retrieve uploaded image {image_id}: {e}")
             return None
 
-    def store_pdf(self, filename: str, pdf_data: Dict[str, Any], session_id: str) -> str:
+    def store_pdf(
+        self, filename: str, pdf_data: Dict[str, Any], session_id: str
+    ) -> str:
         """
         Store PDF data externally and return reference ID
 
@@ -245,7 +255,9 @@ class FileStorageService:
             pdf_path = self.pdfs_dir / f"{pdf_id}.json"
             logger.debug(f"Storing PDF at: {pdf_path}")
             pdf_path.write_text(json.dumps(pdf_data, indent=2))
-            logger.debug(f"PDF stored successfully at: {pdf_path}, exists: {pdf_path.exists()}")
+            logger.debug(
+                f"PDF stored successfully at: {pdf_path}, exists: {pdf_path.exists()}"
+            )
 
             # Save metadata
             metadata = {
@@ -267,7 +279,9 @@ class FileStorageService:
             logger.error(f"Failed to store PDF: {e}")
             raise FileProcessingError(f"PDF storage failed: {e}")
 
-    def store_pdf_batch(self, filename: str, batch_data: Dict[str, Any], session_id: str, batch_num: int) -> str:
+    def store_pdf_batch(
+        self, filename: str, batch_data: Dict[str, Any], session_id: str, batch_num: int
+    ) -> str:
         """
         Store a batch of PDF pages
 
@@ -327,7 +341,9 @@ class FileStorageService:
                 logger.warning(f"PDF file not found: {pdf_path}")
                 # List available PDFs for debugging
                 available_pdfs = list(self.pdfs_dir.glob("*.json"))
-                logger.debug(f"Available PDFs in storage: {[p.name for p in available_pdfs]}")
+                logger.debug(
+                    f"Available PDFs in storage: {[p.name for p in available_pdfs]}"
+                )
                 return None
 
             pdf_data = json.loads(pdf_path.read_text())
@@ -341,7 +357,9 @@ class FileStorageService:
                 if not filename:
                     # If no filename in metadata, try to derive from PDF data or use a default
                     filename = pdf_data.get('filename', f'{pdf_id}.pdf')
-                    logger.warning(f"No filename in metadata for {pdf_id}, using: {filename}")
+                    logger.warning(
+                        f"No filename in metadata for {pdf_id}, using: {filename}"
+                    )
 
                 pdf_data['filename'] = filename
                 # Optionally add other metadata fields if needed
@@ -350,10 +368,14 @@ class FileStorageService:
                 # If no metadata, ensure we still have a filename
                 if 'filename' not in pdf_data or not pdf_data['filename']:
                     pdf_data['filename'] = f'{pdf_id}.pdf'
-                    logger.warning(f"No metadata found for {pdf_id}, using filename: {pdf_data['filename']}")
+                    logger.warning(
+                        f"No metadata found for {pdf_id}, using filename: {pdf_data['filename']}"
+                    )
                 pdf_data['pdf_id'] = pdf_id
 
-            logger.debug(f"Retrieved PDF {pdf_id} with filename: {pdf_data.get('filename')}")
+            logger.debug(
+                f"Retrieved PDF {pdf_id} with filename: {pdf_data.get('filename')}"
+            )
             return pdf_data
 
         except Exception as e:
@@ -518,7 +540,9 @@ class FileStorageService:
 
         # Define limits upfront
         max_count = (
-            config.session.MAX_IMAGES_IN_SESSION if file_type == "images" else config.session.MAX_PDFS_IN_SESSION
+            config.session.MAX_IMAGES_IN_SESSION
+            if file_type == "images"
+            else config.session.MAX_PDFS_IN_SESSION
         )
         max_size = 100 * 1024 * 1024  # 100MB
 
@@ -549,10 +573,14 @@ class FileStorageService:
 
             # Check limits
             if count >= max_count:
-                raise MemoryLimitError(f"{file_type.title()} limit exceeded: {count}/{max_count}")
+                raise MemoryLimitError(
+                    f"{file_type.title()} limit exceeded: {count}/{max_count}"
+                )
 
             if total_size > max_size:
-                raise MemoryLimitError(f"Storage limit exceeded: {total_size / (1024*1024):.1f}MB")
+                raise MemoryLimitError(
+                    f"Storage limit exceeded: {total_size / (1024*1024):.1f}MB"
+                )
 
         except MemoryLimitError:
             raise
@@ -567,7 +595,11 @@ class FileStorageService:
             stats = {
                 "total_images": len(list(self.images_dir.glob("*.png"))),
                 "total_pdfs": len(list(self.pdfs_dir.glob("*.json"))),
-                "total_size_mb": sum(f.stat().st_size for f in self.storage_path.rglob("*") if f.is_file())
+                "total_size_mb": sum(
+                    f.stat().st_size
+                    for f in self.storage_path.rglob("*")
+                    if f.is_file()
+                )
                 / (1024 * 1024),
             }
             return stats
