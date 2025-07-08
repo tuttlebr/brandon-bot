@@ -59,4 +59,4 @@ repos:
     rev: v3.3.7
     hooks:
       - id: pylint
-        args: [--disable=all, --enable=unreachable]
+        args: [--enable=all]
