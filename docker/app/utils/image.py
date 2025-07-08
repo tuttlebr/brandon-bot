@@ -38,8 +38,6 @@ HTTP_HEADERS = {"Accept": "application/json", "Content-Type": "application/json"
 class ImageProcessingError(Exception):
     """Custom exception for image processing errors."""
 
-    pass
-
 
 class ImageProcessingRequest(BaseModel):
     """

@@ -6,7 +6,7 @@ It splits PDFs into manageable chunks and processes them sequentially.
 """
 
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 from utils.config import config
 

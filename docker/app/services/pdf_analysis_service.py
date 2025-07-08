@@ -7,7 +7,7 @@ by processing pages in batches and combining relevant findings.
 
 import asyncio
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List
 
 from models.chat_config import ChatConfig
 from utils.batch_processor import BatchProcessor, DocumentProcessor

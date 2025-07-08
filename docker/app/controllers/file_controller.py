@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import tempfile
-import time
 from typing import Tuple
 
 import requests

@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 
 from models.chat_config import ChatConfig
 from services.llm_client_service import llm_client_service
-from utils.batch_processor import BatchProcessor, DocumentProcessor
+from utils.batch_processor import DocumentProcessor
 from utils.config import config as app_config
 
 logger = logging.getLogger(__name__)

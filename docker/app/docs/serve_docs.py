@@ -5,10 +5,10 @@ Documentation API Server - Enhanced version with better navigation and content h
 
 import re
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 # Initialize FastAPI app
@@ -835,7 +835,7 @@ async def api_search(q: str = ""):
 
                 if len(results) >= 20:
                     break
-        except Exception as e:
+        except Exception:
             continue
 
     return JSONResponse({"query": q, "results": results})

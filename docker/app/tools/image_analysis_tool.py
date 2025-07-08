@@ -7,7 +7,6 @@ This tool analyzes uploaded images using vision-capable language models.
 import logging
 from typing import Any, Dict
 
-import streamlit as st
 from pydantic import Field
 from tools.base import BaseTool, BaseToolResponse
 

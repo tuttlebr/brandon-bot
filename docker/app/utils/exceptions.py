@@ -9,13 +9,9 @@ and debugging throughout the application.
 class ChatbotException(Exception):
     """Base exception for all chatbot-related errors"""
 
-    pass
-
 
 class ConfigurationError(ChatbotException):
     """Raised when there's an error in configuration"""
-
-    pass
 
 
 class ToolExecutionError(ChatbotException):
@@ -29,28 +25,18 @@ class ToolExecutionError(ChatbotException):
 class LLMServiceError(ChatbotException):
     """Raised when LLM service encounters an error"""
 
-    pass
-
 
 class StreamingError(ChatbotException):
     """Raised when streaming response fails"""
-
-    pass
 
 
 class ValidationError(ChatbotException):
     """Raised when input validation fails"""
 
-    pass
-
 
 class FileProcessingError(ChatbotException):
     """Raised when file processing fails"""
 
-    pass
-
 
 class MemoryLimitError(ChatbotException):
     """Raised when memory limits are exceeded"""
-
-    pass

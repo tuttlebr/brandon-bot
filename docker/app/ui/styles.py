@@ -1,6 +1,3 @@
-import streamlit as st
-
-
 def apply_custom_styles():
     """Apply custom CSS styling to the Streamlit application"""
     # st.markdown(
