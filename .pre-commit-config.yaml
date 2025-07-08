@@ -55,3 +55,8 @@ repos:
             --remove-unused-variables,
             --ignore-init-module-imports,
           ]
+  - repo: https://github.com/PyCQA/pylint
+    rev: v3.3.7
+    hooks:
+      - id: pylint
+        args: [--disable=all, --enable=unreachable]

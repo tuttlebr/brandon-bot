@@ -1,4 +1,3 @@
-import json
 import logging
 import random
 import time
@@ -100,7 +99,6 @@ class ProductionStreamlitChatApp:
 
             # Display user message with centralized configuration
             with st.chat_message("user", avatar=self.config_obj.user_avatar):
-                # truncated_prompt = self.message_controller.truncate_long_prompt(prompt)
                 st.markdown(prompt)
 
             # Validate prompt using controller with proper error handling
@@ -181,8 +179,8 @@ class ProductionStreamlitChatApp:
 
         if processing_status == "processing":
             # Show processing status
-            processing_file = getattr(st.session_state, "pdf_processing_file", "Unknown")
-            processing_start = getattr(st.session_state, "pdf_processing_start_time", time.time())
+            getattr(st.session_state, "pdf_processing_file", "Unknown")
+            getattr(st.session_state, "pdf_processing_start_time", time.time())
 
         elif processing_status == "completed":
             # Show completion message
@@ -362,6 +360,7 @@ class ProductionStreamlitChatApp:
                 if latest_image:
                     filename = latest_image.get("filename", "Unknown")
                     st.success(f"✅ Current Image: {filename}")
+                    st.image(latest_image["file_path"])
 
                     if st.button("🗑️ Remove Current Image", help="Remove the current image from session",):
                         self.session_controller.clear_uploaded_images()

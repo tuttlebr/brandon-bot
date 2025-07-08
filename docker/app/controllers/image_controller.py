@@ -90,7 +90,7 @@ class ImageController:
             # Read the image file and convert to base64
             with open(temp_file_path, "rb") as image_file:
                 image_bytes = image_file.read()
-                image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+                image_base64 = base64.b64encode(image_bytes).decode("utf-8")
 
             # Get file type from uploaded file
             file_type = uploaded_file.type if uploaded_file.type else "image/png"
@@ -129,8 +129,17 @@ class ImageController:
             # Store image in session controller
             if self.session_controller:
                 image_id = self.session_controller.store_uploaded_image(
-                    image_data["image_data"], image_data["filename"], image_data["file_type"]
+                    image_data["image_data"], image_data["filename"], image_data["file_type"],
                 )
+
+                # Get the stored image data to retrieve the file path
+                stored_image_data = self.session_controller.get_latest_uploaded_image()
+                if stored_image_data and "file_path" in stored_image_data:
+                    # Add the file path to the image_data dict
+                    image_data["file_object"] = stored_image_data["file_path"]
+                    logging.info(f"Added file path to image_data: {stored_image_data['file_path']}")
+                else:
+                    logging.warning("Could not retrieve file path for stored image")
 
                 # Store the image data in session state for easy access
                 st.session_state.current_image_base64 = image_data["image_data"]
