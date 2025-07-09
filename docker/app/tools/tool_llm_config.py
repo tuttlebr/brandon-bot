@@ -13,12 +13,12 @@ TOOL_LLM_TYPES = {
     "tavily_news_search": "llm",
     "tavily_internet_search": "fast",
     "retrieval_search": "llm",
-    "retrieve_pdf_summary": "llm",
-    "process_pdf_text": "llm",
+    "retrieve_pdf_summary": "intelligent",
+    "process_pdf_text": "intelligent",
     "text_assistant": "intelligent",
     "generate_image": "fast",
     "analyze_image": "vlm",
-    "tool_selection": "intelligent",
+    "tool_selection": "llm",
 }
 
 # Default LLM type if not specified

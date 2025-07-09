@@ -5,7 +5,7 @@
     "prettier": "3.6.2"
   },
   "lint-staged": {
-    "*.{js,css,md}": "prettier --write"
+    "*.{markdown,yaml,json,js,css,md}": "prettier --write"
   },
   "scripts": {
     "prepare": "husky install"

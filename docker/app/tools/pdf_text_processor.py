@@ -50,7 +50,7 @@ class PDFTextProcessorTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "process_pdf_text"
-        self.description = "ONLY use this when explicitly asked to perform text processing on PDF pages or when the user specifically mentions processing, analyzing, or working with specific pages of a PDF document. Performs text processing operations (summarize, proofread, rewrite, translate, Q&A) on specific pages or sections of PDF documents. For Q&A tasks, use when the user asks questions about the PDF content. DO NOT use for general questions, web searches, or when no PDF is being discussed."
+        self.description = "ONLY use this when explicitly asked to perform text processing on PDF pages or when the user specifically mentions processing, analyzing, or working with specific pages of a PDF document. Performs text processing operations (summarize, proofread, rewrite, translate, Q&A) on specific pages or sections of PDF documents. For Q&A tasks, use when the user asks questions about the PDF content. DO NOT use for general questions, web searches, or when no PDF is being discussed. Only answer the question the user asks, do not provide any other information and ignore irrelevant or confusing information."
         self.supported_contexts = ['pdf_analysis']
 
     def to_openai_format(self) -> Dict[str, Any]:

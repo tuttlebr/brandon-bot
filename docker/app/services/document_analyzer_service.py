@@ -66,7 +66,7 @@ class DocumentAnalyzerService:
             client = llm_client_service.get_async_client(self.llm_type)
             model_name = llm_client_service.get_model_name(self.llm_type)
 
-            system_prompt = f"""You are analyzing a {document_type} to gather information which will be used to provide a direct answer to the user's question or instructions: {instructions}"""
+            system_prompt = f"""You are analyzing a {document_type} to gather information and omit irrelevant or confusing information which will be used to provide a direct answer to the user's question or instructions: {instructions}"""
 
             if filename:
                 user_message = f"Based on the document '{filename}', please answer this question: {instructions}\n\nDocument:\n{document_text}"
