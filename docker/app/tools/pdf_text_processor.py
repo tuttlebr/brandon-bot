@@ -174,7 +174,6 @@ class PDFTextProcessorTool(BaseTool):
             # For batch PDFs without specific pages, process the complete document
             pages_to_process = list(range(1, total_pages + 1))
 
-
         if not pages_to_process:
             return PDFTextProcessorResponse(
                 success=False,
@@ -488,7 +487,6 @@ class PDFTextProcessorTool(BaseTool):
             # For batch PDFs without specific pages, process the complete document
             pages_to_process = list(range(1, total_pages + 1))
 
-
         if not pages_to_process:
             return PDFTextProcessorResponse(
                 success=False,
@@ -595,7 +593,9 @@ class PDFTextProcessorTool(BaseTool):
 
         # If we have multiple batch results, combine them hierarchically
         if len(batch_results) > 1:
-            return self._combine_batch_results(batch_results, task_type, instructions, question)
+            return self._combine_batch_results(
+                batch_results, task_type, instructions, question
+            )
         else:
             return batch_results[0]
 
@@ -652,7 +652,12 @@ class PDFTextProcessorTool(BaseTool):
 
             # Process the batch directly
             return self._process_text(
-                task_type, batch_text, instructions, question, source_language, target_language
+                task_type,
+                batch_text,
+                instructions,
+                question,
+                source_language,
+                target_language,
             )
 
         except Exception as e:

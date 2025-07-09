@@ -513,7 +513,6 @@ class PDFContextService:
             total_pages = pdf_data.get('total_pages', 0)
             page_numbers = list(range(1, total_pages + 1))
 
-
         # Remove duplicates and sort
         page_numbers = sorted(set(page_numbers))
         logger.info(f"Requesting pages: {page_numbers}")

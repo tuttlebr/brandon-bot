@@ -165,7 +165,7 @@ class TextProcessorService:
             # Run all chunk processing tasks concurrently
             chunk_results = await asyncio.gather(
                 *[process_chunk_async(i, chunk) for i, chunk in enumerate(chunks)],
-                return_exceptions=True
+                return_exceptions=True,
             )
 
             # Handle any exceptions in results
@@ -173,10 +173,12 @@ class TextProcessorService:
             for i, result in enumerate(chunk_results):
                 if isinstance(result, Exception):
                     logger.error(f"Chunk {i+1} failed with exception: {result}")
-                    processed_results.append(f"Section {i+1} processing failed due to error: {str(result)}")
+                    processed_results.append(
+                        f"Section {i+1} processing failed due to error: {str(result)}"
+                    )
                 else:
                     processed_results.append(result)
-            
+
             chunk_results = processed_results
 
             if not chunk_results:

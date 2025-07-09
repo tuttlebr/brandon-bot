@@ -60,15 +60,15 @@ class LLMClientService:
         return httpx.AsyncClient(
             limits=httpx.Limits(
                 max_keepalive_connections=20,  # Keep connections alive
-                max_connections=100,           # Allow many concurrent connections
-                keepalive_expiry=30,          # Keep connections alive for 30 seconds
+                max_connections=100,  # Allow many concurrent connections
+                keepalive_expiry=30,  # Keep connections alive for 30 seconds
             ),
             timeout=httpx.Timeout(
-                connect=30.0,    # 30 seconds to connect
-                read=300.0,      # 5 minutes to read response (for long LLM calls)
-                write=30.0,      # 30 seconds to write request
-                pool=10.0        # 10 seconds to get connection from pool
-            )
+                connect=30.0,  # 30 seconds to connect
+                read=300.0,  # 5 minutes to read response (for long LLM calls)
+                write=30.0,  # 30 seconds to write request
+                pool=10.0,  # 10 seconds to get connection from pool
+            ),
         )
 
     def get_client(
@@ -163,7 +163,7 @@ class LLMClientService:
         # Create new async client based on type with optimized HTTP client
         try:
             http_client = self._create_async_http_client()
-            
+
             if llm_type == "fast":
                 client = AsyncOpenAI(
                     api_key=self._config.api_key,
@@ -172,7 +172,7 @@ class LLMClientService:
                 )
             elif llm_type == "llm":
                 client = AsyncOpenAI(
-                    api_key=self._config.api_key, 
+                    api_key=self._config.api_key,
                     base_url=self._config.llm_endpoint,
                     http_client=http_client,
                 )
@@ -184,7 +184,7 @@ class LLMClientService:
                 )
             elif llm_type == "vlm":
                 client = AsyncOpenAI(
-                    api_key=self._config.api_key, 
+                    api_key=self._config.api_key,
                     base_url=self._config.vlm_endpoint,
                     http_client=http_client,
                 )
@@ -193,7 +193,9 @@ class LLMClientService:
 
             # Cache the client
             self._async_clients[llm_type] = client
-            logger.debug(f"Created {llm_type} async LLM client with concurrent connection support")
+            logger.debug(
+                f"Created {llm_type} async LLM client with concurrent connection support"
+            )
 
             return client
 

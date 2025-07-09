@@ -199,14 +199,14 @@ class PDFSummarizationService:
 
         # Create all batches
         batches = [
-            page_summaries[i:i + batch_size] 
+            page_summaries[i : i + batch_size]
             for i in range(0, len(page_summaries), batch_size)
         ]
 
         # Run all intermediate summary tasks concurrently
         intermediate_results = await asyncio.gather(
             *[create_intermediate_batch_summary(batch) for batch in batches],
-            return_exceptions=True
+            return_exceptions=True,
         )
 
         # Process results

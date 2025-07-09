@@ -52,6 +52,7 @@ class BaseTool(ABC):
         self._name = value
         if value:  # Only set if name is not empty
             from tools.tool_llm_config import get_tool_llm_type
+
             self.llm_type = get_tool_llm_type(value)
 
     def get_definition(self) -> Dict[str, Any]:

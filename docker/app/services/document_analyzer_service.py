@@ -151,7 +151,7 @@ class DocumentAnalyzerService:
             # Run all chunk processing tasks concurrently
             chunk_results_raw = await asyncio.gather(
                 *[process_chunk_async(i, chunk) for i, chunk in enumerate(chunks)],
-                return_exceptions=True
+                return_exceptions=True,
             )
 
             # Handle any exceptions in results
@@ -159,7 +159,9 @@ class DocumentAnalyzerService:
             for i, result in enumerate(chunk_results_raw):
                 if isinstance(result, Exception):
                     logger.error(f"Chunk {i+1} failed with exception: {result}")
-                    chunk_results.append(f"Section {i+1} processing failed due to error: {str(result)}")
+                    chunk_results.append(
+                        f"Section {i+1} processing failed due to error: {str(result)}"
+                    )
                 else:
                     chunk_results.append(result)
 
@@ -267,7 +269,6 @@ class DocumentAnalyzerService:
                 "error": "The document appears to be empty or contains no extractable text.",
             }
 
-
         # Categorize document and route appropriately
         doc_size = DocumentProcessor.categorize_document_size(total_pages)
 
@@ -279,7 +280,9 @@ class DocumentAnalyzerService:
             if doc_size == "small":
                 return await self._analyze_small_document(pages, instructions, filename)
             elif doc_size == "medium":
-                return await self._analyze_medium_document(pages, instructions, filename)
+                return await self._analyze_medium_document(
+                    pages, instructions, filename
+                )
             else:  # large
                 return await self._analyze_large_document(pages, instructions, filename)
         except Exception as e:
@@ -307,7 +310,9 @@ class DocumentAnalyzerService:
             # Determine actual page numbers for this batch
             if batch_pages:
                 start_page_num = batch_pages[0].get('page', i + 1)
-                end_page_num = batch_pages[-1].get('page', min(i + batch_size, len(pages)))
+                end_page_num = batch_pages[-1].get(
+                    'page', min(i + batch_size, len(pages))
+                )
             else:
                 start_page_num = i + 1
                 end_page_num = min(i + batch_size, len(pages))
@@ -333,14 +338,13 @@ class DocumentAnalyzerService:
 
         # Create all batches
         batches = [
-            (i, pages[i:i + batch_size]) 
-            for i in range(0, len(pages), batch_size)
+            (i, pages[i : i + batch_size]) for i in range(0, len(pages), batch_size)
         ]
 
         # Run all batch processing tasks concurrently
         batch_results_raw = await asyncio.gather(
             *[process_batch_async(i, batch_pages) for i, batch_pages in batches],
-            return_exceptions=True
+            return_exceptions=True,
         )
 
         # Filter out None results and exceptions
@@ -352,7 +356,9 @@ class DocumentAnalyzerService:
                 batch_results.append(result)
 
         # Synthesize results
-        return await self._synthesize_batch_results(batch_results, instructions, filename)
+        return await self._synthesize_batch_results(
+            batch_results, instructions, filename
+        )
 
     async def _analyze_large_document(
         self, pages: List[Dict[str, Any]], instructions: str, filename: str
@@ -365,9 +371,7 @@ class DocumentAnalyzerService:
 
         # Process ALL pages in batches for relevant analysis
         # Use medium document approach but with larger batches for efficiency
-        batch_size = max(
-            20, len(pages) // 10
-        ) 
+        batch_size = max(20, len(pages) // 10)
 
         # Create async function for processing each large batch
         async def process_large_batch_async(i: int, batch_pages: List[Dict[str, Any]]):
@@ -403,14 +407,16 @@ class DocumentAnalyzerService:
 
         # Create all large batches
         large_batches = [
-            (i, pages[i:i + batch_size]) 
-            for i in range(0, len(pages), batch_size)
+            (i, pages[i : i + batch_size]) for i in range(0, len(pages), batch_size)
         ]
 
         # Run all large batch processing tasks concurrently
         batch_results_raw = await asyncio.gather(
-            *[process_large_batch_async(i, batch_pages) for i, batch_pages in large_batches],
-            return_exceptions=True
+            *[
+                process_large_batch_async(i, batch_pages)
+                for i, batch_pages in large_batches
+            ],
+            return_exceptions=True,
         )
 
         # Filter out None results and exceptions
@@ -422,7 +428,9 @@ class DocumentAnalyzerService:
                 batch_results.append(result)
 
         # Synthesize results from ALL batches
-        return await self._synthesize_batch_results(batch_results, instructions, filename)
+        return await self._synthesize_batch_results(
+            batch_results, instructions, filename
+        )
 
     async def _synthesize_batch_results(
         self, batch_results: List[Dict[str, str]], instructions: str, filename: str
@@ -439,6 +447,7 @@ class DocumentAnalyzerService:
             )
             intermediate_summaries = []
             intermediate_batch_size = 5
+
             # Create all the async tasks for intermediate summaries
             async def create_intermediate_summary(chunk):
                 chunk_findings = "\n\n".join(
@@ -454,19 +463,19 @@ class DocumentAnalyzerService:
                 return await self.analyze_document(
                     chunk_findings, synthesis_instruction, "analysis results", None
                 )
-            
+
             # Create chunks and tasks
             chunks = [
                 batch_results[i : i + intermediate_batch_size]
                 for i in range(0, len(batch_results), intermediate_batch_size)
             ]
-            
+
             # Run all intermediate summary tasks concurrently
             intermediate_results = await asyncio.gather(
                 *[create_intermediate_summary(chunk) for chunk in chunks],
-                return_exceptions=True
+                return_exceptions=True,
             )
-            
+
             # Process results
             for result in intermediate_results:
                 if not isinstance(result, Exception) and result.get("success"):

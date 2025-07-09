@@ -61,18 +61,14 @@ class PDFAnalysisService:
 
             # For batch-processed PDFs, load the complete document
             if pdf_data.get("batch_processed", False):
-                logger.info(
-                    f"Loading complete document from batches for analysis"
-                )
+                logger.info(f"Loading complete document from batches for analysis")
                 complete_pages = await self._load_complete_document_from_batches(
                     pdf_data
                 )
                 if complete_pages:
                     pages = complete_pages
                     total_pages = len(pages)
-                    logger.info(
-                        f"Loaded {total_pages} pages from batches for analysis"
-                    )
+                    logger.info(f"Loaded {total_pages} pages from batches for analysis")
 
             # Use DocumentProcessor to categorize and route appropriately
             doc_size = DocumentProcessor.categorize_document_size(total_pages)
@@ -184,9 +180,7 @@ When analyzing documents, thoroughly understand the content, context, and purpos
     ) -> str:
         """Analyze large documents by processing ALL pages in detail"""
         try:
-            logger.info(
-                f"Starting analysis of all {len(pages)} pages for '{filename}'"
-            )
+            logger.info(f"Starting analysis of all {len(pages)} pages for '{filename}'")
 
             # Use batched analysis for ALL pages (not just relevant ones)
             return await self._analyze_document_batched(pages, user_query, filename)

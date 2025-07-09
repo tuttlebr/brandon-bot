@@ -134,7 +134,7 @@ class SystemPromptManager:
 
 {description}
 
-Remember to maintain your core personality and conversational style while performing {context} tasks. 
+Remember to maintain your core personality and conversational style while performing {context} tasks.
 
 CRITICAL: You must synthesize tool outputs into a single, unified response. Do not provide step-by-step reasoning or show your work. Extract only the essential information that directly answers the user's question and present it as one coherent train of thought in your natural voice."""
 

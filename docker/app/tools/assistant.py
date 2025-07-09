@@ -144,7 +144,7 @@ class AssistantTool(BaseTool):
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-        
+
         return loop.run_until_complete(self._run_async(**params))
 
     async def _run_async(
@@ -195,7 +195,9 @@ class AssistantTool(BaseTool):
         elif task_enum == AssistantTaskType.QA:
             return await self._handle_qa(text, question, instructions, messages)
         else:
-            return await self._handle_text_processing(task_enum, text, instructions, messages)
+            return await self._handle_text_processing(
+                task_enum, text, instructions, messages
+            )
 
     def _prepare_text_with_context(
         self, text: str, messages: Optional[List[Dict[str, Any]]]
@@ -320,15 +322,17 @@ class AssistantTool(BaseTool):
         messages: Optional[List[Dict[str, Any]]],
     ) -> AssistantResponse:
         """Handle Q&A tasks for document content"""
-        
+
         if not question:
             raise ValueError("Question parameter is required for Q&A tasks")
-        
+
         # Prepare instructions for Q&A
-        qa_instructions = f"Answer the following question based on the document content: {question}"
+        qa_instructions = (
+            f"Answer the following question based on the document content: {question}"
+        )
         if instructions:
             qa_instructions += f"\n\nAdditional instructions: {instructions}"
-        
+
         # Use the document analyzer for Q&A tasks on PDFs
         if self._is_pdf_content(text):
             # Parse PDF pages from context
@@ -337,7 +341,9 @@ class AssistantTool(BaseTool):
                 # For Q&A, try to load the complete document
                 complete_pages = self._load_complete_document_for_analysis(pages)
                 if complete_pages:
-                    logger.info(f"Loaded complete document with {len(complete_pages)} pages for Q&A")
+                    logger.info(
+                        f"Loaded complete document with {len(complete_pages)} pages for Q&A"
+                    )
                     result = await self.document_analyzer.analyze_pdf_pages(
                         complete_pages, qa_instructions, "Document"
                     )
@@ -348,10 +354,14 @@ class AssistantTool(BaseTool):
                     )
             else:
                 # Fallback to regular document analysis
-                result = await self.document_analyzer.analyze_document(text, qa_instructions)
+                result = await self.document_analyzer.analyze_document(
+                    text, qa_instructions
+                )
         else:
             # Regular document Q&A
-            result = await self.document_analyzer.analyze_document(text, qa_instructions)
+            result = await self.document_analyzer.analyze_document(
+                text, qa_instructions
+            )
 
         if result["success"]:
             return AssistantResponse(
@@ -525,7 +535,6 @@ class AssistantTool(BaseTool):
                 logger.info(
                     f"Successfully loaded {len(all_pages)} pages from batches for analysis"
                 )
-
 
                 return all_pages
             else:
