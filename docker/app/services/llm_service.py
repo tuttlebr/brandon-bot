@@ -135,6 +135,7 @@ class LLMService:
             content, tool_calls = self.parsing_service.parse_response(response)
 
             # If there are tool calls, execute them and stream the response
+            logger.info(f"All tool calls: {tool_calls}")
             if tool_calls:
                 # Log which tools were selected (without arguments to avoid logging base64 data)
                 tool_names = [tc.get("name", "unknown") for tc in tool_calls]

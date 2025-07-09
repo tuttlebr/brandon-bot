@@ -18,11 +18,11 @@ TOOL_LLM_TYPES = {
     "text_assistant": "intelligent",  # Complex text processing tasks
     "image_gen": "fast",  # Complex prompt enhancement for image generation
     "analyze_image": "vlm",  # Vision analysis requires vlm model
-    "tool_selection": "llm",  # Tool selection, no reasoning - determines which tools to use for user queries
+    "tool_selection": "intelligent",  # Tool selection, no reasoning - determines which tools to use for user queries
 }
 
 # Default LLM type if not specified
-DEFAULT_LLM_TYPE = "llm"
+DEFAULT_LLM_TYPE = "intelligent"
 
 
 def get_tool_llm_type(tool_name: str) -> str:

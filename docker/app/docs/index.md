@@ -10,6 +10,15 @@ The models are optimized for different computing platforms: Nano for cost-effici
 
 The Nemotron models are commercially viable with an open license that allows for customization and data control.
 
+### 🤖 NVIDIA Nemotron Models
+
+Build enterprise agentic AI with benchmark-winning open reasoning and multimodal foundation models. This app is powered by NVIDIA's state-of-the-art language models, offering specialized models for different use cases:
+
+- **llama-3.1-nemotron-nano-8b-v1 (fast)**: Leading reasoning and agentic AI accuracy model for PC and edge.
+- **llama-3.3-nemotron-super-49b-v1 (llm)**: High efficiency model with leading accuracy for reasoning, tool calling, chat, and instruction following.
+- **llama-3.1-nemotron-ultra-253b-v1 (intelligent)**: Superior inference efficiency with highest accuracy for scientific and complex math reasoning, coding, tool calling, and instruction following.
+- **llama-3.1-nemotron-nano-vl-8b-v1 (vlm)**: Multi-modal vision-language model that understands text/img and creates informative responses.
+
 ## Overview
 
 This application provides a sophisticated chat interface powered by NVIDIA's language models, featuring:

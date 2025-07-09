@@ -362,6 +362,9 @@ class FileStorageService:
                     )
 
                 pdf_data['filename'] = filename
+                # Add total_pages from metadata to pdf_data
+                total_pages = metadata.get('total_pages', 0)
+                pdf_data['total_pages'] = total_pages
                 # Optionally add other metadata fields if needed
                 pdf_data['pdf_id'] = metadata.get('pdf_id', pdf_id)
             else:
@@ -372,6 +375,8 @@ class FileStorageService:
                         f"No metadata found for {pdf_id}, using filename: {pdf_data['filename']}"
                     )
                 pdf_data['pdf_id'] = pdf_id
+                # Calculate total_pages from pages if metadata not available
+                pdf_data['total_pages'] = len(pdf_data.get('pages', []))
 
             logger.debug(
                 f"Retrieved PDF {pdf_id} with filename: {pdf_data.get('filename')}"
@@ -447,6 +452,7 @@ class FileStorageService:
             'filename': filename,
             'pdf_id': pdf_id,
             'pages': merged_pages,
+            'total_pages': len(merged_pages),
             'batch_processed': True,
             'total_batches': len(batches),
         }

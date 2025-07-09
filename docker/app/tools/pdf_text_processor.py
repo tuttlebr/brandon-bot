@@ -1,7 +1,7 @@
 """
 PDF Text Processor Tool
 
-This tool enables text processing tasks (summarize, proofread, rewrite, etc.)
+This tool enables text processing tasks (summarize, proofread, rewrite, translate, Q&A, etc.)
 on PDF content with automatic chunking for large documents.
 """
 
@@ -43,12 +43,14 @@ class PDFTextProcessorTool(BaseTool):
 
     This tool performs text processing tasks on PDF content,
     automatically handling chunking for large documents.
+    Supports summarization, proofreading, rewriting, translation,
+    and Q&A tasks on PDF documents.
     """
 
     def __init__(self):
         super().__init__()
         self.name = "process_pdf_text"
-        self.description = "ONLY use this when explicitly asked to perform text processing on PDF pages or when the user specifically mentions processing, analyzing, or working with specific pages of a PDF document. Performs text processing operations (summarize, proofread, rewrite, translate) on specific pages or sections of PDF documents. DO NOT use for general questions, web searches, or when no PDF is being discussed."
+        self.description = "ONLY use this when explicitly asked to perform text processing on PDF pages or when the user specifically mentions processing, analyzing, or working with specific pages of a PDF document. Performs text processing operations (summarize, proofread, rewrite, translate, Q&A) on specific pages or sections of PDF documents. For Q&A tasks, use when the user asks questions about the PDF content. DO NOT use for general questions, web searches, or when no PDF is being discussed."
         self.supported_contexts = ['pdf_analysis']
 
     def to_openai_format(self) -> Dict[str, Any]:
@@ -70,6 +72,7 @@ class PDFTextProcessorTool(BaseTool):
                                 "critic",
                                 "writer",
                                 "translate",
+                                "qa",
                             ],
                             "description": "The type of text processing task to perform",
                         },
@@ -81,6 +84,10 @@ class PDFTextProcessorTool(BaseTool):
                         "instructions": {
                             "type": "string",
                             "description": "Optional specific instructions for the task (e.g., 'make it more formal', 'focus on methodology')",
+                        },
+                        "question": {
+                            "type": "string",
+                            "description": "The question to ask about the document (required for Q&A tasks)",
                         },
                         "source_language": {
                             "type": "string",
@@ -113,6 +120,7 @@ class PDFTextProcessorTool(BaseTool):
         task_type = params.get("task_type")
         page_numbers = params.get("page_numbers", [])
         instructions = params.get("instructions", "")
+        question = params.get("question", "")
         source_language = params.get("source_language")
         target_language = params.get("target_language")
         messages = params.get("messages", [])
@@ -131,6 +139,18 @@ class PDFTextProcessorTool(BaseTool):
                 direct_response=True,
             )
 
+        # Validate Q&A task has question parameter
+        if task_type == "qa" and not question:
+            return PDFTextProcessorResponse(
+                success=False,
+                filename="Unknown",
+                task_type=task_type,
+                pages_processed=[],
+                result="",
+                message="Question parameter is required for Q&A tasks.",
+                direct_response=True,
+            )
+
         filename = pdf_data.get("filename", "Unknown")
         pages = pdf_data.get("pages", [])
         total_pages = len(pages)
@@ -142,6 +162,7 @@ class PDFTextProcessorTool(BaseTool):
                 task_type,
                 page_numbers,
                 instructions,
+                question,
                 source_language,
                 target_language,
             )
@@ -184,6 +205,7 @@ class PDFTextProcessorTool(BaseTool):
                 extracted_text,
                 pages_to_process,
                 instructions,
+                question,
                 source_language,
                 target_language,
             )
@@ -196,6 +218,7 @@ class PDFTextProcessorTool(BaseTool):
                 task_type,
                 extracted_text,
                 instructions,
+                question,
                 source_language,
                 target_language,
             )
@@ -289,6 +312,7 @@ class PDFTextProcessorTool(BaseTool):
         text: str,
         page_numbers: List[int],
         instructions: str,
+        question: str,
         source_language: Optional[str],
         target_language: Optional[str],
     ) -> str:
@@ -311,6 +335,7 @@ class PDFTextProcessorTool(BaseTool):
                 task_type,
                 chunk["text"],
                 chunk_instruction,
+                question,
                 source_language,
                 target_language,
             )
@@ -331,10 +356,23 @@ class PDFTextProcessorTool(BaseTool):
                 "summarize",
                 combined,
                 "Create a cohesive summary from these section summaries",
+                "",
                 None,
                 None,
             )
             return final_summary
+        elif task_type == "qa" and len(chunks) > 1:
+            # For Q&A, combine all chunks and answer the question
+            combined = "\n\n".join(chunk_results)
+            final_answer = self._process_text(
+                "qa",
+                combined,
+                "Based on the information from all sections, provide a comprehensive answer",
+                question,
+                None,
+                None,
+            )
+            return final_answer
         else:
             # For other tasks, just combine with clear separation
             return "\n\n---\n\n".join(chunk_results)
@@ -344,6 +382,7 @@ class PDFTextProcessorTool(BaseTool):
         task_type: str,
         text: str,
         instructions: str,
+        question: str,
         source_language: Optional[str],
         target_language: Optional[str],
     ) -> str:
@@ -356,6 +395,8 @@ class PDFTextProcessorTool(BaseTool):
                 "instructions": instructions,
             }
 
+            if question:
+                assistant_params["question"] = question
             if source_language:
                 assistant_params["source_language"] = source_language
             if target_language:
@@ -401,6 +442,7 @@ class PDFTextProcessorTool(BaseTool):
             "critic": "Critical Analysis",
             "writer": "Written Content",
             "translate": "Translation",
+            "qa": "Q&A",
         }
         return descriptions.get(task_type, "Processed Text")
 
@@ -416,6 +458,7 @@ class PDFTextProcessorTool(BaseTool):
         task_type: str,
         page_numbers: List[int],
         instructions: str,
+        question: str,
         source_language: Optional[str],
         target_language: Optional[str],
     ) -> PDFTextProcessorResponse:
@@ -473,6 +516,7 @@ class PDFTextProcessorTool(BaseTool):
             pages_to_process,
             task_type,
             instructions,
+            question,
             source_language,
             target_language,
         )
@@ -508,6 +552,7 @@ class PDFTextProcessorTool(BaseTool):
         page_numbers: List[int],
         task_type: str,
         instructions: str,
+        question: str,
         source_language: Optional[str],
         target_language: Optional[str],
     ) -> str:
@@ -546,6 +591,7 @@ class PDFTextProcessorTool(BaseTool):
                 batch_pages,
                 task_type,
                 instructions,
+                question,
                 source_language,
                 target_language,
             )
@@ -557,7 +603,7 @@ class PDFTextProcessorTool(BaseTool):
 
         # If we have multiple batch results, combine them hierarchically
         if len(batch_results) > 1:
-            return self._combine_batch_results(batch_results, task_type, instructions)
+            return self._combine_batch_results(batch_results, task_type, instructions, question)
         else:
             return batch_results[0]
 
@@ -569,6 +615,7 @@ class PDFTextProcessorTool(BaseTool):
         batch_pages: List[int],
         task_type: str,
         instructions: str,
+        question: str,
         source_language: Optional[str],
         target_language: Optional[str],
     ) -> Optional[str]:
@@ -606,13 +653,14 @@ class PDFTextProcessorTool(BaseTool):
                     batch_pages,
                     task_type,
                     instructions,
+                    question,
                     source_language,
                     target_language,
                 )
 
             # Process the batch directly
             return self._process_text(
-                task_type, batch_text, instructions, source_language, target_language
+                task_type, batch_text, instructions, question, source_language, target_language
             )
 
         except Exception as e:
@@ -663,6 +711,7 @@ class PDFTextProcessorTool(BaseTool):
         batch_pages: List[int],
         task_type: str,
         instructions: str,
+        question: str,
         source_language: Optional[str],
         target_language: Optional[str],
     ) -> str:
@@ -699,6 +748,7 @@ class PDFTextProcessorTool(BaseTool):
                     task_type,
                     chunk,
                     chunk_instructions,
+                    question,
                     source_language,
                     target_language,
                 )
@@ -716,7 +766,7 @@ class PDFTextProcessorTool(BaseTool):
             return "No content could be processed from this batch."
 
     def _combine_batch_results(
-        self, batch_results: List[str], task_type: str, instructions: str
+        self, batch_results: List[str], task_type: str, instructions: str, question: str
     ) -> str:
         """
         Combine multiple batch results into a final result
@@ -741,6 +791,11 @@ class PDFTextProcessorTool(BaseTool):
                 )
             elif task_type == "translate":
                 final_instructions = f"Translate the combined content. Ensure consistency across all sections. {instructions}"
+            elif task_type == "qa":
+                final_instructions = (
+                    f"Based on the information from all sections, provide a comprehensive answer to the question. "
+                    f"Use all relevant information to give a complete response. {instructions}"
+                )
             else:
                 final_instructions = (
                     f"Process the combined content from all sections. "
@@ -749,7 +804,7 @@ class PDFTextProcessorTool(BaseTool):
 
             # Process the combined results
             return self._process_text(
-                task_type, combined_text, final_instructions, None, None
+                task_type, combined_text, final_instructions, question, None, None
             )
 
         except Exception as e:

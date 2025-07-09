@@ -705,9 +705,8 @@ class PDFContextService:
             return None
 
         filename = pdf_data.get('filename', 'Unknown')
-        total_pages = len(pdf_data.get('pages', []))
 
-        return f"📄 Active document: {filename} ({total_pages} pages)"
+        return f"📄 Active document: {filename}"
 
     def debug_batch_processing(self, pdf_id: str) -> str:
         """

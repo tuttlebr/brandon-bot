@@ -64,7 +64,7 @@ class FileProcessingConfig:
     # Supported file types
     SUPPORTED_PDF_TYPES: List[str] = field(default_factory=lambda: ['pdf'])
     SUPPORTED_IMAGE_TYPES: List[str] = field(
-        default_factory=lambda: ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp']
+        default_factory=lambda: ['png', 'jpg', 'jpeg']
     )
 
     # PDF Summarization settings
@@ -113,7 +113,7 @@ class LLMConfig:
     """LLM service configuration"""
 
     # Default model parameters
-    DEFAULT_TEMPERATURE: float = 0.6
+    DEFAULT_TEMPERATURE: float = 0.3
     DEFAULT_TOP_P: float = 0.95
     DEFAULT_FREQUENCY_PENALTY: float = 0.0
     DEFAULT_PRESENCE_PENALTY: float = 0.0
