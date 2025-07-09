@@ -399,7 +399,7 @@ class PDFContextService:
         content_parts.extend(
             [
                 "",
-                "Please use this PDF content to answer the user's question. Be specific and cite page numbers when referencing information.",
+                "Please use this PDF content to answer the user's question. Be specific and cite page numbers when referencing information at the end of the document.",
             ]
         )
 
@@ -512,14 +512,7 @@ class PDFContextService:
             # For batch-processed PDFs, we load all pages for analysis.
             total_pages = pdf_data.get('total_pages', 0)
             page_numbers = list(range(1, total_pages + 1))
-            if total_pages > 100:
-                logger.warning(
-                    f"Loading all {total_pages} pages for a large document. Analysis may take some time."
-                )
-            else:
-                logger.info(
-                    f"No specific pages mentioned, loading all {total_pages} pages for comprehensive analysis."
-                )
+
 
         # Remove duplicates and sort
         page_numbers = sorted(set(page_numbers))
@@ -547,7 +540,7 @@ class PDFContextService:
                             p for p in merged_pages if p.get('page', 0) in page_numbers
                         ]
                     else:
-                        # Use the entire document for comprehensive analysis
+                        # Use the entire document for analysis
                         loaded_pages = merged_pages
 
             if not loaded_pages:

@@ -5,6 +5,7 @@ This service handles document analysis operations, particularly for PDFs.
 Extracted from the monolithic AssistantTool to separate concerns.
 """
 
+import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 class DocumentAnalyzerService:
     """Service for analyzing documents, especially PDFs"""
 
-    def __init__(self, config: ChatConfig, llm_type: str = "intelligent"):
+    def __init__(self, config: ChatConfig, llm_type: str):
         """
         Initialize document analyzer service
 
@@ -30,7 +31,7 @@ class DocumentAnalyzerService:
         self.config = config
         self.llm_type = llm_type
 
-    def analyze_document(
+    async def analyze_document(
         self,
         document_text: str,
         instructions: str,
@@ -52,22 +53,20 @@ class DocumentAnalyzerService:
         try:
             # Check if the document is too large for direct processing
             estimated_tokens = len(document_text) // 4  # Rough token estimation
-            max_tokens = 100000  # Conservative limit to stay well under model limits
+            max_tokens = 126000  # Conservative limit to stay well under model limits
 
             if estimated_tokens > max_tokens:
                 logger.warning(
                     f"Document too large ({estimated_tokens} estimated tokens), processing in chunks"
                 )
-                return self._analyze_large_document_chunked(
+                return await self._analyze_large_document_chunked(
                     document_text, instructions, document_type, filename
                 )
 
-            client = llm_client_service.get_client(self.llm_type)
+            client = llm_client_service.get_async_client(self.llm_type)
             model_name = llm_client_service.get_model_name(self.llm_type)
 
-            system_prompt = f"""You are analyzing a {document_type} to provide comprehensive insights and answer specific questions.
-
-When analyzing documents, thoroughly understand the content, context, and purpose. Extract key insights, identify main themes and arguments, and provide accurate answers supported by evidence from the text. Be specific and cite relevant sections when answering questions."""
+            system_prompt = f"""You are analyzing a {document_type} to gather information which will be used to provide a direct answer to the user's question or instructions: {instructions}"""
 
             if filename:
                 user_message = f"Based on the document '{filename}', please answer this question: {instructions}\n\nDocument:\n{document_text}"
@@ -79,12 +78,12 @@ When analyzing documents, thoroughly understand the content, context, and purpos
                 {"role": "user", "content": user_message},
             ]
 
-            logger.debug(f"Analyzing document with {model_name}")
+            logger.info(f"Analyzing document with {model_name}")
 
-            response = client.chat.completions.create(
+            response = await client.chat.completions.create(
                 model=model_name,
                 messages=messages,
-                temperature=0.3,  # Lower temperature for factual analysis
+                temperature=app_config.llm.DEFAULT_TEMPERATURE,
                 top_p=app_config.llm.DEFAULT_TOP_P,
                 frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
                 presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,
@@ -102,7 +101,7 @@ When analyzing documents, thoroughly understand the content, context, and purpos
             logger.error(f"Error analyzing document: {e}")
             return {"success": False, "error": str(e)}
 
-    def _analyze_large_document_chunked(
+    async def _analyze_large_document_chunked(
         self,
         document_text: str,
         instructions: str,
@@ -132,27 +131,37 @@ When analyzing documents, thoroughly understand the content, context, and purpos
 
             logger.info(f"Processing large document in {len(chunks)} chunks")
 
-            # Process each chunk individually
-            chunk_results = []
-            for i, chunk in enumerate(chunks):
+            # Process all chunks concurrently
+            async def process_chunk_async(i: int, chunk: str):
                 try:
                     chunk_instructions = (
                         f"{instructions} (Processing section {i+1} of {len(chunks)})"
                     )
-                    chunk_result = self._analyze_single_chunk(
+                    chunk_result = await self._analyze_single_chunk(
                         chunk, chunk_instructions, document_type, filename
                     )
                     if chunk_result["success"]:
-                        chunk_results.append(chunk_result["result"])
+                        return chunk_result["result"]
                     else:
-                        chunk_results.append(
-                            f"Section {i+1} processing failed: {chunk_result.get('error', 'Unknown error')}"
-                        )
+                        return f"Section {i+1} processing failed: {chunk_result.get('error', 'Unknown error')}"
                 except Exception as e:
                     logger.error(f"Error processing chunk {i+1}: {e}")
-                    chunk_results.append(
-                        f"Section {i+1} processing failed due to error: {str(e)}"
-                    )
+                    return f"Section {i+1} processing failed due to error: {str(e)}"
+
+            # Run all chunk processing tasks concurrently
+            chunk_results_raw = await asyncio.gather(
+                *[process_chunk_async(i, chunk) for i, chunk in enumerate(chunks)],
+                return_exceptions=True
+            )
+
+            # Handle any exceptions in results
+            chunk_results = []
+            for i, result in enumerate(chunk_results_raw):
+                if isinstance(result, Exception):
+                    logger.error(f"Chunk {i+1} failed with exception: {result}")
+                    chunk_results.append(f"Section {i+1} processing failed due to error: {str(result)}")
+                else:
+                    chunk_results.append(result)
 
             if not chunk_results:
                 return {
@@ -166,11 +175,11 @@ When analyzing documents, thoroughly understand the content, context, and purpos
 
                 # Create final synthesis
                 synthesis_instructions = (
-                    f"Based on these analysis sections, provide a comprehensive answer to: {instructions}. "
-                    f"Combine all relevant information into a cohesive response."
+                    f"Based on these analysis sections, provide a direct answer to: {instructions}. "
+                    f"Combine all relevant information into a concise response."
                 )
 
-                return self._analyze_single_chunk(
+                return await self._analyze_single_chunk(
                     combined_text, synthesis_instructions, "analysis results", filename
                 )
             else:
@@ -180,7 +189,7 @@ When analyzing documents, thoroughly understand the content, context, and purpos
             logger.error(f"Error in chunked document analysis: {e}")
             return {"success": False, "error": str(e)}
 
-    def _analyze_single_chunk(
+    async def _analyze_single_chunk(
         self,
         chunk_text: str,
         instructions: str,
@@ -200,12 +209,10 @@ When analyzing documents, thoroughly understand the content, context, and purpos
             Analysis result dictionary
         """
         try:
-            client = llm_client_service.get_client(self.llm_type)
+            client = llm_client_service.get_async_client(self.llm_type)
             model_name = llm_client_service.get_model_name(self.llm_type)
 
-            system_prompt = f"""You are analyzing a {document_type} to provide comprehensive insights and answer specific questions.
-
-When analyzing documents, thoroughly understand the content, context, and purpose. Extract key insights, identify main themes and arguments, and provide accurate answers supported by evidence from the text. Be specific and cite relevant sections when answering questions."""
+            system_prompt = f"""You are analyzing a {document_type} to answer specific questions or provide analysis. Your response should be a concise response to the user's question or instructions. Similar to an executive summary."""
 
             if filename:
                 user_message = f"Based on the document '{filename}', please answer this question: {instructions}\n\nDocument:\n{chunk_text}"
@@ -217,10 +224,10 @@ When analyzing documents, thoroughly understand the content, context, and purpos
                 {"role": "user", "content": user_message},
             ]
 
-            response = client.chat.completions.create(
+            response = await client.chat.completions.create(
                 model=model_name,
                 messages=messages,
-                temperature=0.3,  # Lower temperature for factual analysis
+                temperature=app_config.llm.DEFAULT_TEMPERATURE,
                 top_p=app_config.llm.DEFAULT_TOP_P,
                 frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
                 presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,
@@ -238,7 +245,7 @@ When analyzing documents, thoroughly understand the content, context, and purpos
             logger.error(f"Error analyzing chunk: {e}")
             return {"success": False, "error": str(e)}
 
-    def analyze_pdf_pages(
+    async def analyze_pdf_pages(
         self, pages: List[Dict[str, Any]], instructions: str, filename: str
     ) -> Dict[str, any]:
         """
@@ -260,15 +267,6 @@ When analyzing documents, thoroughly understand the content, context, and purpos
                 "error": "The document appears to be empty or contains no extractable text.",
             }
 
-        # Verify comprehensive analysis
-        if total_pages < 100:
-            logger.warning(
-                f"⚠️  Only {total_pages} pages available for analysis - may not be comprehensive"
-            )
-        else:
-            logger.info(
-                f"✓ Comprehensive analysis confirmed: Processing {total_pages} pages"
-            )
 
         # Categorize document and route appropriately
         doc_size = DocumentProcessor.categorize_document_size(total_pages)
@@ -279,43 +277,40 @@ When analyzing documents, thoroughly understand the content, context, and purpos
 
         try:
             if doc_size == "small":
-                return self._analyze_small_document(pages, instructions, filename)
+                return await self._analyze_small_document(pages, instructions, filename)
             elif doc_size == "medium":
-                return self._analyze_medium_document(pages, instructions, filename)
+                return await self._analyze_medium_document(pages, instructions, filename)
             else:  # large
-                return self._analyze_large_document(pages, instructions, filename)
+                return await self._analyze_large_document(pages, instructions, filename)
         except Exception as e:
             logger.error(f"Error in PDF analysis: {e}")
             return {"success": False, "error": str(e)}
 
-    def _analyze_small_document(
+    async def _analyze_small_document(
         self, pages: List[Dict[str, Any]], instructions: str, filename: str
     ) -> Dict[str, any]:
         """Analyze small documents in a single pass"""
 
         full_text = DocumentProcessor.format_pages_for_analysis(pages)
-        return self.analyze_document(full_text, instructions, "PDF", filename)
+        return await self.analyze_document(full_text, instructions, "PDF", filename)
 
-    def _analyze_medium_document(
+    async def _analyze_medium_document(
         self, pages: List[Dict[str, Any]], instructions: str, filename: str
     ) -> Dict[str, any]:
         """Analyze medium documents in batches"""
 
         # Process in batches of 3-5 pages
         batch_size = max(3, len(pages) // 3)
-        batch_results = []
 
-        for i in range(0, len(pages), batch_size):
-            batch_end = min(i + batch_size, len(pages))
-            batch_pages = pages[i:batch_end]
-
+        # Create async function for processing each batch
+        async def process_batch_async(i: int, batch_pages: List[Dict[str, Any]]):
             # Determine actual page numbers for this batch
             if batch_pages:
                 start_page_num = batch_pages[0].get('page', i + 1)
-                end_page_num = batch_pages[-1].get('page', batch_end)
+                end_page_num = batch_pages[-1].get('page', min(i + batch_size, len(pages)))
             else:
                 start_page_num = i + 1
-                end_page_num = batch_end
+                end_page_num = min(i + batch_size, len(pages))
 
             batch_text = DocumentProcessor.format_pages_for_analysis(batch_pages)
 
@@ -325,43 +320,59 @@ When analyzing documents, thoroughly understand the content, context, and purpos
                 f"If not relevant, say 'No relevant information found in these pages.'"
             )
 
-            result = self.analyze_document(
+            result = await self.analyze_document(
                 batch_text, batch_instruction, "PDF", filename
             )
 
             if result["success"]:
-                batch_results.append(
-                    {
-                        "page_range": f"{start_page_num}-{end_page_num}",
-                        "analysis": result["result"],
-                    }
-                )
+                return {
+                    "page_range": f"{start_page_num}-{end_page_num}",
+                    "analysis": result["result"],
+                }
+            return None
+
+        # Create all batches
+        batches = [
+            (i, pages[i:i + batch_size]) 
+            for i in range(0, len(pages), batch_size)
+        ]
+
+        # Run all batch processing tasks concurrently
+        batch_results_raw = await asyncio.gather(
+            *[process_batch_async(i, batch_pages) for i, batch_pages in batches],
+            return_exceptions=True
+        )
+
+        # Filter out None results and exceptions
+        batch_results = []
+        for result in batch_results_raw:
+            if isinstance(result, Exception):
+                logger.error(f"Batch processing failed: {result}")
+            elif result is not None:
+                batch_results.append(result)
 
         # Synthesize results
-        return self._synthesize_batch_results(batch_results, instructions, filename)
+        return await self._synthesize_batch_results(batch_results, instructions, filename)
 
-    def _analyze_large_document(
+    async def _analyze_large_document(
         self, pages: List[Dict[str, Any]], instructions: str, filename: str
     ) -> Dict[str, any]:
-        """Analyze large documents comprehensively by processing ALL pages"""
+        """Analyze large documents relevantly by processing ALL pages"""
 
         logger.info(
-            f"Starting comprehensive analysis of all {len(pages)} pages for '{filename}'"
+            f"Starting relevant analysis of all {len(pages)} pages for '{filename}'"
         )
-        logger.warning(f"This is a large document, and analysis may take some time.")
 
-        # Process ALL pages in batches for comprehensive analysis
+        # Process ALL pages in batches for relevant analysis
         # Use medium document approach but with larger batches for efficiency
         batch_size = max(
             20, len(pages) // 10
-        )  # Process in larger batches (increased from 10)
-        batch_results = []
+        ) 
 
-        for i in range(0, len(pages), batch_size):
-            batch_end = min(i + batch_size, len(pages))
-            batch_pages = pages[i:batch_end]
-
+        # Create async function for processing each large batch
+        async def process_large_batch_async(i: int, batch_pages: List[Dict[str, Any]]):
             # Determine actual page numbers for this batch
+            batch_end = min(i + batch_size, len(pages))
             if batch_pages:
                 start_page_num = batch_pages[0].get('page', i + 1)
                 end_page_num = batch_pages[-1].get('page', batch_end)
@@ -376,25 +387,44 @@ When analyzing documents, thoroughly understand the content, context, and purpos
                 f"The user's overall question is: {instructions}. "
                 f"Provide a detailed analysis of any information in this chunk that is relevant to the user's question. "
                 f"If no relevant information is found, explicitly state that this section was reviewed but contained no relevant content. "
-                f"Cite page numbers for any specific findings."
+                f"Cite page numbers for any specific findings at the end of your response."
             )
 
-            result = self.analyze_document(
+            result = await self.analyze_document(
                 batch_text, batch_instruction, "PDF", filename
             )
 
             if result["success"]:
-                batch_results.append(
-                    {
-                        "page_range": f"{start_page_num}-{end_page_num}",
-                        "analysis": result["result"],
-                    }
-                )
+                return {
+                    "page_range": f"{start_page_num}-{end_page_num}",
+                    "analysis": result["result"],
+                }
+            return None
+
+        # Create all large batches
+        large_batches = [
+            (i, pages[i:i + batch_size]) 
+            for i in range(0, len(pages), batch_size)
+        ]
+
+        # Run all large batch processing tasks concurrently
+        batch_results_raw = await asyncio.gather(
+            *[process_large_batch_async(i, batch_pages) for i, batch_pages in large_batches],
+            return_exceptions=True
+        )
+
+        # Filter out None results and exceptions
+        batch_results = []
+        for result in batch_results_raw:
+            if isinstance(result, Exception):
+                logger.error(f"Large batch processing failed: {result}")
+            elif result is not None:
+                batch_results.append(result)
 
         # Synthesize results from ALL batches
-        return self._synthesize_batch_results(batch_results, instructions, filename)
+        return await self._synthesize_batch_results(batch_results, instructions, filename)
 
-    def _synthesize_batch_results(
+    async def _synthesize_batch_results(
         self, batch_results: List[Dict[str, str]], instructions: str, filename: str
     ) -> Dict[str, any]:
         """Synthesize results from multiple batch analyses with hierarchical summarization"""
@@ -403,14 +433,14 @@ When analyzing documents, thoroughly understand the content, context, and purpos
             return {"success": False, "error": "No batch results to synthesize"}
 
         # If there are many results, create intermediate summaries first
-        if len(batch_results) > 10:
+        if len(batch_results) > 1:
             logger.info(
                 f"Performing hierarchical summarization on {len(batch_results)} batch results."
             )
             intermediate_summaries = []
             intermediate_batch_size = 5
-            for i in range(0, len(batch_results), intermediate_batch_size):
-                chunk = batch_results[i : i + intermediate_batch_size]
+            # Create all the async tasks for intermediate summaries
+            async def create_intermediate_summary(chunk):
                 chunk_findings = "\n\n".join(
                     [
                         f"Analysis of pages {result['page_range']}:\n{result['analysis']}"
@@ -419,19 +449,34 @@ When analyzing documents, thoroughly understand the content, context, and purpos
                 )
                 synthesis_instruction = (
                     f"Synthesize the following findings from a document analysis into a coherent intermediate summary. "
-                    f"Focus on the key points related to the user's query: {instructions}"
+                    f"Focus only on the key points related to the user's query: {instructions}"
                 )
-                intermediate_summary = self.analyze_document(
+                return await self.analyze_document(
                     chunk_findings, synthesis_instruction, "analysis results", None
                 )
-                if intermediate_summary["success"]:
-                    intermediate_summaries.append(intermediate_summary["result"])
+            
+            # Create chunks and tasks
+            chunks = [
+                batch_results[i : i + intermediate_batch_size]
+                for i in range(0, len(batch_results), intermediate_batch_size)
+            ]
+            
+            # Run all intermediate summary tasks concurrently
+            intermediate_results = await asyncio.gather(
+                *[create_intermediate_summary(chunk) for chunk in chunks],
+                return_exceptions=True
+            )
+            
+            # Process results
+            for result in intermediate_results:
+                if not isinstance(result, Exception) and result.get("success"):
+                    intermediate_summaries.append(result["result"])
 
             # Combine intermediate summaries for the final synthesis
             combined_findings = "\n\n---\n\n".join(intermediate_summaries)
             synthesis_instruction = (
-                f"Based on these intermediate summaries from '{filename}', provide a final, comprehensive answer to: {instructions}. "
-                f"Synthesize all relevant information into a cohesive response, citing page ranges where possible."
+                f"Based on these intermediate summaries from '{filename}', provide a final concise answer to: {instructions}. "
+                f"Citing page ranges where possible at the end of your response. Be sure to answer the user's question, not simply tell them where to look in the document."
             )
         else:
             # Format batch results for a single synthesis pass
@@ -442,10 +487,10 @@ When analyzing documents, thoroughly understand the content, context, and purpos
                 ]
             )
             synthesis_instruction = (
-                f"Based on these analyses from '{filename}', provide a comprehensive answer to: {instructions}. "
-                f"Synthesize all relevant information into a cohesive response."
+                f"Based on these analyses from '{filename}', provide a concise answer to: {instructions}. "
+                f"Synthesize all relevant information into a cohesive response. Be concise and to the point."
             )
 
-        return self.analyze_document(
+        return await self.analyze_document(
             combined_findings, synthesis_instruction, "analysis results", None
         )

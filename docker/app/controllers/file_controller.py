@@ -464,7 +464,7 @@ class FileController:
                     # Notify in chat that summarization is complete
                     summary_complete_msg = (
                         f"✨ Document summary complete for **{filename}**! "
-                        f"I now have a comprehensive understanding of the document's content, "
+                        f"I now have a better understanding of the document's content, "
                         f"which will help me respond more quickly to your questions.\n\n"
                         f"💡 You can ask me to 'show the summary of the document' to see the AI-generated overview."
                     )

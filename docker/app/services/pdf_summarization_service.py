@@ -161,14 +161,10 @@ class PDFSummarizationService:
         Returns:
             List of intermediate summaries
         """
-        intermediate_summaries = []
         batch_size = 5  # Combine 5 page summaries at a time
 
-        for i in range(0, len(page_summaries), batch_size):
-            batch_end = min(i + batch_size, len(page_summaries))
-            batch_summaries = page_summaries[i:batch_end]
-
-            # Combine summaries
+        # Create async function for processing each batch
+        async def create_intermediate_batch_summary(batch_summaries: List[Dict]):
             combined_text = "\n\n".join(
                 [f"Section {s['page_range']}:\n{s['summary']}" for s in batch_summaries]
             )
@@ -191,17 +187,40 @@ class PDFSummarizationService:
                     summary_params,
                 )
 
-                intermediate_summaries.append(
-                    {
-                        "sections_covered": [s['page_range'] for s in batch_summaries],
-                        "summary": summary_result.result,
-                    }
-                )
+                return {
+                    "sections_covered": [s['page_range'] for s in batch_summaries],
+                    "summary": summary_result.result,
+                }
 
             except Exception as e:
                 logger.error(f"Error creating intermediate summary: {e}")
-                # Fallback to original summaries if intermediate fails
-                intermediate_summaries.extend(batch_summaries)
+                # Return original summaries as fallback
+                return batch_summaries
+
+        # Create all batches
+        batches = [
+            page_summaries[i:i + batch_size] 
+            for i in range(0, len(page_summaries), batch_size)
+        ]
+
+        # Run all intermediate summary tasks concurrently
+        intermediate_results = await asyncio.gather(
+            *[create_intermediate_batch_summary(batch) for batch in batches],
+            return_exceptions=True
+        )
+
+        # Process results
+        intermediate_summaries = []
+        for result in intermediate_results:
+            if isinstance(result, Exception):
+                logger.error(f"Intermediate summary batch failed: {result}")
+                continue
+            elif isinstance(result, list):
+                # Fallback case - extend with original summaries
+                intermediate_summaries.extend(result)
+            else:
+                # Normal case - append the intermediate summary
+                intermediate_summaries.append(result)
 
         return intermediate_summaries
 
@@ -227,7 +246,7 @@ class PDFSummarizationService:
             summary_params = {
                 "task_type": "summarize",
                 "text": combined_text,
-                "instructions": f"Create a comprehensive executive summary of the entire document '{filename}'. Include main topics, key findings, important details, and overall conclusions. Make it informative yet concise.",
+                "instructions": f"Create a relevant executive summary of the entire document '{filename}'. Include main topics, key findings, important details, and overall conclusions. Make it informative yet concise.",
             }
 
             # Import locally to avoid circular imports

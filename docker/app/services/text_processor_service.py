@@ -5,6 +5,7 @@ This service handles text processing operations like summarizing, proofreading,
 rewriting, and critiquing text. Extracted from the monolithic AssistantTool.
 """
 
+import asyncio
 import logging
 from enum import Enum
 from typing import Dict, List, Optional
@@ -30,7 +31,7 @@ class TextTaskType(str, Enum):
 class TextProcessorService:
     """Service for text processing operations"""
 
-    def __init__(self, config: ChatConfig, llm_type: str = "intelligent"):
+    def __init__(self, config: ChatConfig, llm_type: str):
         """
         Initialize text processor service
 
@@ -41,7 +42,7 @@ class TextProcessorService:
         self.config = config
         self.llm_type = llm_type
 
-    def process_text(
+    async def process_text(
         self,
         task_type: TextTaskType,
         text: str,
@@ -69,11 +70,11 @@ class TextProcessorService:
                 logger.warning(
                     f"Text too large ({estimated_tokens} estimated tokens), processing in chunks"
                 )
-                return self._process_large_text_chunked(
+                return await self._process_large_text_chunked(
                     task_type, text, instructions, messages
                 )
 
-            client = llm_client_service.get_client(self.llm_type)
+            client = llm_client_service.get_async_client(self.llm_type)
             model_name = llm_client_service.get_model_name(self.llm_type)
             system_prompt = self._get_system_prompt(task_type, instructions)
 
@@ -90,7 +91,7 @@ class TextProcessorService:
 
             logger.debug(f"Processing text with {task_type} using {model_name}")
 
-            response = client.chat.completions.create(
+            response = await client.chat.completions.create(
                 model=model_name,
                 messages=final_messages,
                 temperature=app_config.llm.DEFAULT_TEMPERATURE,
@@ -112,7 +113,7 @@ class TextProcessorService:
             logger.error(f"Error processing text with {task_type}: {e}")
             return {"success": False, "error": str(e), "task_type": task_type}
 
-    def _process_large_text_chunked(
+    async def _process_large_text_chunked(
         self,
         task_type: TextTaskType,
         text: str,
@@ -142,29 +143,41 @@ class TextProcessorService:
 
             logger.info(f"Processing large text in {len(chunks)} chunks")
 
-            # Process each chunk individually
-            chunk_results = []
-            for i, chunk in enumerate(chunks):
+            # Process all chunks concurrently
+            async def process_chunk_async(i: int, chunk: str):
                 try:
                     chunk_instructions = (
                         f"{instructions} (Processing section {i+1} of {len(chunks)})"
                         if instructions
                         else f"Processing section {i+1} of {len(chunks)}"
                     )
-                    chunk_result = self._process_single_chunk(
+                    chunk_result = await self._process_single_chunk(
                         task_type, chunk, chunk_instructions, messages
                     )
                     if chunk_result["success"]:
-                        chunk_results.append(chunk_result["result"])
+                        return chunk_result["result"]
                     else:
-                        chunk_results.append(
-                            f"Section {i+1} processing failed: {chunk_result.get('error', 'Unknown error')}"
-                        )
+                        return f"Section {i+1} processing failed: {chunk_result.get('error', 'Unknown error')}"
                 except Exception as e:
                     logger.error(f"Error processing chunk {i+1}: {e}")
-                    chunk_results.append(
-                        f"Section {i+1} processing failed due to error: {str(e)}"
-                    )
+                    return f"Section {i+1} processing failed due to error: {str(e)}"
+
+            # Run all chunk processing tasks concurrently
+            chunk_results = await asyncio.gather(
+                *[process_chunk_async(i, chunk) for i, chunk in enumerate(chunks)],
+                return_exceptions=True
+            )
+
+            # Handle any exceptions in results
+            processed_results = []
+            for i, result in enumerate(chunk_results):
+                if isinstance(result, Exception):
+                    logger.error(f"Chunk {i+1} failed with exception: {result}")
+                    processed_results.append(f"Section {i+1} processing failed due to error: {str(result)}")
+                else:
+                    processed_results.append(result)
+            
+            chunk_results = processed_results
 
             if not chunk_results:
                 return {
@@ -174,11 +187,11 @@ class TextProcessorService:
 
             # Combine chunk results based on task type
             if task_type == TextTaskType.SUMMARIZE:
-                return self._combine_summaries(chunk_results, instructions)
+                return await self._combine_summaries(chunk_results, instructions)
             elif task_type == TextTaskType.TRANSLATE:
-                return self._combine_translations(chunk_results)
+                return await self._combine_translations(chunk_results)
             else:
-                return self._combine_general_results(
+                return await self._combine_general_results(
                     chunk_results, task_type, instructions
                 )
 
@@ -186,7 +199,7 @@ class TextProcessorService:
             logger.error(f"Error in chunked text processing: {e}")
             return {"success": False, "error": str(e), "task_type": task_type}
 
-    def _process_single_chunk(
+    async def _process_single_chunk(
         self,
         task_type: TextTaskType,
         chunk_text: str,
@@ -206,7 +219,7 @@ class TextProcessorService:
             Processing result dictionary
         """
         try:
-            client = llm_client_service.get_client(self.llm_type)
+            client = llm_client_service.get_async_client(self.llm_type)
             model_name = llm_client_service.get_model_name(self.llm_type)
             system_prompt = self._get_system_prompt(task_type, instructions)
 
@@ -221,7 +234,7 @@ class TextProcessorService:
                     {"role": "user", "content": chunk_text},
                 ]
 
-            response = client.chat.completions.create(
+            response = await client.chat.completions.create(
                 model=model_name,
                 messages=final_messages,
                 temperature=app_config.llm.DEFAULT_TEMPERATURE,
@@ -243,7 +256,7 @@ class TextProcessorService:
             logger.error(f"Error processing chunk: {e}")
             return {"success": False, "error": str(e), "task_type": task_type}
 
-    def _combine_summaries(
+    async def _combine_summaries(
         self, chunk_results: List[str], instructions: Optional[str]
     ) -> Dict[str, any]:
         """Combine multiple summaries into a final summary"""
@@ -251,11 +264,11 @@ class TextProcessorService:
             combined_text = "\n\n---\n\n".join(chunk_results)
 
             synthesis_instructions = (
-                f"Create a comprehensive summary based on these section summaries. "
+                f"Create an executive summary based on these section summaries. "
                 f"Combine the information into a cohesive whole. {instructions or ''}"
             )
 
-            return self._process_single_chunk(
+            return await self._process_single_chunk(
                 TextTaskType.SUMMARIZE, combined_text, synthesis_instructions, None
             )
         except Exception as e:
@@ -266,7 +279,7 @@ class TextProcessorService:
                 "task_type": TextTaskType.SUMMARIZE,
             }
 
-    def _combine_translations(self, chunk_results: List[str]) -> Dict[str, any]:
+    async def _combine_translations(self, chunk_results: List[str]) -> Dict[str, any]:
         """Combine multiple translations into a final translation"""
         try:
             # For translations, just concatenate the results
@@ -285,7 +298,7 @@ class TextProcessorService:
                 "task_type": TextTaskType.TRANSLATE,
             }
 
-    def _combine_general_results(
+    async def _combine_general_results(
         self,
         chunk_results: List[str],
         task_type: TextTaskType,
@@ -300,7 +313,7 @@ class TextProcessorService:
                 f"Ensure consistency and coherence across the entire document. {instructions or ''}"
             )
 
-            return self._process_single_chunk(
+            return await self._process_single_chunk(
                 task_type, combined_text, synthesis_instructions, None
             )
         except Exception as e:

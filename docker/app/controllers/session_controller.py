@@ -45,6 +45,7 @@ class SessionController:
             st.session_state.intelligent_llm_model_name = (
                 self.config_obj.intelligent_llm_model_name
             )
+            st.session_state.vlm_model_name = self.config_obj.vlm_model_name
             st.session_state.messages = [
                 {"role": "system", "content": get_system_prompt()}
             ]
@@ -177,10 +178,11 @@ class SessionController:
                 "intelligent_llm_model_name",
                 self.config_obj.intelligent_llm_model_name,
             ),
+            "vlm": ("vlm_model_name", self.config_obj.vlm_model_name),
         }
 
         if model_type not in model_mapping:
-            logging.warning(
+            logging.error(
                 f"Unknown model type '{model_type}', defaulting to fast model"
             )
             model_type = "fast"
@@ -189,7 +191,7 @@ class SessionController:
         model_name = st.session_state.get(session_key, config_fallback)
 
         if not model_name:
-            logging.warning(f"No {model_type} model name found, using config fallback")
+            logging.error(f"No {model_type} model name found, using config fallback")
             model_name = config_fallback
 
         return model_name

@@ -179,7 +179,7 @@ Summarize key points, themes, and main arguments from the document. Identify the
                     if focus_query:
                         user_message = f"Analyze this document content focusing specifically on '{focus_query}' and relate it to the conversation context:\n\nDocument Content:\n{document_content}\n\nConversation Context:\n{conversation_text}"
                     else:
-                        user_message = f"Analyze this document content comprehensively in relation to the user's conversation context:\n\nDocument Content:\n{document_content}\n\nConversation Context:\n{conversation_text}"
+                        user_message = f"Analyze this document content concisely in relation to the user's conversation context:\n\nDocument Content:\n{document_content}\n\nConversation Context:\n{conversation_text}"
                 else:
                     user_message = f"Analyze the conversation for document-related queries and provide guidance (no document content found):\n\n{conversation_text}"
             elif context_type == ContextType.CREATIVE_DIRECTOR:

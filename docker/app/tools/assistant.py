@@ -5,6 +5,7 @@ This tool delegates to specialized services for text processing tasks
 instead of implementing everything in one monolithic class.
 """
 
+import asyncio
 import logging
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -136,9 +137,17 @@ class AssistantTool(BaseTool):
 
     def execute(self, params: Dict[str, Any]) -> AssistantResponse:
         """Execute the assistant tool with given parameters"""
-        return self._run(**params)
+        # Since this is called from tools that may not be in async context,
+        # we need to handle the async execution
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        return loop.run_until_complete(self._run_async(**params))
 
-    def _run(
+    async def _run_async(
         self,
         task_type: str,
         text: str,
@@ -150,7 +159,7 @@ class AssistantTool(BaseTool):
         **kwargs,
     ) -> AssistantResponse:
         """
-        Execute an assistant task with the given parameters
+        Execute an assistant task with the given parameters (async version)
 
         Args:
             task_type: The type of task to perform
@@ -182,11 +191,11 @@ class AssistantTool(BaseTool):
                 text, source_language, target_language, messages
             )
         elif task_enum == AssistantTaskType.ANALYZE:
-            return self._handle_analysis(text, instructions, messages)
+            return await self._handle_analysis(text, instructions, messages)
         elif task_enum == AssistantTaskType.QA:
-            return self._handle_qa(text, question, instructions, messages)
+            return await self._handle_qa(text, question, instructions, messages)
         else:
-            return self._handle_text_processing(task_enum, text, instructions, messages)
+            return await self._handle_text_processing(task_enum, text, instructions, messages)
 
     def _prepare_text_with_context(
         self, text: str, messages: Optional[List[Dict[str, Any]]]
@@ -253,7 +262,7 @@ class AssistantTool(BaseTool):
         else:
             raise Exception(result.get("error", "Translation failed"))
 
-    def _handle_analysis(
+    async def _handle_analysis(
         self,
         text: str,
         instructions: Optional[str],
@@ -266,30 +275,30 @@ class AssistantTool(BaseTool):
             # Parse PDF pages from context
             pages = self._parse_pdf_content(text)
             if pages:
-                # For comprehensive analysis, try to load the complete document
+                # For analysis, try to load the complete document
                 complete_pages = self._load_complete_document_for_analysis(pages)
                 if complete_pages:
                     logger.info(
-                        f"Loaded complete document with {len(complete_pages)} pages for comprehensive analysis"
+                        f"Loaded complete document with {len(complete_pages)} pages for analysis"
                     )
                     pdf_data = {"pages": complete_pages, "filename": "Document"}
-                    result = self.document_analyzer.analyze_pdf_pages(
+                    result = await self.document_analyzer.analyze_pdf_pages(
                         complete_pages, instructions, "Document"
                     )
                 else:
                     # Fallback to context pages
                     pdf_data = {"pages": pages, "filename": "Document"}
-                    result = self.document_analyzer.analyze_pdf_pages(
+                    result = await self.document_analyzer.analyze_pdf_pages(
                         pages, instructions, "Document"
                     )
             else:
                 # Fallback to regular document analysis
-                result = self.document_analyzer.analyze_document(
+                result = await self.document_analyzer.analyze_document(
                     text, instructions or "Analyze this document"
                 )
         else:
             # Regular document analysis
-            result = self.document_analyzer.analyze_document(
+            result = await self.document_analyzer.analyze_document(
                 text, instructions or "Analyze this text"
             )
 
@@ -303,7 +312,7 @@ class AssistantTool(BaseTool):
         else:
             raise Exception(result.get("error", "Analysis failed"))
 
-    def _handle_qa(
+    async def _handle_qa(
         self,
         text: str,
         question: Optional[str],
@@ -329,20 +338,20 @@ class AssistantTool(BaseTool):
                 complete_pages = self._load_complete_document_for_analysis(pages)
                 if complete_pages:
                     logger.info(f"Loaded complete document with {len(complete_pages)} pages for Q&A")
-                    result = self.document_analyzer.analyze_pdf_pages(
+                    result = await self.document_analyzer.analyze_pdf_pages(
                         complete_pages, qa_instructions, "Document"
                     )
                 else:
                     # Fallback to context pages
-                    result = self.document_analyzer.analyze_pdf_pages(
+                    result = await self.document_analyzer.analyze_pdf_pages(
                         pages, qa_instructions, "Document"
                     )
             else:
                 # Fallback to regular document analysis
-                result = self.document_analyzer.analyze_document(text, qa_instructions)
+                result = await self.document_analyzer.analyze_document(text, qa_instructions)
         else:
             # Regular document Q&A
-            result = self.document_analyzer.analyze_document(text, qa_instructions)
+            result = await self.document_analyzer.analyze_document(text, qa_instructions)
 
         if result["success"]:
             return AssistantResponse(
@@ -354,7 +363,7 @@ class AssistantTool(BaseTool):
         else:
             raise Exception(result.get("error", "Q&A failed"))
 
-    def _handle_text_processing(
+    async def _handle_text_processing(
         self,
         task_type: AssistantTaskType,
         text: str,
@@ -377,7 +386,7 @@ class AssistantTool(BaseTool):
         if not text_task_type:
             raise ValueError(f"Unsupported text processing task: {task_type}")
 
-        result = self.text_processor.process_text(
+        result = await self.text_processor.process_text(
             text_task_type, text, instructions, messages
         )
 
@@ -448,7 +457,7 @@ class AssistantTool(BaseTool):
         self, context_pages: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """
-        Load the complete document from batch files for comprehensive analysis
+        Load the complete document from batch files for analysis
 
         Args:
             context_pages: Pages from context injection
@@ -504,7 +513,7 @@ class AssistantTool(BaseTool):
             )
 
             if batches:
-                logger.info(f"Found {len(batches)} batches for comprehensive analysis")
+                logger.info(f"Found {len(batches)} batches for analysis")
 
                 # Load all pages from all batches
                 all_pages = []
@@ -514,18 +523,9 @@ class AssistantTool(BaseTool):
                     all_pages.extend(batch_pages)
 
                 logger.info(
-                    f"Successfully loaded {len(all_pages)} pages from batches for comprehensive analysis"
+                    f"Successfully loaded {len(all_pages)} pages from batches for analysis"
                 )
 
-                # Verify we have a substantial number of pages for comprehensive analysis
-                if len(all_pages) < 100:
-                    logger.warning(
-                        f"Only loaded {len(all_pages)} pages - this may not be comprehensive analysis"
-                    )
-                else:
-                    logger.info(
-                        f"✓ Comprehensive analysis confirmed: {len(all_pages)} pages loaded"
-                    )
 
                 return all_pages
             else:

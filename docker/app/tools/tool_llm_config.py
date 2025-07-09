@@ -2,27 +2,27 @@
 Tool LLM Configuration
 
 This module documents the LLM type configuration for each tool in the system.
-Tools can use "fast", "llm", or "intelligent" models based on their requirements.
+Tools can use "fast", "llm", "intelligent", or "vlm" models based on their requirements.
 """
 
-# Tool LLM type configurations
+# Tool LLM type configurations - matching actual tool names from tool classes
 TOOL_LLM_TYPES = {
-    "conversation_context": "intelligent",  # Quick context analysis
-    "extract_web_content": "fast",  # Simple API calls and formatting
-    "weather": "fast",  # Simple API calls and formatting
-    "news": "llm",  # Simple API calls and formatting
-    "tavily": "fast",  # Complex web search and synthesis
-    "retriever": "llm",  # Semantic search and retrieval
-    "pdf_summary": "llm",  # PDF summarization
-    "pdf_text_processor": "llm",  # PDF text processing
-    "text_assistant": "intelligent",  # Complex text processing tasks
-    "image_gen": "fast",  # Complex prompt enhancement for image generation
-    "analyze_image": "vlm",  # Vision analysis requires vlm model
-    "tool_selection": "intelligent",  # Tool selection, no reasoning - determines which tools to use for user queries
+    "conversation_context": "llm",
+    "extract_web_content": "fast",
+    "get_weather": "fast",
+    "tavily_news_search": "llm",
+    "tavily_internet_search": "fast",
+    "retrieval_search": "llm",
+    "retrieve_pdf_summary": "llm",
+    "process_pdf_text": "llm",
+    "text_assistant": "intelligent",
+    "generate_image": "fast",
+    "analyze_image": "vlm",
+    "tool_selection": "intelligent",
 }
 
 # Default LLM type if not specified
-DEFAULT_LLM_TYPE = "intelligent"
+DEFAULT_LLM_TYPE = "llm"
 
 
 def get_tool_llm_type(tool_name: str) -> str:
@@ -33,6 +33,6 @@ def get_tool_llm_type(tool_name: str) -> str:
         tool_name: Name of the tool or operation
 
     Returns:
-        LLM type: "fast", "llm", or "intelligent"
+        LLM type: "fast", "llm", "intelligent", or "vlm"
     """
     return TOOL_LLM_TYPES.get(tool_name, DEFAULT_LLM_TYPE)

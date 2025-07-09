@@ -43,12 +43,12 @@ class PDFAnalysisService:
             user_query: The user's question about the document
 
         Returns:
-            Comprehensive answer based on the PDF content
+            Helpful answer based on the PDF content
         """
         try:
-            pages = pdf_data.get('pages', [])
+            pages = pdf_data.get("pages", [])
             total_pages = len(pages)
-            filename = pdf_data.get('filename', 'Unknown')
+            filename = pdf_data.get("filename", "Unknown")
 
             logger.info(
                 f"Starting intelligent PDF analysis for query '{user_query}' on {filename} ({total_pages} pages)"
@@ -60,9 +60,9 @@ class PDFAnalysisService:
                 )
 
             # For batch-processed PDFs, load the complete document
-            if pdf_data.get('batch_processed', False):
+            if pdf_data.get("batch_processed", False):
                 logger.info(
-                    f"Loading complete document from batches for comprehensive analysis"
+                    f"Loading complete document from batches for analysis"
                 )
                 complete_pages = await self._load_complete_document_from_batches(
                     pdf_data
@@ -71,7 +71,7 @@ class PDFAnalysisService:
                     pages = complete_pages
                     total_pages = len(pages)
                     logger.info(
-                        f"Loaded {total_pages} pages from batches for comprehensive analysis"
+                        f"Loaded {total_pages} pages from batches for analysis"
                     )
 
             # Use DocumentProcessor to categorize and route appropriately
@@ -101,7 +101,9 @@ class PDFAnalysisService:
             analysis_params = {
                 "task_type": "analyze",
                 "text": full_text,
-                "instructions": f"Based on the document '{filename}', please answer this question: {user_query}. Provide specific details and cite page numbers when referencing information.",
+                "instructions": f"""Based on the document '{filename}', please answer this question: {user_query}. Provide executive insights and answer specific questions.
+
+When analyzing documents, thoroughly understand the content, context, and purpose. Extract key insights, identify main themes and arguments, and provide accurate answers supported by evidence from the text. Be specific and cite relevant sections when answering questions at the end of your response.""",
             }
 
             # Import locally to avoid circular imports
@@ -141,7 +143,7 @@ class PDFAnalysisService:
                 analysis_params = {
                     "task_type": "analyze",
                     "text": batch_text,
-                    "instructions": f"Analyze pages {start_idx+1}-{end_idx} of '{filename}' for this question: {user_query}. If relevant information is found, provide it with page numbers. If not relevant, say 'No relevant information found in these pages.'",
+                    "instructions": f"Analyze pages {start_idx+1}-{end_idx} of '{filename}' for this question: {user_query}. If relevant information is found, provide it with page numbers.",
                 }
 
                 # Import locally to avoid circular imports
@@ -183,7 +185,7 @@ class PDFAnalysisService:
         """Analyze large documents by processing ALL pages in detail"""
         try:
             logger.info(
-                f"Starting comprehensive analysis of all {len(pages)} pages for '{filename}'"
+                f"Starting analysis of all {len(pages)} pages for '{filename}'"
             )
 
             # Use batched analysis for ALL pages (not just relevant ones)
@@ -208,8 +210,8 @@ class PDFAnalysisService:
                 # Create summaries using DocumentProcessor
                 page_summaries = []
                 for page in batch_pages:
-                    page_num = page.get('page', start_idx + 1)
-                    page_text = page.get('text', '')[:1000]
+                    page_num = page.get("page", start_idx + 1)
+                    page_text = page.get("text", "")[:1000]
                     page_summaries.append(f"Page {page_num}: {page_text}...")
 
                 batch_text = "\n\n".join(page_summaries)
@@ -259,7 +261,7 @@ class PDFAnalysisService:
             # Extract the full page data for relevant pages
             relevant_pages = []
             for page in pages:
-                if page.get('page') in relevant_page_nums:
+                if page.get("page") in relevant_page_nums:
                     relevant_pages.append(page)
 
             logger.info(
@@ -301,24 +303,24 @@ class PDFAnalysisService:
             # Format batch results for synthesis
             formatted_results = []
             for result in batch_results:
-                if 'page_range' in result:
+                if "page_range" in result:
                     formatted_results.append(
                         f"Analysis of pages {result['page_range']}:\n{result['analysis']}"
                     )
-                elif 'pages' in result:
-                    page_list = ', '.join(map(str, result['pages']))
+                elif "pages" in result:
+                    page_list = ", ".join(map(str, result["pages"]))
                     formatted_results.append(
                         f"Pages {page_list}:\n{result['analysis']}"
                     )
                 else:
-                    formatted_results.append(result['analysis'])
+                    formatted_results.append(result["analysis"])
 
             combined_findings = "\n\n".join(formatted_results)
 
             synthesis_params = {
                 "task_type": "analyze",
                 "text": combined_findings,
-                "instructions": f"Based on these analyses from '{filename}', provide a comprehensive answer to: {user_query}. Synthesize all relevant information into a cohesive response.",
+                "instructions": f"Based on these analyses from '{filename}', provide a concise answer to: {user_query}. Synthesize all relevant information into a cohesive response.",
             }
 
             # Import locally to avoid circular imports
@@ -338,12 +340,12 @@ class PDFAnalysisService:
             logger.error(f"Error synthesizing results: {e}")
             # Fallback: return all individual results
             return "\n\n".join(
-                [result.get('analysis', '') for result in batch_results if result]
+                [result.get("analysis", "") for result in batch_results if result]
             )
 
     async def _load_complete_document_from_batches(self, pdf_data: Dict) -> List[Dict]:
         """
-        Load the complete document from batch files for comprehensive analysis
+        Load the complete document from batch files for analysis
 
         Args:
             pdf_data: PDF metadata with batch information
@@ -352,7 +354,7 @@ class PDFAnalysisService:
             List of all pages from the document
         """
         try:
-            pdf_id = pdf_data.get('pdf_id')
+            pdf_id = pdf_data.get("pdf_id")
             if not pdf_id:
                 logger.warning("No PDF ID available for batch loading")
                 return []
@@ -373,7 +375,7 @@ class PDFAnalysisService:
             # Load all pages from all batches
             all_pages = []
             for batch in batches:
-                batch_pages = batch.get('pages', [])
+                batch_pages = batch.get("pages", [])
                 all_pages.extend(batch_pages)
 
             logger.info(f"Successfully loaded {len(all_pages)} pages from batches")

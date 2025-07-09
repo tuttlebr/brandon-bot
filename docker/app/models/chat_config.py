@@ -46,7 +46,7 @@ class ChatConfig:
 
     @property
     def vlm_model_name(self) -> str:
-        return config.env.VLM_MODEL_NAME or "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
+        return config.env.VLM_MODEL_NAME
 
     @property
     def vlm_endpoint(self) -> str:

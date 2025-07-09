@@ -33,14 +33,26 @@ class BaseTool(ABC):
     """Abstract base class for all tools"""
 
     def __init__(self):
-        self.name: str = ""
+        self._name: str = ""
         self.description: str = ""
         # LLM type configuration - which LLM this tool should use
-        # Options: "fast", "llm", "intelligent"
-        # Default to "fast" for efficiency, tools can override
-        self.llm_type: Literal["fast", "llm", "intelligent"] = "fast"
+        # This will be automatically set based on the tool name
+        self.llm_type: Literal["fast", "llm", "intelligent", "vlm"] = "intelligent"
         # Contexts this tool supports (for system prompt context mapping)
         self.supported_contexts: List[str] = []
+
+    @property
+    def name(self) -> str:
+        """Get the tool name"""
+        return self._name
+
+    @name.setter
+    def name(self, value: str):
+        """Set the tool name and automatically configure llm_type"""
+        self._name = value
+        if value:  # Only set if name is not empty
+            from tools.tool_llm_config import get_tool_llm_type
+            self.llm_type = get_tool_llm_type(value)
 
     def get_definition(self) -> Dict[str, Any]:
         """
@@ -89,6 +101,6 @@ class BaseTool(ABC):
         Get the LLM type this tool should use
 
         Returns:
-            The LLM type: "fast", "llm", or "intelligent"
+            The LLM type: "fast", "llm", "intelligent", or "vlm"
         """
         return self.llm_type

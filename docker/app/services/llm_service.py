@@ -49,7 +49,7 @@ class LLMService:
         Get the appropriate model name for a given model type
 
         Args:
-            model_type: The model type ("fast", "llm", or "intelligent")
+            model_type: The model type ("fast", "llm", "intelligent", "vlm")
 
         Returns:
             The model name from configuration

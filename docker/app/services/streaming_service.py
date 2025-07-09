@@ -30,7 +30,7 @@ class StreamingService:
         # Initialize llm_client_service if not already done
         llm_client_service.initialize(config_obj)
 
-    def get_client(self, model_type: str = "fast", async_client: bool = False):
+    def get_client(self, model_type: str, async_client: bool = False):
         """
         Get the appropriate client for the model type
 
@@ -50,7 +50,7 @@ class StreamingService:
         self,
         messages: List[Dict[str, Any]],
         model: str,
-        model_type: str = "fast",
+        model_type: str,
         tools: Optional[List[Dict[str, Any]]] = None,
         **kwargs,
     ) -> AsyncGenerator[str, None]:
@@ -102,7 +102,7 @@ class StreamingService:
         self,
         messages: List[Dict[str, Any]],
         model: str,
-        model_type: str = "fast",
+        model_type: str,
         tools: Optional[List[Dict[str, Any]]] = None,
         tool_choice: Optional[str] = "auto",
         **kwargs,
@@ -155,7 +155,7 @@ class StreamingService:
             raise StreamingError(f"Failed to get completion: {e}")
 
     async def simple_stream(
-        self, prompt: str, model_type: str = "fast"
+        self, prompt: str, model_type: str
     ) -> AsyncGenerator[str, None]:
         """
         Simple streaming for basic prompts

@@ -52,7 +52,7 @@ class PDFSummaryTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "retrieve_pdf_summary"
-        self.description = "ONLY use this when explicitly asked to summarize a PDF document or when the user specifically mentions 'summarize the PDF', 'summarize the document', or similar phrases. Generates comprehensive summaries of PDF documents, providing both document-level overviews and page-by-page summaries for large PDFs. DO NOT use for general questions, web searches, or when no PDF is being discussed."
+        self.description = "ONLY use this when explicitly asked to summarize a PDF document or when the user specifically mentions 'summarize the PDF', 'summarize the document', or similar phrases. Generates executive summaries of PDF documents, providing both document-level overviews and page-by-page summaries for large PDFs. DO NOT use for general questions, web searches, or when no PDF is being discussed."
         self.supported_contexts = ['pdf_analysis']
         self.summarization_service = None  # Will be initialized on first use
 
@@ -209,7 +209,7 @@ class PDFSummaryTool(BaseTool):
 
                 # Log progress message (UI operations should be handled by the caller)
                 logger.info(
-                    f"Generating comprehensive summary for {actual_filename} ({total_pages} pages)..."
+                    f"Generating summary for {actual_filename} ({total_pages} pages)..."
                 )
 
                 # Use async recursive summarization for full document processing
@@ -221,7 +221,7 @@ class PDFSummaryTool(BaseTool):
                     loop = asyncio.new_event_loop()
                     asyncio.set_event_loop(loop)
 
-                # Perform async recursive summarization for comprehensive results
+                # Perform async recursive summarization for results
                 enhanced_pdf_data = loop.run_until_complete(
                     self.summarization_service.summarize_pdf_recursive(pdf_data)
                 )
@@ -234,7 +234,7 @@ class PDFSummaryTool(BaseTool):
 
                     if file_storage.update_pdf(pdf_id, enhanced_pdf_data):
                         logger.info(
-                            f"Updated PDF '{actual_filename}' with comprehensive summarization data"
+                            f"Updated PDF '{actual_filename}' with executive summary data"
                         )
                         pdf_data = enhanced_pdf_data
                     else:
@@ -244,17 +244,17 @@ class PDFSummaryTool(BaseTool):
                 else:
                     # For directly passed PDFs, just update the local copy
                     logger.info(
-                        f"Updated directly passed PDF '{actual_filename}' with comprehensive summarization data"
+                        f"Updated directly passed PDF '{actual_filename}' with executive summary data"
                     )
                     pdf_data = enhanced_pdf_data
 
             except Exception as e:
-                logger.error(f"Error generating comprehensive summary: {e}")
+                logger.error(f"Error generating executive summary: {e}")
                 return PDFSummaryResponse(
                     success=False,
                     filename=actual_filename,
                     summary_type=summary_type,
-                    message=f"❌ Error generating comprehensive summary for **{actual_filename}**: {str(e)}",
+                    message=f"❌ Error generating executive summary for **{actual_filename}**: {str(e)}",
                     direct_response=True,
                 )
 
@@ -425,7 +425,7 @@ class PDFSummaryTool(BaseTool):
             )
 
         formatted_summary = (
-            f"## {summary_type.title()} Summary of {filename}\n\n{final_summary}"
+            f"{summary_type.title()} Summary of {filename}\n\n{final_summary}"
         )
 
         return PDFSummaryResponse(
@@ -619,7 +619,7 @@ class PDFSummaryTool(BaseTool):
             # Create final summary instructions
             if summary_type == "detailed":
                 instructions = (
-                    f"Create a comprehensive, detailed summary of the entire document '{filename}' "
+                    f"Create an executive summary of the entire document '{filename}' "
                     f"based on these batch summaries. Include all major sections, key findings, "
                     f"methodologies, and conclusions. Synthesize the information into a cohesive whole."
                 )

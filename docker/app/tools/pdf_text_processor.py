@@ -173,12 +173,7 @@ class PDFTextProcessorTool(BaseTool):
         else:
             # For batch PDFs without specific pages, process the complete document
             pages_to_process = list(range(1, total_pages + 1))
-            if total_pages > 100:
-                logger.warning(
-                    f"Processing a large document with {total_pages} pages. This may take some time."
-                )
-            else:
-                logger.info(f"Processing complete document ({total_pages} pages)")
+
 
         if not pages_to_process:
             return PDFTextProcessorResponse(
@@ -244,7 +239,8 @@ class PDFTextProcessorTool(BaseTool):
             pages_processed=pages_to_process,
             result=result,
             chunks_processed=chunks_processed,
-            message=f"## {task_desc} of {filename} ({pages_desc})\n\n{result}",
+            # message=f"{task_desc} of {filename} ({pages_desc})\n\n{result}",
+            message=result,
             direct_response=True,
         )
 
@@ -367,7 +363,7 @@ class PDFTextProcessorTool(BaseTool):
             final_answer = self._process_text(
                 "qa",
                 combined,
-                "Based on the information from all sections, provide a comprehensive answer",
+                "Based on the information from all sections, provide a helpful answer",
                 question,
                 None,
                 None,
@@ -491,12 +487,7 @@ class PDFTextProcessorTool(BaseTool):
         else:
             # For batch PDFs without specific pages, process the complete document
             pages_to_process = list(range(1, total_pages + 1))
-            if total_pages > 100:
-                logger.warning(
-                    f"Processing a large document with {total_pages} pages. This may take some time."
-                )
-            else:
-                logger.info(f"Processing complete document ({total_pages} pages)")
+
 
         if not pages_to_process:
             return PDFTextProcessorResponse(
@@ -541,7 +532,8 @@ class PDFTextProcessorTool(BaseTool):
             pages_processed=pages_to_process,
             result=result,
             chunks_processed=1,  # We'll track this differently for hierarchical processing
-            message=f"## {task_desc} of {filename} ({pages_desc})\n\n{result}",
+            # message=f"{task_desc} of {filename} ({pages_desc})\n\n{result}",
+            message=result,
             direct_response=True,
         )
 
@@ -786,15 +778,15 @@ class PDFTextProcessorTool(BaseTool):
             # Create final processing instructions
             if task_type == "summarize":
                 final_instructions = (
-                    f"Create a comprehensive summary based on these processed sections. "
+                    f"Create an executive summary based on these processed sections. "
                     f"Combine the information into a cohesive whole. {instructions}"
                 )
             elif task_type == "translate":
                 final_instructions = f"Translate the combined content. Ensure consistency across all sections. {instructions}"
             elif task_type == "qa":
                 final_instructions = (
-                    f"Based on the information from all sections, provide a comprehensive answer to the question. "
-                    f"Use all relevant information to give a complete response. {instructions}"
+                    f"Based on the information from all sections, provide a concise answer to the question. "
+                    f"Use all relevant information to give an helpful response. {instructions}"
                 )
             else:
                 final_instructions = (
