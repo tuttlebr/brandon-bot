@@ -129,8 +129,12 @@ class AssistantTool(BaseTool):
                             "enum": self.translator.get_supported_languages(),
                             "description": "The target language for translation (required for translation tasks)",
                         },
+                        "but_why": {
+                            "type": "string",
+                            "description": "A single sentence explaining why this tool was selected for the query.",
+                        },
                     },
-                    "required": ["task_type", "text"],
+                    "required": ["task_type", "text", "but_why"],
                 },
             },
         }

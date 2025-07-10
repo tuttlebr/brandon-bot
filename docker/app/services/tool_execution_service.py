@@ -78,9 +78,12 @@ class ToolExecutionService:
         """Execute tools in parallel"""
         logger.info(f"Executing {len(tool_calls)} tools in parallel")
 
+        is_multi_tool = len(tool_calls) > 1
         tasks = []
         for tool_call in tool_calls:
-            task = self._execute_single_tool(tool_call, current_user_message, messages)
+            task = self._execute_single_tool(
+                tool_call, current_user_message, messages, is_multi_tool
+            )
             tasks.append(task)
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -112,11 +115,12 @@ class ToolExecutionService:
         """Execute tools sequentially"""
         logger.info(f"Executing {len(tool_calls)} tools sequentially")
 
+        is_multi_tool = len(tool_calls) > 1
         responses = []
         for i, tool_call in enumerate(tool_calls):
             try:
                 result = await self._execute_single_tool(
-                    tool_call, current_user_message, messages
+                    tool_call, current_user_message, messages, is_multi_tool
                 )
                 result["execution_order"] = i + 1
                 responses.append(result)
@@ -145,6 +149,7 @@ class ToolExecutionService:
         tool_call: Dict[str, Any],
         current_user_message: Optional[Dict[str, Any]] = None,
         messages: Optional[List[Dict[str, Any]]] = None,
+        is_multi_tool_call: bool = False,
     ) -> Dict[str, Any]:
         """Execute a single tool"""
         tool_name = tool_call.get("name")
@@ -155,7 +160,7 @@ class ToolExecutionService:
 
         # Apply tool-specific modifications
         modified_args = await self._apply_tool_modifications(
-            tool_name, tool_args, current_user_message, messages
+            tool_name, tool_args, current_user_message, messages, is_multi_tool_call
         )
 
         # Execute tool through registry with Streamlit context preserved
@@ -199,6 +204,7 @@ class ToolExecutionService:
         tool_args: Dict[str, Any],
         current_user_message: Optional[Dict[str, Any]] = None,
         messages: Optional[List[Dict[str, Any]]] = None,
+        is_multi_tool_call: bool = False,
     ) -> Dict[str, Any]:
         """Apply tool-specific argument modifications"""
         modified_args = tool_args.copy()
@@ -206,7 +212,16 @@ class ToolExecutionService:
         # Add conversation context for specific tools
         context_tools = ["conversation_context", "text_assistant", "generate_image"]
         if tool_name in context_tools and messages:
-            modified_args["messages"] = messages
+            # Special handling for image generation in multi-tool scenarios
+            if tool_name == "generate_image" and is_multi_tool_call:
+                # When multiple tools are called, disable conversation context for image generation
+                # to prevent confusion from other tool contexts
+                logger.info(
+                    "Multi-tool call detected: disabling conversation context for image generation"
+                )
+                modified_args["use_conversation_context"] = False
+            else:
+                modified_args["messages"] = messages
 
         # Add messages and PDF data for PDF tools
         pdf_tools = ["retrieve_pdf_summary", "process_pdf_text"]

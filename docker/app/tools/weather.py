@@ -99,9 +99,13 @@ class WeatherTool(BaseTool):
                         "location": {
                             "type": "string",
                             "description": "City name or ZIP code. If provided as 'City, ST', only the city name may be used for weather lookup.",
-                        }
+                        },
+                        "but_why": {
+                            "type": "string",
+                            "description": "A single sentence explaining why this tool was selected for the query.",
+                        },
                     },
-                    "required": ["location"],
+                    "required": ["location", "but_why"],
                 },
             },
         }

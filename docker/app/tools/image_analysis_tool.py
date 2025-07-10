@@ -48,9 +48,13 @@ class ImageAnalysisTool(BaseTool):
                         "question": {
                             "type": "string",
                             "description": "The question to ask about the uploaded image",
-                        }
+                        },
+                        "but_why": {
+                            "type": "string",
+                            "description": "A single sentence explaining why this tool was selected for the query.",
+                        },
                     },
-                    "required": ["question"],
+                    "required": ["question", "but_why"],
                 },
             },
         }

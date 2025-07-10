@@ -57,9 +57,13 @@ class WebExtractTool(BaseTool):
                         "url": {
                             "type": "string",
                             "description": "The web URL to extract content from. Must be a valid HTTP or HTTPS URL.",
-                        }
+                        },
+                        "but_why": {
+                            "type": "string",
+                            "description": "A single sentence explaining why this tool was selected for the query.",
+                        },
                     },
-                    "required": ["url"],
+                    "required": ["url", "but_why"],
                 },
             },
         }

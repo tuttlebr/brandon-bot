@@ -18,11 +18,11 @@ TOOL_LLM_TYPES = {
     "text_assistant": "intelligent",
     "generate_image": "fast",
     "analyze_image": "vlm",
-    "tool_selection": "llm",
+    "tool_selection": "intelligent",
 }
 
 # Default LLM type if not specified
-DEFAULT_LLM_TYPE = "intelligent"
+DEFAULT_LLM_TYPE = "llm"
 
 
 def get_tool_llm_type(tool_name: str) -> str:

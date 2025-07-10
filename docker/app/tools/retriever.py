@@ -560,9 +560,13 @@ class RetrieverTool(BaseTool):
                         "query": {
                             "type": "string",
                             "description": "The search query to find relevant documents",
-                        }
+                        },
+                        "but_why": {
+                            "type": "string",
+                            "description": "A single sentence explaining why this tool was selected for the query.",
+                        },
                     },
-                    "required": ["query"],
+                    "required": ["query", "but_why"],
                 },
             },
         }

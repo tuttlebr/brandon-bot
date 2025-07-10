@@ -62,9 +62,13 @@ class NewsTool(BaseTool):
                         "query": {
                             "type": "string",
                             "description": "The search query for recent news, breaking news, or current events (only use for news-related topics)",
-                        }
+                        },
+                        "but_why": {
+                            "type": "string",
+                            "description": "A single sentence explaining why this tool was selected for the query.",
+                        },
                     },
-                    "required": ["query"],
+                    "required": ["query", "but_why"],
                 },
             },
         }

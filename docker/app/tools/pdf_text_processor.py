@@ -97,8 +97,12 @@ class PDFTextProcessorTool(BaseTool):
                             "type": "string",
                             "description": "Target language for translation (required for translation tasks)",
                         },
+                        "but_why": {
+                            "type": "string",
+                            "description": "A single sentence explaining why this tool was selected for the query.",
+                        },
                     },
-                    "required": ["task_type"],
+                    "required": ["task_type", "but_why"],
                 },
             },
         }

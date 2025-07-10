@@ -126,8 +126,12 @@ class ImageGenerationTool(BaseTool):
                             "description": "Whether to use conversation history to enhance the prompt. Useful for generating images related to ongoing discussions or stories.",
                             "default": True,
                         },
+                        "but_why": {
+                            "type": "string",
+                            "description": "A single sentence explaining why this tool was selected for the query.",
+                        },
                     },
-                    "required": ["user_prompt", "subject"],
+                    "required": ["user_prompt", "subject", "but_why"],
                 },
             },
         }
@@ -201,6 +205,22 @@ class ImageGenerationTool(BaseTool):
         if config is None:
             config = ChatConfig.from_environment()
 
+        # Debug logging
+        logger.info(f"[DEBUG] _enhance_prompt_with_llm called with:")
+        logger.info(f"[DEBUG] user_prompt: '{user_prompt}'")
+        logger.info(f"[DEBUG] subject: '{subject}'")
+        logger.info(
+            f"[DEBUG] has conversation_context: {conversation_context is not None}"
+        )
+        if conversation_context:
+            summary = conversation_context.get("summary", "")
+            logger.info(f"[DEBUG] context summary length: {len(summary)} chars")
+            logger.info(
+                f"[DEBUG] context summary preview: {summary[:200]}..."
+                if len(summary) > 200
+                else f"[DEBUG] context summary: {summary}"
+            )
+
         try:
             # Initialize fast LLM client for prompt enhancement
             fast_client = OpenAI(
@@ -221,10 +241,12 @@ class ImageGenerationTool(BaseTool):
 
 Acting as a seasoned imaging specialist, your task is to elevate a user's foundational image request into a sophisticated, visually evocative prompt that consistently yields high-impact results. Synergize technical precision with artistic nuance to meet the user's creative vision without imposing undue constraints.
 
+**CRITICAL RULE:** The user's original request MUST be the primary focus. Conversation context should only be used to add subtle enhancements, NOT to replace or overwhelm the original request.
+
 **CORE DIRECTIVES:**
 - **Vivid Specification:** Convert basic input into immersive, detailed descriptions that stimulate superior visual outputs.
 - **Artistic & Technical Integration:** Seamlessly incorporate relevant techniques (e.g., chiaroscuro, impasto), lighting dynamics, compositional principles, and atmospheric conditions.
-- **Contextual Harmony:** Naturally assimilate contextual information to enrich the prompt's narrative or conceptual depth.
+- **Contextual Harmony:** Naturally assimilate contextual information to enrich the prompt's narrative or conceptual depth WITHOUT changing the core subject.
 - **Creative Fidelity:** Preserve the user's core intent while augmenting with discipline-specific terminology (e.g., 'tenebrism' for dramatic lighting).
 - **Linguistic Precision:** Employ visceral, evocative language to supplant generic descriptors, amplifying visual impact.
 - **Visual Hierarchy:** Prioritize key elements: chromatic schemes, textural contrasts, luminous qualities, spatial composition, and perspectival choices.
@@ -238,15 +260,19 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
 - **Fantasy:** Integrate magical phenomena, ethereal luminosity, and mythopoeic motifs while maintaining visual coherence.
 - **Minimalist:** Emphasize austere composition, strategic negative space, and the strategic deployment of simple, potent visual elements.
 
-**OUTPUT PARAMETERS:** Deliver the refined prompt ONLY as sentences, no lists, no markdown, ensuring adherence to the aforementioned standards. Do not include any other text or comments regarding what you did to improved the prompt."""
+**OUTPUT PARAMETERS:** Deliver the refined prompt ONLY as sentences, no lists, no markdown, ensuring adherence to the aforementioned standards. Do not include any other text or comments regarding what you did to improved the prompt. The output MUST be about the original subject requested, not about conversation history or other topics."""
 
             user_message = f"""**Original Request:** "{user_prompt}"
-**Subject Matter:** {subject}
-**Designated Style:** {style}
-**Atmospheric/Mood Specifications:** {mood}
-**Supplementary Details & Context:** {details}{context_info}
+**Subject:** {subject}
+**Style:** {style}
+**Mood:** {mood}
+{f'**Details:** {details}' if details else ''}
 
-**Task Brief:** Transmute the provided inputs into a technically precise, artistically nuanced image generation prompt engineered to elicit exceptional visual outputs, harmonizing user intent with professional imaging expertise."""
+**Task:** Transform the original request into a single, vivid image generation prompt. Focus ONLY on generating an image of "{subject}" as requested. Any context should be used subtly for atmosphere only."""
+
+            # Add conversation context at the end if available, but make it clear it's secondary
+            if conversation_context and conversation_context.get("summary"):
+                user_message += f"\n\n**Background Context (use sparingly for subtle enhancement only):**\n{conversation_context['summary']}"
 
             # Call the fast LLM for enhancement
             response = fast_client.chat.completions.create(
@@ -264,6 +290,10 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
             )
 
             enhanced_prompt = response.choices[0].message.content.strip()
+
+            # Debug logging to see what the LLM returned
+            logger.info(f"[DEBUG] LLM returned enhanced prompt: '{enhanced_prompt}'")
+            logger.info(f"[DEBUG] Enhanced prompt length: {len(enhanced_prompt)} chars")
 
             # Fallback validation - ensure we got a reasonable response
             if not enhanced_prompt or len(enhanced_prompt) < 20:
@@ -585,6 +615,13 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
         logger.debug(
             f"run_with_dict called with user_prompt: '{user_prompt}', subject: '{subject}', aspect_ratio: {aspect_ratio}, cfg_scale: {cfg_scale}, use_context: {use_conversation_context}"
         )
+
+        # Add more detailed logging to debug the issue
+        logger.info(f"[DEBUG] Image generation parameters:")
+        logger.info(f"[DEBUG] user_prompt: '{user_prompt}'")
+        logger.info(f"[DEBUG] subject: '{subject}'")
+        logger.info(f"[DEBUG] use_conversation_context: {use_conversation_context}")
+        logger.info(f"[DEBUG] Number of messages: {len(messages) if messages else 0}")
 
         # Create config from environment
         config = ChatConfig.from_environment()

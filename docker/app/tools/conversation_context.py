@@ -96,8 +96,12 @@ class ConversationContextTool(BaseTool):
                             "description": "Whether to include full document content in analysis if documents are present",
                             "default": True,
                         },
+                        "but_why": {
+                            "type": "string",
+                            "description": "A single sentence explaining why this tool was selected for the query.",
+                        },
                     },
-                    "required": ["query", "max_messages"],
+                    "required": ["query", "max_messages", "but_why"],
                 },
             },
         }

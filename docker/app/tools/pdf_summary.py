@@ -76,8 +76,12 @@ class PDFSummaryTool(BaseTool):
                             "default": "document",
                             "description": "Type of summary to retrieve: 'document' for overall summary, 'pages' for page-level summaries, 'all' for both, 'debug' for troubleshooting",
                         },
+                        "but_why": {
+                            "type": "string",
+                            "description": "A single sentence explaining why this tool was selected for the query.",
+                        },
                     },
-                    "required": [],
+                    "required": ["but_why"],
                 },
             },
         }

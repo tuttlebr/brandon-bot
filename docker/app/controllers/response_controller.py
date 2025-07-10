@@ -154,20 +154,29 @@ class ResponseController:
                 message_placeholder.markdown(error_message)
                 full_response = error_message
 
-            # After streaming is complete, check for image generation response
-            image_response = self._check_for_image_generation_response()
+            # After streaming is complete, check for UI elements (images, etc.)
+            ui_elements = self._get_ui_elements_from_llm_service()
 
-            if image_response:
-                # Clear the text placeholder and display image instead
-                message_placeholder.empty()
-                self._display_image_generation_response(image_response)
-                self._handle_tool_context()
-                full_response = (
-                    ""  # No text response to add to history for image generation
+            if ui_elements:
+                # Display the synthesized response with embedded UI elements
+                self._display_response_with_ui_elements(
+                    full_response, ui_elements, message_placeholder
                 )
             else:
-                # Handle tool context for text response
-                self._handle_tool_context()
+                # Check for single image generation response (backward compatibility)
+                image_response = self._check_for_image_generation_response()
+
+                if image_response:
+                    # Clear the text placeholder and display image instead
+                    message_placeholder.empty()
+                    self._display_image_generation_response(image_response)
+                    self._handle_tool_context()
+                    full_response = (
+                        ""  # No text response to add to history for image generation
+                    )
+                else:
+                    # Handle tool context for text response
+                    self._handle_tool_context()
 
         # Store response for further processing
         self._full_response = full_response
@@ -553,6 +562,73 @@ class ResponseController:
             return (
                 f"**PDF Query Result:** {tool_data.get('message', 'No content found')}"
             )
+
+    def _get_ui_elements_from_llm_service(self) -> List[Dict[str, Any]]:
+        """
+        Get UI elements (images, etc.) from the LLM service
+
+        Returns:
+            List of UI element dictionaries
+        """
+        if hasattr(self.llm_service, 'last_ui_elements'):
+            return self.llm_service.last_ui_elements
+        return []
+
+    def _display_response_with_ui_elements(
+        self, full_response: str, ui_elements: List[Dict[str, Any]], message_placeholder
+    ):
+        """
+        Display the synthesized response with embedded UI elements
+
+        Args:
+            full_response: The synthesized text response from LLM
+            ui_elements: List of UI elements to display
+            message_placeholder: Streamlit placeholder for the message
+        """
+        from utils.image import base64_to_pil_image
+
+        # First, display the full text response
+        display_response = strip_think_tags(full_response)
+        message_placeholder.markdown(display_response)
+
+        # Then display each UI element
+        for element in ui_elements:
+            if element["type"] == "image":
+                image_data = element["data"]
+                if image_data["success"] and image_data["image_data"]:
+                    # Convert base64 to PIL Image
+                    generated_image = base64_to_pil_image(image_data["image_data"])
+                    if generated_image:
+                        # Display the image below the text
+                        st.image(
+                            generated_image,
+                            caption=image_data["enhanced_prompt"],
+                            use_container_width=True,
+                        )
+
+                        # Store image in session state
+                        image_id = self.session_controller.store_generated_image(
+                            image_data["image_data"],
+                            image_data["enhanced_prompt"],
+                            image_data["original_prompt"],
+                        )
+
+                        # Create history message for the image
+                        history_message = {
+                            "type": "image",
+                            "image_id": image_id,
+                            "text": f"🎨 Generated image with prompt: **{image_data['enhanced_prompt']}**",
+                            "enhanced_prompt": image_data["enhanced_prompt"],
+                            "original_prompt": image_data["original_prompt"],
+                        }
+
+                        # Add image to chat history
+                        self.message_controller.safe_add_message_to_history(
+                            "assistant", history_message
+                        )
+
+        # Handle tool context
+        self._handle_tool_context()
 
     def _handle_response_error(self, error: Exception):
         """

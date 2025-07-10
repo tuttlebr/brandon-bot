@@ -63,9 +63,13 @@ class TavilyTool(BaseTool):
                         "query": {
                             "type": "string",
                             "description": "The search query for general web information, facts, or knowledge (avoid news/current events)",
-                        }
+                        },
+                        "but_why": {
+                            "type": "string",
+                            "description": "A single sentence explaining why this tool was selected for the query.",
+                        },
                     },
-                    "required": ["query"],
+                    "required": ["query", "but_why"],
                 },
             },
         }

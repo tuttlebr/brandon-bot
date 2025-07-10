@@ -191,19 +191,45 @@ class LLMService:
         # Store for context extraction
         self.last_tool_responses = tool_responses
 
-        # Check for direct response tools
+        # Collect direct response tools with UI elements (like images)
+        # instead of returning immediately
+        ui_elements = []
+        has_direct_responses = False
+
         for response in tool_responses:
             if response.get("role") == "direct_response":
-                # For direct response tools, yield the content directly
-                content = response.get("content", "")
-                # Yield in small chunks for better streaming experience
-                chunk_size = 50  # Characters per chunk
-                for i in range(0, len(content), chunk_size):
-                    yield content[i : i + chunk_size]
-                return
+                has_direct_responses = True
+                # Check if this is an image generation response
+                if response.get("tool_name") == "generate_image":
+                    tool_result = response.get("tool_result")
+                    if (
+                        tool_result
+                        and hasattr(tool_result, 'success')
+                        and tool_result.success
+                    ):
+                        ui_elements.append(
+                            {
+                                "type": "image",
+                                "tool_name": "generate_image",
+                                "data": {
+                                    "success": tool_result.success,
+                                    "image_data": getattr(
+                                        tool_result, 'image_data', None
+                                    ),
+                                    "original_prompt": getattr(
+                                        tool_result, 'original_prompt', ''
+                                    ),
+                                    "enhanced_prompt": getattr(
+                                        tool_result, 'enhanced_prompt', ''
+                                    ),
+                                },
+                            }
+                        )
 
-        # Add tool responses to messages
+        # Add all tool responses to messages for LLM synthesis
         extended_messages = messages.copy()
+
+        # Add tool responses in a way that the LLM can understand
         for response in tool_responses:
             if response.get("role") == "tool":
                 extended_messages.append(
@@ -212,6 +238,41 @@ class LLMService:
                         "content": f"Tool {response.get('tool_name')} returned: {response.get('content')}",
                     }
                 )
+            elif response.get("role") == "direct_response":
+                # For direct response tools, add a summary without the full content
+                tool_name = response.get("tool_name", "unknown")
+                if tool_name == "generate_image":
+                    tool_result = response.get("tool_result")
+                    if tool_result and hasattr(tool_result, 'success'):
+                        if tool_result.success:
+                            enhanced_prompt = getattr(
+                                tool_result, 'enhanced_prompt', ''
+                            )
+                            extended_messages.append(
+                                {
+                                    "role": "assistant",
+                                    "content": f"Tool generate_image successfully created an image with prompt: {enhanced_prompt}",
+                                }
+                            )
+                        else:
+                            error_msg = getattr(
+                                tool_result, 'error_message', 'Unknown error'
+                            )
+                            extended_messages.append(
+                                {
+                                    "role": "assistant",
+                                    "content": f"Tool generate_image failed: {error_msg}",
+                                }
+                            )
+                else:
+                    # For other direct response tools
+                    content = response.get("content", "")
+                    extended_messages.append(
+                        {
+                            "role": "assistant",
+                            "content": f"Tool {tool_name} returned: {content[:200]}...",  # Truncate long responses
+                        }
+                    )
 
         # Re-inject PDF context after tool execution to ensure PDF content is available
         # for the final response generation, especially after PDF-related tool calls
@@ -241,7 +302,10 @@ class LLMService:
         # Filter messages to ensure LLM compatibility
         extended_messages = self._filter_messages_for_llm(extended_messages)
 
-        # Stream the final response based on tool results
+        # Store UI elements for the response controller to access
+        self.last_ui_elements = ui_elements
+
+        # Stream the final synthesized response based on all tool results
         async for chunk in self.streaming_service.stream_completion(
             extended_messages, model, model_type
         ):
