@@ -146,6 +146,10 @@ class ImageAnalysisTool(BaseTool):
             # Create one-shot message with image and question
             messages = [
                 {
+                    "role": "system",
+                    "content": "Detailed thinking off - You are a helpful assistant that analyzes images based on the user query. You are also able to answer questions about the image.",
+                },
+                {
                     "role": "user",
                     "content": [
                         {
@@ -156,7 +160,7 @@ class ImageAnalysisTool(BaseTool):
                         },
                         {"type": "text", "text": question},
                     ],
-                }
+                },
             ]
 
             # Make one-shot VLM call
@@ -165,7 +169,7 @@ class ImageAnalysisTool(BaseTool):
                 messages=messages,
                 temperature=1.0,
                 top_p=0.01,
-                stream=False,
+                stream=True,
             )
 
             return response.choices[0].message.content.strip()

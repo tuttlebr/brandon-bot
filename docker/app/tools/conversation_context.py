@@ -112,15 +112,15 @@ class ConversationContextTool(BaseTool):
         """Get the appropriate system prompt for context analysis"""
 
         base_prompts = {
-            ContextType.CONVERSATION_SUMMARY: """detailed thinking on
+            ContextType.CONVERSATION_SUMMARY: """detailed thinking off
             You are summarizing the conversation history to provide context.
 
 Create a concise overview that captures the main themes, user objectives, and ongoing tasks. Include critical background information needed for immediate context. Keep the summary focused and within 200 words.""",
-            ContextType.RECENT_TOPICS: """detailed thinking on
+            ContextType.RECENT_TOPICS: """detailed thinking off
             You are identifying and listing the main topics discussed in the conversation.
 
 Extract and enumerate the primary discussion threads. Note recurring themes and the current focus of engagement. Include relevant related topics that may be important. Prioritize topics that are most relevant to ongoing tasks or questions.""",
-            ContextType.USER_PREFERENCES: """detailed thinking on
+            ContextType.USER_PREFERENCES: """detailed thinking off
             You are analyzing user interaction patterns and preferences.
 
 Identify the user's communication style, typical request types, and preferred response formats. Note any stated constraints or preferences. Assess the user's apparent expertise level and information needs based on their interactions.""",

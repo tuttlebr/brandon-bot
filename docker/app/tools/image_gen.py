@@ -206,19 +206,17 @@ class ImageGenerationTool(BaseTool):
             config = ChatConfig.from_environment()
 
         # Debug logging
-        logger.info(f"[DEBUG] _enhance_prompt_with_llm called with:")
-        logger.info(f"[DEBUG] user_prompt: '{user_prompt}'")
-        logger.info(f"[DEBUG] subject: '{subject}'")
-        logger.info(
-            f"[DEBUG] has conversation_context: {conversation_context is not None}"
-        )
+        logger.debug(f"_enhance_prompt_with_llm called with:")
+        logger.debug(f"user_prompt: '{user_prompt}'")
+        logger.debug(f"subject: '{subject}'")
+        logger.debug(f"has conversation_context: {conversation_context is not None}")
         if conversation_context:
             summary = conversation_context.get("summary", "")
-            logger.info(f"[DEBUG] context summary length: {len(summary)} chars")
-            logger.info(
-                f"[DEBUG] context summary preview: {summary[:200]}..."
+            logger.debug(f"context summary length: {len(summary)} chars")
+            logger.debug(
+                f"context summary preview: {summary[:200]}..."
                 if len(summary) > 200
-                else f"[DEBUG] context summary: {summary}"
+                else f"context summary: {summary}"
             )
 
         try:
@@ -292,8 +290,8 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
             enhanced_prompt = response.choices[0].message.content.strip()
 
             # Debug logging to see what the LLM returned
-            logger.info(f"[DEBUG] LLM returned enhanced prompt: '{enhanced_prompt}'")
-            logger.info(f"[DEBUG] Enhanced prompt length: {len(enhanced_prompt)} chars")
+            logger.debug(f"LLM returned enhanced prompt: '{enhanced_prompt}'")
+            logger.debug(f"Enhanced prompt length: {len(enhanced_prompt)} chars")
 
             # Fallback validation - ensure we got a reasonable response
             if not enhanced_prompt or len(enhanced_prompt) < 20:
@@ -617,11 +615,11 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
         )
 
         # Add more detailed logging to debug the issue
-        logger.info(f"[DEBUG] Image generation parameters:")
-        logger.info(f"[DEBUG] user_prompt: '{user_prompt}'")
-        logger.info(f"[DEBUG] subject: '{subject}'")
-        logger.info(f"[DEBUG] use_conversation_context: {use_conversation_context}")
-        logger.info(f"[DEBUG] Number of messages: {len(messages) if messages else 0}")
+        logger.debug(f"Image generation parameters:")
+        logger.debug(f"user_prompt: '{user_prompt}'")
+        logger.debug(f"subject: '{subject}'")
+        logger.debug(f"use_conversation_context: {use_conversation_context}")
+        logger.debug(f"Number of messages: {len(messages) if messages else 0}")
 
         # Create config from environment
         config = ChatConfig.from_environment()

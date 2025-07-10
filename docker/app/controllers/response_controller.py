@@ -345,6 +345,15 @@ class ResponseController:
                 image_data, enhanced_prompt, original_prompt
             )
 
+            # Store the generated image in session state for easy access by other tools
+            st.session_state.current_image_base64 = image_data
+            st.session_state.current_image_filename = f"generated_{image_id}.png"
+            st.session_state.current_image_id = image_id
+
+            logging.info(
+                f"Stored generated image in session state - image_id: {image_id}, data length: {len(image_data)}"
+            )
+
             # Create history message
             history_message = {
                 "type": "image",
@@ -611,6 +620,17 @@ class ResponseController:
                             image_data["image_data"],
                             image_data["enhanced_prompt"],
                             image_data["original_prompt"],
+                        )
+
+                        # Store the generated image in session state for easy access by other tools
+                        st.session_state.current_image_base64 = image_data["image_data"]
+                        st.session_state.current_image_filename = (
+                            f"generated_{image_id}.png"
+                        )
+                        st.session_state.current_image_id = image_id
+
+                        logging.info(
+                            f"Stored generated image in session state - image_id: {image_id}, data length: {len(image_data['image_data'])}"
                         )
 
                         # Create history message for the image
