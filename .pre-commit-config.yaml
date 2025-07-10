@@ -9,7 +9,8 @@ repos:
       - id: end-of-file-fixer
       - id: trailing-whitespace
       - id: check-yaml
-        exclude: docker/app/mkdocs.yml
+        exclude: |
+          docker/app/mkdocs.yml
       - id: mixed-line-ending
         args: ["--fix=lf"]
   - repo: https://github.com/psf/black
@@ -37,7 +38,7 @@ repos:
     rev: v0.0.5 # Use the ref you want to point at
     hooks:
       - id: detect-nv-keys
-        exclude: package-lock.json
+        exclude: docker/app/docs/gpu-glossary/.*\.md$
   - repo: https://github.com/PyCQA/autoflake
     rev: v2.3.1 # Use the latest version available
     hooks:

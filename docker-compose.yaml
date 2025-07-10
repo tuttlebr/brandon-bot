@@ -36,13 +36,12 @@ services:
       target: docs
     ports:
       - "8001:8001"
-    volumes:
-      - ./docker/app/docs:/app/docs:ro
     restart: unless-stopped
     networks:
       - chatbot-network
+    command: serve -a 0.0.0.0:8001
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/"]
+      test: ["CMD", "curl", "-f", "http://0.0.0.0:8001/readme/"]
       interval: 30s
       timeout: 10s
       retries: 3

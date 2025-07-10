@@ -22,7 +22,7 @@ TOOL_LLM_TYPES = {
 }
 
 # Default LLM type if not specified
-DEFAULT_LLM_TYPE = "llm"
+DEFAULT_LLM_TYPE = "intelligent"
 
 
 def get_tool_llm_type(tool_name: str) -> str:

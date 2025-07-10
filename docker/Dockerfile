@@ -24,19 +24,19 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --extra streamlit-docs
-COPY app/docs/ .
-COPY app/mkdocs.yml /mkdocs.yml
+COPY app/docs/ /docs
 ENV PATH="/docs/.venv/bin:$PATH"
 EXPOSE 8001
-ENTRYPOINT ["python", "serve_docs.py"]
+RUN apt-get update && apt-get install -y curl --no-install-recommends --quiet
+ENTRYPOINT ["mkdocs"]
 
 ####
-FROM docs AS jupyter
+FROM app AS jupyter
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
 ENV NODE_MAJOR=18
 ENV PATH="/app/.venv/bin:$PATH"
-RUN apt-get update && apt-get install -y ca-certificates curl gnupg --no-install-recommends --quiet
+RUN apt-get update && apt-get install -y curl ca-certificates gnupg --no-install-recommends --quiet
 RUN curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg
 RUN echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_$NODE_MAJOR.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list
 RUN apt-get update && apt-get install nodejs -y --no-install-recommends --quiet

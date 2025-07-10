@@ -1,0 +1,110 @@
+site_name: GPU Glossary
+site_description: A comprehensive glossary of GPU and CUDA terminology
+site_author: Modal Labs
+
+docs_dir: gpu-glossary
+theme:
+  name: material
+  palette:
+    scheme: slate
+  features:
+    - navigation.indexes
+    - search.highlight
+    - content.code.copy
+    - navigation.instant
+
+plugins:
+  - search
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+      user: modal-labs
+      repo: gpu-glossary
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+nav:
+  - Home: readme.md
+  - Device Hardware:
+    - device-hardware.md
+    - Core: device-hardware/core.md
+    - CUDA Core: device-hardware/cuda-core.md
+    - CUDA Device Architecture: device-hardware/cuda-device-architecture.md
+    - GPU RAM: device-hardware/gpu-ram.md
+    - Graphics Processing Cluster: device-hardware/graphics-processing-cluster.md
+    - L1 Data Cache: device-hardware/l1-data-cache.md
+    - Load/Store Unit: device-hardware/load-store-unit.md
+    - Register File: device-hardware/register-file.md
+    - Special Function Unit: device-hardware/special-function-unit.md
+    - Streaming Multiprocessor: device-hardware/streaming-multiprocessor.md
+    - Streaming Multiprocessor Architecture: device-hardware/streaming-multiprocessor-architecture.md
+    - Tensor Core: device-hardware/tensor-core.md
+    - Texture Processing Cluster: device-hardware/texture-processing-cluster.md
+    - Warp Scheduler: device-hardware/warp-scheduler.md
+  - Device Software:
+    - device-software.md
+    - Compute Capability: device-software/compute-capability.md
+    - Cooperative Thread Array: device-software/cooperative-thread-array.md
+    - CUDA Programming Model: device-software/cuda-programming-model.md
+    - Global Memory: device-software/global-memory.md
+    - Kernel: device-software/kernel.md
+    - Memory Hierarchy: device-software/memory-hierarchy.md
+    - Parallel Thread Execution: device-software/parallel-thread-execution.md
+    - Registers: device-software/registers.md
+    - Shared Memory: device-software/shared-memory.md
+    - Streaming Assembler: device-software/streaming-assembler.md
+    - Thread Block Grid: device-software/thread-block-grid.md
+    - Thread Block: device-software/thread-block.md
+    - Thread Hierarchy: device-software/thread-hierarchy.md
+    - Thread: device-software/thread.md
+    - Warp: device-software/warp.md
+  - Host Software:
+    - host-software.md
+    - CUDA Binary Utilities: host-software/cuda-binary-utilities.md
+    - CUDA C++: host-software/cuda-c.md
+    - CUDA Driver API: host-software/cuda-driver-api.md
+    - CUDA Runtime API: host-software/cuda-runtime-api.md
+    - CUDA Software Platform: host-software/cuda-software-platform.md
+    - CUPTI: host-software/cupti.md
+    - libcuda.so: host-software/libcuda.md
+    - libcudart.so: host-software/libcudart.md
+    - libnvml.so: host-software/libnvml.md
+    - Nsight Systems: host-software/nsight-systems.md
+    - nvcc: host-software/nvcc.md
+    - NVIDIA GPU Drivers: host-software/nvidia-gpu-drivers.md
+    - nvidia.ko: host-software/nvidia-ko.md
+    - nvidia-smi: host-software/nvidia-smi.md
+    - NVML: host-software/nvml.md
+    - NVRTC: host-software/nvrtc.md
+  - Contributors: contributors.md
+
+extra_css:
+  - stylesheets/extra.css

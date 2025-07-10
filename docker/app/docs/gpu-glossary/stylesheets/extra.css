@@ -1,0 +1,1131 @@
+/* =============================================================================
+ * UNIFIED GPU GLOSSARY THEME
+ * =============================================================================
+ */
+
+/* -----------------------------------------------------------------------------
+ * 1. FONT DEFINITIONS
+ * -----------------------------------------------------------------------------
+ */
+@supports not (font-variation-settings: normal) {
+  @font-face {
+    font-family: NVIDIA;
+    font-style: normal;
+    font-weight: 300;
+    src:
+      url(https://images.nvidia.com/etc/designs/nvidiaGDC/clientlibs_base/fonts/nvidia-sans/GLOBAL/NVIDIASans_W_Lt.woff)
+        format("woff"),
+      url(https://images.nvidia.com/etc/designs/nvidiaGDC/clientlibs_base/fonts/nvidia-sans/GLOBAL/NVIDIASans_W_Lt.woff2)
+        format("woff2");
+  }
+  @font-face {
+    font-family: NVIDIA;
+    font-style: normal;
+    font-weight: 400;
+    src:
+      url(https://images.nvidia.com/etc/designs/nvidiaGDC/clientlibs_base/fonts/nvidia-sans/GLOBAL/NVIDIASans_W_Rg.woff)
+        format("woff"),
+      url(https://images.nvidia.com/etc/designs/nvidiaGDC/clientlibs_base/fonts/nvidia-sans/GLOBAL/NVIDIASans_W_Rg.woff2)
+        format("woff2");
+  }
+  @font-face {
+    font-family: NVIDIA;
+    font-style: normal;
+    font-weight: 500;
+    src:
+      url(https://images.nvidia.com/etc/designs/nvidiaGDC/clientlibs_base/fonts/nvidia-sans/GLOBAL/NVIDIASans_W_Md.woff)
+        format("woff"),
+      url(https://images.nvidia.com/etc/designs/nvidiaGDC/clientlibs_base/fonts/nvidia-sans/GLOBAL/NVIDIASans_W_Md.woff2)
+        format("woff2");
+  }
+  @font-face {
+    font-family: NVIDIA;
+    font-style: normal;
+    font-weight: 700;
+    src:
+      url(https://images.nvidia.com/etc/designs/nvidiaGDC/clientlibs_base/fonts/nvidia-sans/GLOBAL/NVIDIASans_W_Bd.woff)
+        format("woff"),
+      url(https://images.nvidia.com/etc/designs/nvidiaGDC/clientlibs_base/fonts/nvidia-sans/GLOBAL/NVIDIASans_W_Bd.woff2)
+        format("woff2");
+  }
+  @font-face {
+    font-family: RobotoMono;
+    font-style: normal;
+    font-weight: 400;
+    src: url(https://images.nvidia.com/etc/designs/nvidiaGDC/clientlibs_base/fonts/Roboto_Mono/static/RobotoMono-Regular.ttf)
+      format("truetype");
+  }
+  @font-face {
+    font-family: RobotoMono;
+    font-style: normal;
+    font-weight: 700;
+    src: url(https://images.nvidia.com/etc/designs/nvidiaGDC/clientlibs_base/fonts/Roboto_Mono/static/RobotoMono-Bold.ttf)
+      format("truetype");
+  }
+}
+
+@supports (font-variation-settings: normal) {
+  @font-face {
+    font-family: NVIDIA;
+    font-stretch: 25% 151%;
+    font-style: normal;
+    font-weight: 100 1000;
+    src:
+      url(https://images.nvidia.com/etc/designs/nvidiaGDC/clientlibs_base/fonts/nvidia-sans/GLOBAL/var/NVIDIASansVF_W_Wght.woff2)
+        format("woff2 supports variations"),
+      url(https://images.nvidia.com/etc/designs/nvidiaGDC/clientlibs_base/fonts/nvidia-sans/GLOBAL/var/NVIDIASansVF_W_Wght.woff2)
+        format("woff2-variations");
+  }
+  @font-face {
+    font-family: RobotoMono;
+    font-stretch: 25% 151%;
+    font-style: normal;
+    font-weight: 100 1000;
+    src:
+      url(https://images.nvidia.com/etc/designs/nvidiaGDC/clientlibs_base/fonts/Roboto_Mono/RobotoMono-VariableFont_wght.ttf)
+        format("truetype supports variations"),
+      url(https://images.nvidia.com/etc/designs/nvidiaGDC/clientlibs_base/fonts/Roboto_Mono/RobotoMono-VariableFont_wght.ttf)
+        format("truetype-variations");
+  }
+}
+
+/* -----------------------------------------------------------------------------
+ * 2. CSS VARIABLES & THEME CONFIGURATION
+ * -----------------------------------------------------------------------------
+ */
+:root {
+  /* NVIDIA Colors */
+  --nv-color-green: #76b900;
+  --nv-color-green-2: #004831;
+
+  /* Terminal Theme Colors */
+  --brand-color: #76b900;
+  --bg-primary: #000000;
+  --bg-secondary: #1e2329;
+  --bg-tertiary: #282c34;
+  --text-primary: #ffffff;
+  --text-secondary: #b8bcc8;
+  --text-muted: #8b92a4;
+  --border-color: #3d4147;
+  --code-bg: #1a1d23;
+  --link-color: #76b900;
+  --link-hover: #8fd11f;
+
+  /* Font Configuration */
+  --font-base: 12px;
+  --font-h1: 1.5rem;
+  --font-h2: 1.3rem;
+  --font-h3: 1.1rem;
+  --font-text: 1rem;
+  --font-nav: 0.8rem;
+  --font-code: 0.7rem;
+
+  /* Font Families */
+  --pst-font-family-base: NVIDIA, Arial, Helvetica, Sans-Serif;
+  --pst-font-family-monospace:
+    RobotoMono, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono,
+    Courier New, Courier, monospace;
+
+  /* Header Controls */
+  --show-header-logo: none;
+  --show-header-icons: block;
+
+  /* Icon Configuration */
+  --header-icon: "";
+  --folder-icon: "";
+  --expanded-icon: "";
+  --collapsed-icon: "";
+  --active-page-icon: "";
+  --tree-branch: "";
+  --tree-end: "";
+
+  /* Sphinx Theme Variables */
+  --pst-color-background: var(--bg-primary);
+  --pst-color-heading: var(--text-primary);
+  --pst-color-text-base: var(--text-secondary);
+  --pst-color-text-muted: var(--text-muted);
+  --pst-color-surface: var(--bg-secondary);
+  --pst-color-primary: var(--brand-color);
+  --pst-color-inline-code: var(--brand-color);
+  --pst-color-secondary: var(--brand-color);
+  --pst-color-accent: var(--brand-color);
+  --pst-header-height: 3rem;
+}
+
+/* -----------------------------------------------------------------------------
+ * 3. MATERIAL DESIGN & THEME OVERRIDES
+ * -----------------------------------------------------------------------------
+ */
+html:not([data-theme]),
+html[data-theme="light"] {
+  --pst-color-background: #fff;
+  --pst-color-heading: #000;
+  --pst-color-text-base: #1a1a1a;
+  --pst-color-text-muted: #666;
+  --pst-color-surface: #f7f7f7;
+}
+
+html[data-theme="dark"] {
+  --pst-color-background: var(--bg-primary);
+  --pst-color-heading: var(--text-primary);
+  --pst-color-text-base: var(--text-secondary);
+  --pst-color-text-muted: var(--text-muted);
+  --pst-color-surface: var(--bg-secondary);
+}
+
+[data-md-color-scheme="slate"] {
+  --md-default-bg-color: #0e1117;
+  --md-default-fg-color: #ffffff;
+  --md-primary-fg-color: #76b900;
+  --md-accent-fg-color: #76b900;
+  --md-code-bg-color: #1a1d23;
+  --md-code-fg-color: #b8bcc8;
+}
+
+/* -----------------------------------------------------------------------------
+ * 4. BASE STYLING & LAYOUT
+ * -----------------------------------------------------------------------------
+ */
+* {
+  box-sizing: border-box;
+}
+
+html {
+  overflow-y: scroll;
+  scroll-behavior: smooth;
+}
+
+body,
+.md-container {
+  font-family: var(--pst-font-family-base) !important;
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+  font-size: var(--font-base) !important;
+  line-height: 1.6;
+  width: 100vw !important;
+  max-width: 100vw !important;
+  overflow-x: auto !important;
+}
+
+/* Layout - remove all width constraints */
+.md-main,
+.md-main__inner,
+.md-container,
+.md-grid,
+.md-content {
+  max-width: none !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Clearer utility */
+div.clearer,
+.clearfix::after {
+  clear: both;
+  content: "";
+  display: block;
+}
+
+/* -----------------------------------------------------------------------------
+ * 5. HEADER STYLING
+ * -----------------------------------------------------------------------------
+ */
+.md-header {
+  background: var(--bg-primary) !important;
+  border-bottom: 1px solid var(--brand-color) !important;
+  box-shadow: none !important;
+  height: var(--pst-header-height);
+}
+
+.md-header__inner {
+  padding: 0.5rem 1rem !important;
+}
+
+.md-header__title {
+  color: var(--brand-color) !important;
+  font-weight: bold !important;
+  font-family: var(--pst-font-family-base);
+}
+
+/* Configurable header buttons and icons */
+.md-header__button.md-logo {
+  display: var(--show-header-logo) !important;
+}
+
+.md-header__button.md-icon {
+  display: var(--show-header-icons) !important;
+}
+
+/* Header brand styling */
+.navbar-brand {
+  font-weight: 700;
+  padding: 0;
+  color: var(--brand-color) !important;
+}
+
+.footer-brand img {
+  height: var(--pst-header-height);
+}
+
+/* Header items layout */
+.bd-header .navbar-header-items__start {
+  flex-basis: fit-content;
+}
+
+.bd-header .navbar-header-items__end {
+  flex-grow: 1;
+}
+
+/* -----------------------------------------------------------------------------
+ * 6. SIDEBAR & NAVIGATION STYLING
+ * -----------------------------------------------------------------------------
+ */
+.md-sidebar--primary {
+  background: var(--bg-primary) !important;
+  border-right: 1px solid var(--border-color) !important;
+  box-shadow: none !important;
+  flex-basis: 20%;
+  min-width: 250px;
+}
+
+.md-sidebar--secondary {
+  display: none !important;
+  flex-basis: 25%;
+  min-width: 250px;
+}
+
+.bd-sidebar-primary {
+  flex-basis: 20%;
+  min-width: 250px;
+}
+
+.bd-sidebar-secondary {
+  flex-basis: 25%;
+  min-width: 250px;
+}
+
+.md-nav--primary .md-nav__title {
+  background: var(--bg-primary) !important;
+  color: var(--brand-color) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  padding: 1rem !important;
+  font-weight: bold !important;
+}
+
+.md-nav--primary .md-nav__title::before {
+  content: "";
+}
+
+/* Sidebar wrapper */
+div.sphinxsidebarwrapper {
+  padding: 10px 5px 0 10px;
+}
+
+div.sphinxsidebar {
+  float: left;
+  width: 270px;
+  margin-left: -100%;
+  font-size: 90%;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.md-nav__link {
+  color: var(--text-secondary) !important;
+  padding: 0.25rem 1rem !important;
+  font-size: var(--font-nav) !important; /* Navigation font size */
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  transition: color 0.2s ease !important;
+}
+
+/* Navigation hierarchy indicators */
+.md-nav__link::before {
+  content: var(--tree-branch);
+  color: var(--text-muted);
+  margin-right: 0.25rem;
+}
+
+.md-nav__item:last-child .md-nav__link::before {
+  content: var(--tree-end);
+  color: var(--text-muted);
+  margin-right: 0.25rem;
+}
+
+/* Parent section indicators with collapse/expand toggle */
+.md-nav__item--section > .md-nav__link::before {
+  content: var(--collapsed-icon) " ";
+  color: var(--brand-color);
+  margin-right: 0.5rem;
+  transition: transform 0.2s ease;
+  display: inline-block;
+  width: 1rem;
+  text-align: center;
+}
+
+/* Expanded section indicator */
+.md-nav__item--section.md-nav__item--active > .md-nav__link::before,
+.md-nav__item--section:has(.md-nav__item--active) > .md-nav__link::before {
+  transform: rotate(90deg);
+  content: var(--expanded-icon) " ";
+}
+
+/* Section title styling */
+.md-nav__item--section > .md-nav__link {
+  font-weight: bold !important;
+  color: var(--brand-color) !important;
+  cursor: pointer;
+  padding: 0.5rem 1rem !important;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  margin: 0.1rem 0;
+}
+
+.md-nav__item--section > .md-nav__link:hover {
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--border-color);
+}
+
+/* Active section styling */
+.md-nav__item--section.md-nav__item--active > .md-nav__link {
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--brand-color);
+}
+
+/* Child page indentation and indicators */
+.md-nav--secondary {
+  margin-left: 1rem;
+  border-left: 1px solid var(--border-color);
+  padding-left: 0.5rem;
+}
+
+.md-nav--secondary .md-nav__link {
+  padding: 0.25rem 1rem !important;
+  font-size: var(--font-nav) !important;
+}
+
+.md-nav--secondary .md-nav__link::before {
+  content: var(--tree-branch);
+  color: var(--text-muted);
+  margin-right: 0.25rem;
+}
+
+.md-nav--secondary .md-nav__item:last-child .md-nav__link::before {
+  content: var(--tree-end);
+  color: var(--text-muted);
+  margin-right: 0.25rem;
+}
+
+/* Collapsible navigation behavior */
+.md-nav__item--section:not(.md-nav__item--active) .md-nav--secondary {
+  display: none;
+}
+
+.md-nav__item--section.md-nav__item--active .md-nav--secondary {
+  display: block;
+  animation: slideDown 0.2s ease-out;
+}
+
+/* Animation for smooth expand/collapse */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.md-nav__link:hover {
+  color: var(--brand-color) !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+
+.md-nav__link--active {
+  color: var(--brand-color) !important;
+  background: none !important;
+  box-shadow: none !important;
+  font-weight: bold !important;
+}
+
+.md-nav__link--active::before {
+  content: var(--active-page-icon) " ";
+  color: var(--brand-color);
+}
+
+/* Override for active child pages in sections */
+.md-nav--secondary .md-nav__link--active::before {
+  content: var(--active-page-icon) " ";
+  color: var(--brand-color);
+  font-weight: bold;
+}
+
+/* -----------------------------------------------------------------------------
+ * 7. CONTENT AREA & LAYOUT
+ * -----------------------------------------------------------------------------
+ */
+.md-main {
+  background: var(--bg-primary) !important;
+}
+
+.md-content {
+  background: var(--bg-primary) !important;
+}
+
+.md-content__inner {
+  background: var(--bg-primary) !important;
+  padding: 2rem !important;
+  max-width: none !important;
+  width: 100% !important;
+}
+
+/* Ensure typography spans full width */
+.md-typeset {
+  max-width: none !important;
+  width: 100% !important;
+}
+
+.md-typeset > * {
+  max-width: none !important;
+}
+
+.md-typeset .md-content__inner {
+  max-width: none !important;
+}
+
+/* Body layout for Sphinx */
+div.body {
+  min-width: 360px;
+  max-width: none;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+div.body p,
+div.body dd,
+div.body li,
+div.body blockquote {
+  -moz-hyphens: auto;
+  -ms-hyphens: auto;
+  -webkit-hyphens: auto;
+  hyphens: auto;
+}
+
+/* -----------------------------------------------------------------------------
+ * 8. TYPOGRAPHY
+ * -----------------------------------------------------------------------------
+ */
+.md-typeset h1,
+.bd-article h1,
+h1 {
+  color: var(--brand-color) !important;
+  border-bottom: 2px solid var(--brand-color) !important;
+  padding-bottom: 0.5rem !important;
+  font-weight: bold !important;
+  margin-top: 2rem !important;
+  font-size: var(--font-h1) !important;
+  font-family: var(--pst-font-family-base);
+  word-wrap: break-word;
+}
+
+.md-typeset h2,
+.bd-article h2,
+h2 {
+  color: var(--text-primary) !important;
+  margin-top: 1.5rem !important;
+  font-weight: bold !important;
+  font-size: var(--font-h2) !important;
+  font-family: var(--pst-font-family-base);
+  word-wrap: break-word;
+}
+
+.md-typeset h3,
+.bd-article h3,
+h3 {
+  color: var(--text-primary) !important;
+  margin-top: 1.25rem !important;
+  font-size: var(--font-h3) !important;
+  font-family: var(--pst-font-family-base);
+  word-wrap: break-word;
+}
+
+.md-typeset h4,
+.bd-article h4,
+h4 {
+  color: var(--text-primary) !important;
+  margin-top: 1rem !important;
+  font-size: 1.125rem !important;
+  font-family: var(--pst-font-family-base);
+  word-wrap: break-word;
+}
+
+.md-typeset h5,
+.bd-article h5,
+h5 {
+  color: var(--text-primary) !important;
+  margin-top: 1rem !important;
+  font-size: 1rem !important;
+  font-family: var(--pst-font-family-base);
+  word-wrap: break-word;
+}
+
+.md-typeset h6,
+.bd-article h6,
+h6 {
+  color: var(--text-primary) !important;
+  margin-top: 1rem !important;
+  font-size: 0.875rem !important;
+  font-family: var(--pst-font-family-base);
+  word-wrap: break-word;
+}
+
+.md-typeset p,
+p {
+  color: var(--text-secondary) !important;
+  margin: 1rem 0 !important;
+  font-size: var(--font-text) !important;
+  font-family: var(--pst-font-family-base);
+}
+
+/* Rubric styling */
+p.rubric {
+  margin-top: 30px;
+  font-weight: bold;
+  color: var(--brand-color);
+}
+
+/* First element margin reset */
+.first {
+  margin-top: 0 !important;
+}
+
+/* Caption styling */
+.caption-number::after {
+  content: ": ";
+  margin-left: -0.25rem;
+}
+
+/* Header links */
+a.headerlink {
+  visibility: hidden;
+  color: var(--brand-color);
+}
+
+h1:hover > a.headerlink,
+h2:hover > a.headerlink,
+h3:hover > a.headerlink,
+h4:hover > a.headerlink,
+h5:hover > a.headerlink,
+h6:hover > a.headerlink {
+  visibility: visible;
+}
+
+/* -----------------------------------------------------------------------------
+ * 9. LINKS
+ * -----------------------------------------------------------------------------
+ */
+.md-typeset a,
+.bd-article a,
+a {
+  color: var(--link-color) !important;
+  text-decoration: underline !important;
+  text-decoration-color: var(--link-color) !important;
+  text-decoration-skip-ink: none;
+}
+
+.md-typeset a:hover,
+.bd-article a:hover,
+a:hover {
+  color: var(--link-hover) !important;
+  text-decoration-color: var(--link-hover) !important;
+  text-decoration-thickness: max(3px, 0.1875rem, 0.12em);
+}
+
+/* Special link styling */
+.bd-article a.headerlink {
+  color: var(--brand-color);
+}
+
+code.xref,
+a code {
+  background-color: transparent;
+  font-weight: bold;
+  color: var(--brand-color);
+}
+
+/* -----------------------------------------------------------------------------
+ * 10. CODE BLOCKS & SYNTAX HIGHLIGHTING
+ * -----------------------------------------------------------------------------
+ */
+.md-typeset code,
+code {
+  background: var(--code-bg) !important;
+  color: var(--brand-color) !important;
+  padding: 0.1rem 0.3rem !important;
+  border-radius: 3px !important;
+  border: 1px solid var(--border-color) !important;
+  font-family: var(--pst-font-family-monospace) !important;
+  font-size: var(--font-code) !important;
+}
+
+.md-typeset pre,
+pre {
+  background: var(--code-bg) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 6px !important;
+  padding: 1rem !important;
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  position: relative !important;
+  color: var(--text-secondary);
+  font-family: var(--pst-font-family-monospace);
+  margin: 1em 0;
+}
+
+.md-typeset pre code,
+pre code {
+  background: none !important;
+  border: none !important;
+  color: var(--text-secondary) !important;
+  padding: 0 !important;
+  font-family: var(--pst-font-family-monospace);
+}
+
+/* Headers with code */
+h1 code,
+h2 code,
+h3 code,
+h4 code,
+h5 code,
+h6 code {
+  background-color: transparent;
+  color: var(--brand-color);
+  font-family: var(--pst-font-family-monospace);
+}
+
+/* Signature styling */
+.sig {
+  font-family: var(--pst-font-family-monospace);
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 0.25rem;
+  line-height: 1.25rem;
+  margin-bottom: 0.5rem;
+  padding: 0.1rem 0.25rem;
+  color: var(--text-secondary);
+}
+
+.sig-name,
+code.descname {
+  background-color: transparent;
+  font-weight: bold;
+  color: var(--brand-color);
+}
+
+.sig-name {
+  font-size: 1.1em;
+}
+
+code.descname {
+  font-size: 1.2em;
+}
+
+/* Syntax highlighting for code blocks */
+.highlight .hll {
+  display: block;
+  background-color: var(--bg-tertiary);
+}
+
+/* Code block captions */
+div.code-block-caption {
+  margin-top: 1em;
+  padding: 2px 5px;
+  font-size: small;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+}
+
+div.code-block-caption code {
+  background-color: transparent;
+  color: var(--brand-color);
+}
+
+/* Line numbers */
+td.linenos pre,
+span.linenos {
+  border: 0;
+  background-color: transparent;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+/* Highlighted text */
+span.highlighted {
+  background-color: #fbe54e;
+  color: #000;
+}
+
+/* Inline code spans */
+span.pre {
+  white-space: nowrap;
+  font-family: var(--pst-font-family-monospace);
+}
+
+/* -----------------------------------------------------------------------------
+ * 11. LISTS
+ * -----------------------------------------------------------------------------
+ */
+.md-typeset ul,
+ul {
+  color: var(--text-secondary) !important;
+  list-style: none;
+  padding-left: 1.5rem;
+}
+
+.md-typeset li,
+li {
+  margin: 0.25rem 0 !important;
+  position: relative;
+}
+
+.md-typeset ul > li::before,
+ul > li::before {
+  content: "• ";
+  color: var(--brand-color);
+  font-weight: bold;
+  position: absolute;
+  left: -1rem;
+}
+
+/* Ordered lists */
+ol.arabic {
+  list-style: decimal;
+  color: var(--text-secondary);
+}
+
+ol.arabic ol {
+  list-style: lower-alpha;
+}
+
+ol.arabic ol ol {
+  list-style: lower-roman;
+}
+
+ol.arabic li::marker {
+  font-weight: 700;
+  color: var(--brand-color);
+}
+
+/* Nested lists */
+ul ul,
+ul ol,
+ol ul,
+ol ol {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* Definition lists */
+dl {
+  margin-bottom: 15px;
+}
+
+dd {
+  margin-top: 3px;
+  margin-bottom: 10px;
+  margin-left: 30px;
+}
+
+dt {
+  font-weight: bold;
+  color: var(--brand-color);
+}
+
+/* -----------------------------------------------------------------------------
+ * 12. TABLES
+ * -----------------------------------------------------------------------------
+ */
+.md-typeset table,
+table {
+  border-collapse: collapse !important;
+  width: 100% !important;
+  margin: 1.5rem 0 !important;
+  border: 1px solid var(--border-color) !important;
+  background: var(--bg-secondary) !important;
+}
+
+.md-typeset table th,
+table th {
+  background: var(--bg-tertiary) !important;
+  color: var(--brand-color) !important;
+  padding: 0.75rem !important;
+  border: 1px solid var(--border-color) !important;
+  font-weight: bold !important;
+  text-align: left;
+}
+
+.md-typeset table td,
+table td {
+  background: var(--bg-secondary) !important;
+  color: var(--text-secondary) !important;
+  padding: 0.75rem !important;
+  border: 1px solid var(--border-color) !important;
+  text-align: left;
+  vertical-align: top;
+}
+
+.md-typeset table tr:hover td,
+table tr:hover td {
+  background: var(--bg-tertiary) !important;
+}
+
+/* Table alignment */
+table.align-center {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+table.align-default {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* -----------------------------------------------------------------------------
+ * 13. BLOCKQUOTES & ADMONITIONS
+ * -----------------------------------------------------------------------------
+ */
+.md-typeset blockquote,
+blockquote {
+  border-left: 3px solid var(--brand-color) !important;
+  background: var(--bg-secondary) !important;
+  margin: 1rem 0 !important;
+  padding: 1rem !important;
+  color: var(--text-secondary) !important;
+  border-radius: 0 6px 6px 0 !important;
+  clear: left;
+}
+
+/* Admonitions */
+div.admonition {
+  margin: 10px 0;
+  padding: 7px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  border-radius: 6px;
+}
+
+div.admonition dt {
+  font-weight: bold;
+  color: var(--brand-color);
+}
+
+p.admonition-title {
+  margin: 0px 10px 5px 0px;
+  font-weight: bold;
+  color: var(--brand-color);
+}
+
+/* Sidebars */
+div.sidebar,
+aside.sidebar {
+  margin: 0 0 0.5em 1em;
+  border: 1px solid var(--border-color);
+  padding: 7px;
+  background-color: var(--bg-secondary);
+  width: 40%;
+  float: right;
+  clear: right;
+  overflow-x: auto;
+}
+
+p.sidebar-title {
+  font-weight: bold;
+  color: var(--brand-color);
+}
+
+/* -----------------------------------------------------------------------------
+ * 14. NAVIGATION TABS & SEARCH
+ * -----------------------------------------------------------------------------
+ */
+.md-tabs {
+  background: var(--bg-secondary) !important;
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+.md-tabs__link {
+  color: var(--text-secondary) !important;
+  padding: 0.75rem 1rem !important;
+}
+
+.md-tabs__link:hover {
+  color: var(--brand-color) !important;
+}
+
+.md-tabs__link--active {
+  color: var(--brand-color) !important;
+  border-bottom: 2px solid var(--brand-color) !important;
+}
+
+/* Search */
+.md-search__input {
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--border-color) !important;
+  color: var(--text-primary) !important;
+  font-family: var(--pst-font-family-base);
+}
+
+.md-search__input::placeholder {
+  color: var(--text-muted) !important;
+}
+
+/* Search results */
+ul.search {
+  margin: 10px 0 0 20px;
+  padding: 0;
+}
+
+ul.search li {
+  padding: 5px 0 5px 20px;
+  background-repeat: no-repeat;
+  background-position: 0 7px;
+}
+
+ul.search li a {
+  font-weight: bold;
+  color: var(--brand-color);
+}
+
+ul.search li p.context {
+  color: var(--text-muted);
+  margin: 2px 0 0 30px;
+  text-align: left;
+}
+
+/* -----------------------------------------------------------------------------
+ * 15. FOOTER & MISCELLANEOUS
+ * -----------------------------------------------------------------------------
+ */
+.md-footer,
+.bd-footer {
+  display: none !important;
+}
+
+/* Images */
+img {
+  border: 0;
+  max-width: 100%;
+}
+
+/* Alignment utilities */
+.align-left {
+  text-align: left;
+}
+
+.align-center {
+  text-align: center;
+}
+
+.align-right {
+  text-align: right;
+}
+
+.align-default {
+  text-align: center;
+}
+
+/* Figures */
+div.figure,
+figure {
+  margin: 0.5em;
+  padding: 0.5em;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+}
+
+div.figure p.caption,
+figcaption {
+  padding: 0.3em;
+  color: var(--text-secondary);
+}
+
+/* System messages */
+.system-message {
+  background-color: #fda;
+  padding: 5px;
+  border: 3px solid red;
+  color: #000;
+}
+
+/* Responsive design */
+@media (max-width: 960px) {
+  .md-sidebar--primary {
+    display: block !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: -250px !important;
+    width: 250px !important;
+    height: 100vh !important;
+    transition: left 0.3s ease-out !important;
+    z-index: 10 !important;
+  }
+
+  input.md-toggle[data-md-toggle="drawer"]:checked ~ .md-nav {
+    left: 0 !important;
+  }
+
+  .md-content__inner {
+    padding: 1rem !important;
+  }
+
+  .navbar-brand img {
+    display: none;
+  }
+}
+
+@media (min-width: 961px) {
+  .md-sidebar--primary {
+    flex-basis: 20% !important;
+    min-width: 250px !important;
+  }
+}
+
+/* -----------------------------------------------------------------------------
+ * 16. RESET & CLEANUP
+ * -----------------------------------------------------------------------------
+ */
+/* Remove all shadows and fancy effects */
+* {
+  box-shadow: none !important;
+}
+
+/* Print styles */
+@media print {
+  div.document,
+  div.documentwrapper,
+  div.bodywrapper {
+    margin: 0 !important;
+    width: 100%;
+  }
+
+  div.sphinxsidebar,
+  div.related,
+  div.footer,
+  .md-header,
+  .md-sidebar,
+  #top-link {
+    display: none;
+  }
+}
+
+/* =============================================================================
+ * END OF UNIFIED GPU GLOSSARY THEME
+ * =============================================================================
+ */
