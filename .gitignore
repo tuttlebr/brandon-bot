@@ -263,7 +263,6 @@ nginx/
 .python-version
 workspace/
 ignore.*
-rebuild.sh
 ignore/
 tmp/
 node_modules/
