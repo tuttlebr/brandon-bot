@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from pymilvus import MilvusClient
 from tools.base import BaseTool, BaseToolResponse
 from utils.config import config
+from utils.text_processing import strip_think_tags
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -484,6 +485,8 @@ class SimilaritySearch:
         """Format a single search result entry"""
         title = entity["title"].strip()
         text = entity["text"].replace(title, "").strip()
+        # Strip think tags from text content before display
+        text = strip_think_tags(text)
         source = entity["source"].strip()
         creation_date = entity["creation_date"].strip()
         base_text = (

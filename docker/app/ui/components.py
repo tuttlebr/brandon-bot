@@ -6,6 +6,7 @@ from models.chat_message import ChatMessage
 from services.file_storage_service import FileStorageService
 from utils.image import base64_to_pil_image
 from utils.split_context import extract_context_regex
+from utils.text_processing import strip_think_tags
 
 
 class ChatHistoryComponent:
@@ -161,8 +162,10 @@ class ChatHistoryComponent:
             with st.expander(
                 "📋 View Tool Data Sources (for verification)", expanded=False
             ):
+                # Strip think tags before displaying
+                cleaned_context = strip_think_tags(context)
                 st.markdown(
-                    extract_context_regex(context)
+                    extract_context_regex(cleaned_context)
                     .replace("$", "\\$")
                     .replace("\\${", "${"),
                     unsafe_allow_html=True,

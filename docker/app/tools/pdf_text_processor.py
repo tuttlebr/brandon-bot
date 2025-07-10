@@ -13,6 +13,7 @@ from tools.assistant import assistant_tool
 from tools.base import BaseTool, BaseToolResponse
 from utils.config import config
 from utils.pdf_extractor import PDFDataExtractor
+from utils.text_processing import strip_think_tags
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -226,11 +227,14 @@ class PDFTextProcessorTool(BaseTool):
         pages_desc = self._format_page_range(pages_to_process)
         task_desc = self._get_task_description(task_type)
 
+        # Strip think tags from result before displaying
+        cleaned_result = strip_think_tags(result)
+
         # Add note about document processing coverage
         if len(pages_to_process) == total_pages:
-            result += f"\n\n**Note:** Processed the complete document ({len(pages_to_process)} of {total_pages} pages)."
+            cleaned_result += f"\n\n**Note:** Processed the complete document ({len(pages_to_process)} of {total_pages} pages)."
         elif len(pages_to_process) < total_pages:
-            result += (
+            cleaned_result += (
                 f"\n\n**Note:** Processed {len(pages_to_process)} of {total_pages} total pages. "
                 f"To process other pages, please specify the page numbers."
             )
@@ -240,10 +244,10 @@ class PDFTextProcessorTool(BaseTool):
             filename=filename,
             task_type=task_type,
             pages_processed=pages_to_process,
-            result=result,
+            result=result,  # Keep original result for data field
             chunks_processed=chunks_processed,
             # message=f"{task_desc} of {filename} ({pages_desc})\n\n{result}",
-            message=result,
+            message=cleaned_result,
             direct_response=True,
         )
 
@@ -518,11 +522,14 @@ class PDFTextProcessorTool(BaseTool):
         pages_desc = self._format_page_range(pages_to_process)
         task_desc = self._get_task_description(task_type)
 
+        # Strip think tags from result before displaying
+        cleaned_result = strip_think_tags(result)
+
         # Add note about document processing coverage
         if len(pages_to_process) == total_pages:
-            result += f"\n\n**Note:** Processed the complete document ({len(pages_to_process)} of {total_pages} pages)."
+            cleaned_result += f"\n\n**Note:** Processed the complete document ({len(pages_to_process)} of {total_pages} pages)."
         elif len(pages_to_process) < total_pages:
-            result += (
+            cleaned_result += (
                 f"\n\n**Note:** Processed {len(pages_to_process)} of {total_pages} total pages. "
                 f"To process other pages, please specify the page numbers."
             )
@@ -532,10 +539,10 @@ class PDFTextProcessorTool(BaseTool):
             filename=filename,
             task_type=task_type,
             pages_processed=pages_to_process,
-            result=result,
+            result=result,  # Keep original result for data field
             chunks_processed=1,  # We'll track this differently for hierarchical processing
             # message=f"{task_desc} of {filename} ({pages_desc})\n\n{result}",
-            message=result,
+            message=cleaned_result,
             direct_response=True,
         )
 

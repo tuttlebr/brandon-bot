@@ -1,22 +1,20 @@
 import logging
-import random
 import time
 
 import streamlit as st
 
 # Import the controller classes
-from controllers import (
-    FileController,
-    ImageController,
-    MessageController,
-    ResponseController,
-    SessionController,
-)
+from controllers.file_controller import FileController
+from controllers.image_controller import ImageController
+from controllers.message_controller import MessageController
+from controllers.response_controller import ResponseController
+from controllers.session_controller import SessionController
+
 from models import ChatConfig
 from services import ChatService, ImageService, LLMService
 from services.pdf_context_service import PDFContextService
 from tools.initialize_tools import initialize_all_tools
-from ui import ChatHistoryComponent, apply_custom_styles
+from ui import ChatHistoryComponent
 from utils.config import config
 from utils.exceptions import ChatbotException, ConfigurationError
 from utils.system_prompt import greeting_prompt
@@ -38,7 +36,6 @@ class ProductionStreamlitChatApp:
                 initialize_all_tools()
 
             # Apply custom styling using centralized configuration
-            apply_custom_styles()
             st.markdown(
                 f'<h1 style="color: {config.ui.BRAND_COLOR}; text-align: center;">{greeting_prompt()}</h1>',
                 unsafe_allow_html=True,
@@ -141,16 +138,14 @@ class ProductionStreamlitChatApp:
             )
 
             # Generate and display response using controller with centralized spinner
-            random_icon = random.choice(config.ui.SPINNER_ICONS)
             cleanup_fn = None
-            with st.spinner(f"{random_icon} _Typing..._", show_time=False):
-                cleanup_fn = (
-                    self.response_controller.generate_response_with_cleanup_separation(
-                        prepared_messages
-                    )
+            cleanup_fn = (
+                self.response_controller.generate_response_with_cleanup_separation(
+                    prepared_messages
                 )
+            )
 
-            # Execute cleanup after spinner closes to avoid delay
+            # Execute cleanup
             if cleanup_fn:
                 cleanup_fn()
 

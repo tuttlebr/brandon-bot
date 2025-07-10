@@ -17,6 +17,7 @@ from services.text_processor_service import TextProcessorService, TextTaskType
 from services.translation_service import TranslationService
 from tools.base import BaseTool, BaseToolResponse
 from utils.pdf_extractor import PDFDataExtractor
+from utils.text_processing import strip_think_tags
 
 logger = logging.getLogger(__name__)
 
@@ -312,7 +313,7 @@ class AssistantTool(BaseTool):
             return AssistantResponse(
                 original_text=text[:500] + "..." if len(text) > 500 else text,
                 task_type=AssistantTaskType.ANALYZE,
-                result=result["result"],
+                result=strip_think_tags(result["result"]),
                 processing_notes=result.get("processing_notes"),
             )
         else:
@@ -371,7 +372,7 @@ class AssistantTool(BaseTool):
             return AssistantResponse(
                 original_text=text[:500] + "..." if len(text) > 500 else text,
                 task_type=AssistantTaskType.QA,
-                result=result["result"],
+                result=strip_think_tags(result["result"]),
                 processing_notes=result.get("processing_notes"),
             )
         else:
@@ -418,7 +419,7 @@ class AssistantTool(BaseTool):
             return AssistantResponse(
                 original_text=text[:500] + "..." if len(text) > 500 else text,
                 task_type=task_type,
-                result=result["result"],
+                result=strip_think_tags(result["result"]),
                 improvements=improvements,
                 summary_length=summary_length,
                 processing_notes=result.get("processing_notes"),

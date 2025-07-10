@@ -16,6 +16,7 @@ from services.pdf_summarization_service import PDFSummarizationService
 from tools.base import BaseTool, BaseToolResponse
 from utils.config import AppConfig
 from utils.pdf_extractor import PDFDataExtractor
+from utils.text_processing import strip_think_tags
 
 config = AppConfig()
 
@@ -52,7 +53,7 @@ class PDFSummaryTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "retrieve_pdf_summary"
-        self.description = "ONLY use this when explicitly asked to summarize a PDF document or when the user specifically mentions 'summarize the PDF', 'summarize the document', or similar phrases. Generates executive summaries of PDF documents, providing both document-level overviews and page-by-page summaries for large PDFs. DO NOT use for general questions, web searches, or when no PDF is being discussed."
+        self.description = "ONLY use this when explicitly asked to summarize a PDF document or when the user specifically mentions 'summarize the PDF', 'summarize the document', or similar phrases. Generates executive summaries of PDF documents, providing both document-level overviews and page-by-page summaries for large PDFs. DO NOT use for general questions, web searches, or when no PDF is being discussed. If someone provides a URL, this is not the correct tool as you cannot download PDF URLs."
         self.supported_contexts = ['pdf_analysis']
         self.summarization_service = None  # Will be initialized on first use
 
@@ -269,12 +270,14 @@ class PDFSummaryTool(BaseTool):
         # Format the response based on summary type
         if summary_type == "document":
             if document_summary:
+                # Strip think tags from document summary before display
+                cleaned_summary = strip_think_tags(document_summary)
                 return PDFSummaryResponse(
                     success=True,
                     filename=actual_filename,
                     summary_type=summary_type,
                     document_summary=document_summary,
-                    message=f"## Summary of {actual_filename}\n\n{document_summary}",
+                    message=f"## Summary of {actual_filename}\n\n{cleaned_summary}",
                     direct_response=True,
                 )
             else:
@@ -311,7 +314,8 @@ class PDFSummaryTool(BaseTool):
 
             if document_summary:
                 parts.append("### Document Overview\n")
-                parts.append(document_summary)
+                # Strip think tags from document summary
+                parts.append(strip_think_tags(document_summary))
                 parts.append("\n")
 
             if page_summaries:
@@ -344,7 +348,9 @@ class PDFSummaryTool(BaseTool):
         for summary in page_summaries:
             page_range = summary.get("page_range", "Unknown")
             summary_text = summary.get("summary", "No summary available")
-            formatted.append(f"**Pages {page_range}:**\n{summary_text}\n")
+            # Strip think tags from each page summary
+            cleaned_text = strip_think_tags(summary_text)
+            formatted.append(f"**Pages {page_range}:**\n{cleaned_text}\n")
 
         return "\n".join(formatted)
 
@@ -414,6 +420,9 @@ class PDFSummaryTool(BaseTool):
             )
         else:
             final_summary = batch_summaries[0]
+
+        # Strip think tags from final summary
+        final_summary = strip_think_tags(final_summary)
 
         # Add note about complete document coverage
         if pages_included == total_pages:

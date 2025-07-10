@@ -13,6 +13,7 @@ from services.conversation_context_service import ConversationContextService
 from services.response_parsing_service import ResponseParsingService
 from services.streaming_service import StreamingService
 from services.tool_execution_service import ToolExecutionService
+from services.translation_service import TranslationService
 from tools.registry import tool_registry
 from tools.tool_llm_config import DEFAULT_LLM_TYPE, get_tool_llm_type
 from utils.config import config

@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 import requests
 from pydantic import Field
 from tools.base import BaseTool, BaseToolResponse
+from utils.text_processing import strip_think_tags
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -512,6 +513,9 @@ class WebExtractTool(BaseTool):
         # Clean up whitespace
         content = re.sub(r' {2,}', ' ', content)
         content = content.strip()
+
+        # Strip think tags from extracted content
+        content = strip_think_tags(content)
 
         # Add a header with the extraction notice
         header = "## Web Content Extract\n\n"

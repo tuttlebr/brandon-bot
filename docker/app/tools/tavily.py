@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional
 import requests
 from pydantic import BaseModel, Field
 from tools.base import BaseTool, BaseToolResponse
+from utils.text_processing import strip_think_tags
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -161,11 +162,13 @@ class TavilyTool(BaseTool):
 
             # Add extracted content if available
             if result.extracted_content:
+                # Strip think tags from extracted content before display
+                cleaned_extract = strip_think_tags(result.extracted_content)
                 # Truncate extracted content to avoid overwhelming the response
                 truncated_extract = (
-                    result.extracted_content[:500] + "..."
-                    if len(result.extracted_content) > 500
-                    else result.extracted_content
+                    cleaned_extract[:500] + "..."
+                    if len(cleaned_extract) > 500
+                    else cleaned_extract
                 )
                 entry += f"\n\n**Extracted Content:** {truncated_extract}"
 

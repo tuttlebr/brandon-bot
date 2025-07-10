@@ -1,24 +1,22 @@
 import asyncio
 import json
 import logging
-import random
 from typing import Any, Dict, List
 
 import streamlit as st
+import streamlit.components.v1 as components
 from controllers.message_controller import MessageController
 from controllers.session_controller import SessionController
 from models.chat_config import ChatConfig
 from services import LLMService
 from ui import ChatHistoryComponent
+from utils.animated_loading import get_animated_loading_html
 from utils.config import config
-from utils.text_processing import strip_think_tags
+from utils.text_processing import StreamingThinkTagFilter, strip_think_tags
 
 
 class ResponseController:
     """Controller for handling LLM response generation and display"""
-
-    # Constants
-    SPINNER_ICONS = ["🤖", "🧠", "🤔", "🤓", "⚡"]
 
     def __init__(
         self,
@@ -52,10 +50,8 @@ class ResponseController:
             prepared_messages: Prepared messages for API call
         """
         try:
-            # Show spinner during the slow LLM API call
-            random_icon = random.choice(config.ui.SPINNER_ICONS)
-            with st.spinner(f"{random_icon} _Typing..._", show_time=False):
-                self._generate_response_chunks(prepared_messages)
+            # Generate response chunks (animation is now inside the chat message)
+            self._generate_response_chunks(prepared_messages)
 
             # Display the response without spinner
             self._display_response()
@@ -134,6 +130,18 @@ class ResponseController:
         with st.chat_message("assistant", avatar=self.config_obj.assistant_avatar):
             message_placeholder = st.empty()
 
+            # Display loading animation inside the chat message
+            with message_placeholder.container():
+                components.html(
+                    get_animated_loading_html(
+                        icon=None,  # No icon since we're inside chat message
+                        dot_size=8,
+                        dot_gap=8,
+                        animation_height=30,  # Smaller height for inline display
+                    ),
+                    height=40,  # Compact height for inline display
+                )
+
             try:
                 # Use asyncio.run for simpler async handling
                 full_response = asyncio.run(
@@ -204,6 +212,9 @@ class ResponseController:
             Full response text
         """
         full_response = ""
+        display_text = ""
+        think_filter = StreamingThinkTagFilter()
+        first_chunk_received = False
 
         try:
             # Stream response from LLM service with consistent model type
@@ -213,14 +224,28 @@ class ResponseController:
                 response_chunks.append(chunk)
                 full_response += chunk
 
-                # Update UI with accumulated response
-                if full_response.strip():
-                    # Strip think tags before displaying
-                    display_response = strip_think_tags(full_response)
-                    message_placeholder.markdown(display_response)
+                # Process chunk through streaming filter
+                filtered_chunk = think_filter.process_chunk(chunk)
+                if filtered_chunk:
+                    display_text += filtered_chunk
+
+                    # Update UI with filtered response
+                    # The first update will replace the loading animation
+                    if display_text.strip():
+                        if not first_chunk_received:
+                            # Clear the animation on first real content
+                            message_placeholder.empty()
+                            first_chunk_received = True
+                        message_placeholder.markdown(display_text)
 
                 # Small delay for visual effect
                 await asyncio.sleep(0.01)
+
+            # Process any remaining buffered content
+            final_chunk = think_filter.flush()
+            if final_chunk:
+                display_text += final_chunk
+                message_placeholder.markdown(display_text)
 
         except Exception as e:
             logging.error(f"Streaming error: {e}")
