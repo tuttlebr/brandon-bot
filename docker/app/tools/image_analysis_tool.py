@@ -169,7 +169,7 @@ class ImageAnalysisTool(BaseTool):
                 messages=messages,
                 temperature=1.0,
                 top_p=0.01,
-                stream=True,
+                stream=False,
             )
 
             return response.choices[0].message.content.strip()
