@@ -164,13 +164,8 @@ class TavilyTool(BaseTool):
             if result.extracted_content:
                 # Strip think tags from extracted content before display
                 cleaned_extract = strip_think_tags(result.extracted_content)
-                # Truncate extracted content to avoid overwhelming the response
-                truncated_extract = (
-                    cleaned_extract[:500] + "..."
-                    if len(cleaned_extract) > 500
-                    else cleaned_extract
-                )
-                entry += f"\n\n**Extracted Content:** {truncated_extract}"
+
+                entry += f"\n\n**Extracted Content:** {cleaned_extract}"
 
             formatted_entries.append(entry)
 

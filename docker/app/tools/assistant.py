@@ -259,7 +259,7 @@ class AssistantTool(BaseTool):
 
         if result["success"]:
             return AssistantResponse(
-                original_text=text[:500] + "..." if len(text) > 500 else text,
+                original_text=text,
                 task_type=AssistantTaskType.TRANSLATE,
                 result=result["result"],
                 source_language=result.get("source_language"),
@@ -311,7 +311,7 @@ class AssistantTool(BaseTool):
 
         if result["success"]:
             return AssistantResponse(
-                original_text=text[:500] + "..." if len(text) > 500 else text,
+                original_text=text,
                 task_type=AssistantTaskType.ANALYZE,
                 result=strip_think_tags(result["result"]),
                 processing_notes=result.get("processing_notes"),
@@ -370,7 +370,7 @@ class AssistantTool(BaseTool):
 
         if result["success"]:
             return AssistantResponse(
-                original_text=text[:500] + "..." if len(text) > 500 else text,
+                original_text=text,
                 task_type=AssistantTaskType.QA,
                 result=strip_think_tags(result["result"]),
                 processing_notes=result.get("processing_notes"),
@@ -417,7 +417,7 @@ class AssistantTool(BaseTool):
                     improvements = ["See detailed feedback in the result"]
 
             return AssistantResponse(
-                original_text=text[:500] + "..." if len(text) > 500 else text,
+                original_text=text,
                 task_type=task_type,
                 result=strip_think_tags(result["result"]),
                 improvements=improvements,
