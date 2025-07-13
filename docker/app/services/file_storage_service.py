@@ -162,6 +162,10 @@ class FileStorageService:
             Image reference ID
         """
         try:
+            logger.debug(
+                f"Storing uploaded image: {filename}, type: {file_type}, base64 length: {len(image_data)}"
+            )
+
             # Generate unique ID based on content hash
             image_hash = hashlib.md5(image_data.encode()).hexdigest()[:12]
             image_id = f"uploaded_img_{image_hash}"
@@ -169,11 +173,26 @@ class FileStorageService:
             # Check storage limits
             self._check_storage_limits(session_id, "images")
 
+            # Determine file extension from MIME type
+            extension = '.png'  # default
+            if file_type:
+                if 'jpeg' in file_type or 'jpg' in file_type:
+                    extension = '.jpg'
+                elif 'png' in file_type:
+                    extension = '.png'
+                elif 'gif' in file_type:
+                    extension = '.gif'
+                elif 'bmp' in file_type:
+                    extension = '.bmp'
+
             # Save image file
-            image_path = self.images_dir / f"{image_id}.png"
+            image_path = self.images_dir / f"{image_id}{extension}"
             if not image_path.exists():
                 image_bytes = base64.b64decode(image_data)
                 image_path.write_bytes(image_bytes)
+                logger.debug(
+                    f"Saved image file: {image_path}, size: {len(image_bytes)} bytes"
+                )
 
             # Save metadata
             metadata = {
@@ -182,14 +201,18 @@ class FileStorageService:
                 "file_type": file_type,
                 "session_id": session_id,
                 "file_path": str(image_path),
-                "size_bytes": len(image_data),
+                "size_bytes": len(
+                    base64.b64decode(image_data)
+                ),  # Use actual bytes size, not base64 size
                 "upload_type": "user_uploaded",
             }
 
             metadata_path = self.metadata_dir / f"{image_id}.json"
             metadata_path.write_text(json.dumps(metadata, indent=2))
 
-            logger.info(f"Stored uploaded image {image_id} for session {session_id}")
+            logger.info(
+                f"Stored uploaded image {image_id} ({filename}), size: {metadata['size_bytes'] / 1024:.1f} KB"
+            )
             return image_id
 
         except Exception as e:

@@ -72,7 +72,7 @@ class ImageAnalysisTool(BaseTool):
             import streamlit as st
 
             if (
-                not hasattr(st.session_state, 'current_image_base64')
+                not hasattr(st.session_state, "current_image_base64")
                 or not st.session_state.current_image_base64
             ):
                 return ImageAnalysisResponse(
@@ -86,9 +86,21 @@ class ImageAnalysisTool(BaseTool):
 
             # Get image data from session state
             image_base64 = st.session_state.current_image_base64
-            filename = getattr(st.session_state, 'current_image_filename', 'Unknown')
+            filename = getattr(st.session_state, "current_image_filename", "Unknown")
 
         logger.info(f"Analyzing image: {filename}")
+        logger.debug(f"Image base64 length: {len(image_base64)}")
+
+        # Log the actual size of the image being sent to VLM
+        import base64
+
+        try:
+            image_bytes = base64.b64decode(image_base64)
+            logger.debug(
+                f"Image size being sent to VLM: {len(image_bytes) / 1024:.2f} KB"
+            )
+        except Exception as e:
+            logger.error(f"Failed to decode base64 for size check: {e}")
 
         try:
             # Analyze the image
@@ -127,8 +139,94 @@ class ImageAnalysisTool(BaseTool):
         """
         try:
             # Import here to avoid circular imports
+            import base64
+            from io import BytesIO
+
             from models.chat_config import ChatConfig
             from openai import OpenAI
+            from PIL import Image
+
+            # Resize image before sending to VLM to prevent OOM
+            try:
+                # Decode base64 to PIL Image
+                image_bytes = base64.b64decode(image_base64)
+                img = Image.open(BytesIO(image_bytes))
+
+                original_width, original_height = img.size
+                max_dimension = 150  # Maximum dimension for VLM
+
+                logger.info(
+                    f"VLM preprocessing - Original image dimensions: {original_width}x{original_height}"
+                )
+
+                # Check if resizing is needed
+                if original_width > max_dimension or original_height > max_dimension:
+                    # Calculate scale factor
+                    scale = max_dimension / max(original_width, original_height)
+                    new_width = int(original_width * scale)
+                    new_height = int(original_height * scale)
+
+                    # Resize image
+                    resized_img = img.resize(
+                        (new_width, new_height), Image.Resampling.LANCZOS
+                    )
+
+                    logger.info(
+                        f"Resized image for VLM from {original_width}x{original_height} to {new_width}x{new_height}"
+                    )
+
+                    # Convert back to base64
+                    buffer = BytesIO()
+                    # Save as JPEG with good quality to reduce size further
+                    if img.mode in ('RGBA', 'LA', 'P'):
+                        # Convert to RGB for JPEG
+                        rgb_img = Image.new('RGB', resized_img.size, (255, 255, 255))
+                        rgb_img.paste(
+                            resized_img,
+                            mask=(
+                                resized_img.split()[-1]
+                                if resized_img.mode == 'RGBA'
+                                else None
+                            ),
+                        )
+                        resized_img = rgb_img
+
+                    resized_img.save(buffer, format='JPEG', quality=85, optimize=True)
+                    buffer.seek(0)
+                    resized_bytes = buffer.getvalue()
+                    image_base64 = base64.b64encode(resized_bytes).decode('utf-8')
+
+                    logger.info(
+                        f"VLM image size after resize: {len(resized_bytes) / 1024:.2f} KB"
+                    )
+                else:
+                    logger.info(
+                        f"Image already small enough for VLM: {original_width}x{original_height}"
+                    )
+                    # Still convert to JPEG to reduce size if it's PNG
+                    if (
+                        img.format == 'PNG' or len(image_bytes) > 50 * 1024
+                    ):  # If PNG or larger than 50KB
+                        buffer = BytesIO()
+                        if img.mode in ('RGBA', 'LA', 'P'):
+                            rgb_img = Image.new('RGB', img.size, (255, 255, 255))
+                            rgb_img.paste(
+                                img,
+                                mask=img.split()[-1] if img.mode == 'RGBA' else None,
+                            )
+                            img = rgb_img
+                        img.save(buffer, format='JPEG', quality=85, optimize=True)
+                        buffer.seek(0)
+                        jpeg_bytes = buffer.getvalue()
+                        if len(jpeg_bytes) < len(image_bytes):
+                            image_base64 = base64.b64encode(jpeg_bytes).decode('utf-8')
+                            logger.info(
+                                f"Converted to JPEG for VLM: {len(image_bytes) / 1024:.2f} KB -> {len(jpeg_bytes) / 1024:.2f} KB"
+                            )
+
+            except Exception as e:
+                logger.error(f"Failed to resize image for VLM, using original: {e}")
+                # Continue with original image if resize fails
 
             config_obj = ChatConfig.from_environment()
 
@@ -145,10 +243,6 @@ class ImageAnalysisTool(BaseTool):
 
             # Create one-shot message with image and question
             messages = [
-                {
-                    "role": "system",
-                    "content": "Detailed thinking off - You are a helpful assistant that analyzes images based on the user query. You are also able to answer questions about the image.",
-                },
                 {
                     "role": "user",
                     "content": [

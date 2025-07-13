@@ -2,11 +2,13 @@ import base64
 import logging
 import os
 import tempfile
+from io import BytesIO
 from typing import Tuple
 
 import streamlit as st
 from controllers.message_controller import MessageController
 from models.chat_config import ChatConfig
+from PIL import Image
 from utils.config import config
 
 
@@ -74,6 +76,10 @@ class ImageController:
         Returns:
             Tuple of (success: bool, result: dict)
         """
+        logging.info(
+            f"Starting to process image file: {uploaded_file.name}, type: {uploaded_file.type}"
+        )
+
         # Create temporary file with configured suffix
         with tempfile.NamedTemporaryFile(
             delete=False, suffix=f".{uploaded_file.type.split('/')[-1]}"
@@ -84,6 +90,8 @@ class ImageController:
         try:
             # Check file size limits
             file_size = os.path.getsize(temp_file_path)
+            logging.debug(f"Original file size: {file_size / 1024:.2f} KB")
+
             if file_size > config.file_processing.MAX_IMAGE_SIZE:
                 return (
                     False,
@@ -92,10 +100,81 @@ class ImageController:
                     },
                 )
 
-            # Read the image file and convert to base64
-            with open(temp_file_path, "rb") as image_file:
-                image_bytes = image_file.read()
+            # Open image with PIL for resizing
+            with Image.open(temp_file_path) as img:
+                original_width, original_height = img.size
+                max_dimension = 150
+
+                logging.debug(
+                    f"Original image dimensions: {original_width}x{original_height}"
+                )
+
+                # Check if resizing is needed
+                if original_width > max_dimension or original_height > max_dimension:
+                    # Calculate scale factor to fit longest side within max_dimension
+                    scale = max_dimension / max(original_width, original_height)
+
+                    # Calculate new dimensions
+                    new_width = int(original_width * scale)
+                    new_height = int(original_height * scale)
+
+                    logging.debug(f"Image needs resizing. Scale factor: {scale:.3f}")
+
+                    # Resize using high-quality Lanczos resampling
+                    resized_img = img.resize(
+                        (new_width, new_height), Image.Resampling.LANCZOS
+                    )
+
+                    logging.info(
+                        f"Resized uploaded image '{uploaded_file.name}' from {original_width}x{original_height} to {new_width}x{new_height}"
+                    )
+
+                    # Save resized image to bytes
+                    img_buffer = BytesIO()
+                    # Determine format from file type or default to PNG
+                    img_format = uploaded_file.type.split('/')[-1].upper()
+                    if img_format == 'JPG':
+                        img_format = 'JPEG'
+                    if img_format not in ['JPEG', 'PNG', 'GIF', 'BMP']:
+                        img_format = 'PNG'
+
+                    logging.debug(f"Saving resized image as format: {img_format}")
+
+                    resized_img.save(img_buffer, format=img_format, optimize=True)
+                    img_buffer.seek(0)  # Reset buffer position to beginning
+                    image_bytes = img_buffer.getvalue()
+
+                    logging.debug(
+                        f"Resized image size: {len(image_bytes) / 1024:.2f} KB"
+                    )
+                else:
+                    logging.debug(
+                        f"Uploaded image '{uploaded_file.name}' already within size limit ({original_width}x{original_height})"
+                    )
+                    # Read original image bytes
+                    with open(temp_file_path, "rb") as image_file:
+                        image_bytes = image_file.read()
+
+                # Convert to base64
                 image_base64 = base64.b64encode(image_bytes).decode("utf-8")
+
+                # Verify the dimensions of the final image
+                from io import BytesIO as IOByteIO
+
+                from PIL import Image as PILImage
+
+                verify_img = PILImage.open(IOByteIO(image_bytes))
+                verify_width, verify_height = verify_img.size
+                logging.debug(
+                    f"Final image dimensions after processing: {verify_width}x{verify_height}"
+                )
+
+                # Update file size after potential resizing
+                file_size = len(image_bytes)
+
+                logging.info(
+                    f"Processed image '{uploaded_file.name}': {file_size / 1024:.2f} KB, {verify_width}x{verify_height}"
+                )
 
             # Get file type from uploaded file
             file_type = uploaded_file.type if uploaded_file.type else "image/png"
@@ -112,13 +191,14 @@ class ImageController:
 
         except Exception as e:
             error_msg = f"Failed to process image file: {str(e)}"
-            logging.error(f"Image processing error: {e}")
+            logging.error(f"Image processing error: {e}", exc_info=True)
             return False, {"error": error_msg}
 
         finally:
             # Clean up temporary file
             try:
                 os.unlink(temp_file_path)
+                logging.debug(f"Cleaned up temporary file: {temp_file_path}")
             except OSError:
                 pass
 
@@ -155,8 +235,16 @@ class ImageController:
                 st.session_state.current_image_filename = filename
                 st.session_state.current_image_id = image_id
 
-                logging.info(
+                logging.debug(
                     f"Stored image in session state - filename: {filename}, data length: {len(image_data['image_data'])}"
+                )
+
+                # Verify the size of what we stored in session state
+                import base64 as b64
+
+                stored_bytes = b64.b64decode(st.session_state.current_image_base64)
+                logging.debug(
+                    f"Session state image size: {len(stored_bytes) / 1024:.2f} KB"
                 )
 
                 # Add user notification message (without base64 data)

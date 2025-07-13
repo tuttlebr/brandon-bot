@@ -266,3 +266,11 @@ ignore.*
 ignore/
 tmp/
 node_modules/
+
+create-app-secrets.sh
+create-ssl-secret.sh
+deploy.sh
+env-to-k8s.sh
+kubernetes-deployment-guide.md
+kubernetes-deployment.yaml
+undeploy.sh

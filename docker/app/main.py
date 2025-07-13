@@ -9,7 +9,6 @@ from controllers.image_controller import ImageController
 from controllers.message_controller import MessageController
 from controllers.response_controller import ResponseController
 from controllers.session_controller import SessionController
-
 from models import ChatConfig
 from services import ChatService, ImageService, LLMService
 from services.pdf_context_service import PDFContextService
@@ -425,6 +424,34 @@ class ProductionStreamlitChatApp:
                 if latest_image:
                     filename = latest_image.get("filename", "Unknown")
                     st.success(f"✅ Current Image: {filename}")
+
+                    # Remove verbose logging that runs every second
+                    # Only log once when the image changes
+                    if (
+                        not hasattr(st.session_state, '_last_displayed_image')
+                        or st.session_state._last_displayed_image != filename
+                    ):
+                        st.session_state._last_displayed_image = filename
+                        if "image_data" in latest_image:
+                            import base64
+
+                            img_bytes = base64.b64decode(latest_image['image_data'])
+                            logging.info(
+                                f"Displaying new image {filename}: {len(img_bytes) / 1024:.2f} KB"
+                            )
+
+                            # Check actual dimensions only for new images
+                            try:
+                                from io import BytesIO
+
+                                from PIL import Image
+
+                                img = Image.open(BytesIO(img_bytes))
+                                width, height = img.size
+                                logging.info(f"Image dimensions: {width}x{height}")
+                            except Exception as e:
+                                logging.error(f"Failed to check image dimensions: {e}")
+
                     st.image(latest_image["file_path"])
 
                     if st.button(

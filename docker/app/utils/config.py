@@ -357,6 +357,11 @@ class AppConfig:
 # Use this throughout the application instead of scattered constants
 config = AppConfig()
 
+# Ensure log directory exists before configuring logging
+import os
+
+log_dir = "/tmp/chatbot_storage"
+os.makedirs(log_dir, exist_ok=True)
 
 # Configure logging with centralized format
 logging.basicConfig(
@@ -365,6 +370,6 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler("/tmp/chatbot_storage/chatbot.log", mode="a"),
+        logging.FileHandler(os.path.join(log_dir, "chatbot.log"), mode="a"),
     ],
 )

@@ -9,7 +9,7 @@ volumes:
 
 services:
   app:
-    image: streamlit-chatbot:local
+    image: daedalus.ddns.me:5050/btuttle/streamlit-chatbot:latest
     build:
       context: ./docker
       dockerfile: Dockerfile
@@ -29,7 +29,7 @@ services:
       - chatbot-network
 
   docs:
-    image: streamlit-chatbot-docs:local
+    image: daedalus.ddns.me:5050/btuttle/streamlit-chatbot-docs:latest
     build:
       context: ./docker
       dockerfile: Dockerfile
@@ -67,8 +67,10 @@ services:
       context: ./docker
       dockerfile: Dockerfile
       target: jupyter
-    image: jupyter/notebook:latest
+    image: daedalus.ddns.me:5050/btuttle/jupyter/notebook:latest
     working_dir: /workspace
+    env_file:
+      - .env
     ports:
       - "8888:8888"
     volumes:
