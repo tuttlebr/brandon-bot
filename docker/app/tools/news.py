@@ -88,14 +88,46 @@ class NewsTool(BaseTool):
             results: List of search results
 
         Returns:
-            List of search results with extracted content added
+            List of high-scoring search results with extracted content added
         """
-        # Filter results with score >= 0.45
-        high_scoring_results = [result for result in results if result.score >= 0.45]
+        # Filter results with score >= 0.8
+        high_scoring_results = [result for result in results if result.score >= 0.8]
 
         if not high_scoring_results:
-            logger.debug("No high-scoring results to extract content from")
-            return results
+            logger.debug(
+                "No high-scoring results found, attempting extraction for top result only"
+            )
+            if not results:
+                return []
+
+            # Use the top result as fallback and attempt extraction
+            top_result = results[0]
+            fallback_results = [top_result]
+
+            # Import extract tool
+            from tools.extract import execute_web_extract_batch
+
+            try:
+                # Attempt extraction for the top result
+                extract_results = execute_web_extract_batch([top_result.url])
+
+                # Update with extracted content if successful
+                for extract_result in extract_results:
+                    if extract_result.success and extract_result.content:
+                        top_result.extracted_content = extract_result.content
+                        logger.debug(
+                            f"Successfully extracted content from fallback result: {extract_result.url}"
+                        )
+                    else:
+                        logger.warning(
+                            f"Failed to extract content from fallback result: {extract_result.url}"
+                        )
+
+            except Exception as e:
+                logger.error(f"Error in fallback extraction: {e}")
+                # Continue without extracted content - don't fail the entire search
+
+            return fallback_results
 
         logger.info(
             f"Extracting content for {len(high_scoring_results)} high-scoring results"
@@ -110,9 +142,6 @@ class NewsTool(BaseTool):
 
             # Perform batch extraction
             extract_results = execute_web_extract_batch(urls)
-            logger.info(
-                f"Batch extraction completed. {len(extract_results)} successful extractions"
-            )
 
             # Create a mapping of URL to extracted content
             url_to_content = {}
@@ -127,8 +156,8 @@ class NewsTool(BaseTool):
                         f"Failed to extract content from {extract_result.url}: {extract_result.error_message}"
                     )
 
-            # Update the original results with extracted content
-            for result in results:
+            # Update only the high-scoring results with extracted content
+            for result in high_scoring_results:
                 if result.url in url_to_content:
                     result.extracted_content = url_to_content[result.url]
 
@@ -140,7 +169,7 @@ class NewsTool(BaseTool):
             logger.error(f"Error in batch extraction: {e}")
             # Continue without extracted content - don't fail the entire search
 
-        return results
+        return high_scoring_results
 
     def format_results(self, results: List[SearchResult]) -> str:
         """
@@ -160,14 +189,14 @@ class NewsTool(BaseTool):
             # Clean up content text to remove formatting artifacts
             clean_content = self._clean_content(result.content)
             # Format as: 1. [title](url): content
-            entry = f"{i}. [{result.title}]({result.url}): {clean_content}"
+            entry = f"{i}. [{result.title}]({result.url}): {clean_content}\n___"
 
             # Add extracted content if available
             if result.extracted_content:
                 # Strip think tags from extracted content before display
                 cleaned_extract = strip_think_tags(result.extracted_content)
 
-                entry += f"\n\n**Extracted Content:** {cleaned_extract}"
+                entry += f"\n\n**Extracted Content:**\n{cleaned_extract}"
 
             formatted_entries.append(entry)
 
@@ -244,7 +273,7 @@ class NewsTool(BaseTool):
             "topic": "news",
             "auto_parameters": True,
             "include_raw_content": False,
-            "max_results": 10,
+            "max_results": 5,
             "include_images": False,
             "country": "united states",
         }

@@ -8,7 +8,7 @@ Tools can use "fast", "llm", "intelligent", or "vlm" models based on their requi
 # Tool LLM type configurations - matching actual tool names from tool classes
 TOOL_LLM_TYPES = {
     "conversation_context": "llm",
-    "extract_web_content": "fast",
+    "extract_web_content": "intelligent",
     "get_weather": "fast",
     "tavily_news_search": "llm",
     "tavily_internet_search": "fast",
