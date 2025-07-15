@@ -16,7 +16,7 @@ A production-ready conversational AI application built with Streamlit, featuring
 
 ## Overview
 
-This application provides a sophisticated chat interface powered by NVIDIA's language models, with support for:
+This application provides a sophisticated agent interface powered by NVIDIA's language models, with support for:
 
 - 🤖 Real-time streaming responses with tool calling capabilities
 - 📄 Intelligent PDF document analysis with progress tracking
@@ -29,7 +29,7 @@ This application provides a sophisticated chat interface powered by NVIDIA's lan
 
 ### Core Capabilities
 
-- **Multimodal Chat Interface**: Support for text, images, and document-based conversations
+- **Multimodal Interface**: Support for text, images, and document-based conversations
 - **Advanced Tool System**: 11 specialized tools for various tasks
 - **Smart Context Management**: Automatic conversation context injection
 - **Real-time Streaming**: Smooth response streaming with progress indicators
@@ -55,7 +55,7 @@ This application provides a sophisticated chat interface powered by NVIDIA's lan
 The application follows a Model-View-Controller (MVC) pattern with clear separation of concerns:
 
 ```
-streamlit-chatbot/
+./
 ├── docker/
 │   └── app/
 │       ├── main.py                    # Application entry point
