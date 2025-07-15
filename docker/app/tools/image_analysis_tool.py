@@ -146,83 +146,88 @@ class ImageAnalysisTool(BaseTool):
             from openai import OpenAI
             from PIL import Image
 
-            # Resize image before sending to VLM to prevent OOM
+            # Resize image using 12-tile constraint system
             try:
                 # Decode base64 to PIL Image
                 image_bytes = base64.b64decode(image_base64)
                 img = Image.open(BytesIO(image_bytes))
 
                 original_width, original_height = img.size
-                max_dimension = 1024  # Maximum dimension for VLM
+                original_aspect = original_width / original_height
 
                 logger.info(
-                    f"VLM preprocessing - Original image dimensions: {original_width}x{original_height}"
+                    f"VLM preprocessing - Original image dimensions: {original_width}x{original_height}, aspect ratio: {original_aspect:.3f}"
                 )
 
-                # Check if resizing is needed
-                if original_width > max_dimension or original_height > max_dimension:
-                    # Calculate scale factor
-                    scale = max_dimension / max(original_width, original_height)
-                    new_width = int(original_width * scale)
-                    new_height = int(original_height * scale)
+                # Find best tile configuration (w_tiles × h_tiles ≤ 12) that maintains closest aspect ratio
+                # with maximum dimension constraint of 3072 pixels
+                best_tiles = (1, 1)
+                best_aspect_diff = float('inf')
+                max_dimension = 3072
+                tile_size = 512
+                max_tiles_per_dimension = (
+                    max_dimension // tile_size
+                )  # 6 tiles max per dimension
 
+                for w_tiles in range(1, max_tiles_per_dimension + 1):
+                    for h_tiles in range(1, max_tiles_per_dimension + 1):
+                        if w_tiles * h_tiles > 12:
+                            break
+
+                        tile_aspect = w_tiles / h_tiles
+                        aspect_diff = abs(original_aspect - tile_aspect)
+
+                        if aspect_diff < best_aspect_diff:
+                            best_aspect_diff = aspect_diff
+                            best_tiles = (w_tiles, h_tiles)
+
+                # Calculate target dimensions
+                target_width = best_tiles[0] * 512
+                target_height = best_tiles[1] * 512
+
+                # Ensure minimum 32x32
+                target_width = max(target_width, 32)
+                target_height = max(target_height, 32)
+
+                # Check if resizing is needed
+                if original_width != target_width or original_height != target_height:
                     # Resize image
                     resized_img = img.resize(
-                        (new_width, new_height), Image.Resampling.LANCZOS
+                        (target_width, target_height), Image.Resampling.LANCZOS
                     )
 
                     logger.info(
-                        f"Resized image for VLM from {original_width}x{original_height} to {new_width}x{new_height}"
-                    )
-
-                    # Convert back to base64
-                    buffer = BytesIO()
-                    # Save as JPEG with good quality to reduce size further
-                    if img.mode in ('RGBA', 'LA', 'P'):
-                        # Convert to RGB for JPEG
-                        rgb_img = Image.new('RGB', resized_img.size, (255, 255, 255))
-                        rgb_img.paste(
-                            resized_img,
-                            mask=(
-                                resized_img.split()[-1]
-                                if resized_img.mode == 'RGBA'
-                                else None
-                            ),
-                        )
-                        resized_img = rgb_img
-
-                    resized_img.save(buffer, format='JPEG', quality=85, optimize=True)
-                    buffer.seek(0)
-                    resized_bytes = buffer.getvalue()
-                    image_base64 = base64.b64encode(resized_bytes).decode('utf-8')
-
-                    logger.info(
-                        f"VLM image size after resize: {len(resized_bytes) / 1024:.2f} KB"
+                        f"Resized image for VLM from {original_width}x{original_height} to {target_width}x{target_height} (tiles: {best_tiles[0]}x{best_tiles[1]})"
                     )
                 else:
+                    resized_img = img
                     logger.info(
-                        f"Image already small enough for VLM: {original_width}x{original_height}"
+                        f"Image already at target size: {target_width}x{target_height}"
                     )
-                    # Still convert to JPEG to reduce size if it's PNG
-                    if (
-                        img.format == 'PNG' or len(image_bytes) > 50 * 1024
-                    ):  # If PNG or larger than 50KB
-                        buffer = BytesIO()
-                        if img.mode in ('RGBA', 'LA', 'P'):
-                            rgb_img = Image.new('RGB', img.size, (255, 255, 255))
-                            rgb_img.paste(
-                                img,
-                                mask=img.split()[-1] if img.mode == 'RGBA' else None,
-                            )
-                            img = rgb_img
-                        img.save(buffer, format='JPEG', quality=85, optimize=True)
-                        buffer.seek(0)
-                        jpeg_bytes = buffer.getvalue()
-                        if len(jpeg_bytes) < len(image_bytes):
-                            image_base64 = base64.b64encode(jpeg_bytes).decode('utf-8')
-                            logger.info(
-                                f"Converted to JPEG for VLM: {len(image_bytes) / 1024:.2f} KB -> {len(jpeg_bytes) / 1024:.2f} KB"
-                            )
+
+                # Convert to RGB and encode (lossless PNG format)
+                buffer = BytesIO()
+                if resized_img.mode in ('RGBA', 'LA', 'P'):
+                    # Convert to RGB (no alpha channel support)
+                    rgb_img = Image.new('RGB', resized_img.size, (255, 255, 255))
+                    rgb_img.paste(
+                        resized_img,
+                        mask=(
+                            resized_img.split()[-1]
+                            if resized_img.mode == 'RGBA'
+                            else None
+                        ),
+                    )
+                    resized_img = rgb_img
+
+                resized_img.save(buffer, format='PNG')
+                buffer.seek(0)
+                resized_bytes = buffer.getvalue()
+                image_base64 = base64.b64encode(resized_bytes).decode('utf-8')
+
+                logger.info(
+                    f"VLM image size after processing: {len(resized_bytes) / 1024:.2f} KB"
+                )
 
             except Exception as e:
                 logger.error(f"Failed to resize image for VLM, using original: {e}")
