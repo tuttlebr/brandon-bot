@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import tempfile
 from typing import Tuple
 
@@ -36,6 +37,147 @@ class FileController:
         self.session_controller = session_controller
         self.pdf_summarization_service = PDFSummarizationService(config_obj)
         self.batch_processor = PDFBatchProcessor()
+
+    def normalize_pdf_text(self, pdf_data: dict) -> dict:
+        """
+        Normalize text content in PDF data to remove potentially problematic characters
+        and patterns that could cause issues with LLMs.
+
+        Args:
+            pdf_data: PDF data dictionary containing pages with text content
+
+        Returns:
+            PDF data with normalized text content
+        """
+        try:
+            if not isinstance(pdf_data, dict) or "pages" not in pdf_data:
+                return pdf_data
+
+            normalized_data = pdf_data.copy()
+            pages = normalized_data.get("pages", [])
+
+            for page in pages:
+                if isinstance(page, dict) and "text" in page:
+                    original_text = page.get("text", "")
+                    if isinstance(original_text, str):
+                        page["text"] = self._normalize_text_content(original_text)
+
+            logging.debug(f"Normalized text content for {len(pages)} pages")
+            return normalized_data
+
+        except Exception as e:
+            logging.error(f"Error normalizing PDF text: {e}")
+            # Return original data if normalization fails
+            return pdf_data
+
+    def _normalize_text_content(self, text: str) -> str:
+        """
+        Normalize a single text string to remove problematic patterns and characters.
+
+        Args:
+            text: Original text content
+
+        Returns:
+            Normalized text content
+        """
+        if not text or not isinstance(text, str):
+            return text
+
+        # Remove potential prompt injection patterns
+        # Remove common prompt injection attempts
+        prompt_injection_patterns = [
+            r'(?i)ignore\s+(?:all\s+)?(?:previous\s+)?(?:instructions?|prompts?|commands?)',
+            r'(?i)forget\s+(?:all\s+)?(?:previous\s+)?(?:instructions?|prompts?|commands?)',
+            r'(?i)system\s*:\s*you\s+are\s+now',
+            r'(?i)act\s+as\s+(?:a\s+)?(?:different|new)\s+(?:ai|assistant|bot)',
+            r'(?i)pretend\s+(?:to\s+be|you\s+are)',
+            r'(?i)role\s*:\s*(?:system|admin|root)',
+            r'(?i)override\s+(?:all\s+)?(?:previous\s+)?(?:instructions?|settings?)',
+            r'(?i)execute\s+(?:this\s+)?(?:command|code|script)',
+            r'(?i)\/\*.*?\*\/',  # Remove comment blocks
+            r'(?i)<!--.*?-->',  # Remove HTML comments
+        ]
+
+        normalized = text
+        for pattern in prompt_injection_patterns:
+            normalized = re.sub(pattern, '', normalized, flags=re.DOTALL)
+
+        # Remove excessive repetitive characters (more than 5 in a row)
+        # This prevents issues with very long sequences of the same character
+        normalized = re.sub(r'(.)\1{5,}', r'\1\1\1', normalized)
+
+        # Remove excessive whitespace but preserve paragraph breaks
+        normalized = re.sub(
+            r'\n\s*\n\s*\n+', '\n\n', normalized
+        )  # Max 2 consecutive newlines
+        normalized = re.sub(r'[ \t]+', ' ', normalized)  # Collapse multiple spaces/tabs
+
+        # Remove potentially problematic Unicode characters
+        # Remove various problematic Unicode ranges
+        problematic_ranges = [
+            r'[\u200B-\u200D]',  # Zero-width characters
+            r'[\u2060-\u206F]',  # Word joiner and other formatting characters
+            r'[\uFEFF]',  # Zero-width no-break space
+            r'[\u00AD]',  # Soft hyphen
+            r'[\u1680]',  # Ogham space mark
+            r'[\u180E]',  # Mongolian vowel separator
+            r'[\u2000-\u200A]',  # En quad to hair space
+            r'[\u2028-\u2029]',  # Line separator, paragraph separator
+            r'[\u202F]',  # Narrow no-break space
+            r'[\u205F]',  # Medium mathematical space
+            r'[\u3000]',  # Ideographic space
+        ]
+
+        for char_range in problematic_ranges:
+            normalized = re.sub(char_range, '', normalized)
+
+        # Remove control characters except for common ones (tab, newline, carriage return)
+        normalized = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', normalized)
+
+        # Remove excessive punctuation repetition (more than 3 in a row)
+        normalized = re.sub(r'([.!?;:,])\1{3,}', r'\1\1\1', normalized)
+
+        # Normalize quotes to prevent potential issues
+        normalized = re.sub(r'[""„‚«»‹›]', '"', normalized)
+        normalized = re.sub(r'[' '‛`]', "'", normalized)
+
+        # Remove potential script injection patterns
+        script_patterns = [
+            r'(?i)<script[^>]*>.*?</script>',
+            r'(?i)<iframe[^>]*>.*?</iframe>',
+            r'(?i)javascript\s*:',
+            r'(?i)on\w+\s*=\s*["\'].*?["\']',
+        ]
+
+        for pattern in script_patterns:
+            normalized = re.sub(pattern, '', normalized, flags=re.DOTALL)
+
+        # Trim excessive length per line (prevents extremely long lines)
+        lines = normalized.split('\n')
+        normalized_lines = []
+        for line in lines:
+            if len(line) > 5000:  # Arbitrary reasonable limit
+                # Split very long lines at sentence boundaries
+                sentences = re.split(r'(?<=[.!?])\s+', line)
+                current_line = ""
+                for sentence in sentences:
+                    if len(current_line + sentence) > 5000:
+                        if current_line:
+                            normalized_lines.append(current_line.strip())
+                        current_line = sentence
+                    else:
+                        current_line += (" " + sentence) if current_line else sentence
+                if current_line:
+                    normalized_lines.append(current_line.strip())
+            else:
+                normalized_lines.append(line)
+
+        normalized = '\n'.join(normalized_lines)
+
+        # Final cleanup - remove leading/trailing whitespace
+        normalized = normalized.strip()
+
+        return normalized
 
     def process_pdf_upload(self, uploaded_file) -> bool:
         """
@@ -132,7 +274,10 @@ class FileController:
             if not pages:
                 return False, {"error": "No pages found in PDF response"}
 
-            return True, pdf_data
+            # Normalize the text content to remove problematic characters
+            normalized_pdf_data = self.normalize_pdf_text(pdf_data)
+
+            return True, normalized_pdf_data
 
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
             if "Connection refused" in str(e):

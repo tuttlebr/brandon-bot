@@ -1,4 +1,4 @@
-# Streamlit Chat Application
+# Streamlit Agentic Application
 
 A production-ready conversational AI application built with Streamlit, featuring advanced language model capabilities, document analysis, and multimodal interactions.
 

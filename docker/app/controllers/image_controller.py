@@ -103,7 +103,7 @@ class ImageController:
             # Open image with PIL for resizing
             with Image.open(temp_file_path) as img:
                 original_width, original_height = img.size
-                max_dimension = 150
+                max_dimension = 1024
 
                 logging.debug(
                     f"Original image dimensions: {original_width}x{original_height}"

@@ -113,10 +113,11 @@ class LLMConfig:
     """LLM service configuration"""
 
     # Default model parameters
-    DEFAULT_TEMPERATURE: float = 0.6
+    DEFAULT_TEMPERATURE: float = 0.4
     DEFAULT_TOP_P: float = 0.95
     DEFAULT_FREQUENCY_PENALTY: float = 0.0
     DEFAULT_PRESENCE_PENALTY: float = 0.0
+    DEFAULT_MAX_TOKENS: int = 4096
 
     # Context and token limits
     SLIDING_WINDOW_MAX_TURNS: int = 20  # Increased from 6 to prevent context loss
@@ -177,7 +178,7 @@ class EnvironmentConfig:
 
     # Bot configuration
     BOT_TITLE: str = field(default_factory=lambda: os.getenv("BOT_TITLE", "Nano"))
-    META_USER: str = field(default_factory=lambda: os.getenv("META_USER", "human"))
+    META_USER: str = field(default_factory=lambda: os.getenv("META_USER", "Human"))
 
     # Model endpoints and names
     FAST_LLM_MODEL_NAME: Optional[str] = field(
@@ -311,6 +312,7 @@ class AppConfig:
             "top_p": self.llm.DEFAULT_TOP_P,
             "frequency_penalty": self.llm.DEFAULT_FREQUENCY_PENALTY,
             "presence_penalty": self.llm.DEFAULT_PRESENCE_PENALTY,
+            "max_tokens": self.llm.DEFAULT_MAX_TOKENS,
         }
 
     def get_api_timeout(self, endpoint_type: str = "default") -> int:

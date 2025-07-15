@@ -1,3 +1,45 @@
 from .components import ChatHistoryComponent
+from .view_helpers import (
+    ChatHelper,
+    FileHelper,
+    FormHelper,
+    LayoutHelper,
+    MessageHelper,
+    ProgressHelper,
+    ViewHelperFactory,
+    view_factory,
+)
+from .view_interfaces import (
+    IApplicationInterface,
+    IChatDisplayInterface,
+    IFileManagementInterface,
+    ILayoutInterface,
+    INotificationInterface,
+    ISessionManagementInterface,
+    IValidationDisplayInterface,
+    ViewInterfaceFactory,
+    ViewInterfaceRegistry,
+    view_registry,
+)
 
-__all__ = ["ChatHistoryComponent"]
+__all__ = [
+    "ChatHistoryComponent",
+    "ViewHelperFactory",
+    "MessageHelper",
+    "LayoutHelper",
+    "FormHelper",
+    "ChatHelper",
+    "FileHelper",
+    "ProgressHelper",
+    "view_factory",
+    "IChatDisplayInterface",
+    "IFileManagementInterface",
+    "ISessionManagementInterface",
+    "INotificationInterface",
+    "ILayoutInterface",
+    "IValidationDisplayInterface",
+    "IApplicationInterface",
+    "ViewInterfaceFactory",
+    "ViewInterfaceRegistry",
+    "view_registry",
+]

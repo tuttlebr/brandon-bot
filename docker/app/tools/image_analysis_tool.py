@@ -153,7 +153,7 @@ class ImageAnalysisTool(BaseTool):
                 img = Image.open(BytesIO(image_bytes))
 
                 original_width, original_height = img.size
-                max_dimension = 150  # Maximum dimension for VLM
+                max_dimension = 1024  # Maximum dimension for VLM
 
                 logger.info(
                     f"VLM preprocessing - Original image dimensions: {original_width}x{original_height}"
