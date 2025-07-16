@@ -32,8 +32,6 @@ class AssistantTaskType(str, Enum):
     CRITIC = "critic"
     TRANSLATE = "translate"
     DEVELOP = "develop"
-    GENERALIST = "generalist"
-    QA = "qa"
 
 
 class AssistantResponse(BaseToolResponse):
@@ -74,7 +72,7 @@ class AssistantTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "text_assistant"
-        self.description = "ONLY use for text and document processing tasks when explicitly requested. Use 'analyze' for document insights and PDF analysis, 'summarize' to condense long content into key points, 'proofread' to correct errors and improve writing quality, 'rewrite' to enhance clarity and impact while preserving meaning, 'critic' for constructive feedback and improvement suggestions, 'translate' to convert text between languages, 'develop' for programming assistance and code writing, 'qa' to answer questions about document content, or 'generalist' for thoughtful discussion on any topic. DO NOT use for image analysis, general questions, web searches, or information lookup - use appropriate specialized tools for those tasks."
+        self.description = "ONLY use for text and document processing tasks when explicitly requested. Use 'analyze' for document insights and PDF analysis, 'summarize' to condense long content into key points, 'proofread' to correct errors and improve writing quality, 'rewrite' to enhance clarity and impact while preserving meaning, 'critic' for constructive feedback and improvement suggestions, 'translate' to convert text between languages, or 'develop' for programming assistance and code writing. DO NOT use for image analysis, general questions, web searches, or information lookup - use appropriate specialized tools for those tasks."
         self.supported_contexts = ['translation', 'text_processing', 'code_generation']
 
         # Initialize services
@@ -103,10 +101,8 @@ class AssistantTool(BaseTool):
                                 "critic",
                                 "translate",
                                 "develop",
-                                "generalist",
-                                "qa",
                             ],
-                            "description": "The type of text processing task to perform. Choose 'analyze' for document analysis and insights, 'summarize' to condense long text into key points, 'proofread' to correct errors and improve style, 'rewrite' to enhance clarity and impact, 'critic' for constructive feedback and improvement suggestions, 'translate' to convert between languages, 'develop' for programming and code assistance, 'qa' to answer questions about document content, or 'generalist' for thoughtful discussion on any topic.",
+                            "description": "The type of text processing task to perform. Choose 'analyze' for document analysis and insights, 'summarize' to condense long text into key points, 'proofread' to correct errors and improve style, 'rewrite' to enhance clarity and impact, 'critic' for constructive feedback and improvement suggestions, 'translate' to convert between languages, or 'develop' for programming and code assistance.",
                         },
                         "text": {
                             "type": "string",
@@ -114,11 +110,7 @@ class AssistantTool(BaseTool):
                         },
                         "instructions": {
                             "type": "string",
-                            "description": "REQUIRED when analyzing PDF content: The specific question or task about the document. For other tasks, use to provide specific guidance (e.g., 'focus on technical accuracy' for proofreading, 'make it more formal' for rewriting, 'target audience: executives' for summarize).",
-                        },
-                        "question": {
-                            "type": "string",
-                            "description": "The question to ask about the document content (required for Q&A tasks).",
+                            "description": "REQUIRED when analyzing PDF content: The specific task or analysis request about the document. For other tasks, use to provide specific guidance (e.g., 'focus on technical accuracy' for proofreading, 'make it more formal' for rewriting, 'target audience: executives' for summarize).",
                         },
                         "source_language": {
                             "type": "string",
@@ -157,7 +149,6 @@ class AssistantTool(BaseTool):
         task_type: str,
         text: str,
         instructions: Optional[str] = None,
-        question: Optional[str] = None,
         source_language: Optional[str] = None,
         target_language: Optional[str] = None,
         messages: Optional[List[Dict[str, Any]]] = None,
@@ -170,7 +161,6 @@ class AssistantTool(BaseTool):
             task_type: The type of task to perform
             text: The text to process
             instructions: Optional instructions
-            question: Question to ask about the document (for Q&A tasks)
             source_language: Source language for translation
             target_language: Target language for translation
             messages: Optional conversation messages
@@ -197,8 +187,6 @@ class AssistantTool(BaseTool):
             )
         elif task_enum == AssistantTaskType.ANALYZE:
             return await self._handle_analysis(text, instructions, messages)
-        elif task_enum == AssistantTaskType.QA:
-            return await self._handle_qa(text, question, instructions, messages)
         else:
             return await self._handle_text_processing(
                 task_enum, text, instructions, messages
@@ -319,65 +307,6 @@ class AssistantTool(BaseTool):
         else:
             raise Exception(result.get("error", "Analysis failed"))
 
-    async def _handle_qa(
-        self,
-        text: str,
-        question: Optional[str],
-        instructions: Optional[str],
-        messages: Optional[List[Dict[str, Any]]],
-    ) -> AssistantResponse:
-        """Handle Q&A tasks for document content"""
-
-        if not question:
-            raise ValueError("Question parameter is required for Q&A tasks")
-
-        # Prepare instructions for Q&A
-        qa_instructions = (
-            f"Answer the following question based on the document content: {question}"
-        )
-        if instructions:
-            qa_instructions += f"\n\nAdditional instructions: {instructions}"
-
-        # Use the document analyzer for Q&A tasks on PDFs
-        if self._is_pdf_content(text):
-            # Parse PDF pages from context
-            pages = self._parse_pdf_content(text)
-            if pages:
-                # For Q&A, try to load the complete document
-                complete_pages = self._load_complete_document_for_analysis(pages)
-                if complete_pages:
-                    logger.info(
-                        f"Loaded complete document with {len(complete_pages)} pages for Q&A"
-                    )
-                    result = await self.document_analyzer.analyze_pdf_pages(
-                        complete_pages, qa_instructions, "Document"
-                    )
-                else:
-                    # Fallback to context pages
-                    result = await self.document_analyzer.analyze_pdf_pages(
-                        pages, qa_instructions, "Document"
-                    )
-            else:
-                # Fallback to regular document analysis
-                result = await self.document_analyzer.analyze_document(
-                    text, qa_instructions
-                )
-        else:
-            # Regular document Q&A
-            result = await self.document_analyzer.analyze_document(
-                text, qa_instructions
-            )
-
-        if result["success"]:
-            return AssistantResponse(
-                original_text=text,
-                task_type=AssistantTaskType.QA,
-                result=strip_think_tags(result["result"]),
-                processing_notes=result.get("processing_notes"),
-            )
-        else:
-            raise Exception(result.get("error", "Q&A failed"))
-
     async def _handle_text_processing(
         self,
         task_type: AssistantTaskType,
@@ -394,7 +323,6 @@ class AssistantTool(BaseTool):
             AssistantTaskType.REWRITE: TextTaskType.REWRITE,
             AssistantTaskType.CRITIC: TextTaskType.CRITIC,
             AssistantTaskType.DEVELOP: TextTaskType.DEVELOP,
-            AssistantTaskType.GENERALIST: TextTaskType.GENERALIST,
         }
 
         text_task_type = text_task_map.get(task_type)
@@ -572,7 +500,6 @@ def execute_assistant_task(
     task_type: str,
     text: str,
     instructions: Optional[str] = None,
-    question: Optional[str] = None,
     source_language: Optional[str] = None,
     target_language: Optional[str] = None,
 ) -> AssistantResponse:
@@ -583,7 +510,6 @@ def execute_assistant_task(
         task_type: The type of task to perform
         text: The text to process
         instructions: Optional specific instructions
-        question: Question to ask about the document (for Q&A tasks)
         source_language: Source language for translation (optional)
         target_language: Target language for translation (required for translation)
 
@@ -595,7 +521,6 @@ def execute_assistant_task(
             "task_type": task_type,
             "text": text,
             "instructions": instructions,
-            "question": question,
             "source_language": source_language,
             "target_language": target_language,
         }

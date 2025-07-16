@@ -8,21 +8,22 @@ Tools can use "fast", "llm", "intelligent", or "vlm" models based on their requi
 # Tool LLM type configurations - matching actual tool names from tool classes
 TOOL_LLM_TYPES = {
     "conversation_context": "llm",
-    "extract_web_content": "intelligent",
+    "extract_web_content": "llm",
     "get_weather": "fast",
-    "tavily_news_search": "llm",
+    "tavily_news_search": "fast",
     "tavily_internet_search": "fast",
     "retrieval_search": "llm",
-    "retrieve_pdf_summary": "intelligent",
-    "process_pdf_text": "intelligent",
-    "text_assistant": "intelligent",
+    "retrieve_pdf_summary": "llm",
+    "process_pdf_text": "llm",
+    "text_assistant": "fast",
     "generate_image": "fast",
     "analyze_image": "vlm",
+    "generalist_conversation": "fast",
     "tool_selection": "intelligent",
 }
 
 # Default LLM type if not specified
-DEFAULT_LLM_TYPE = "llm"
+DEFAULT_LLM_TYPE = "fast"
 
 
 def get_tool_llm_type(tool_name: str) -> str:

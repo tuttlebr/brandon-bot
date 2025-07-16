@@ -6,6 +6,8 @@ description = "Agentic chatbot for the BrandonBot project"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "html2text==2025.4.15",
+    "beautifulsoup4==4.13.4",
     "langchain==0.3.25",
     "langchain-openai==0.3.23",
     "openai==1.86.0",

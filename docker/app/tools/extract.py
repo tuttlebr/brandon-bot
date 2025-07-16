@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 import requests
+from bs4 import BeautifulSoup
 from pydantic import Field
 from services.llm_client_service import llm_client_service
 from tools.base import BaseTool, BaseToolResponse
@@ -45,12 +46,12 @@ class WebExtractTool(BaseTool):
 
         # Request headers to mimic a real browser
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Accept-Encoding': 'gzip, deflate',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate",
+            "Connection": "keep-alive",
+            "Upgrade-Insecure-Requests": "1",
         }
 
     def to_openai_format(self) -> Dict[str, Any]:
@@ -113,7 +114,7 @@ class WebExtractTool(BaseTool):
         """
         try:
             # Basic URL validation
-            if not url.startswith(('http://', 'https://')):
+            if not url.startswith(("http://", "https://")):
                 return False
 
             # Parse URL to validate structure
@@ -184,17 +185,23 @@ class WebExtractTool(BaseTool):
             response.raise_for_status()
 
             # Check if content is HTML
-            content_type = response.headers.get('content-type', '').lower()
+            content_type = response.headers.get("content-type", "").lower()
             if (
-                'text/html' not in content_type
-                and 'application/xhtml' not in content_type
+                "text/html" not in content_type
+                and "application/xhtml" not in content_type
             ):
                 raise ValueError(
                     f"URL does not return HTML content. Content-Type: {content_type}"
                 )
 
+            soup = BeautifulSoup(response.text, "html.parser")
+            for script in soup(["script", "style", "noscript", "iframe"]):
+                script.decompose()
+            body = str(soup.find("body"))
+
             response_time = time.time() - start_time
-            return response.text, response_time
+
+            return body, response_time
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to fetch URL {url}: {e}")
@@ -223,16 +230,15 @@ class WebExtractTool(BaseTool):
                 f"Using LLM type '{self.llm_type}' for web extraction (configured in tool_llm_config.py)"
             )
 
-            # Truncate HTML if it's too large (keep first 100k characters)
-            if len(html_content) > 100000:
+            if len(html_content) > 200000:
                 html_content = (
-                    html_content[:100000] + "\n[Content truncated due to length]"
+                    html_content[:200000] + "\n[Content truncated due to length]"
                 )
                 logger.info(
-                    f"Truncated HTML content to 100k characters for LLM processing"
+                    f"Truncated HTML content to 300k characters for LLM processing"
                 )
 
-            system_prompt = """detailed thinking on
+            system_prompt = """detailed thinking off
 
 You are an expert HTML to markdown converter. Your task is to extract the main content from web pages and convert it to clean, readable markdown format.
 
@@ -261,9 +267,7 @@ Output only the extracted markdown content, nothing else."""
             response = client.chat.completions.create(
                 model=model_name,
                 messages=messages,
-                temperature=0.6,  # Low temperature for consistent extraction
-                top_p=0.95,
-                max_tokens=4000,  # Reasonable limit for extracted content
+                temperature=0.0,
                 stream=False,
             )
 
@@ -372,11 +376,7 @@ Output only the extracted markdown content, nothing else."""
             return ExtractResult(
                 url=url,
                 content=extracted_content,
-                raw_content=(
-                    html_content[:5000] + "..."
-                    if len(html_content) > 5000
-                    else html_content
-                ),  # Store truncated raw content
+                raw_content=html_content,
                 success=True,
                 response_time=response_time,
             )
@@ -441,13 +441,13 @@ Output only the extracted markdown content, nothing else."""
             return ""
 
         # Remove excessive newlines
-        content = re.sub(r'\n{3,}', '\n\n', content)
+        content = re.sub(r"\n{3,}", "\n\n", content)
 
         # Remove any remaining HTML tags that might have slipped through
-        content = re.sub(r'<[^>]+>', '', content)
+        content = re.sub(r"<[^>]+>", "", content)
 
         # Remove excessive whitespace
-        content = re.sub(r' {2,}', ' ', content)
+        content = re.sub(r" {2,}", " ", content)
         content = content.strip()
 
         # Strip think tags from extracted content

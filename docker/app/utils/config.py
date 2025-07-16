@@ -72,7 +72,7 @@ class FileProcessingConfig:
     PDF_SUMMARIZATION_BATCH_SIZE: int = (
         10  # Pages per batch for summarization (increased from 5)
     )
-    PDF_SUMMARY_MAX_LENGTH: int = 800  # Max words per page summary (increased from 500)
+    PDF_SUMMARY_MAX_LENGTH: int = 800
     PDF_SUMMARIZATION_ENABLED: bool = (
         True  # Enabled - summarization should be user-driven
     )
@@ -113,7 +113,7 @@ class LLMConfig:
     """LLM service configuration"""
 
     # Default model parameters
-    DEFAULT_TEMPERATURE: float = 0.4
+    DEFAULT_TEMPERATURE: float = 0.2
     DEFAULT_TOP_P: float = 0.95
     DEFAULT_FREQUENCY_PENALTY: float = 0.0
     DEFAULT_PRESENCE_PENALTY: float = 0.0

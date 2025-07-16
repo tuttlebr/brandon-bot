@@ -15,6 +15,12 @@ from .extract import (
     execute_web_extract_with_dict,
     get_web_extract_tool_definition,
 )
+from .generalist import (
+    GeneralistTool,
+    execute_generalist_conversation,
+    execute_generalist_with_dict,
+    get_generalist_tool_definition,
+)
 from .image_analysis_tool import (
     ImageAnalysisTool,
     execute_image_analysis_with_dict,
@@ -102,4 +108,8 @@ __all__ = [
     "get_tools_list_text",
     "execute_pdf_summary_with_dict",
     "get_pdf_summary_tool_definition",
+    "GeneralistTool",
+    "get_generalist_tool_definition",
+    "execute_generalist_conversation",
+    "execute_generalist_with_dict",
 ]

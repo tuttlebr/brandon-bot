@@ -115,7 +115,7 @@ class StreamingService:
             model: Model name
             model_type: Type of model to use
             tools: Optional tool definitions
-            tool_choice: How to handle tool selection ("auto", "none", or specific tool)
+            tool_choice: How to handle tool selection ("auto", None, or "required")
             **kwargs: Additional parameters for the API
 
         Returns:

@@ -25,7 +25,6 @@ class TextTaskType(str, Enum):
     REWRITE = "rewrite"
     CRITIC = "critic"
     DEVELOP = "develop"
-    GENERALIST = "generalist"
 
 
 class TextProcessorService:
@@ -379,5 +378,3 @@ class TextProcessorService:
             return "Critical analysis and feedback provided"
         elif task_type == TextTaskType.DEVELOP:
             return "Code is ready for review"
-        elif task_type == TextTaskType.GENERALIST:
-            return "Generalist advice provided"

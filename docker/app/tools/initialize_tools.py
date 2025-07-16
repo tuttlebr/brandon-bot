@@ -93,6 +93,12 @@ def initialize_all_tools():
         weather = WeatherTool()
         tool_registry.register(weather)
 
+        # Generalist Tool
+        from tools.generalist import GeneralistTool
+
+        generalist = GeneralistTool()
+        tool_registry.register(generalist)
+
         logger.info(f"Successfully initialized {len(tool_registry._tools)} tools")
 
     except Exception as e:

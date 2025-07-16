@@ -129,7 +129,7 @@ class LLMService:
                 tool_selection_model,
                 tool_selection_model_type,
                 tools=tools,
-                tool_choice="required",
+                tool_choice="auto",
             )
 
             # Parse response for content and tool calls
@@ -282,7 +282,7 @@ class LLMService:
             extended_messages = self.pdf_context_service.inject_pdf_context_forced(
                 extended_messages
             )
-            logger.info("Re-injected PDF context after tool execution")
+            logger.info("Re-injected text context after tool execution")
 
         # Check token count after adding tool responses and truncate if necessary
         max_tokens = config.llm.MAX_CONTEXT_TOKENS
@@ -307,6 +307,7 @@ class LLMService:
         self.last_ui_elements = ui_elements
 
         # Stream the final synthesized response based on all tool results
+        logger.info(f"Streaming final response with {model}:{model_type}")
         async for chunk in self.streaming_service.stream_completion(
             extended_messages, model, model_type
         ):

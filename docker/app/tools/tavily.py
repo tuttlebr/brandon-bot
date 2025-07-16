@@ -92,7 +92,7 @@ class TavilyTool(BaseTool):
             List of high-scoring search results with extracted content added
         """
         # Filter results with score >= 0.7
-        high_scoring_results = [result for result in results if result.score >= 0.7]
+        high_scoring_results = [result for result in results if result.score >= 0.6]
 
         if not high_scoring_results:
             logger.info(

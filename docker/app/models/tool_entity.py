@@ -121,7 +121,7 @@ class ToolEntity(BaseModel):
     description: str = Field(..., description="Tool description")
     tool_type: ToolType = Field(..., description="Tool type category")
     llm_type: Literal["fast", "llm", "intelligent", "vlm"] = Field(
-        default="intelligent", description="Required LLM type"
+        default="llm", description="Required LLM type"
     )
     status: ToolStatus = Field(
         default=ToolStatus.AVAILABLE, description="Current tool status"

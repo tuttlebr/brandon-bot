@@ -516,7 +516,7 @@ class ResponseController:
         if "formatted_results" in tool_data:
             formatted_results = tool_data["formatted_results"]
             if formatted_results and formatted_results.strip():
-                return f"**Tool Response Data:**\n{formatted_results}"
+                return f"**Tool Response Data:**\n\n{formatted_results}"
 
         # Handle different tool response formats
         if "results" in tool_data:
@@ -524,7 +524,7 @@ class ResponseController:
             if isinstance(results, list) and results:
                 return f"**Tool found {len(results)} results**"
             elif isinstance(results, str) and results.strip():
-                return f"**Tool Response:**\n{results}"
+                return f"**Tool Response:**\n\n{results}"
 
         # Handle weather tool response format
         if "location" in tool_data and "current" in tool_data:
@@ -540,6 +540,25 @@ class ResponseController:
             and isinstance(tool_data.get("content"), list)
         ):
             return self._format_pdf_content_context(tool_data)
+
+        # Handle web extraction results
+        if "url" in tool_data and "content" in tool_data and "success" in tool_data:
+            url = tool_data.get("url", "Unknown URL")
+            content = tool_data.get("content", "")
+            success = tool_data.get("success", False)
+
+            if success and content.strip():
+                # Show extracted content with URL context
+                content_preview = content[: config.tool_context.PREVIEW_TEXT_LENGTH]
+                if len(content) > config.tool_context.PREVIEW_TEXT_LENGTH:
+                    content_preview += config.tool_context.CONTEXT_TRUNCATION_SUFFIX
+
+                return f"**Web Content Extracted from:** {url}\n\n{content_preview}"
+            elif not success:
+                error_msg = tool_data.get("error_message", "Extraction failed")
+                return f"**Web Extraction Failed:** {url}\n\nError: {error_msg}"
+            else:
+                return f"**Web Extraction:** {url} (No content extracted)"
 
         # Generic fallback
         summary_parts = []

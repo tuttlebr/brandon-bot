@@ -246,7 +246,7 @@ class ImageAnalysisTool(BaseTool):
                 f"Using VLM model: {model_name} at endpoint: {config_obj.vlm_endpoint}"
             )
 
-            # Create one-shot message with image and question
+            # For better results, make sure to put the image before any text part in the request body.
             messages = [
                 {
                     "role": "user",
@@ -269,6 +269,7 @@ class ImageAnalysisTool(BaseTool):
                 temperature=1.0,
                 top_p=0.01,
                 stream=False,
+                max_tokens=256,
             )
 
             return response.choices[0].message.content.strip()
