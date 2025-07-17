@@ -162,9 +162,7 @@ class SimilaritySearch:
                 logging.warning("No results with valid logit scores after reranking")
                 return None
 
-            validated_results, stats = self._remove_outliers(
-                results_with_logits, std_threshold=0.85, key="logit"
-            )
+            validated_results = self._remove_outliers(results_with_logits, key="logit")
             limit = int(self.config.topk * 0.5)
             return [validated_results[:limit]]
         except Exception as e:
@@ -239,37 +237,27 @@ class SimilaritySearch:
     def _remove_outliers(
         self,
         data: Union[List[float], List[Dict[str, Any]]],
-        std_threshold: float = 1.0,
         key: Optional[str] = None,
-    ) -> Tuple[Union[List[float], List[Dict[str, Any]]], Dict[str, Any]]:
+    ) -> Union[List[float], List[Dict[str, Any]]]:
         """
-        Removes outliers from either a list of scores or a list of dictionaries containing scores
-        using a standard deviation approach. Values greater than (mean + std_threshold * std_dev)
-        will be considered outliers and removed.
+        Automatically removes outliers by finding natural breaks in the data distribution.
+        For logit scores, lower values are considered more relevant and the lowest value is always kept.
+        Finds the largest gap in sorted values to determine the natural cutoff point.
 
         Parameters:
-        data (Union[List[float], List[Dict[str, Any]]]): Either a list of similarity scores or a list of dictionaries with scores
-        std_threshold (float): Number of standard deviations from the mean to use as threshold
+        data (Union[List[float], List[Dict[str, Any]]]): Either a list of scores or a list of dictionaries with scores
         key (str, optional): If data is a list of dictionaries, the key for the score values
 
         Returns:
         Union[List[float], List[Dict[str, Any]]]: Filtered list with outliers removed
-        Dict[str, Any]: Statistics about the filtering process
-
-        Raises:
-        ValueError: If data is empty or contains non-numeric values
         """
         # Input validation
         if not data:
             logging.error("Input data cannot be empty")
-            return data, {"error": "Input data is empty"}
+            return data
 
         # Debug logging
-        logging.debug(
-            f"_remove_outliers called with {len(data)} items, key='{key}', std_threshold={std_threshold}"
-        )
-        if data and len(data) > 0:
-            logging.debug(f"First item type: {type(data[0])}, First item: {data[0]}")
+        logging.debug(f"_remove_outliers called with {len(data)} items, key='{key}'")
 
         try:
             # Extract scores if data is a list of dictionaries
@@ -282,9 +270,7 @@ class SimilaritySearch:
                     for item in data:
                         if key not in item:
                             logging.error(f"Key '{key}' not found in item: {item}")
-                            return data, {
-                                "error": f"Key '{key}' not found in data dictionary"
-                            }
+                            return data
 
                         value = item[key]
                         # Check if value is numeric (int, float) and not None/NaN
@@ -305,17 +291,14 @@ class SimilaritySearch:
 
                     if not raw_scores:
                         logging.warning("No valid numeric values found in data")
-                        return data, {"warning": "No valid numeric values found"}
+                        return data
 
                     scores = np.array(raw_scores, dtype=np.float64)
                     original_data = valid_items  # Use only the items with valid scores
 
-                except KeyError as e:
-                    logging.error(f"Key '{key}' not found in data dictionary: {e}")
-                    return data, {"error": f"Key '{key}' not found in data dictionary"}
                 except Exception as e:
                     logging.error(f"Error extracting scores from dictionary data: {e}")
-                    return data, {"error": f"Error extracting scores: {str(e)}"}
+                    return data
             else:
                 original_data = None
                 try:
@@ -335,131 +318,76 @@ class SimilaritySearch:
                         cleaned_data.append(float(value))
 
                     if not cleaned_data:
-                        logging.error(
-                            "No valid numeric values found in cleaned_data: %s",
-                            cleaned_data,
-                        )
-                        return data, {"error": "No valid numeric values found"}
+                        logging.error("No valid numeric values found in data")
+                        return data
 
                     scores = np.array(cleaned_data, dtype=np.float64)
                 except Exception as e:
                     logging.error(f"Error creating array from data: {e}")
-                    return data, {"error": f"Error creating array: {str(e)}"}
+                    return data
 
             # Verify we have a valid numeric array
             if not np.issubdtype(scores.dtype, np.number):
                 logging.error(
                     "All values must be numeric. Found non-numeric values in data."
                 )
-                return data, {"error": "Non-numeric values found in data"}
+                return data
 
             if len(scores) == 0:
                 logging.error("No valid scores remain after filtering")
-                return data, {"error": "No valid scores remain after filtering"}
+                return data
 
             original_count = len(scores)
 
-            # Calculate mean and standard deviation
-            mean = np.mean(scores)
-            std_dev = np.std(scores)
+            # If we only have 1-2 items, keep them all
+            if original_count <= 2:
+                logging.debug("Only 1-2 items, keeping all")
+                return data
 
-            # Calculate cutoff value (mean + std_threshold * std_dev)
-            cutoff = mean + (std_threshold * std_dev)
-            method_desc = f"standard deviation (keeping values < mean + {std_threshold} * std_dev)"
+            # Sort scores to find natural breaks
+            sorted_scores = np.sort(scores)
 
-            # Gather statistics
-            stats = {
-                "original_count": original_count,
-                "original_min": float(np.min(scores)),
-                "original_max": float(np.max(scores)),
-                "original_mean": float(mean),
-                "original_std_dev": float(std_dev),
-                "method": "std_dev",
-                "threshold_value": std_threshold,
-                "method_description": method_desc,
-                "cutoff_value": float(cutoff),
-            }
+            # Find the largest gap between consecutive values
+            gaps = []
+            gap_positions = []
 
-            # Filter based on the calculated cutoff
+            for i in range(1, len(sorted_scores)):
+                gap = sorted_scores[i] - sorted_scores[i - 1]
+                gaps.append(gap)
+                gap_positions.append(i)  # Position after which to cut
+
+            # Find the largest gap
+            max_gap_idx = np.argmax(gaps)
+            max_gap_size = gaps[max_gap_idx]
+            cut_position = gap_positions[max_gap_idx]
+
+            # The cutoff is the value just before the largest gap
+            cutoff = sorted_scores[cut_position - 1]
+
+            # Always keep at least the lowest value (most relevant)
+            min_score = np.min(scores)
+            if cutoff < min_score:
+                cutoff = min_score
+
+            # Filter based on the cutoff
             if original_data is None:
-                # Filter scores (keep values below the cutoff)
+                # Filter scores (keep values <= cutoff)
                 filtered_scores = scores[scores <= cutoff]
-
-                # Add filtered statistics
-                stats.update(
-                    {
-                        "filtered_count": len(filtered_scores),
-                        "removed_count": original_count - len(filtered_scores),
-                        "filtered_min": (
-                            float(np.min(filtered_scores))
-                            if len(filtered_scores) > 0
-                            else None
-                        ),
-                        "filtered_max": (
-                            float(np.max(filtered_scores))
-                            if len(filtered_scores) > 0
-                            else None
-                        ),
-                        "filtered_mean": (
-                            float(np.mean(filtered_scores))
-                            if len(filtered_scores) > 0
-                            else None
-                        ),
-                    }
-                )
-
                 logging.info(
-                    f"Removed {stats['removed_count']} values above cutoff {cutoff:.2f}"
+                    f"Natural break filtering: kept {len(filtered_scores)}/{original_count} values, cutoff: {cutoff:.6f}, largest gap: {max_gap_size:.6f}"
                 )
-                return filtered_scores.tolist()[:5], stats
-
-            # If we're working with dictionaries
+                return filtered_scores.tolist()[:5]
             else:
+                # Filter dictionaries
                 filtered_data = [item for item in original_data if item[key] <= cutoff]
-
-                # Add filtered statistics
-                if filtered_data:
-                    filtered_scores = np.array([item[key] for item in filtered_data])
-                    stats.update(
-                        {
-                            "filtered_count": len(filtered_data),
-                            "removed_count": original_count - len(filtered_data),
-                            "filtered_min": (
-                                float(np.min(filtered_scores))
-                                if len(filtered_data) > 0
-                                else None
-                            ),
-                            "filtered_max": (
-                                float(np.max(filtered_scores))
-                                if len(filtered_data) > 0
-                                else None
-                            ),
-                            "filtered_mean": (
-                                float(np.mean(filtered_scores))
-                                if len(filtered_data) > 0
-                                else None
-                            ),
-                        }
-                    )
-                else:
-                    stats.update(
-                        {
-                            "filtered_count": 0,
-                            "removed_count": original_count,
-                            "filtered_min": None,
-                            "filtered_max": None,
-                            "filtered_mean": None,
-                        }
-                    )
-
                 logging.info(
-                    f"Removed {stats['removed_count']} values above cutoff {cutoff:.2f}"
+                    f"Natural break filtering: kept {len(filtered_data)}/{original_count} items, cutoff: {cutoff:.6f}, largest gap: {max_gap_size:.6f}"
                 )
-                return filtered_data, stats
+                return filtered_data
 
         except Exception as e:
             logging.error(f"Error in remove_outliers: {str(e)}")
-            return data, {"error": str(e)}
+            return data
 
     def format_results(self, results: Optional[List[Dict[str, Any]]]) -> str:
         """Format search results for display"""

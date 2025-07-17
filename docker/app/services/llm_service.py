@@ -192,6 +192,20 @@ class LLMService:
         # Store for context extraction
         self.last_tool_responses = tool_responses
 
+        # Determine the LLM type for final response based on executed tools
+        # Use the first tool's configured LLM type (primary tool drives the response)
+        response_llm_type = model_type  # fallback to original
+        response_model = model  # fallback to original
+
+        if tool_calls:
+            primary_tool_name = tool_calls[0].get("name")
+            if primary_tool_name:
+                response_llm_type = get_tool_llm_type(primary_tool_name)
+                response_model = self._get_model_for_type(response_llm_type)
+                logger.info(
+                    f"Using LLM type '{response_llm_type}' for final response based on primary tool '{primary_tool_name}'"
+                )
+
         # Collect direct response tools with UI elements (like images)
         # instead of returning immediately
         ui_elements = []
@@ -306,10 +320,12 @@ class LLMService:
         # Store UI elements for the response controller to access
         self.last_ui_elements = ui_elements
 
-        # Stream the final synthesized response based on all tool results
-        logger.info(f"Streaming final response with {model}:{model_type}")
+        # Stream the final synthesized response using the tool's configured LLM type
+        logger.info(
+            f"Streaming final response with {response_model}:{response_llm_type} (based on tool configuration)"
+        )
         async for chunk in self.streaming_service.stream_completion(
-            extended_messages, model, model_type
+            extended_messages, response_model, response_llm_type
         ):
             yield chunk
 
