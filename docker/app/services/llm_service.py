@@ -320,14 +320,28 @@ class LLMService:
         # Store UI elements for the response controller to access
         self.last_ui_elements = ui_elements
 
-        # Stream the final synthesized response using the tool's configured LLM type
-        logger.info(
-            f"Streaming final response with {response_model}:{response_llm_type} (based on tool configuration)"
+        # Check if all tool responses are direct responses
+        # If so, skip LLM synthesis since direct response tools provide their own final output
+        all_direct_responses = all(
+            response.get("role") == "direct_response" for response in tool_responses
         )
-        async for chunk in self.streaming_service.stream_completion(
-            extended_messages, response_model, response_llm_type
-        ):
-            yield chunk
+
+        if all_direct_responses:
+            logger.info(
+                "All tools are direct response tools - skipping LLM synthesis to avoid redundant commentary"
+            )
+            # For direct response tools, we don't need additional LLM commentary
+            # The tools have provided their final response, just return without generating more text
+            return
+        else:
+            # Stream the final synthesized response using the tool's configured LLM type
+            logger.info(
+                f"Streaming final response with {response_model}:{response_llm_type} (based on tool configuration)"
+            )
+            async for chunk in self.streaming_service.stream_completion(
+                extended_messages, response_model, response_llm_type
+            ):
+                yield chunk
 
     def _apply_sliding_window(
         self, messages: List[Dict[str, Any]], max_turns: Optional[int] = None
