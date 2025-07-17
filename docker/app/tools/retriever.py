@@ -14,6 +14,8 @@ from utils.text_processing import strip_think_tags
 # Configure logger
 logger = logging.getLogger(__name__)
 
+MAX_RESULTS = 10
+
 
 @dataclass
 class SearchConfig:
@@ -25,7 +27,7 @@ class SearchConfig:
     vector_field: str = "embedding"
     radius: float = 2.0
     range_filter: float = 0.001
-    topk: int = 10
+    topk: int = MAX_RESULTS
     output_fields: List[str] = None
 
     def __post_init__(self):
@@ -163,8 +165,7 @@ class SimilaritySearch:
                 return None
 
             validated_results = self._remove_outliers(results_with_logits, key="logit")
-            limit = int(self.config.topk * 0.5)
-            return [validated_results[:limit]]
+            return [validated_results]
         except Exception as e:
             logging.error("Reranking failed: %s", str(e))
             return None
@@ -243,6 +244,7 @@ class SimilaritySearch:
         Automatically removes outliers by finding natural breaks in the data distribution.
         For logit scores, lower values are considered more relevant and the lowest value is always kept.
         Finds the largest gap in sorted values to determine the natural cutoff point.
+        'How many GPUs are in a single compute tray of the NVL72 GB200?'
 
         Parameters:
         data (Union[List[float], List[Dict[str, Any]]]): Either a list of scores or a list of dictionaries with scores
@@ -258,36 +260,63 @@ class SimilaritySearch:
 
         # Debug logging
         logging.debug(f"_remove_outliers called with {len(data)} items, key='{key}'")
+        if data and len(data) > 0:
+            logging.debug(f"First item type: {type(data[0])}")
+            logging.debug(f"First item: {data[0]}")
+            if key and isinstance(data[0], dict):
+                logging.debug(f"First item has key '{key}': {key in data[0]}")
+                if key in data[0]:
+                    logging.info(
+                        f"Value for key '{key}': {data[0][key]} (type: {type(data[0][key])})"
+                    )
 
         try:
-            # Extract scores if data is a list of dictionaries
-            if key is not None and isinstance(data[0], dict):
+            # Extract scores if data is a list of dictionaries or Pymilvus Hit objects
+            if key is not None and (isinstance(data[0], dict) or hasattr(data[0], key)):
                 try:
                     # Extract values and validate they are numeric, keeping track of valid items
                     raw_scores = []
                     valid_items = []
 
                     for item in data:
-                        if key not in item:
-                            logging.error(f"Key '{key}' not found in item: {item}")
-                            return data
+                        # Handle both dictionaries and Pymilvus Hit objects
+                        try:
+                            if isinstance(item, dict):
+                                if key not in item:
+                                    logging.error(
+                                        f"Key '{key}' not found in dict item: {item}"
+                                    )
+                                    continue
+                                value = item[key]
+                            else:
+                                # Handle Pymilvus Hit objects or other objects with attributes
+                                if hasattr(item, key):
+                                    value = getattr(item, key)
+                                else:
+                                    logging.error(
+                                        f"Attribute '{key}' not found in item: {type(item)}"
+                                    )
+                                    continue
 
-                        value = item[key]
-                        # Check if value is numeric (int, float) and not None/NaN
-                        if value is None or (
-                            isinstance(value, float) and np.isnan(value)
-                        ):
-                            logging.warning(f"Skipping non-numeric value: {value}")
+                            # Check if value is numeric (int, float) and not None/NaN
+                            if value is None or (
+                                isinstance(value, float) and np.isnan(value)
+                            ):
+                                logging.warning(f"Skipping non-numeric value: {value}")
+                                continue
+
+                            if not isinstance(value, (int, float)):
+                                logging.debug(
+                                    f"Skipping non-numeric value of type {type(value)}: {value}"
+                                )
+                                continue
+
+                            raw_scores.append(float(value))
+                            valid_items.append(item)
+
+                        except Exception as e:
+                            logging.warning(f"Error processing item: {e}")
                             continue
-
-                        if not isinstance(value, (int, float)):
-                            logging.debug(
-                                f"Skipping non-numeric value of type {type(value)}: {value}"
-                            )
-                            continue
-
-                        raw_scores.append(float(value))
-                        valid_items.append(item)
 
                     if not raw_scores:
                         logging.warning("No valid numeric values found in data")
@@ -297,7 +326,7 @@ class SimilaritySearch:
                     original_data = valid_items  # Use only the items with valid scores
 
                 except Exception as e:
-                    logging.error(f"Error extracting scores from dictionary data: {e}")
+                    logging.error(f"Error extracting scores from data: {e}")
                     return data
             else:
                 original_data = None
@@ -362,7 +391,7 @@ class SimilaritySearch:
             cut_position = gap_positions[max_gap_idx]
 
             # The cutoff is the value just before the largest gap
-            cutoff = sorted_scores[cut_position - 1]
+            cutoff = sorted_scores[cut_position]
 
             # Always keep at least the lowest value (most relevant)
             min_score = np.min(scores)
@@ -378,8 +407,21 @@ class SimilaritySearch:
                 )
                 return filtered_scores.tolist()[:5]
             else:
-                # Filter dictionaries
-                filtered_data = [item for item in original_data if item[key] <= cutoff]
+                # Filter dictionaries or Hit objects
+                filtered_data = []
+                for item in original_data:
+                    try:
+                        if isinstance(item, dict):
+                            value = item[key]
+                        else:
+                            value = getattr(item, key)
+
+                        if value <= cutoff:
+                            filtered_data.append(item)
+                    except Exception as e:
+                        logging.warning(f"Error filtering item: {e}")
+                        continue
+
                 logging.info(
                     f"Natural break filtering: kept {len(filtered_data)}/{original_count} items, cutoff: {cutoff:.6f}, largest gap: {max_gap_size:.6f}"
                 )
@@ -595,7 +637,7 @@ class RetrieverTool(BaseTool):
         self,
         query: str = None,
         use_reranker: bool = True,
-        max_results: int = 10,
+        max_results: int = MAX_RESULTS,
         **kwargs,
     ) -> RetrievalResponse:
         """
@@ -643,7 +685,7 @@ class RetrieverTool(BaseTool):
 
         query = params["query"]
         use_reranker = params.get("use_reranker", True)
-        max_results = params.get("max_results", 10)
+        max_results = params.get("max_results", MAX_RESULTS)
 
         logger.debug(
             f"run_with_dict method called with query: '{query}', use_reranker: {use_reranker}, max_results: {max_results}"
@@ -666,7 +708,7 @@ def get_retrieval_tool_definition() -> Dict[str, Any]:
 
 
 def execute_retrieval_search(
-    query: str, use_reranker: bool = True, max_results: int = 10
+    query: str, use_reranker: bool = True, max_results: int = MAX_RESULTS
 ) -> RetrievalResponse:
     """
     Execute a retrieval search with the given query
