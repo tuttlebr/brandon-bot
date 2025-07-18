@@ -1,115 +1,157 @@
-# Streamlit Agentic Application
+# Streamlit Agentic Chatbot
 
-A production-ready conversational AI application built with Streamlit, featuring advanced language model capabilities, document analysis, multimodal interactions, and a sophisticated **Model-View-Controller (MVC)** architecture.
+A production-ready conversational AI application built with Streamlit, featuring advanced language model capabilities, intelligent document analysis, multimodal interactions, and a sophisticated **Model-View-Controller (MVC)** architecture with framework abstraction.
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [Features](#features)
-- [Enhanced MVC Architecture](#enhanced-mvc-architecture)
-- [Domain Models](#domain-models)
-- [View Abstraction Layer](#view-abstraction-layer)
-- [Validation System](#validation-system)
+- [Architecture](#architecture)
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
 - [Available Tools](#available-tools)
+- [MVC Implementation](#mvc-implementation)
+- [Services Layer](#services-layer)
 - [Development Guide](#development-guide)
-- [API Reference](#api-reference)
 - [Production Deployment](#production-deployment)
 
 ## Overview
 
-This application provides a sophisticated agentic interface powered by NVIDIA's language models, implemented with a **gold-standard MVC architecture** that ensures:
+This application provides a sophisticated agentic chatbot interface powered by NVIDIA's language models, with a **production-grade MVC architecture** that ensures:
 
 - 🏗️ **Clean separation of concerns** between Models, Views, and Controllers
-- 🎯 **Domain-driven design** with rich business logic encapsulation
-- 🔗 **Framework abstraction** enabling easy UI framework switching
-- ✅ **Comprehensive validation** with cross-model consistency checks
+- 🎯 **Framework abstraction** through view interfaces and helpers
+- 🔗 **Service-oriented architecture** with specialized business logic services
+- ✅ **Domain-driven design** with rich models and validation
 - 🧪 **High testability** through dependency injection and interfaces
-- 🚀 **Production-ready scalability** with proper error handling
+- 🚀 **Production scalability** with external file storage and efficient processing
 
 ### Core Capabilities
 
-- 🤖 **Real-time streaming responses** with tool calling capabilities
-- 📄 **Intelligent PDF document analysis** with progress tracking
-- 🎨 **AI-powered image generation and analysis**
-- 🔍 **Semantic search** through knowledge bases
-- 🌐 **Web content extraction and search**
-- 💬 **Smart context management** with automatic conversation context injection
-- 📁 **Session management** with isolated user sessions and external file storage
-- ⚡ **Batch processing** for efficient handling of large documents
+- 🤖 **Real-time streaming responses** with advanced tool orchestration
+- 📄 **Intelligent PDF analysis** with query-aware processing and batch handling
+- 🎨 **AI-powered image generation and analysis** with VLM support
+- 🔍 **Multi-source information retrieval** (web search, news, weather)
+- 💬 **Smart context management** with automatic conversation and PDF context injection
+- 📁 **Robust session management** with isolated user sessions and file storage
+- ⚡ **Optimized processing** for large documents and multimodal content
 
 ## Features
 
 ### Advanced Tool System
 
-11 specialized tools providing comprehensive AI capabilities:
+The application includes **12 specialized tools** providing comprehensive AI capabilities:
 
-1. **Text Assistant** (`text_assistant`) - Analysis, summarization, translation, and code development
-2. **Image Generation** (`generate_image`) - AI-powered image creation with style control
-3. **Image Analysis** (`analyze_image`) - Vision-capable LLM for image understanding
-4. **PDF Summary** (`retrieve_pdf_summary`) - Intelligent document summarization
-5. **PDF Text Processor** (`process_pdf_text`) - Advanced PDF text extraction
-6. **Web Search** (`tavily_internet_search`) - General internet search capabilities
+1. **Text Assistant** (`text_assistant`) - Comprehensive text processing with multiple capabilities:
+   - Document analysis and insights extraction
+   - Intelligent summarization
+   - Grammar and style proofreading
+   - Content rewriting and enhancement
+   - Constructive criticism and feedback
+   - Multi-language translation
+   - Code development assistance
+
+2. **Image Generation** (`generate_image`) - AI-powered image creation with:
+   - Context-aware prompt enhancement
+   - Multiple style presets (photorealistic, digital art, oil painting, etc.)
+   - Aspect ratio control
+   - Conversation context integration
+
+3. **Image Analysis** (`analyze_image`) - Vision-capable LLM for:
+   - Image description and understanding
+   - Object identification
+   - Visual question answering
+   - Automatic image optimization for VLM processing
+
+4. **PDF Summary** (`retrieve_pdf_summary`) - Intelligent document summarization with:
+   - Recursive summarization for large documents
+   - Query-aware processing
+   - Batch processing for efficiency
+
+5. **PDF Text Processor** (`process_pdf_text`) - Advanced PDF analysis:
+   - Query-specific document analysis
+   - Intelligent page selection
+   - Context-aware responses
+
+6. **Web Search** (`tavily_internet_search`) - General web search integration
+
 7. **News Search** (`tavily_news_search`) - Real-time news and current events
-8. **Weather** (`weather`) - Current weather information for any location
-9. **Web Extract** (`extract_web_content`) - Clean content extraction from web pages
-10. **Retriever** (`retrieval_search`) - Semantic search through knowledge bases
-11. **Conversation Context** (`conversation_context`) - Conversation history analysis
+
+8. **Weather** (`get_weather`) - Current weather information
+
+9. **Web Extract** (`extract_web_content`) - Clean content extraction from URLs
+
+10. **Retriever** (`retrieval_search`) - Vector-based semantic search for knowledge bases
+
+11. **Conversation Context** (`conversation_context`) - Intelligent conversation analysis:
+    - Conversation summaries
+    - Topic extraction
+    - Task continuity tracking
+    - Document analysis context
+
+12. **Generalist Conversation** (`generalist_conversation`) - General discussion and explanations
 
 ### Production Features
 
-- **Real-time Streaming**: Smooth response streaming with progress indicators
-- **Multimodal Interface**: Support for text, images, and document-based conversations
-- **External File Storage**: Prevents memory exhaustion in production environments
-- **Intelligent Document Processing**: Hierarchical processing with query-aware analysis
+- **Streaming Architecture**: Efficient real-time response streaming with progress indicators
+- **Smart Context Management**: Automatic injection of conversation and document context
+- **External File Storage**: Prevents memory exhaustion with disk-based file management
+- **Batch Processing**: Efficient handling of large PDFs through intelligent batching
 - **Session Isolation**: Secure, isolated user sessions with proper cleanup
-- **Error Recovery**: Comprehensive error handling with automatic fallbacks
+- **Error Recovery**: Comprehensive error handling with graceful degradation
+- **View Abstraction**: Framework-agnostic UI layer for easy testing and migration
 
-## Enhanced MVC Architecture
+## Architecture
 
-This application implements a **sophisticated MVC pattern** with modern enhancements:
+This application implements a **sophisticated MVC pattern** with service-oriented architecture:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                           VIEW LAYER                            │
 │  ┌─────────────────────┐  ┌──────────────────────────────────┐  │
-│  │   UI Components     │  │        View Interfaces           │  │
-│  │   - ChatHistory     │  │  - IChatDisplayInterface         │  │
-│  │   - Streamlit UI    │  │  - IFileManagementInterface      │  │
-│  │   - Components      │  │  - ISessionManagementInterface   │  │
-│  └─────────────────────┘  └──────────────────────────────────┘  │
-│           │                           │                         │
-│  ┌─────────────────────┐  ┌──────────────────────────────────┐  │
-│  │    View Helpers     │  │      View Abstractions           │  │
-│  │   - MessageHelper   │  │  - StreamlitViewInterface        │  │
-│  │   - FormHelper      │  │  - ViewHelperFactory             │  │
-│  │   - FileHelper      │  │  - Framework Independence        │  │
-│  │   - ProgressHelper  │  │  - Easy Testing & Mocking        │  │
-│  └─────────────────────┘  └──────────────────────────────────┘  │
+│  │   UI Components     │  │      View Abstraction            │  │
+│  │   - ChatHistory     │  │  - IViewInterface                │  │
+│  │   - Streamlit UI    │  │  - StreamlitViewInterface        │  │
+│  └─────────────────────┘  │  - ViewHelperFactory             │  │
+│                           │  - Framework Independence        │  │
+│                           └──────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
                                │
 ┌─────────────────────────────────────────────────────────────────┐
 │                        CONTROLLER LAYER                         │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │                    Controllers                             │ │
+│  │   - SessionController: Session state & lifecycle           │ │
+│  │   - MessageController: Message validation & processing     │ │
+│  │   - FileController: File upload coordination               │ │
+│  │   - ImageController: Image processing coordination         │ │
+│  │   - ResponseController: LLM response orchestration         │ │
+│  └────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+┌─────────────────────────────────────────────────────────────────┐
+│                         SERVICE LAYER                           │
 │  ┌─────────────────────┐  ┌──────────────────────────────────┐  │
-│  │    Controllers      │  │       Enhanced Features          │  │
-│  │   - SessionContro...│  │  - Domain Model Integration      │  │
-│  │   - MessageContro...│  │  - View Helper Usage             │  │
-│  │   - FileController  │  │  - Reduced Framework Coupling    │  │
-│  │   - ImageController │  │  - Comprehensive Validation      │  │
-│  │   - ResponseContr...│  │  - Dependency Injection          │  │
-│  └─────────────────────┘  └──────────────────────────────────┘  │
+│  │   Core Services     │  │    Specialized Services          │  │
+│  │   - LLMService      │  │  - PDFAnalysisService            │  │
+│  │   - ChatService     │  │  - PDFContextService             │  │
+│  │   - StreamingService│  │  - PDFSummarizationService       │  │
+│  │   - FileStorage     │  │  - DocumentAnalyzerService       │  │
+│  └─────────────────────┘  │  - TextProcessorService          │  │
+│                           │  - TranslationService            │  │
+│                           │  - ConversationContextService    │  │
+│                           │  - ToolExecutionService          │  │
+│                           └──────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
                                │
 ┌─────────────────────────────────────────────────────────────────┐
 │                         MODEL LAYER                             │
 │  ┌─────────────────────┐  ┌──────────────────────────────────┐  │
-│  │   Domain Models     │  │       Validation Layer           │  │
-│  │   - User            │  │  - ValidationService             │  │
-│  │   - Session         │  │  - Cross-Model Validation        │  │
-│  │   - ToolEntity      │  │  - Business Rule Enforcement     │  │
-│  │   - FileInfo        │  │  - Comprehensive Error Reporting │  │
-│  │   - ChatMessage     │  │  - Batch Validation Support      │  │
+│  │   Domain Models     │  │        Tool System               │  │
+│  │   - User            │  │  - BaseTool (MVC pattern)        │  │
+│  │   - Session         │  │  - Tool Registry                 │  │
+│  │   - ChatMessage     │  │  - Tool Controllers              │  │
+│  │   - ChatConfig      │  │  - Tool Views                    │  │
 │  └─────────────────────┘  └──────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -120,190 +162,58 @@ This application implements a **sophisticated MVC pattern** with modern enhancem
 ./
 ├── docker/
 │   └── app/
-│       ├── main.py                      # Application entry point & orchestration
+│       ├── main.py                      # Application entry point
 │       │
 │       ├── controllers/                 # 🎮 CONTROLLER LAYER
-│       │   ├── session_controller.py    # Session state & lifecycle management
-│       │   ├── message_controller.py    # Message processing & validation
-│       │   ├── file_controller.py       # File upload & processing coordination
-│       │   ├── image_controller.py      # Image upload & processing coordination
-│       │   └── response_controller.py   # LLM response generation & streaming
+│       │   ├── session_controller.py    # Session management
+│       │   ├── message_controller.py    # Message processing
+│       │   ├── file_controller.py       # File upload handling
+│       │   ├── image_controller.py      # Image processing
+│       │   └── response_controller.py   # Response generation
 │       │
 │       ├── models/                      # 📊 MODEL LAYER
-│       │   ├── user.py                  # User domain model with business logic
-│       │   ├── session.py               # Session domain model with state management
-│       │   ├── tool_entity.py           # Tool domain model with execution tracking
-│       │   ├── chat_message.py          # Message domain model with transformations
-│       │   ├── chat_config.py           # Configuration wrapper model
-│       │   └── validation.py            # Comprehensive validation service
+│       │   ├── user.py                  # User domain model
+│       │   ├── session.py               # Session domain model
+│       │   ├── chat_message.py          # Message model
+│       │   ├── chat_config.py           # Configuration wrapper
+│       │   └── validation.py            # Validation service
 │       │
 │       ├── ui/                          # 🖥️ VIEW LAYER
-│       │   ├── components.py            # UI component implementations
-│       │   ├── view_helpers.py          # Framework abstraction helpers
-│       │   └── view_interfaces.py       # UI operation contracts & interfaces
+│       │   ├── components.py            # UI components
+│       │   ├── view_helpers.py          # View abstraction helpers
+│       │   └── view_interfaces.py       # Interface definitions
 │       │
 │       ├── services/                    # 🔧 SERVICE LAYER
-│       │   ├── llm_service.py          # LLM interaction orchestration
-│       │   ├── chat_service.py         # Chat processing business logic
-│       │   ├── streaming_service.py     # Response streaming management
-│       │   ├── tool_execution_service.py # Tool orchestration & execution
-│       │   ├── file_storage_service.py  # External file storage management
-│       │   ├── pdf_analysis_service.py  # Intelligent PDF processing
-│       │   └── ...                     # Additional specialized services
+│       │   ├── llm_service.py          # LLM orchestration
+│       │   ├── chat_service.py         # Chat processing
+│       │   ├── streaming_service.py     # Response streaming
+│       │   ├── tool_execution_service.py # Tool execution
+│       │   ├── file_storage_service.py  # File management
+│       │   ├── pdf_analysis_service.py  # PDF analysis
+│       │   ├── pdf_context_service.py   # PDF context injection
+│       │   ├── document_analyzer_service.py # Document analysis
+│       │   ├── text_processor_service.py # Text processing
+│       │   └── translation_service.py   # Translation service
 │       │
 │       ├── tools/                       # 🛠️ TOOL SYSTEM
-│       │   ├── base.py                 # Abstract tool interface
-│       │   ├── registry.py             # Tool registry & management
-│       │   ├── assistant.py            # Text processing tool
-│       │   ├── image_gen.py            # Image generation tool
-│       │   └── ...                     # Additional tool implementations
+│       │   ├── base.py                 # Base tool with MVC
+│       │   ├── registry.py             # Tool registry
+│       │   ├── assistant.py            # Text assistant tool
+│       │   ├── image_gen.py            # Image generation
+│       │   ├── image_analysis_tool.py  # Image analysis
+│       │   ├── conversation_context.py # Context analysis
+│       │   ├── generalist.py           # General conversation
+│       │   └── ...                     # Other tools
 │       │
 │       └── utils/                       # 🔧 UTILITIES
-│           ├── config.py               # Centralized configuration management
-│           └── ...                     # Additional utilities
+│           ├── config.py               # Centralized config
+│           ├── animated_loading.py     # UI animations
+│           └── ...                     # Other utilities
 │
-├── docker-compose.yml                   # 🐳 Container orchestration
-├── .env.example                        # 📝 Environment configuration template
-└── README.md                           # 📚 This documentation
+├── docker-compose.yml                   # Container orchestration
+├── .env.example                        # Environment template
+└── README.md                           # This documentation
 ```
-
-## Domain Models
-
-The application uses **rich domain models** that encapsulate business logic and provide type safety:
-
-### User Model (`models/user.py`)
-
-```python
-from models import User, UserRole, UserPreferences
-
-# Create user with validation
-user = User(
-    user_id="user_123",
-    role=UserRole.USER,
-    preferences=UserPreferences(
-        language="en",
-        theme="dark",
-        message_limit=100
-    )
-)
-
-# Business logic methods
-user.increment_message_count()
-user.can_send_message()  # Checks against message limit
-user.get_display_name()  # Returns formatted display name
-```
-
-### Session Model (`models/session.py`)
-
-```python
-from models import Session, SessionStatus, ProcessingStatus, FileInfo
-
-# Create session with comprehensive state tracking
-session = Session(
-    session_id="session_456",
-    user_id="user_123",
-    status=SessionStatus.ACTIVE,
-    processing_status=ProcessingStatus.IDLE
-)
-
-# File management
-file_info = session.add_uploaded_file("doc.pdf", "file_789", "pdf", 1024)
-session.mark_file_processed("file_789")
-pdf_files = session.get_files_by_type("pdf")
-
-# Context management
-session.set_context("current_topic", "AI Architecture")
-topic = session.get_context("current_topic")
-```
-
-### Tool Entity Model (`models/tool_entity.py`)
-
-```python
-from models import ToolEntity, ToolStatus, ToolType, ExecutionMetrics
-
-# Create tool with metadata and tracking
-tool = ToolEntity(
-    tool_id="text_assistant",
-    name="Text Assistant",
-    display_name="AI Text Assistant",
-    description="Comprehensive text processing tool",
-    tool_type=ToolType.TEXT_PROCESSING,
-    status=ToolStatus.AVAILABLE
-)
-
-# Execution tracking
-tool.record_execution(success=True, execution_time=1.5)
-success_rate = tool.metrics.get_success_rate()  # Returns percentage
-```
-
-## View Abstraction Layer
-
-The **view abstraction layer** provides framework independence and improved testability:
-
-### View Interfaces (`ui/view_interfaces.py`)
-
-```python
-from ui import IChatDisplayInterface, IFileManagementInterface
-
-# Abstract interfaces define contracts for UI operations
-class IChatDisplayInterface(ABC):
-    @abstractmethod
-    def display_message(self, role: str, content: str) -> None: ...
-
-    @abstractmethod
-    def get_user_message(self, placeholder: str) -> Optional[str]: ...
-```
-
-### View Helpers (`ui/view_helpers.py`)
-
-```python
-from ui import view_factory
-
-# Use framework-agnostic helpers in controllers
-message_helper = view_factory.create_message_helper()
-file_helper = view_factory.create_file_helper()
-progress_helper = view_factory.create_progress_helper()
-
-# Display operations without framework coupling
-message_helper.show_success("Operation completed successfully!")
-file_result = file_helper.upload_pdf("Upload your document")
-with progress_helper.show_indeterminate_progress("Processing..."):
-    # Long-running operation
-    pass
-```
-
-## Validation System
-
-The **comprehensive validation system** ensures data integrity and business rule compliance:
-
-### Validation Service (`models/validation.py`)
-
-```python
-from models import validation_service, User, Session
-
-# Validate individual models
-user = User(user_id="test", preferences=UserPreferences(message_limit=-1))
-result = validation_service.validate_user(user)
-
-if not result.is_valid:
-    for error in result.errors:
-        print(f"Field {error.field}: {error.message}")
-
-# Cross-model validation
-session = Session(session_id="test", user_id="different_user")
-consistency_result = validation_service.validate_user_session_pair(user, session)
-
-# Batch validation
-models = [user1, user2, session1, session2]
-batch_results = validation_service.validate_batch(models)
-```
-
-### Business Rule Validation
-
-- **User validation**: Message limits, preferences, role consistency
-- **Session validation**: File integrity, context serialization, timestamp logic
-- **Tool validation**: Parameter requirements, execution metrics
-- **Cross-model validation**: User-session consistency, file-session alignment
 
 ## Quick Start
 
@@ -319,7 +229,7 @@ batch_results = validation_service.validate_batch(models)
 1. **Clone the repository**
 
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/tuttlebr/streamlit-agent.git
    cd streamlit-chatbot
    ```
 
@@ -350,7 +260,7 @@ batch_results = validation_service.validate_batch(models)
 
 ## Configuration
 
-All configuration is centralized in `utils/config.py` with comprehensive validation.
+All configuration is managed through environment variables and centralized in `utils/config.py`.
 
 ### Required Environment Variables
 
@@ -358,19 +268,22 @@ All configuration is centralized in `utils/config.py` with comprehensive validat
 # NVIDIA API Configuration
 NVIDIA_API_KEY=your_api_key_here
 
-# Model Endpoints
+# LLM Model Configuration
 LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
-FAST_LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
-INTELLIGENT_LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
-
-# Model Names
 LLM_MODEL_NAME=meta/llama-3.1-70b-instruct
+
+FAST_LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
 FAST_LLM_MODEL_NAME=meta/llama-3.1-8b-instruct
+
+INTELLIGENT_LLM_ENDPOINT=https://integrate.api.nvidia.com/v1
 INTELLIGENT_LLM_MODEL_NAME=nvidia/llama-3.3-nemotron-70b-instruct
 
 # Vision Language Model (for image analysis)
 VLM_ENDPOINT=https://integrate.api.nvidia.com/v1
 VLM_MODEL_NAME=nvidia/llama-3.1-nemotron-nano-vl-8b-v1
+
+# Application Settings
+BOT_TITLE=Streamlit Agentic Chatbot
 ```
 
 ### Optional Services
@@ -382,10 +295,10 @@ IMAGE_ENDPOINT=your_image_generation_endpoint
 # Web Search (Tavily)
 TAVILY_API_KEY=your_tavily_api_key
 
-# PDF Processing
+# PDF Processing (NVIngest)
 NVINGEST_ENDPOINT=http://localhost:7670
 
-# Vector Database (for retrieval)
+# Vector Database (for retrieval tool)
 EMBEDDING_ENDPOINT=https://integrate.api.nvidia.com/v1
 EMBEDDING_MODEL=nvidia/nv-embedqa-e5-v5
 COLLECTION_NAME=your_collection_name
@@ -393,73 +306,116 @@ DATABASE_URL=your_milvus_url
 DEFAULT_DB=default
 ```
 
-## Available Tools
+### Model Usage by Tool
 
-### Text Processing Capabilities
+The application intelligently selects the appropriate LLM model based on the tool:
 
-The `text_assistant` tool supports multiple task types:
+- **Fast Model** (`FAST_LLM_MODEL_NAME`): Used for quick operations
+  - Weather queries
+  - Web searches
+  - News searches
+  - Image generation prompts
 
-- **analyze** - Document analysis and insights extraction
-- **summarize** - Create concise summaries of long content
-- **proofread** - Grammar and style corrections
-- **rewrite** - Enhance clarity and impact while preserving meaning
-- **critic** - Provide constructive feedback and improvement suggestions
-- **translate** - Convert text between languages with context awareness
-- **develop** - Programming assistance and code development
-- **qa** - Answer questions about document content with citations
+- **Standard Model** (`LLM_MODEL_NAME`): Used for general tasks
+  - Conversation context analysis
+  - Web content extraction
+  - Text processing tasks
 
-### Multimodal Capabilities
+- **Intelligent Model** (`INTELLIGENT_LLM_MODEL_NAME`): Used for complex reasoning
+  - Tool selection and orchestration
 
-- **Image Generation**: AI-powered image creation with customizable styles, moods, and aspect ratios
-- **Image Analysis**: Vision-capable LLM for describing, identifying objects, or answering questions about images
-- **Document Processing**: Intelligent PDF analysis with query-aware processing and hierarchical summarization
-- **Web Integration**: Real-time web search, news retrieval, and clean content extraction
+- **Vision Model** (`VLM_MODEL_NAME`): Used for image analysis
+  - Image understanding and description
 
-### Information Retrieval
+## MVC Implementation
 
-- **Semantic Search**: Query knowledge bases using vector similarity matching
-- **Web Search**: General internet search capabilities using Tavily
-- **News Search**: Specialized search for current events and trending topics
-- **Weather Information**: Current weather data for any global location
+The application follows a strict Model-View-Controller pattern with additional service layer:
 
-## Development Guide
+### Controllers
 
-### Adding New Domain Models
-
-Create rich domain models with validation and business logic:
+Controllers coordinate between models, services, and views:
 
 ```python
-from models import BaseModel, Field, validator
-from datetime import datetime
-from typing import Optional
+# Example: SessionController manages session lifecycle
+class SessionController:
+    def __init__(self, config_obj: ChatConfig):
+        self.config = config_obj
+        self.file_storage = FileStorageService()
 
-class NewDomainModel(BaseModel):
-    """Rich domain model with business logic"""
-
-    entity_id: str = Field(..., description="Unique identifier")
-    name: str = Field(..., description="Entity name")
-    created_at: datetime = Field(default_factory=datetime.now)
-
-    @validator('entity_id')
-    def validate_entity_id(cls, v):
-        if not v or len(v.strip()) == 0:
-            raise ValueError("Entity ID cannot be empty")
-        return v.strip()
-
-    def update_timestamp(self) -> None:
-        """Business logic method"""
-        self.updated_at = datetime.now()
-
-    def to_display_format(self) -> Dict[str, Any]:
-        """View formatting method"""
-        return {
-            "id": self.entity_id,
-            "display_name": self.name,
-            "created": self.created_at.isoformat()
-        }
+    def get_current_session(self) -> Session:
+        """Get or create current session with proper initialization"""
+        # Returns domain model with business logic
 ```
 
-### Creating Controllers with MVC Pattern
+### Services Layer
+
+Services encapsulate complex business logic:
+
+- **LLMService**: Orchestrates LLM interactions, tool execution, and response streaming
+- **PDFAnalysisService**: Handles intelligent PDF analysis with query-aware processing
+- **ConversationContextService**: Manages automatic context injection
+- **FileStorageService**: Singleton service for external file management
+- **ToolExecutionService**: Coordinates tool execution strategies (parallel/sequential)
+
+### View Abstraction
+
+The view layer is abstracted through interfaces:
+
+```python
+# View interface for framework independence
+class IViewInterface(ABC):
+    @abstractmethod
+    def show_message(self, message: UIMessage) -> None:
+        """Display a message to the user"""
+
+# Streamlit implementation
+class StreamlitViewInterface(IViewInterface):
+    def show_message(self, message: UIMessage) -> None:
+        if message.message_type == "success":
+            st.success(message.content)
+```
+
+### Tool System with MVC
+
+Each tool follows the MVC pattern:
+
+```python
+class BaseTool(ABC):
+    def __init__(self):
+        self._controller = None  # Tool business logic
+        self._view = None       # Tool response formatting
+        self._initialize_mvc()  # Set up components
+```
+
+## Services Layer
+
+The service layer provides specialized business logic:
+
+### PDF Processing Services
+
+- **PDFAnalysisService**: Intelligent query-specific analysis
+- **PDFSummarizationService**: Recursive summarization for large documents
+- **PDFContextService**: Automatic PDF context injection
+- **PDFBatchProcessor**: Efficient batch processing for large files
+
+### Text Processing Services
+
+- **TextProcessorService**: Handles all text processing tasks
+- **TranslationService**: Multi-language translation
+- **DocumentAnalyzerService**: Deep document analysis
+
+### Core Services
+
+- **StreamingService**: Manages LLM streaming responses
+- **ResponseParsingService**: Parses LLM responses and extracts tool calls
+- **LLMClientService**: Singleton service for LLM client management
+
+### Context Services
+
+- **ConversationContextService**: Automatic conversation context injection
+- **FileStorageService**: External file storage management
+
+### Controllers
 
 Controllers coordinate between models, services, and views:
 
@@ -509,95 +465,7 @@ class NewController:
             self.message_helper.show_error(f"Processing failed: {str(e)}")
 ```
 
-### Implementing View Abstractions
-
-Create framework-agnostic UI operations:
-
-```python
-from ui.view_interfaces import IApplicationInterface
-from ui.view_helpers import UIMessage, FileUploadResult
-
-class CustomViewImplementation(IApplicationInterface):
-    """Custom view implementation for different frameworks"""
-
-    def show_message(self, message: UIMessage) -> None:
-        """Display message using custom framework"""
-        # Framework-specific implementation
-        pass
-
-    def show_file_uploader(self, accepted_types: List[str], **kwargs) -> FileUploadResult:
-        """Show file uploader using custom framework"""
-        # Framework-specific implementation
-        pass
-```
-
-### Creating Tools with Domain Integration
-
-Tools can leverage domain models for better type safety:
-
-```python
-from tools.base import BaseTool, BaseToolResponse
-from models import ToolEntity, ToolStatus
-
-class EnhancedToolResponse(BaseToolResponse):
-    """Type-safe tool response"""
-    result: str
-    metadata: Dict[str, Any]
-    execution_time: float
-
-class NewTool(BaseTool):
-    """Tool with domain model integration"""
-
-    def __init__(self):
-        super().__init__()
-        self.name = "new_tool"
-        self.description = "Enhanced tool with domain models"
-
-        # Create tool entity for tracking
-        self.tool_entity = ToolEntity(
-            tool_id=self.name,
-            name="New Tool",
-            description=self.description,
-            tool_type=ToolType.CUSTOM,
-            status=ToolStatus.AVAILABLE
-        )
-
-    def execute(self, params: Dict[str, Any]) -> EnhancedToolResponse:
-        """Execute with comprehensive tracking"""
-        start_time = time.time()
-
-        try:
-            # Validate parameters using domain model
-            validation_errors = self.tool_entity.validate_parameters(params)
-            if validation_errors:
-                raise ValueError(f"Invalid parameters: {validation_errors}")
-
-            # Execute tool logic
-            result = self._process_request(params)
-
-            # Record successful execution
-            execution_time = time.time() - start_time
-            self.tool_entity.record_execution(True, execution_time)
-
-            return EnhancedToolResponse(
-                success=True,
-                result=result,
-                execution_time=execution_time
-            )
-
-        except Exception as e:
-            # Record failed execution
-            execution_time = time.time() - start_time
-            self.tool_entity.record_execution(False, execution_time, str(e))
-
-            return EnhancedToolResponse(
-                success=False,
-                error_message=str(e),
-                execution_time=execution_time
-            )
-```
-
-### Service Layer Best Practices
+### Services Layer
 
 Services handle business logic and can utilize domain models:
 
@@ -638,123 +506,196 @@ class EnhancedService:
         return result
 ```
 
-## API Reference
+## Development Guide
 
-### Request Flow in MVC Architecture
+### Adding New Tools
 
-1. **User Input** → View Layer captures input using view helpers
-2. **Controller Processing** → Controllers validate input and coordinate actions
-3. **Domain Model Validation** → Comprehensive validation using validation service
-4. **Service Layer Execution** → Business logic processing with domain models
-5. **Tool Execution** → LLM determines and executes required tools
-6. **Response Generation** → LLM synthesizes final response with streaming
-7. **View Layer Display** → Results displayed using view abstractions
-
-### Domain Model Integration
+Create a new tool following the MVC pattern:
 
 ```python
-# Example of complete MVC flow
-from controllers import SessionController
-from models import User, Session, validation_service
+from tools.base import BaseTool, BaseToolResponse, ToolController, ToolView
+from typing import Dict, Any, Type
 
-# 1. Controller coordinates the flow
-controller = SessionController(config)
+class MyToolResponse(BaseToolResponse):
+    """Response model for the tool"""
+    result: str
+    metadata: Dict[str, Any] = {}
 
-# 2. Domain models provide type safety and business logic
-session = controller.get_current_session()  # Returns Session domain model
-user = controller.get_current_user()        # Returns User domain model
+class MyToolController(ToolController):
+    """Business logic for the tool"""
+    def process(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        # Implement tool logic
+        return {"result": "processed"}
 
-# 3. Validation ensures data integrity
-validation_result = validation_service.validate_user_session_pair(user, session)
+class MyToolView(ToolView):
+    """Response formatting for the tool"""
+    def format_response(self, data: Dict[str, Any], response_type: Type[BaseToolResponse]) -> BaseToolResponse:
+        return response_type(success=True, result=data["result"])
 
-# 4. Business logic executed through domain models
-user.increment_message_count()
-session.set_context("processing_status", "active")
+class MyTool(BaseTool):
+    """Main tool class"""
+    def __init__(self):
+        super().__init__()
+        self.name = "my_tool"
+        self.description = "Tool description"
+        self.llm_type = "fast"  # or "llm", "intelligent", "vlm"
 
-# 5. View helpers provide framework-agnostic UI
-controller.display_session_info(show_details=True)
-controller.show_processing_status("Processing your request...")
+    def _initialize_mvc(self):
+        self._controller = MyToolController()
+        self._view = MyToolView()
+
+    def get_definition(self) -> Dict[str, Any]:
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "param1": {"type": "string", "description": "Parameter description"}
+                    },
+                    "required": ["param1"]
+                }
+            }
+        }
 ```
 
-### Tool Execution with Domain Models
+### Creating New Services
+
+Services encapsulate business logic:
 
 ```python
-# Tools can access and update domain models
-from tools.registry import tool_registry
-from models import ToolEntity
+from typing import Dict, Any, Optional
+import asyncio
 
-# Get tool with domain model tracking
-tool_name = "text_assistant"
-tool = tool_registry.get_tool(tool_name)
+class MyBusinessService:
+    """Service for specific business logic"""
 
-# Execute with comprehensive tracking
-result = tool.execute({"task": "analyze", "text": "Sample text"})
+    def __init__(self, config: ChatConfig):
+        self.config = config
+        self.llm_client = self._init_client()
 
-# Access execution metrics through domain model
-tool_entity = tool.tool_entity
-success_rate = tool_entity.metrics.get_success_rate()
-avg_execution_time = tool_entity.metrics.average_execution_time
+    async def process_async(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Async processing with proper error handling"""
+        try:
+            # Business logic here
+            result = await self._perform_operation(data)
+            return {"success": True, "result": result}
+        except Exception as e:
+            logger.error(f"Processing error: {e}")
+            return {"success": False, "error": str(e)}
 ```
+
+### Working with Controllers
+
+Controllers coordinate the application flow:
+
+```python
+from controllers import BaseController
+from services import MyBusinessService
+from ui.view_helpers import ViewHelperFactory
+
+class MyController:
+    """Controller for managing specific functionality"""
+
+    def __init__(self, config: ChatConfig):
+        self.config = config
+        self.service = MyBusinessService(config)
+        self.view_factory = ViewHelperFactory()
+        self.message_helper = self.view_factory.create_message_helper()
+
+    def handle_user_action(self, action_data: Dict[str, Any]):
+        """Handle user action with proper MVC flow"""
+        try:
+            # Validate input
+            if not self._validate_input(action_data):
+                self.message_helper.show_error("Invalid input")
+                return
+
+            # Process through service
+            result = self.service.process(action_data)
+
+            # Update UI through view helpers
+            if result["success"]:
+                self.message_helper.show_success("Operation completed")
+            else:
+                self.message_helper.show_error(result["error"])
+
+        except Exception as e:
+            logger.error(f"Controller error: {e}")
+            self.message_helper.show_error("An error occurred")
+```
+
+### Best Practices
+
+1. **Separation of Concerns**: Keep business logic in services, UI logic in views
+2. **Use View Abstractions**: Always use view helpers instead of direct Streamlit calls
+3. **Error Handling**: Implement comprehensive error handling at each layer
+4. **Async Operations**: Use async/await for I/O operations
+5. **Tool Configuration**: Set appropriate `llm_type` for each tool based on requirements
+6. **Service Patterns**: Use singleton pattern for stateful services (e.g., FileStorageService)
+7. **Testing**: Write tests for controllers and services independently of views
 
 ## Production Deployment
 
-### MVC Architecture Benefits in Production
+### Docker Deployment
 
-- **Maintainability**: Clear separation of concerns makes debugging and updates easier
-- **Testability**: Domain models and view abstractions enable comprehensive testing
-- **Scalability**: Framework-agnostic design allows for easy technology migrations
-- **Reliability**: Comprehensive validation prevents runtime errors
-- **Monitoring**: Domain models provide built-in metrics and tracking
+The application is containerized for easy deployment:
 
-### Performance Optimization
+```bash
+# Build and run with Docker Compose
+docker compose up -d
 
-- **Domain Model Caching**: Controllers cache domain models for efficient access
-- **Validation Caching**: Validation results cached to prevent redundant checks
-- **View Helper Optimization**: Framework abstractions minimize UI framework overhead
-- **Service Layer Efficiency**: Business logic optimized through domain model methods
+# View logs
+docker compose logs -f app
 
-### Reliability Features
-
-- **Comprehensive Validation**: All data validated through domain models and validation service
-- **Error Handling**: Multi-layer error handling with graceful degradation
-- **Session Isolation**: Domain models ensure proper session boundaries
-- **Data Integrity**: Cross-model validation prevents inconsistent states
-
-### Monitoring and Observability
-
-- **Domain Model Metrics**: Built-in tracking for users, sessions, and tools
-- **Validation Monitoring**: Track validation failures and business rule violations
-- **Controller Performance**: Monitor request processing times across controllers
-- **Service Layer Metrics**: Track business logic execution and error rates
-
-### Deployment Considerations
-
-The MVC architecture provides several deployment advantages:
-
-```yaml
-# docker-compose.yml optimized for MVC architecture
-services:
-  app:
-    image: streamlit-chatbot:latest
-    environment:
-      # Domain model validation
-      - VALIDATION_STRICT_MODE=true
-      # View layer configuration
-      - UI_FRAMEWORK=streamlit
-      # Controller optimization
-      - CONTROLLER_CACHE_SIZE=1000
-    volumes:
-      # External file storage for domain models
-      - ./storage:/app/storage
-    healthcheck:
-      # Health check using domain model validation
-      test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "from models import validation_service; print('healthy')",
-        ]
+# Access the application
+# Main app: http://localhost:80
+# Documentation: http://localhost:8001
 ```
 
-This enhanced MVC architecture ensures your application is production-ready, maintainable, and scalable while providing excellent developer experience through clear patterns and comprehensive validation.
+### Environment Configuration
+
+Create a `.env` file with your configuration:
+
+```bash
+# Required
+NVIDIA_API_KEY=your_key_here
+
+# Optional services
+TAVILY_API_KEY=your_key_here
+IMAGE_ENDPOINT=your_endpoint_here
+```
+
+### Production Features
+
+1. **External File Storage**: Files stored on disk to prevent memory issues
+2. **Session Isolation**: Each user has isolated session state
+3. **Error Recovery**: Comprehensive error handling at all layers
+4. **Resource Management**: Efficient streaming and batch processing
+5. **Monitoring**: Built-in logging and error tracking
+
+### Performance Considerations
+
+- **LLM Model Selection**: Different models for different tasks optimize cost/performance
+- **Parallel Tool Execution**: Tools execute in parallel when possible
+- **Streaming Responses**: Efficient memory usage with streaming
+- **Batch Processing**: Large PDFs processed in configurable batches
+- **Context Management**: Automatic context injection with configurable limits
+
+### Scaling Considerations
+
+- **Stateless Design**: Application can be horizontally scaled
+- **External Storage**: File storage can be moved to S3/cloud storage
+- **Database Integration**: Vector database for knowledge retrieval
+- **Load Balancing**: Nginx included for reverse proxy setup
+
+### Security Notes
+
+- **API Key Management**: Use environment variables, never commit keys
+- **File Validation**: All uploads validated before processing
+- **Session Security**: Sessions isolated by user
+- **Input Validation**: All user inputs sanitized
+
+This architecture ensures the application is production-ready with proper separation of concerns, comprehensive error handling, and scalable design.
