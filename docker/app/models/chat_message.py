@@ -61,12 +61,3 @@ class ChatMessage:
                 self.content.get("original_prompt", ""),
             )
         return "", "", ""
-
-    def to_dict(self) -> Dict[str, Any]:
-        """
-        Convert message to dictionary format for API calls
-
-        Returns:
-            Message in dictionary format
-        """
-        return {"role": self.role, "content": self.content}

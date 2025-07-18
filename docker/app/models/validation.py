@@ -6,14 +6,10 @@ including business rule validation and cross-model consistency checks.
 """
 
 import logging
-import re
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, List, Optional
 
-from .chat_message import ChatMessage
-from .session import FileInfo, ProcessingStatus, Session, SessionStatus
-from .tool_entity import ToolEntity, ToolParameter, ToolStatus, ToolType
-from .user import User, UserPreferences, UserRole
+from .session import FileInfo, Session
+from .user import User, UserPreferences
 
 logger = logging.getLogger(__name__)
 
@@ -53,25 +49,9 @@ class ValidationResult:
         """Get list of error messages"""
         return [error.message for error in self.errors]
 
-    def get_errors_by_field(self, field: str) -> List[ValidationError]:
-        """Get errors for a specific field"""
-        return [error for error in self.errors if error.field == field]
-
 
 class ModelValidator:
     """Base model validator with common validation methods"""
-
-    @staticmethod
-    def validate_email(email: str) -> bool:
-        """Validate email format"""
-        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        return re.match(pattern, email) is not None
-
-    @staticmethod
-    def validate_url(url: str) -> bool:
-        """Validate URL format"""
-        pattern = r'^https?://(?:[-\w.])+(?:\:[0-9]+)?(?:/(?:[\w/_.])*(?:\?(?:[\w&=%.])*)?(?:\#(?:[\w.])*)?)?$'
-        return re.match(pattern, url) is not None
 
     @staticmethod
     def validate_file_size(size_bytes: int, max_size_mb: int = 100) -> bool:
@@ -231,71 +211,6 @@ class SessionValidator(ModelValidator):
         return result
 
 
-class ToolValidator(ModelValidator):
-    """Validator for Tool domain model"""
-
-    def validate_tool(self, tool: ToolEntity) -> ValidationResult:
-        """
-        Validate a ToolEntity model
-
-        Args:
-            tool: ToolEntity model to validate
-
-        Returns:
-            ValidationResult with validation details
-        """
-        result = ValidationResult()
-
-        # Validate tool name uniqueness (would need registry access in real implementation)
-        if not tool.name:
-            result.add_error("Tool name is required", "name", "REQUIRED")
-
-        # Validate parameters
-        parameter_names = set()
-        for i, param in enumerate(tool.parameters):
-            param_result = self._validate_parameter(param)
-            for error in param_result.errors:
-                result.add_error(
-                    f"Parameter {i}: {error.message}", f"parameters[{i}]", error.code
-                )
-
-            # Check for duplicate parameter names
-            if param.name in parameter_names:
-                result.add_error(
-                    f"Duplicate parameter name: {param.name}",
-                    f"parameters[{i}].name",
-                    "DUPLICATE",
-                )
-            parameter_names.add(param.name)
-
-        # Validate configuration is JSON serializable
-        if not self.validate_json_serializable(tool.configuration):
-            result.add_error(
-                "Configuration must be JSON serializable",
-                "configuration",
-                "SERIALIZATION_ERROR",
-            )
-
-        return result
-
-    def _validate_parameter(self, parameter: ToolParameter) -> ValidationResult:
-        """Validate ToolParameter object"""
-        result = ValidationResult()
-
-        # Validate parameter type
-        valid_types = {"string", "integer", "number", "boolean", "array", "object"}
-        if parameter.type not in valid_types:
-            result.add_error(
-                f"Invalid parameter type: {parameter.type}", "type", "INVALID_TYPE"
-            )
-
-        # Validate enum values if provided
-        if parameter.enum_values and parameter.type != "string":
-            result.add_warning("Enum values typically used with string type parameters")
-
-        return result
-
-
 class CrossModelValidator:
     """Validator for cross-model consistency"""
 
@@ -310,59 +225,31 @@ class CrossModelValidator:
             session: Session model
 
         Returns:
-            ValidationResult with validation details
+            ValidationResult with consistency checks
         """
         result = ValidationResult()
 
-        # Check user ID consistency
-        if user.user_id != session.user_id:
+        # Validate user_id consistency
+        if session.user_id != user.user_id:
             result.add_error(
-                "User ID mismatch between User and Session",
+                "Session user_id does not match User user_id",
                 "user_id",
-                "CONSISTENCY_ERROR",
+                "CONSISTENCY",
             )
 
-        # Check session ID consistency
+        # Validate session_id consistency
         if user.session_id and user.session_id != session.session_id:
-            result.add_error("Session ID mismatch", "session_id", "CONSISTENCY_ERROR")
-
-        # Check message count consistency
-        if user.message_count != session.message_count:
-            result.add_warning("Message count mismatch between User and Session")
-
-        return result
-
-    def validate_file_session_consistency(
-        self, session: Session, uploaded_files: List[Dict[str, Any]]
-    ) -> ValidationResult:
-        """
-        Validate consistency between Session and actual uploaded files
-
-        Args:
-            session: Session model
-            uploaded_files: List of actual uploaded file metadata
-
-        Returns:
-            ValidationResult with validation details
-        """
-        result = ValidationResult()
-
-        session_file_ids = {f.file_id for f in session.uploaded_files}
-        actual_file_ids = {f.get("file_id") for f in uploaded_files}
-
-        # Check for missing files
-        missing_files = session_file_ids - actual_file_ids
-        if missing_files:
             result.add_error(
-                f"Session references missing files: {missing_files}",
-                "uploaded_files",
-                "MISSING_FILES",
+                "User session_id does not match Session session_id",
+                "session_id",
+                "CONSISTENCY",
             )
 
-        # Check for extra files
-        extra_files = actual_file_ids - session_file_ids
-        if extra_files:
-            result.add_warning(f"Files exist but not tracked in session: {extra_files}")
+        # Validate message count consistency
+        if user.message_count > session.message_count:
+            result.add_warning(
+                "User message count exceeds session message count - possible data sync issue"
+            )
 
         return result
 
@@ -378,7 +265,6 @@ class ValidationService:
     def __init__(self):
         self.user_validator = UserValidator()
         self.session_validator = SessionValidator()
-        self.tool_validator = ToolValidator()
         self.cross_validator = CrossModelValidator()
 
     def validate_user(self, user: User) -> ValidationResult:
@@ -388,10 +274,6 @@ class ValidationService:
     def validate_session(self, session: Session) -> ValidationResult:
         """Validate Session model"""
         return self.session_validator.validate_session(session)
-
-    def validate_tool(self, tool: ToolEntity) -> ValidationResult:
-        """Validate ToolEntity model"""
-        return self.tool_validator.validate_tool(tool)
 
     def validate_user_session_pair(
         self, user: User, session: Session
@@ -418,42 +300,6 @@ class ValidationService:
         combined_result.is_valid = not combined_result.errors
 
         return combined_result
-
-    def validate_batch(
-        self, models: List[Union[User, Session, ToolEntity]]
-    ) -> Dict[str, ValidationResult]:
-        """
-        Validate multiple models at once
-
-        Args:
-            models: List of model instances to validate
-
-        Returns:
-            Dictionary mapping model ID to ValidationResult
-        """
-        results = {}
-
-        for i, model in enumerate(models):
-            try:
-                if isinstance(model, User):
-                    results[f"user_{i}_{model.user_id}"] = self.validate_user(model)
-                elif isinstance(model, Session):
-                    results[f"session_{i}_{model.session_id}"] = self.validate_session(
-                        model
-                    )
-                elif isinstance(model, ToolEntity):
-                    results[f"tool_{i}_{model.tool_id}"] = self.validate_tool(model)
-                else:
-                    results[f"unknown_{i}"] = ValidationResult()
-                    results[f"unknown_{i}"].add_error(
-                        f"Unknown model type: {type(model)}"
-                    )
-            except Exception as e:
-                logger.error(f"Validation error for model {i}: {e}")
-                results[f"error_{i}"] = ValidationResult()
-                results[f"error_{i}"].add_error(f"Validation exception: {str(e)}")
-
-        return results
 
 
 # Singleton instance for global use

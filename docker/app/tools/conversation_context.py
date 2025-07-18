@@ -1,11 +1,18 @@
+"""
+Conversation Context Tool - MVC Pattern Implementation
+
+This tool analyzes conversation history to extract specific types of context
+following the Model-View-Controller pattern.
+"""
+
 import logging
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 
 from models.chat_config import ChatConfig
 from pydantic import Field
 from services.llm_client_service import llm_client_service
-from tools.base import BaseTool, BaseToolResponse
+from tools.base import BaseTool, BaseToolResponse, ToolController, ToolView
 from utils.config import config as app_config
 from utils.pdf_extractor import PDFDataExtractor
 from utils.text_processing import strip_think_tags
@@ -51,101 +58,54 @@ class ConversationContextResponse(BaseToolResponse):
         return self.analysis
 
 
-class ConversationContextTool(BaseTool):
-    """Tool for analyzing conversation context and user intent"""
+class ConversationContextController(ToolController):
+    """Controller handling conversation context analysis logic"""
 
-    def __init__(self):
-        super().__init__()
-        self.name = "conversation_context"
-        self.description = "INTERNAL TOOL: Analyzes conversation history to extract specific types of context. Use ONLY when you need to analyze the conversation itself (not for answering general questions). For analyzing what has been discussed, user patterns, or tracking ongoing tasks/projects. DO NOT use for answering user questions directly - use other appropriate tools for that."
+    def __init__(self, llm_type: str):
+        self.llm_type = llm_type
 
-    def to_openai_format(self) -> Dict[str, Any]:
-        """
-        Convert the tool to OpenAI function calling format
+    def process(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Process the conversation context analysis request"""
+        if "query" not in params:
+            raise ValueError("'query' key is required in parameters dictionary")
+        if "max_messages" not in params:
+            raise ValueError("'max_messages' key is required in parameters dictionary")
 
-        Returns:
-            Dict containing the OpenAI-compatible tool definition
-        """
-        return {
-            "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.description,
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query": {
-                            "type": "string",
-                            "enum": [
-                                "conversation_summary",
-                                "recent_topics",
-                                "user_preferences",
-                                "task_continuity",
-                                "creative_director",
-                                "document_analysis",
-                            ],
-                            "description": "Type of context analysis to perform. Choose 'conversation_summary' for overall summary, 'recent_topics' to list discussion topics, 'user_preferences' for user patterns, 'task_continuity' for tracking tasks, 'creative_director' for creative projects, or 'document_analysis' for document-related context.",
-                        },
-                        "max_messages": {
-                            "type": "integer",
-                            "description": "Maximum number of messages to analyze (default: 20)",
-                            "default": 20,
-                        },
-                        "include_document_content": {
-                            "type": "boolean",
-                            "description": "Whether to include full document content in analysis if documents are present",
-                            "default": True,
-                        },
-                        "but_why": {
-                            "type": "string",
-                            "description": "A single sentence explaining why this tool was selected for the query.",
-                        },
-                    },
-                    "required": ["query", "max_messages", "but_why"],
-                },
-            },
-        }
+        # Validate context type
+        try:
+            context_enum = ContextType(params["query"].lower())
+        except ValueError:
+            raise ValueError(
+                f"Invalid query: {params['query']}. Must be one of: {[t.value for t in ContextType]}"
+            )
 
-    def _get_system_prompt(
-        self, context_type: ContextType, focus_query: Optional[str] = None
-    ) -> str:
-        """Get the appropriate system prompt for context analysis"""
+        # Limit messages to the requested count, excluding system messages
+        messages = params.get("messages", [])
+        filtered_messages = []
+        for msg in reversed(messages):
+            if msg.get("role") != "system":
+                filtered_messages.append(msg)
+                if len(filtered_messages) >= params["max_messages"]:
+                    break
 
-        base_prompts = {
-            ContextType.CONVERSATION_SUMMARY: """detailed thinking off
-            You are summarizing the conversation history to provide context.
+        # Reverse back to chronological order
+        filtered_messages.reverse()
 
-Create a concise overview that captures the main themes and user objectives. Clearly distinguish between COMPLETED tasks (already finished) and ONGOING tasks (still in progress). Focus on what the user is currently working on or likely to ask about next. Keep the summary focused and within 200 words.""",
-            ContextType.RECENT_TOPICS: """detailed thinking off
-            You are identifying and listing the main topics discussed in the conversation.
-
-Extract and enumerate the primary discussion threads. Note recurring themes and the current focus of engagement. Include relevant related topics that may be important. Prioritize topics that are most relevant to ongoing tasks or questions.""",
-            ContextType.USER_PREFERENCES: """detailed thinking off
-            You are analyzing user interaction patterns and preferences.
-
-Identify the user's communication style, typical request types, and preferred response formats. Note any stated constraints or preferences. Assess the user's apparent expertise level and information needs based on their interactions.""",
-            ContextType.TASK_CONTINUITY: """detailed thinking on
-            You are tracking task progression and continuity.
-
-Identify the main task or objective being pursued. Document completed steps and current progress. Determine what stage the user is at in their task. Anticipate likely next steps and information needs. Provide essential context for seamless task continuation.""",
-            ContextType.CREATIVE_DIRECTOR: """detailed thinking on
-            You are maintaining creative project continuity and coherence.
-
-Track the creative project's vision, scope, and goals. Document the evolution of core ideas and concepts. Ensure consistency in tone, style, and narrative direction. Identify opportunities for enhancement or new perspectives. Maintain an awareness of referenced materials and inspirations.""",
-            ContextType.DOCUMENT_ANALYSIS: """detailed thinking on
-            You are analyzing document content in relation to the conversation.
-
-Summarize key points, themes, and main arguments from the document. Identify the document's structure and organization. Extract critical information, facts, and conclusions. Relate content to user queries and conversation context. Note any action items or recommendations. Identify connections between document content and conversation topics.""",
-        }
-
-        prompt = base_prompts.get(
-            context_type, base_prompts[ContextType.CONVERSATION_SUMMARY]
+        logger.debug(
+            f"Context analysis: {params['query']}, {len(filtered_messages)} messages"
         )
 
-        if focus_query:
-            prompt += f"\n\nSpecial focus: Pay particular attention to anything related to: {focus_query}"
+        # Create config from environment
+        config = ChatConfig.from_environment()
 
-        return prompt
+        # Analyze conversation
+        return self._analyze_conversation_context(
+            context_enum,
+            filtered_messages,
+            config,
+            params.get("focus_query"),
+            params.get("pdf_data"),
+        )
 
     def _analyze_conversation_context(
         self,
@@ -154,7 +114,7 @@ Summarize key points, themes, and main arguments from the document. Identify the
         config: ChatConfig,
         focus_query: Optional[str] = None,
         pdf_data: Dict[str, Any] = None,
-    ) -> ConversationContextResponse:
+    ) -> Dict[str, Any]:
         """Analyze conversation messages to generate context"""
 
         logger.info(
@@ -165,7 +125,14 @@ Summarize key points, themes, and main arguments from the document. Identify the
             # Get the appropriate client and model based on this tool's LLM type
             client = llm_client_service.get_client(self.llm_type)
             model_name = llm_client_service.get_model_name(self.llm_type)
-            system_prompt = self._get_system_prompt(context_type, focus_query)
+
+            # Get system prompt with tool-specific override support
+            from tools.tool_llm_config import get_tool_system_prompt
+
+            default_prompt = self._get_system_prompt(context_type, focus_query)
+            system_prompt = get_tool_system_prompt(
+                "conversation_context", default_prompt
+            )
 
             # Prepare conversation history for analysis
             conversation_text = self._format_messages_for_analysis(messages)
@@ -222,31 +189,82 @@ Summarize key points, themes, and main arguments from the document. Identify the
 
             logger.info(f"Successfully generated {context_type} context")
 
-            return ConversationContextResponse(
-                analysis=result,
-                user_intent=user_intent,
-                conversation_type=context_type,
-                key_topics=key_topics,
-                has_document=pdf_data is not None,
-                document_info=(
+            return {
+                "analysis": result,
+                "user_intent": user_intent,
+                "conversation_type": context_type.value,
+                "key_topics": key_topics,
+                "has_document": pdf_data is not None,
+                "document_info": (
                     pdf_data.get("info", "No additional document information")
                     if pdf_data
                     else "No additional document information"
                 ),
-            )
+            }
 
         except Exception as e:
             logger.error(f"Error analyzing conversation context: {e}")
-            return ConversationContextResponse(
-                analysis="",
-                user_intent=None,
-                conversation_type=context_type,
-                key_topics=None,
-                has_document=False,
-                document_info=None,
-                success=False,
-                error_message=str(e),
-            )
+            raise
+
+    def _get_system_prompt(
+        self, context_type: ContextType, focus_query: Optional[str] = None
+    ) -> str:
+        """Get the appropriate system prompt for context analysis"""
+
+        base_prompts = {
+            ContextType.CONVERSATION_SUMMARY: """detailed thinking off
+            You are summarizing the conversation history to provide context.
+
+Create a concise overview that captures the main themes and user objectives.
+
+CRITICAL: For the most recent user message, clearly identify:
+
+1. ACTION REQUESTS: Messages that explicitly ask for something to be done
+   - Contains action verbs: create, generate, make, analyze, search, etc.
+   - Example: "Create an image of a purple duck" → ACTION REQUEST
+   - Example: "Generate another one" → ACTION REQUEST
+
+2. ACKNOWLEDGMENTS: Messages that acknowledge or respond to completed actions
+   - Example: "Thank you" → ACKNOWLEDGMENT (no action needed)
+   - Example: "Perfect!" → ACKNOWLEDGMENT (no action needed)
+
+3. MIXED MESSAGES: Acknowledgment + new request
+   - Example: "Thanks! Now create a blue cat" → ACKNOWLEDGMENT + ACTION REQUEST
+
+For completed tasks, note them as COMPLETED only if they were actually executed (not just discussed).
+
+Be explicit: Does the latest message require action? YES or NO.
+Keep the summary focused and within 200 words.""",
+            ContextType.RECENT_TOPICS: """detailed thinking off
+            You are identifying and listing the main topics discussed in the conversation.
+
+Extract and enumerate the primary discussion threads. Note recurring themes and the current focus of engagement. Include relevant related topics that may be important. Prioritize topics that are most relevant to ongoing tasks or questions.""",
+            ContextType.USER_PREFERENCES: """detailed thinking off
+            You are analyzing user interaction patterns and preferences.
+
+Identify the user's communication style, typical request types, and preferred response formats. Note any stated constraints or preferences. Assess the user's apparent expertise level and information needs based on their interactions.""",
+            ContextType.TASK_CONTINUITY: """detailed thinking on
+            You are tracking task progression and continuity.
+
+Identify the main task or objective being pursued. Document completed steps and current progress. Determine what stage the user is at in their task. Anticipate likely next steps and information needs. Provide essential context for seamless task continuation.""",
+            ContextType.CREATIVE_DIRECTOR: """detailed thinking on
+            You are maintaining creative project continuity and coherence.
+
+Track the creative project's vision, scope, and goals. Document the evolution of core ideas and concepts. Ensure consistency in tone, style, and narrative direction. Identify opportunities for enhancement or new perspectives. Maintain an awareness of referenced materials and inspirations.""",
+            ContextType.DOCUMENT_ANALYSIS: """detailed thinking on
+            You are analyzing document content in relation to the conversation.
+
+Summarize key points, themes, and main arguments from the document. Identify the document's structure and organization. Extract critical information, facts, and conclusions. Relate content to user queries and conversation context. Note any action items or recommendations. Identify connections between document content and conversation topics.""",
+        }
+
+        prompt = base_prompts.get(
+            context_type, base_prompts[ContextType.CONVERSATION_SUMMARY]
+        )
+
+        if focus_query:
+            prompt += f"\n\nSpecial focus: Pay particular attention to anything related to: {focus_query}"
+
+        return prompt
 
     def _format_messages_for_analysis(self, messages: List[Dict[str, Any]]) -> str:
         """Format messages for LLM analysis"""
@@ -428,71 +446,111 @@ Summarize key points, themes, and main arguments from the document. Identify the
             return "\n\n".join(pages_text) if pages_text else None
         return None
 
-    def execute(self, params: Dict[str, Any]) -> ConversationContextResponse:
-        """
-        Execute the tool with given parameters
 
-        Args:
-            params: Dictionary containing the required parameters
+class ConversationContextView(ToolView):
+    """View for formatting conversation context responses"""
 
-        Returns:
-            ConversationContextResponse
-        """
-        return self.run_with_dict(params)
-
-    def run_with_dict(self, params: Dict[str, Any]) -> ConversationContextResponse:
-        """Execute context analysis with parameters provided as a dictionary"""
-
-        if "query" not in params:
-            raise ValueError("'query' key is required in parameters dictionary")
-        if "max_messages" not in params:
-            raise ValueError("'max_messages' key is required in parameters dictionary")
-
-        # Validate context type
+    def format_response(
+        self, data: Dict[str, Any], response_type: Type[BaseToolResponse]
+    ) -> BaseToolResponse:
+        """Format raw data into ConversationContextResponse"""
         try:
-            context_enum = ContextType(params["query"].lower())
-        except ValueError:
-            raise ValueError(
-                f"Invalid query: {params['query']}. Must be one of: {[t.value for t in ContextType]}"
+            return ConversationContextResponse(**data)
+        except Exception as e:
+            logger.error(f"Error formatting context response: {e}")
+            return ConversationContextResponse(
+                analysis="",
+                success=False,
+                error_message=f"Response formatting error: {str(e)}",
+                error_code="FORMAT_ERROR",
             )
 
-        # Limit messages to the requested count, excluding system messages
-        filtered_messages = []
-        for msg in reversed(params["messages"]):
-            if msg.get("role") != "system":
-                filtered_messages.append(msg)
-                if len(filtered_messages) >= params["max_messages"]:
-                    break
+    def format_error(
+        self, error: Exception, response_type: Type[BaseToolResponse]
+    ) -> BaseToolResponse:
+        """Format error into ConversationContextResponse"""
+        error_code = "UNKNOWN_ERROR"
+        if isinstance(error, ValueError):
+            error_code = "VALIDATION_ERROR"
+        elif isinstance(error, TimeoutError):
+            error_code = "TIMEOUT_ERROR"
 
-        # Reverse back to chronological order
-        filtered_messages.reverse()
-
-        logger.debug(
-            f"Context analysis: {params['query']}, {len(filtered_messages)} messages"
-        )
-
-        # Create config from environment
-        config = ChatConfig.from_environment()
-        return self._analyze_conversation_context(
-            context_enum,
-            filtered_messages,
-            config,
-            params.get("focus_query"),
-            params.get("pdf_data"),
+        return ConversationContextResponse(
+            analysis="", success=False, error_message=str(error), error_code=error_code
         )
 
 
-# Create a global instance and helper functions
-conversation_context_tool = ConversationContextTool()
+class ConversationContextTool(BaseTool):
+    """Tool for analyzing conversation context and user intent following MVC pattern"""
+
+    def __init__(self):
+        super().__init__()
+        self.name = "conversation_context"
+        self.description = "INTERNAL TOOL: Analyzes conversation history to extract specific types of context. Use ONLY when you need to analyze the conversation itself (not for answering general questions). For analyzing what has been discussed, user patterns, or tracking ongoing tasks/projects. DO NOT use for answering user questions directly - use other appropriate tools for that."
+
+    def _initialize_mvc(self):
+        """Initialize MVC components"""
+        self._controller = ConversationContextController(self.llm_type)
+        self._view = ConversationContextView()
+
+    def get_definition(self) -> Dict[str, Any]:
+        """Get OpenAI-compatible tool definition"""
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "enum": [
+                                "conversation_summary",
+                                "recent_topics",
+                                "user_preferences",
+                                "task_continuity",
+                                "creative_director",
+                                "document_analysis",
+                            ],
+                            "description": "Type of context analysis to perform. Choose 'conversation_summary' for overall summary, 'recent_topics' to list discussion topics, 'user_preferences' for user patterns, 'task_continuity' for tracking tasks, 'creative_director' for creative projects, or 'document_analysis' for document-related context.",
+                        },
+                        "max_messages": {
+                            "type": "integer",
+                            "description": "Maximum number of messages to analyze (default: 20)",
+                            "default": 20,
+                        },
+                        "include_document_content": {
+                            "type": "boolean",
+                            "description": "Whether to include full document content in analysis if documents are present",
+                            "default": True,
+                        },
+                        "but_why": {
+                            "type": "string",
+                            "description": "A single sentence explaining why this tool was selected for the query.",
+                        },
+                    },
+                    "required": ["query", "max_messages", "but_why"],
+                },
+            },
+        }
+
+    def get_response_type(self) -> Type[BaseToolResponse]:
+        """Get the response type for this tool"""
+        return ConversationContextResponse
 
 
+# Helper functions for backward compatibility
 def get_conversation_context_tool_definition() -> Dict[str, Any]:
     """Get the OpenAI-compatible tool definition for conversation context"""
-    return conversation_context_tool.to_openai_format()
+    from tools.registry import get_tool, register_tool_class
 
+    # Register the tool class if not already registered
+    register_tool_class("conversation_context", ConversationContextTool)
 
-def execute_conversation_context_with_dict(
-    params: Dict[str, Any],
-) -> ConversationContextResponse:
-    """Execute conversation context analysis with parameters as dictionary"""
-    return conversation_context_tool.run_with_dict(params)
+    # Get the tool instance and return its definition
+    tool = get_tool("conversation_context")
+    if tool:
+        return tool.get_definition()
+    else:
+        raise RuntimeError("Failed to get conversation context tool definition")

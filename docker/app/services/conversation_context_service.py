@@ -10,7 +10,6 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from models.chat_config import ChatConfig
-from tools.conversation_context import ConversationContextTool
 from utils.config import config
 
 logger = logging.getLogger(__name__)
@@ -27,7 +26,6 @@ class ConversationContextService:
             config_obj: Configuration object
         """
         self.config = config_obj
-        self.context_tool = ConversationContextTool()
         self._context_cache = {}
 
     def should_inject_context(self, messages: List[Dict[str, Any]]) -> bool:
@@ -153,10 +151,13 @@ class ConversationContextService:
                 "max_messages": len(limited_messages),
                 "messages": limited_messages,
                 "include_document_content": False,  # We handle documents separately
+                "but_why": "Analyzing conversation history to provide relevant context for better response generation",
             }
 
-            # Execute the context analysis
-            response = self.context_tool.run_with_dict(params)
+            # Execute the context analysis using the tool registry
+            from tools.registry import execute_tool
+
+            response = execute_tool("conversation_context", params)
 
             if response and response.success:
                 return response.analysis
@@ -195,8 +196,3 @@ Please maintain continuity with the previous discussion and refer to earlier top
 ---"""
 
         return {"role": "system", "content": content}
-
-    def clear_cache(self):
-        """Clear the context cache"""
-        self._context_cache = {}
-        logger.debug("Cleared conversation context cache")

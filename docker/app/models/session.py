@@ -7,18 +7,15 @@ state management, and business logic encapsulation.
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 
 
 class SessionStatus(str, Enum):
     """Session status enumeration"""
 
     ACTIVE = "active"
-    PAUSED = "paused"
-    COMPLETED = "completed"
-    ERROR = "error"
 
 
 class ProcessingStatus(str, Enum):
@@ -26,9 +23,6 @@ class ProcessingStatus(str, Enum):
 
     IDLE = "idle"
     PROCESSING = "processing"
-    UPLOADING = "uploading"
-    ANALYZING = "analyzing"
-    GENERATING = "generating"
 
 
 class FileInfo(BaseModel):
@@ -44,14 +38,6 @@ class FileInfo(BaseModel):
     processed: bool = Field(
         default=False, description="Whether file has been processed"
     )
-
-    @validator('file_type')
-    def validate_file_type(cls, v):
-        """Validate file type"""
-        allowed_types = {"pdf", "png", "jpg", "jpeg", "gif", "webp", "bmp", "tiff"}
-        if v.lower() not in allowed_types:
-            raise ValueError(f"File type must be one of {allowed_types}")
-        return v.lower()
 
 
 class Session(BaseModel):
@@ -93,29 +79,6 @@ class Session(BaseModel):
         default="", description="Intelligent LLM model being used"
     )
     vlm_model_name: str = Field(default="", description="Vision LLM model being used")
-
-    class Config:
-        """Pydantic configuration"""
-
-        use_enum_values = True
-        validate_assignment = True
-        json_encoders = {datetime: lambda v: v.isoformat()}
-
-    @validator('session_id')
-    def validate_session_id(cls, v):
-        """Validate session ID format"""
-        if not v or len(v.strip()) == 0:
-            raise ValueError("Session ID cannot be empty")
-        if len(v) > 200:
-            raise ValueError("Session ID cannot exceed 200 characters")
-        return v.strip()
-
-    @validator('user_id')
-    def validate_user_id(cls, v):
-        """Validate user ID format"""
-        if not v or len(v.strip()) == 0:
-            raise ValueError("User ID cannot be empty")
-        return v.strip()
 
     def update_timestamp(self) -> None:
         """Update the session's last update timestamp"""
@@ -167,15 +130,6 @@ class Session(BaseModel):
                 self.update_timestamp()
                 return True
         return False
-
-    def get_unprocessed_files(self) -> List[FileInfo]:
-        """
-        Get list of unprocessed files
-
-        Returns:
-            List of unprocessed FileInfo objects
-        """
-        return [f for f in self.uploaded_files if not f.processed]
 
     def get_files_by_type(self, file_type: str) -> List[FileInfo]:
         """
@@ -236,15 +190,6 @@ class Session(BaseModel):
         """Clear all context data"""
         self.context_data.clear()
         self.update_timestamp()
-
-    def get_session_duration(self) -> float:
-        """
-        Get session duration in seconds
-
-        Returns:
-            Duration in seconds since session creation
-        """
-        return (datetime.now() - self.created_at).total_seconds()
 
     def to_streamlit_state(self) -> Dict[str, Any]:
         """

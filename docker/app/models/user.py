@@ -7,17 +7,17 @@ and business logic encapsulation.
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field
 
 
 class UserRole(str, Enum):
     """User role enumeration"""
 
     USER = "user"
-    ASSISTANT = "assistant"
-    SYSTEM = "system"
+    ASSISTANT = "assistant"  # dead: disable
+    SYSTEM = "system"  # dead: disable
 
 
 class UserPreferences(BaseModel):
@@ -29,23 +29,6 @@ class UserPreferences(BaseModel):
         default=100, ge=1, le=1000, description="Messages per session limit"
     )
     auto_save: bool = Field(default=True, description="Auto-save conversations")
-
-    @validator('language')
-    def validate_language(cls, v):
-        """Validate language code format"""
-        if len(v) not in [2, 5]:  # ISO 639-1 or locale format
-            raise ValueError(
-                "Language must be ISO 639-1 format (e.g., 'en') or locale format (e.g., 'en-US')"
-            )
-        return v.lower()
-
-    @validator('theme')
-    def validate_theme(cls, v):
-        """Validate theme options"""
-        allowed_themes = {"light", "dark", "auto"}
-        if v not in allowed_themes:
-            raise ValueError(f"Theme must be one of {allowed_themes}")
-        return v
 
 
 class User(BaseModel):
@@ -71,22 +54,6 @@ class User(BaseModel):
     message_count: int = Field(default=0, ge=0, description="Total messages sent")
     session_count: int = Field(default=0, ge=0, description="Total sessions created")
 
-    class Config:
-        """Pydantic configuration"""
-
-        use_enum_values = True
-        validate_assignment = True
-        json_encoders = {datetime: lambda v: v.isoformat()}
-
-    @validator('user_id')
-    def validate_user_id(cls, v):
-        """Validate user ID format"""
-        if not v or len(v.strip()) == 0:
-            raise ValueError("User ID cannot be empty")
-        if len(v) > 100:
-            raise ValueError("User ID cannot exceed 100 characters")
-        return v.strip()
-
     def update_activity(self) -> None:
         """Update last activity timestamp"""
         self.last_active = datetime.now()
@@ -95,34 +62,6 @@ class User(BaseModel):
         """Increment user message count"""
         self.message_count += 1
         self.update_activity()
-
-    def increment_session_count(self) -> None:
-        """Increment user session count"""
-        self.session_count += 1
-        self.update_activity()
-
-    def can_send_message(self) -> bool:
-        """
-        Check if user can send another message based on preferences
-
-        Returns:
-            True if user can send message, False otherwise
-        """
-        return self.message_count < self.preferences.message_limit
-
-    def get_display_name(self) -> str:
-        """
-        Get user display name for UI
-
-        Returns:
-            Formatted display name
-        """
-        if self.role == UserRole.ASSISTANT:
-            return "Assistant"
-        elif self.role == UserRole.SYSTEM:
-            return "System"
-        else:
-            return f"User {self.user_id[:8]}"
 
     def to_session_state(self) -> Dict[str, Any]:
         """

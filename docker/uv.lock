@@ -180,6 +180,7 @@ dependencies = [
     { name = "langchain" },
     { name = "langchain-openai" },
     { name = "openai" },
+    { name = "openmeteo-py" },
     { name = "pillow" },
     { name = "pillow-heif" },
     { name = "pymilvus" },
@@ -225,6 +226,7 @@ requires-dist = [
     { name = "mkdocs-minify-plugin", marker = "extra == 'streamlit-docs'", specifier = "==0.7.1" },
     { name = "nodejs-bin", marker = "extra == 'jupyterlab'", specifier = "==18.4.0a4" },
     { name = "openai", specifier = "==1.86.0" },
+    { name = "openmeteo-py", specifier = "==0.0.1" },
     { name = "pandas", marker = "extra == 'jupyterlab'", specifier = "==2.3.0" },
     { name = "pillow", specifier = "==11.2.1" },
     { name = "pillow-heif", specifier = "==0.22.0" },
@@ -1504,6 +1506,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ec/7a/9ad4a61f1502f0e59d8c27fb629e28a63259a44d8d31cd2314e1534a2d9f/openai-1.86.0.tar.gz", hash = "sha256:c64d5b788359a8fdf69bd605ae804ce41c1ce2e78b8dd93e2542e0ee267f1e4b", size = 468272, upload-time = "2025-06-10T16:50:32.962Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/58/c1/dfb16b3432810fc9758564f9d1a4dbce6b93b7fb763ba57530c7fc48316d/openai-1.86.0-py3-none-any.whl", hash = "sha256:c8889c39410621fe955c230cc4c21bfe36ec887f4e60a957de05f507d7e1f349", size = 730296, upload-time = "2025-06-10T16:50:30.495Z" },
+]
+
+[[package]]
+name = "openmeteo-py"
+version = "0.0.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pandas" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/cf/ca/e43fb7b169c2b75717c18591b3e779925cbf9b7c60cd7304cd70f70813d2/openmeteo_py-0.0.1.tar.gz", hash = "sha256:8beddc286cc50939f7eedd120f57afe44af487c2a57df07f2e86a5f49f5b6953", size = 13905, upload-time = "2021-10-14T16:26:40.848Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7d/bd/51c2ea1ed6178a425426637ffd0eaf348b65b8579e7fb1e3585153414d01/openmeteo_py-0.0.1-py3-none-any.whl", hash = "sha256:872df0d59119d68411014736fc4aacdec4996027a9cf641914e082a41f7831ce", size = 14259, upload-time = "2021-10-14T16:26:37.605Z" },
 ]
 
 [[package]]

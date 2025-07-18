@@ -161,54 +161,6 @@ class PDFContextService:
         logger.debug(f"Message '{user_message}' does not require PDF context")
         return False
 
-    def should_inject_pdf_context_after_tool(self, user_message: str) -> bool:
-        """
-        Determine if PDF context should be injected after tool execution
-
-        This method is more permissive than should_inject_pdf_context and is used
-        after tool execution to ensure PDF content is available for follow-up responses.
-
-        Args:
-            user_message: The user's query
-
-        Returns:
-            True if PDF context should be injected
-        """
-        # Always inject if there's a PDF in session and the message isn't clearly non-PDF
-        if not self.has_pdf_in_session():
-            return False
-
-        message_lower = user_message.lower()
-
-        # Messages that clearly indicate NOT wanting PDF context (even after tools)
-        non_pdf_indicators = [
-            'thanks',
-            'thank you',
-            'goodbye',
-            'bye',
-            'hello',
-            'hi',
-            'how are you',
-            'what\'s up',
-            'weather',
-            'news',
-        ]
-
-        # Check if message is clearly NOT about the PDF
-        for indicator in non_pdf_indicators:
-            if indicator in message_lower and len(message_lower.split()) <= 3:
-                logger.debug(
-                    f"Message '{user_message}' identified as non-PDF query after tool execution"
-                )
-                return False
-
-        # After tool execution, be more permissive - inject context for most messages
-        # unless they're clearly unrelated to the PDF
-        logger.debug(
-            f"After tool execution, injecting PDF context for message: '{user_message}'"
-        )
-        return True
-
     def has_pdf_in_session(self) -> bool:
         """
         Check if there's a PDF available in the current session

@@ -1,6 +1,6 @@
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Type, Union
 
 import numpy as np
 import requests
@@ -47,14 +47,6 @@ class EmbeddingCreator:
     def __init__(self, base_url: str, api_key: str, model: str):
         self.model = model
         self.embed_model = OpenAI(api_key=api_key, base_url=base_url)
-
-    def create_passage(self, input_text: str) -> Dict[str, Any]:
-        """Create embedding for a passage"""
-        return self.embed_model.embeddings.create(
-            input=input_text,
-            model=self.model,
-            extra_body={"input_type": "passage", "truncate": "END"},
-        )
 
     def create_query(self, input_text: str) -> Dict[str, Any]:
         """Create embedding for a query"""
@@ -501,6 +493,8 @@ class RetrieverTool(BaseTool):
         self.name = "retrieval_search"
         self.description = "ONLY use for questions about NVIDIA products, technologies, mental health topics, or specialized knowledge base content. Searches a specialized knowledge base for information about NVIDIA products, technologies, and mental health topics using vector similarity search. This tool works well when paired with the tavily_internet_search tool."
 
+    def _initialize_mvc(self):
+        """Initialize MVC components"""
         # Initialize embedding creator and similarity search using centralized config
         self.embedding_creator = EmbeddingCreator(
             base_url=config.env.EMBEDDING_ENDPOINT,
@@ -515,9 +509,13 @@ class RetrieverTool(BaseTool):
             vector_field="embedding",
         )
 
-    def to_openai_format(self) -> Dict[str, Any]:
+        # This tool doesn't need separate MVC components
+        self._controller = None
+        self._view = None
+
+    def get_definition(self) -> Dict[str, Any]:
         """
-        Convert the tool to OpenAI function calling format
+        Return OpenAI-compatible tool definition
 
         Returns:
             Dict containing the OpenAI-compatible tool definition
@@ -543,6 +541,10 @@ class RetrieverTool(BaseTool):
                 },
             },
         }
+
+    def get_response_type(self) -> Type[RetrievalResponse]:
+        """Get the response type for this tool"""
+        return RetrievalResponse
 
     def execute(self, params: Dict[str, Any]):
         """Execute the tool with given parameters"""
@@ -633,42 +635,6 @@ class RetrieverTool(BaseTool):
             logger.error(f"Error during retrieval search: {e}")
             raise Exception(f"Retrieval search failed: {str(e)}")
 
-    def _run(
-        self,
-        query: str = None,
-        use_reranker: bool = True,
-        max_results: int = MAX_RESULTS,
-        **kwargs,
-    ) -> RetrievalResponse:
-        """
-        Execute a retrieval search with the given query.
-
-        Args:
-            query: The search query (for backward compatibility)
-            use_reranker: Whether to use reranking
-            max_results: Maximum number of results to return
-            **kwargs: Can accept a dictionary with parameters
-
-        Returns:
-            RetrievalResponse: The search results in a validated Pydantic model
-        """
-        # Support both direct parameter and dictionary input
-        if query is None and "query" in kwargs:
-            query = kwargs["query"]
-        elif query is None:
-            raise ValueError("Query parameter is required")
-
-        if "use_reranker" in kwargs:
-            use_reranker = kwargs["use_reranker"]
-
-        if "max_results" in kwargs:
-            max_results = kwargs["max_results"]
-
-        logger.debug(
-            f"_run method called with query: '{query}', use_reranker: {use_reranker}, max_results: {max_results}"
-        )
-        return self.search_documents(query, use_reranker, max_results)
-
     def run_with_dict(self, params: Dict[str, Any]) -> RetrievalResponse:
         """
         Execute a retrieval search with parameters provided as a dictionary.
@@ -693,10 +659,7 @@ class RetrieverTool(BaseTool):
         return self.search_documents(query, use_reranker, max_results)
 
 
-# Create a global instance and helper functions for easy access
-retrieval_tool = RetrieverTool()
-
-
+# Helper functions for backward compatibility
 def get_retrieval_tool_definition() -> Dict[str, Any]:
     """
     Get the OpenAI-compatible tool definition for retrieval search
@@ -704,49 +667,14 @@ def get_retrieval_tool_definition() -> Dict[str, Any]:
     Returns:
         Dict containing the OpenAI tool definition
     """
-    return retrieval_tool.to_openai_format()
+    from tools.registry import get_tool, register_tool_class
 
+    # Register the tool class if not already registered
+    register_tool_class("retrieval_search", RetrieverTool)
 
-def execute_retrieval_search(
-    query: str, use_reranker: bool = True, max_results: int = MAX_RESULTS
-) -> RetrievalResponse:
-    """
-    Execute a retrieval search with the given query
-
-    Args:
-        query: The search query
-        use_reranker: Whether to use reranking
-        max_results: Maximum number of results to return
-
-    Returns:
-        RetrievalResponse: The search results
-    """
-    return retrieval_tool.search_documents(query, use_reranker, max_results)
-
-
-def execute_retrieval_with_dict(params: Dict[str, Any]) -> RetrievalResponse:
-    """
-    Execute a retrieval search with parameters provided as a dictionary
-
-    Args:
-        params: Dictionary containing the required parameters
-               Expected keys: 'query', optionally 'use_reranker', 'max_results'
-
-    Returns:
-        RetrievalResponse: The search results
-    """
-    return retrieval_tool.run_with_dict(params)
-
-
-def get_simple_search_results(query: str) -> str:
-    """
-    Simple function to get formatted search results as a string
-
-    Args:
-        query: The search query string
-
-    Returns:
-        str: Formatted search results
-    """
-    response = retrieval_tool.search_documents(query)
-    return response.formatted_results
+    # Get the tool instance and return its definition
+    tool = get_tool("retrieval_search")
+    if tool:
+        return tool.get_definition()
+    else:
+        raise RuntimeError("Failed to get retrieval tool definition")

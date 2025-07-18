@@ -11,7 +11,6 @@ import re
 from typing import Any, Dict, List, Tuple
 
 from utils.exceptions import LLMServiceError
-from utils.text_processing import strip_think_tags
 
 logger = logging.getLogger(__name__)
 
@@ -152,15 +151,3 @@ class ResponseParsingService:
             cleaned = re.sub(pattern, '', cleaned, flags=re.DOTALL | re.IGNORECASE)
 
         return cleaned.strip()
-
-    def contains_tool_calls(self, content: str) -> bool:
-        """Check if content contains tool call instructions"""
-        if not content:
-            return False
-
-        pattern = r'<TOOLCALL[^>]*?\[.*?\]</TOOLCALL>'
-        return bool(re.search(pattern, content, re.DOTALL | re.IGNORECASE))
-
-    def filter_think_tags(self, content: str) -> str:
-        """Remove think tags from content"""
-        return strip_think_tags(content)

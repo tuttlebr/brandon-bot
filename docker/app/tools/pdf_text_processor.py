@@ -6,10 +6,9 @@ on PDF content with automatic chunking for large documents.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 
 from pydantic import Field
-from tools.assistant import assistant_tool
 from tools.base import BaseTool, BaseToolResponse
 from utils.config import config
 from utils.pdf_extractor import PDFDataExtractor
@@ -54,8 +53,14 @@ class PDFTextProcessorTool(BaseTool):
         self.description = "ONLY use this when explicitly asked to perform text processing on PDF pages or when the user specifically mentions processing, analyzing, or working with specific pages of a PDF document. Performs text processing operations (summarize, proofread, rewrite, translate, Q&A) on specific pages or sections of PDF documents. For Q&A tasks, use when the user asks questions about the PDF content. DO NOT use for general questions, web searches, or when no PDF is being discussed. Only answer the question the user asks, do not provide any other information and ignore irrelevant or confusing information."
         self.supported_contexts = ['pdf_analysis']
 
-    def to_openai_format(self) -> Dict[str, Any]:
-        """Convert the tool to OpenAI function calling format"""
+    def _initialize_mvc(self):
+        """Initialize MVC components"""
+        # This tool doesn't need separate MVC components as it's simple
+        self._controller = None
+        self._view = None
+
+    def get_definition(self) -> Dict[str, Any]:
+        """Return OpenAI-compatible tool definition"""
         return {
             "type": "function",
             "function": {
@@ -107,6 +112,10 @@ class PDFTextProcessorTool(BaseTool):
                 },
             },
         }
+
+    def get_response_type(self) -> Type[PDFTextProcessorResponse]:
+        """Get the response type for this tool"""
+        return PDFTextProcessorResponse
 
     def execute(self, params: Dict[str, Any]) -> PDFTextProcessorResponse:
         """Execute the tool with given parameters"""
@@ -224,9 +233,6 @@ class PDFTextProcessorTool(BaseTool):
             chunks_processed = 1
 
         # Format the response
-        pages_desc = self._format_page_range(pages_to_process)
-        task_desc = self._get_task_description(task_type)
-
         # Strip think tags from result before displaying
         cleaned_result = strip_think_tags(result)
 
@@ -246,7 +252,6 @@ class PDFTextProcessorTool(BaseTool):
             pages_processed=pages_to_process,
             result=result,  # Keep original result for data field
             chunks_processed=chunks_processed,
-            # message=f"{task_desc} of {filename} ({pages_desc})\n\n{result}",
             message=cleaned_result,
             direct_response=True,
         )
@@ -406,10 +411,14 @@ class PDFTextProcessorTool(BaseTool):
                 assistant_params["target_language"] = target_language
 
             # Execute assistant tool
-            result = assistant_tool.execute(assistant_params)
+            from tools.registry import execute_tool
+
+            result = execute_tool("text_assistant", assistant_params)
 
             if hasattr(result, 'result'):
                 return result.result
+            elif hasattr(result, 'response'):
+                return result.response
             else:
                 return str(result)
 
@@ -435,19 +444,6 @@ class PDFTextProcessorTool(BaseTool):
             return (
                 f"pages {', '.join(map(str, page_numbers[:-1]))} and {page_numbers[-1]}"
             )
-
-    def _get_task_description(self, task_type: str) -> str:
-        """Get human-readable task description"""
-        descriptions = {
-            "summarize": "Summary",
-            "proofread": "Proofreading",
-            "rewrite": "Rewritten Version",
-            "critic": "Critical Analysis",
-            "writer": "Written Content",
-            "translate": "Translation",
-            "qa": "Q&A",
-        }
-        return descriptions.get(task_type, "Processed Text")
 
     def _get_pdf_data_from_messages(
         self, messages: List[Dict[str, Any]]
@@ -519,9 +515,6 @@ class PDFTextProcessorTool(BaseTool):
         )
 
         # Format the response
-        pages_desc = self._format_page_range(pages_to_process)
-        task_desc = self._get_task_description(task_type)
-
         # Strip think tags from result before displaying
         cleaned_result = strip_think_tags(result)
 
@@ -541,7 +534,6 @@ class PDFTextProcessorTool(BaseTool):
             pages_processed=pages_to_process,
             result=result,  # Keep original result for data field
             chunks_processed=1,  # We'll track this differently for hierarchical processing
-            # message=f"{task_desc} of {filename} ({pages_desc})\n\n{result}",
             message=cleaned_result,
             direct_response=True,
         )
@@ -821,17 +813,22 @@ class PDFTextProcessorTool(BaseTool):
             return "\n\n---\n\n".join(batch_results)
 
 
-# Create global instance
-pdf_text_processor_tool = PDFTextProcessorTool()
-
-
+# Helper functions for backward compatibility
 def get_pdf_text_processor_tool_definition() -> Dict[str, Any]:
-    """Get the OpenAI-compatible tool definition"""
-    return pdf_text_processor_tool.to_openai_format()
+    """
+    Get the OpenAI-compatible tool definition for PDF text processor
 
+    Returns:
+        Dict containing the OpenAI tool definition
+    """
+    from tools.registry import get_tool, register_tool_class
 
-def execute_pdf_text_processor_with_dict(
-    params: Dict[str, Any],
-) -> PDFTextProcessorResponse:
-    """Execute PDF text processor with parameters as dictionary"""
-    return pdf_text_processor_tool.run_with_dict(params)
+    # Register the tool class if not already registered
+    register_tool_class("process_pdf_text", PDFTextProcessorTool)
+
+    # Get the tool instance and return its definition
+    tool = get_tool("process_pdf_text")
+    if tool:
+        return tool.get_definition()
+    else:
+        raise RuntimeError("Failed to get pdf text processor tool definition")

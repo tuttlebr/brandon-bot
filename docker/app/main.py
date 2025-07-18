@@ -14,6 +14,7 @@ from models import ChatConfig
 from services import ChatService, ImageService, LLMService
 from services.pdf_context_service import PDFContextService
 from tools.initialize_tools import initialize_all_tools
+from tools.tool_llm_config import configure_tool_prompt
 from ui import ChatHistoryComponent
 from utils.animated_loading import get_galaxy_animation_html
 from utils.config import config
@@ -29,9 +30,9 @@ class ProductionStreamlitChatApp:
 
             # Tools and LLM client service are already initialized in startup.initialize_app()
             # Just verify they're available
-            from tools.registry import tool_registry
+            from tools.registry import get_all_tool_definitions
 
-            if len(tool_registry._tools) == 0:
+            if len(get_all_tool_definitions()) == 0:
                 logging.warning("No tools found, attempting initialization")
                 initialize_all_tools()
 
@@ -74,6 +75,20 @@ class ProductionStreamlitChatApp:
 
             # Initialize session state using controller
             self.session_controller.initialize_session_state()
+
+            # Configure tool prompt AFTER tools are initialized and session state is ready
+            if hasattr(st.session_state, 'system_prompt'):
+                configure_tool_prompt(
+                    "generalist_conversation",
+                    st.session_state.system_prompt.replace(
+                        "detailed thinking off", "detailed thinking on"
+                    ),
+                )
+                logging.info(
+                    f"Configured generalist_conversation tool with system prompt ({len(st.session_state.system_prompt)} chars)"
+                )
+            else:
+                logging.warning("System prompt not found in session state")
 
         except Exception as e:
             logging.error(f"Failed to initialize application: {e}")
@@ -432,14 +447,14 @@ class ProductionStreamlitChatApp:
                     # Remove verbose logging that runs every second
                     # Only log once when the image changes
                     if (
-                        not hasattr(st.session_state, '_last_displayed_image')
+                        not hasattr(st.session_state, "_last_displayed_image")
                         or st.session_state._last_displayed_image != filename
                     ):
                         st.session_state._last_displayed_image = filename
                         if "image_data" in latest_image:
                             import base64
 
-                            img_bytes = base64.b64decode(latest_image['image_data'])
+                            img_bytes = base64.b64decode(latest_image["image_data"])
                             logging.info(
                                 f"Displaying new image {filename}: {len(img_bytes) / 1024:.2f} KB"
                             )

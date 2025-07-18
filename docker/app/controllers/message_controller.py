@@ -5,7 +5,6 @@ from typing import Any, Dict, List
 import streamlit as st
 from models.chat_config import ChatConfig
 from services import ChatService
-from utils.config import config
 from utils.text_processing import strip_think_tags
 
 
@@ -188,22 +187,6 @@ class MessageController:
 
         # Use the safe method to add the message
         self.safe_add_message_to_history(role, text)
-
-    def truncate_long_prompt(self, prompt: str, max_length: int = None) -> str:
-        """
-        Truncate overly long prompts for display purposes
-
-        Args:
-            prompt: Original prompt
-            max_length: Maximum allowed length (uses config default if None)
-
-        Returns:
-            Truncated prompt with ellipsis if needed
-        """
-        max_length = max_length or config.ui.MAX_PROMPT_DISPLAY_LENGTH
-        if len(prompt) > max_length:
-            return prompt[:max_length] + "..."
-        return prompt
 
     def prepare_messages_for_processing(
         self, messages: List[Dict[str, Any]]

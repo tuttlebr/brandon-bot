@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 
 import requests
 from pydantic import BaseModel, Field
@@ -45,9 +45,15 @@ class NewsTool(BaseTool):
         self.name = "tavily_news_search"
         self.description = "Specialized news search tool for finding recent news articles, breaking news, current events, and latest developments from trusted news sources. Use this for: breaking news, recent events, political updates, sports scores, market updates, celebrity news, or any time-sensitive current events. Only use for news-related queries, not general information or facts."
 
-    def to_openai_format(self) -> Dict[str, Any]:
+    def _initialize_mvc(self):
+        """Initialize MVC components"""
+        # This tool doesn't need separate MVC components as it's simple
+        self._controller = None
+        self._view = None
+
+    def get_definition(self) -> Dict[str, Any]:
         """
-        Convert the tool to OpenAI function calling format
+        Return OpenAI-compatible tool definition
 
         Returns:
             Dict containing the OpenAI-compatible tool definition
@@ -73,6 +79,10 @@ class NewsTool(BaseTool):
                 },
             },
         }
+
+    def get_response_type(self) -> Type[TavilyResponse]:
+        """Get the response type for this tool"""
+        return TavilyResponse
 
     def execute(self, params: Dict[str, Any]):
         """Execute the tool with given parameters"""
@@ -338,26 +348,6 @@ class NewsTool(BaseTool):
             logger.error(f"Unexpected error during Tavily search: {e}")
             raise
 
-    def _run(self, query: str = None, **kwargs) -> TavilyResponse:
-        """
-        Execute a Tavily search with the given query.
-
-        Args:
-            query: The search query (for backward compatibility)
-            **kwargs: Can accept a dictionary with 'query' key
-
-        Returns:
-            TavilyResponse: The search results in a validated Pydantic model
-        """
-        # Support both direct parameter and dictionary input
-        if query is None and "query" in kwargs:
-            query = kwargs["query"]
-        elif query is None:
-            raise ValueError("Query parameter is required")
-
-        logger.debug(f"_run method called with query: '{query}'")
-        return self.search_tavily(query)
-
     def run_with_dict(self, params: Dict[str, Any]) -> TavilyResponse:
         """
         Execute a Tavily search with parameters provided as a dictionary.
@@ -377,42 +367,22 @@ class NewsTool(BaseTool):
         return self.search_tavily(query)
 
 
-# Create a global instance and helper function for easy access
-tavily_tool = NewsTool()
-
-
+# Helper functions for backward compatibility
 def get_news_tool_definition() -> Dict[str, Any]:
     """
-    Get the OpenAI-compatible tool definition for Tavily search
+    Get the OpenAI-compatible tool definition for news search
 
     Returns:
         Dict containing the OpenAI tool definition
     """
-    return tavily_tool.to_openai_format()
+    from tools.registry import get_tool, register_tool_class
 
+    # Register the tool class if not already registered
+    register_tool_class("tavily_news_search", NewsTool)
 
-def execute_news_search(query: str) -> TavilyResponse:
-    """
-    Execute a Tavily search with the given query
-
-    Args:
-        query: The search query
-
-    Returns:
-        TavilyResponse: The search results
-    """
-    return tavily_tool.search_tavily(query)
-
-
-def execute_news_with_dict(params: Dict[str, Any]) -> TavilyResponse:
-    """
-    Execute a Tavily search with parameters provided as a dictionary
-
-    Args:
-        params: Dictionary containing the required parameters
-               Expected keys: 'query'
-
-    Returns:
-        TavilyResponse: The search results
-    """
-    return tavily_tool.run_with_dict(params)
+    # Get the tool instance and return its definition
+    tool = get_tool("tavily_news_search")
+    if tool:
+        return tool.get_definition()
+    else:
+        raise RuntimeError("Failed to get news tool definition")

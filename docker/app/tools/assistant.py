@@ -1,21 +1,21 @@
 """
-Assistant Tool - Simplified Implementation
+Assistant Tool - MVC Pattern Implementation
 
 This tool delegates to specialized services for text processing tasks
-instead of implementing everything in one monolithic class.
+following the Model-View-Controller pattern.
 """
 
 import asyncio
 import logging
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 
 from models.chat_config import ChatConfig
 from pydantic import Field
 from services.document_analyzer_service import DocumentAnalyzerService
 from services.text_processor_service import TextProcessorService, TextTaskType
 from services.translation_service import TranslationService
-from tools.base import BaseTool, BaseToolResponse
+from tools.base import BaseTool, BaseToolResponse, ToolController, ToolView
 from utils.pdf_extractor import PDFDataExtractor
 from utils.text_processing import strip_think_tags
 
@@ -61,114 +61,37 @@ class AssistantResponse(BaseToolResponse):
     )
 
 
-class AssistantTool(BaseTool):
-    """
-    Simplified Assistant Tool that delegates to specialized services
+class AssistantController(ToolController):
+    """Controller handling assistant business logic"""
 
-    This facade coordinates between different text processing services
-    to provide a unified interface for all assistant tasks.
-    """
-
-    def __init__(self):
-        super().__init__()
-        self.name = "text_assistant"
-        self.description = "ONLY use for text and document processing tasks when explicitly requested. Use 'analyze' for document insights and PDF analysis, 'summarize' to condense long content into key points, 'proofread' to correct errors and improve writing quality, 'rewrite' to enhance clarity and impact while preserving meaning, 'critic' for constructive feedback and improvement suggestions, 'translate' to convert text between languages, or 'develop' for programming assistance and code writing. DO NOT use for image analysis, general questions, web searches, or information lookup - use appropriate specialized tools for those tasks."
-        self.supported_contexts = ['translation', 'text_processing', 'code_generation']
+    def __init__(self, config: ChatConfig, llm_type: str):
+        self.config = config
+        self.llm_type = llm_type
 
         # Initialize services
-        config = ChatConfig.from_environment()
-        self.text_processor = TextProcessorService(config, self.llm_type)
-        self.translator = TranslationService(config, self.llm_type)
-        self.document_analyzer = DocumentAnalyzerService(config, self.llm_type)
+        self.text_processor = TextProcessorService(config, llm_type)
+        self.translator = TranslationService(config, llm_type)
+        self.document_analyzer = DocumentAnalyzerService(config, llm_type)
 
-    def to_openai_format(self) -> Dict[str, Any]:
-        """Convert the tool to OpenAI function calling format"""
-        return {
-            "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.description,
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "task_type": {
-                            "type": "string",
-                            "enum": [
-                                "analyze",
-                                "summarize",
-                                "proofread",
-                                "rewrite",
-                                "critic",
-                                "translate",
-                                "develop",
-                            ],
-                            "description": "The type of text processing task to perform. Choose 'analyze' for document analysis and insights, 'summarize' to condense long text into key points, 'proofread' to correct errors and improve style, 'rewrite' to enhance clarity and impact, 'critic' for constructive feedback and improvement suggestions, 'translate' to convert between languages, or 'develop' for programming and code assistance.",
-                        },
-                        "text": {
-                            "type": "string",
-                            "description": "The text content to be processed. Use 'the PDF' or 'the document' when referring to uploaded PDF content.",
-                        },
-                        "instructions": {
-                            "type": "string",
-                            "description": "REQUIRED when analyzing PDF content: The specific task or analysis request about the document. For other tasks, use to provide specific guidance (e.g., 'focus on technical accuracy' for proofreading, 'make it more formal' for rewriting, 'target audience: executives' for summarize).",
-                        },
-                        "source_language": {
-                            "type": "string",
-                            "enum": self.translator.get_supported_languages(),
-                            "description": "The source language for translation (optional - will auto-detect if not provided)",
-                        },
-                        "target_language": {
-                            "type": "string",
-                            "enum": self.translator.get_supported_languages(),
-                            "description": "The target language for translation (required for translation tasks)",
-                        },
-                        "but_why": {
-                            "type": "string",
-                            "description": "A single sentence explaining why this tool was selected for the query.",
-                        },
-                    },
-                    "required": ["task_type", "text", "but_why"],
-                },
-            },
-        }
-
-    def execute(self, params: Dict[str, Any]) -> AssistantResponse:
-        """Execute the assistant tool with given parameters"""
-        # Since this is called from tools that may not be in async context,
-        # we need to handle the async execution
+    def process(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Process synchronously by delegating to async method"""
         try:
             loop = asyncio.get_event_loop()
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
 
-        return loop.run_until_complete(self._run_async(**params))
+        return loop.run_until_complete(self.process_async(params))
 
-    async def _run_async(
-        self,
-        task_type: str,
-        text: str,
-        instructions: Optional[str] = None,
-        source_language: Optional[str] = None,
-        target_language: Optional[str] = None,
-        messages: Optional[List[Dict[str, Any]]] = None,
-        **kwargs,
-    ) -> AssistantResponse:
-        """
-        Execute an assistant task with the given parameters (async version)
+    async def process_async(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Process the assistant request asynchronously"""
+        task_type = params['task_type']
+        text = params['text']
+        instructions = params.get('instructions')
+        source_language = params.get('source_language')
+        target_language = params.get('target_language')
+        messages = params.get('messages', [])
 
-        Args:
-            task_type: The type of task to perform
-            text: The text to process
-            instructions: Optional instructions
-            source_language: Source language for translation
-            target_language: Target language for translation
-            messages: Optional conversation messages
-            **kwargs: Additional parameters
-
-        Returns:
-            AssistantResponse with the processed result
-        """
         # Validate task type
         try:
             task_enum = AssistantTaskType(task_type.lower())
@@ -177,10 +100,10 @@ class AssistantTool(BaseTool):
                 f"Invalid task_type: {task_type}. Must be one of: {[t.value for t in AssistantTaskType]}"
             )
 
-        # Extract PDF content if needed
+        # Prepare text with context
         text = self._prepare_text_with_context(text, messages)
 
-        # Route to appropriate service
+        # Route to appropriate handler
         if task_enum == AssistantTaskType.TRANSLATE:
             return self._handle_translation(
                 text, source_language, target_language, messages
@@ -193,7 +116,7 @@ class AssistantTool(BaseTool):
             )
 
     def _prepare_text_with_context(
-        self, text: str, messages: Optional[List[Dict[str, Any]]]
+        self, text: str, messages: List[Dict[str, Any]]
     ) -> str:
         """Prepare text with any injected context from messages or session"""
 
@@ -234,8 +157,8 @@ class AssistantTool(BaseTool):
         text: str,
         source_language: Optional[str],
         target_language: Optional[str],
-        messages: Optional[List[Dict[str, Any]]],
-    ) -> AssistantResponse:
+        messages: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
         """Handle translation tasks"""
 
         if not target_language:
@@ -246,14 +169,14 @@ class AssistantTool(BaseTool):
         )
 
         if result["success"]:
-            return AssistantResponse(
-                original_text=text,
-                task_type=AssistantTaskType.TRANSLATE,
-                result=result["result"],
-                source_language=result.get("source_language"),
-                target_language=target_language,
-                processing_notes=result.get("processing_notes"),
-            )
+            return {
+                "original_text": text,
+                "task_type": AssistantTaskType.TRANSLATE,
+                "result": result["result"],
+                "source_language": result.get("source_language"),
+                "target_language": target_language,
+                "processing_notes": result.get("processing_notes"),
+            }
         else:
             raise Exception(result.get("error", "Translation failed"))
 
@@ -261,8 +184,8 @@ class AssistantTool(BaseTool):
         self,
         text: str,
         instructions: Optional[str],
-        messages: Optional[List[Dict[str, Any]]],
-    ) -> AssistantResponse:
+        messages: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
         """Handle document analysis tasks"""
 
         # Check if this is PDF content
@@ -276,13 +199,11 @@ class AssistantTool(BaseTool):
                     logger.info(
                         f"Loaded complete document with {len(complete_pages)} pages for analysis"
                     )
-                    pdf_data = {"pages": complete_pages, "filename": "Document"}
                     result = await self.document_analyzer.analyze_pdf_pages(
                         complete_pages, instructions, "Document"
                     )
                 else:
                     # Fallback to context pages
-                    pdf_data = {"pages": pages, "filename": "Document"}
                     result = await self.document_analyzer.analyze_pdf_pages(
                         pages, instructions, "Document"
                     )
@@ -298,12 +219,12 @@ class AssistantTool(BaseTool):
             )
 
         if result["success"]:
-            return AssistantResponse(
-                original_text=text,
-                task_type=AssistantTaskType.ANALYZE,
-                result=strip_think_tags(result["result"]),
-                processing_notes=result.get("processing_notes"),
-            )
+            return {
+                "original_text": text,
+                "task_type": AssistantTaskType.ANALYZE,
+                "result": strip_think_tags(result["result"]),
+                "processing_notes": result.get("processing_notes"),
+            }
         else:
             raise Exception(result.get("error", "Analysis failed"))
 
@@ -312,8 +233,8 @@ class AssistantTool(BaseTool):
         task_type: AssistantTaskType,
         text: str,
         instructions: Optional[str],
-        messages: Optional[List[Dict[str, Any]]],
-    ) -> AssistantResponse:
+        messages: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
         """Handle text processing tasks (summarize, proofread, rewrite, critic, etc.)"""
 
         # Map AssistantTaskType to TextTaskType
@@ -344,14 +265,14 @@ class AssistantTool(BaseTool):
                 if "improvements" in result["result"].lower():
                     improvements = ["See detailed feedback in the result"]
 
-            return AssistantResponse(
-                original_text=text,
-                task_type=task_type,
-                result=strip_think_tags(result["result"]),
-                improvements=improvements,
-                summary_length=summary_length,
-                processing_notes=result.get("processing_notes"),
-            )
+            return {
+                "original_text": text,
+                "task_type": task_type,
+                "result": strip_think_tags(result["result"]),
+                "improvements": improvements,
+                "summary_length": summary_length,
+                "processing_notes": result.get("processing_notes"),
+            }
         else:
             raise Exception(result.get("error", "Text processing failed"))
 
@@ -399,15 +320,7 @@ class AssistantTool(BaseTool):
     def _load_complete_document_for_analysis(
         self, context_pages: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
-        """
-        Load the complete document from batch files for analysis
-
-        Args:
-            context_pages: Pages from context injection
-
-        Returns:
-            Complete list of all pages from the document
-        """
+        """Load the complete document from batch files for analysis"""
         try:
             # Direct approach: Load all batch files for the current PDF
             from models.chat_config import ChatConfig
@@ -482,60 +395,129 @@ class AssistantTool(BaseTool):
         return context_pages
 
 
-# Create a global instance for backward compatibility
-assistant_tool = AssistantTool()
+class AssistantView(ToolView):
+    """View for formatting assistant responses"""
+
+    def format_response(
+        self, data: Dict[str, Any], response_type: Type[BaseToolResponse]
+    ) -> BaseToolResponse:
+        """Format raw data into AssistantResponse"""
+        try:
+            return AssistantResponse(**data)
+        except Exception as e:
+            logger.error(f"Error formatting assistant response: {e}")
+            return AssistantResponse(
+                original_text=data.get("original_text", ""),
+                task_type=data.get("task_type", AssistantTaskType.ANALYZE),
+                result="",
+                success=False,
+                error_message=f"Response formatting error: {str(e)}",
+                error_code="FORMAT_ERROR",
+            )
+
+    def format_error(
+        self, error: Exception, response_type: Type[BaseToolResponse]
+    ) -> BaseToolResponse:
+        """Format error into AssistantResponse"""
+        error_code = "UNKNOWN_ERROR"
+        if isinstance(error, ValueError):
+            error_code = "VALIDATION_ERROR"
+        elif isinstance(error, TimeoutError):
+            error_code = "TIMEOUT_ERROR"
+
+        return AssistantResponse(
+            original_text="",
+            task_type=AssistantTaskType.ANALYZE,
+            result="",
+            success=False,
+            error_message=str(error),
+            error_code=error_code,
+        )
 
 
-def get_assistant_tool_definition() -> Dict[str, Any]:
+class AssistantTool(BaseTool):
     """
-    Get the OpenAI-compatible tool definition for text assistant
+    Simplified Assistant Tool that delegates to specialized services
 
-    Returns:
-        Dict containing the OpenAI tool definition
+    This facade coordinates between different text processing services
+    to provide a unified interface for all assistant tasks.
     """
-    return assistant_tool.to_openai_format()
 
+    def __init__(self):
+        super().__init__()
+        self.name = "text_assistant"
+        self.description = "ONLY use for text and document processing tasks when explicitly requested. Use 'analyze' for document insights and PDF analysis, 'summarize' to condense long content into key points, 'proofread' to correct errors and improve writing quality, 'rewrite' to enhance clarity and impact while preserving meaning, 'critic' for constructive feedback and improvement suggestions, 'translate' to convert text between languages, or 'develop' for programming assistance and code writing. DO NOT use for image analysis, general questions, web searches, or information lookup - use appropriate specialized tools for those tasks."
+        self.supported_contexts = ['translation', 'text_processing', 'code_generation']
 
-def execute_assistant_task(
-    task_type: str,
-    text: str,
-    instructions: Optional[str] = None,
-    source_language: Optional[str] = None,
-    target_language: Optional[str] = None,
-) -> AssistantResponse:
-    """
-    Execute an assistant task with the given parameters
+    def _initialize_mvc(self):
+        """Initialize MVC components"""
+        config = ChatConfig.from_environment()
+        self._controller = AssistantController(config, self.llm_type)
+        self._view = AssistantView()
 
-    Args:
-        task_type: The type of task to perform
-        text: The text to process
-        instructions: Optional specific instructions
-        source_language: Source language for translation (optional)
-        target_language: Target language for translation (required for translation)
-
-    Returns:
-        AssistantResponse: The processed result
-    """
-    return assistant_tool.execute(
-        {
-            "task_type": task_type,
-            "text": text,
-            "instructions": instructions,
-            "source_language": source_language,
-            "target_language": target_language,
+    def get_definition(self) -> Dict[str, Any]:
+        """Get OpenAI-compatible tool definition"""
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "task_type": {
+                            "type": "string",
+                            "enum": [t.value for t in AssistantTaskType],
+                            "description": "The type of text processing task to perform. Choose 'analyze' for document analysis and insights, 'summarize' to condense long text into key points, 'proofread' to correct errors and improve style, 'rewrite' to enhance clarity and impact, 'critic' for constructive feedback and improvement suggestions, 'translate' to convert between languages, or 'develop' for programming and code assistance.",
+                        },
+                        "text": {
+                            "type": "string",
+                            "description": "The text content to be processed. Use 'the PDF' or 'the document' when referring to uploaded PDF content.",
+                        },
+                        "instructions": {
+                            "type": "string",
+                            "description": "REQUIRED when analyzing PDF content: The specific task or analysis request about the document. For other tasks, use to provide specific guidance (e.g., 'focus on technical accuracy' for proofreading, 'make it more formal' for rewriting, 'target audience: executives' for summarize).",
+                        },
+                        "source_language": {
+                            "type": "string",
+                            "enum": TranslationService(
+                                ChatConfig.from_environment(), "intelligent"
+                            ).get_supported_languages(),
+                            "description": "The source language for translation (optional - will auto-detect if not provided)",
+                        },
+                        "target_language": {
+                            "type": "string",
+                            "enum": TranslationService(
+                                ChatConfig.from_environment(), "intelligent"
+                            ).get_supported_languages(),
+                            "description": "The target language for translation (required for translation tasks)",
+                        },
+                        "but_why": {
+                            "type": "string",
+                            "description": "A single sentence explaining why this tool was selected for the query.",
+                        },
+                    },
+                    "required": ["task_type", "text", "but_why"],
+                },
+            },
         }
-    )
+
+    def get_response_type(self) -> Type[BaseToolResponse]:
+        """Get the response type for this tool"""
+        return AssistantResponse
 
 
-def execute_assistant_with_dict(params: Dict[str, Any]) -> AssistantResponse:
-    """
-    Execute an assistant task with parameters provided as a dictionary
+# Helper functions for backward compatibility
+def get_assistant_tool_definition() -> Dict[str, Any]:
+    """Get the OpenAI-compatible tool definition for text assistant"""
+    from tools.registry import get_tool, register_tool_class
 
-    Args:
-        params: Dictionary containing the required parameters
-               Expected keys: 'task_type', 'text', and optionally 'instructions', 'source_language', 'target_language'
+    # Register the tool class if not already registered
+    register_tool_class("text_assistant", AssistantTool)
 
-    Returns:
-        AssistantResponse: The processed result
-    """
-    return assistant_tool.execute(params)
+    # Get the tool instance and return its definition
+    tool = get_tool("text_assistant")
+    if tool:
+        return tool.get_definition()
+    else:
+        raise RuntimeError("Failed to get assistant tool definition")

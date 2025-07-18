@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 
 from models.chat_config import ChatConfig
-from tools.registry import tool_registry
+from tools.registry import execute_tool
 from utils.exceptions import ToolExecutionError
 from utils.streamlit_context import run_with_streamlit_context
 
@@ -170,7 +170,7 @@ class ToolExecutionService:
         result = await loop.run_in_executor(
             self.executor,
             run_with_streamlit_context,
-            tool_registry.execute_tool,
+            execute_tool,
             tool_name,
             modified_args,
         )
@@ -212,7 +212,12 @@ class ToolExecutionService:
         modified_args = tool_args.copy()
 
         # Add conversation context for specific tools
-        context_tools = ["conversation_context", "text_assistant", "generate_image"]
+        context_tools = [
+            "conversation_context",
+            "text_assistant",
+            "generate_image",
+            "generalist_conversation",
+        ]
         if tool_name in context_tools and messages:
             # Special handling for image generation in multi-tool scenarios
             if tool_name == "generate_image" and is_multi_tool_call:

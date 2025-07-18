@@ -15,7 +15,7 @@ from models import (
     validation_service,
 )
 from services.file_storage_service import FileStorageService
-from ui.view_helpers import MessageHelper, view_factory
+from ui.view_helpers import view_factory
 from utils.config import config
 from utils.system_prompt import get_system_prompt
 
@@ -87,8 +87,22 @@ class SessionController:
             # Store models in session state
             self._store_session_state(session, user)
 
-            # Initialize legacy session state for backward compatibility
-            self._initialize_legacy_session_state(session)
+            # Initialize system prompt with full tools list
+            # Ensure tools are initialized first
+            from tools.registry import get_all_tool_definitions
+
+            if len(get_all_tool_definitions()) == 0:
+                logging.info(
+                    "No tools found when initializing session, attempting to initialize tools"
+                )
+                from tools.initialize_tools import initialize_all_tools
+
+                initialize_all_tools()
+
+            st.session_state.system_prompt = get_system_prompt()
+            logging.info(
+                f"Initialized system prompt with available tools ({len(st.session_state.system_prompt)} chars)"
+            )
 
             # Cache models
             self._current_session = session
@@ -129,18 +143,6 @@ class SessionController:
         for key, value in user_data.items():
             if not key.startswith('session_'):  # Avoid duplication
                 setattr(st.session_state, f"user_{key}", value)
-
-    def _initialize_legacy_session_state(self, session: Session) -> None:
-        """Initialize legacy session state fields for backward compatibility"""
-        st.session_state.messages = [{"role": "system", "content": get_system_prompt()}]
-        st.session_state.current_page = config.ui.CURRENT_PAGE_DEFAULT
-        st.session_state.processing = False
-
-        # Initialize file references
-        if not hasattr(st.session_state, 'stored_images'):
-            st.session_state.stored_images = []
-        if not hasattr(st.session_state, 'stored_pdfs'):
-            st.session_state.stored_pdfs = []
 
     def get_current_session(self) -> Session:
         """
@@ -217,33 +219,6 @@ class SessionController:
 
         return self._current_user
 
-    def update_session(self, **updates) -> None:
-        """
-        Update session model and sync to session state
-
-        Args:
-            **updates: Fields to update in the session
-        """
-        session = self.get_current_session()
-
-        # Update session fields
-        for key, value in updates.items():
-            if hasattr(session, key):
-                setattr(session, key, value)
-
-        session.update_timestamp()
-
-        # Validate updated session
-        validation_result = validation_service.validate_session(session)
-        if not validation_result.is_valid:
-            logging.warning(
-                f"Session update validation errors: {validation_result.get_error_messages()}"
-            )
-
-        # Update cache and session state
-        self._current_session = session
-        self._store_session_state(session, self.get_current_user())
-
     def set_processing_status(self, status: ProcessingStatus) -> None:
         """
         Set processing status using domain model
@@ -263,7 +238,7 @@ class SessionController:
 
     def set_processing_state(self, processing: bool) -> None:
         """
-        Legacy method for backward compatibility
+        Set processing state
 
         Args:
             processing: Whether app is processing
@@ -408,58 +383,48 @@ class SessionController:
         self._current_session = None
         self._current_user = None
 
-    def display_session_info(self, show_details: bool = False) -> None:
+    def get_system_prompt(self) -> str:
         """
-        Display session information using view helpers
+        Get the system prompt from session state
 
-        Args:
-            show_details: Whether to show detailed information
+        Returns:
+            The system prompt with full tools list
         """
-        session = self.get_current_session()
-        user = self.get_current_user()
+        # Get from session state if available
+        system_prompt = getattr(st.session_state, 'system_prompt', None)
 
-        if show_details:
-            info_text = (
-                f"**Session:** {session.session_id}\n"
-                f"**User:** {user.get_display_name()}\n"
-                f"**Status:** {session.status}\n"
-                f"**Messages:** {session.message_count}\n"
-                f"**Files:** {len(session.uploaded_files)}\n"
-                f"**Duration:** {session.get_session_duration():.1f}s"
+        # If not in session state, get it and store it
+        if not system_prompt:
+            system_prompt = get_system_prompt()
+            st.session_state.system_prompt = system_prompt
+            logging.info(
+                "System prompt not found in session state, initialized with tools list"
             )
-        else:
-            info_text = f"Session: {session.session_id[:12]}... | Messages: {session.message_count}"
 
-        self.message_helper.show_info(info_text)
+        return system_prompt
 
-    def show_processing_status(self, message: str = "") -> None:
-        """
-        Show current processing status using view helpers
-
-        Args:
-            message: Optional custom message
-        """
-        session = self.get_current_session()
-
-        if session.is_processing():
-            status_message = message or f"Processing... ({session.processing_status})"
-            with self.progress_helper.show_indeterminate_progress(status_message):
-                pass
-
-    # Legacy methods for backward compatibility
     def store_tool_context(self, context: str) -> None:
-        """Legacy method: Store tool context"""
+        """Store tool context in session state"""
         st.session_state.last_tool_context = context
 
     def clear_tool_context(self) -> None:
-        """Legacy method: Clear tool context"""
+        """Clear tool context from session state"""
         if hasattr(st.session_state, 'last_tool_context'):
             st.session_state.last_tool_context = None
 
     def store_generated_image(
         self, image_data: str, enhanced_prompt: str, original_prompt: str
     ) -> str:
-        """Legacy method: Store generated image"""
+        """Store AI-generated image
+
+        Args:
+            image_data: Base64 encoded image data
+            enhanced_prompt: Enhanced prompt used for generation
+            original_prompt: Original user prompt
+
+        Returns:
+            Image ID for retrieval
+        """
         session = self.get_current_session()
 
         image_id = self.file_storage.store_image(
@@ -476,10 +441,6 @@ class SessionController:
             ]
 
         return image_id
-
-    def get_generated_image(self, image_id: str) -> Dict[str, Any]:
-        """Legacy method: Get generated image"""
-        return self.file_storage.get_image(image_id)
 
     def get_model_name(self, model_type: str = "fast") -> str:
         """
@@ -517,34 +478,65 @@ class SessionController:
         return model_name
 
     def get_messages(self) -> List[Dict[str, Any]]:
-        """Legacy method: Get messages from session state"""
+        """Get messages from session state
+
+        Returns:
+            List of message dictionaries
+        """
         if not getattr(st.session_state, "initialized", False):
             self.initialize_session_state()
+
+        # Initialize messages if not present
+        if not hasattr(st.session_state, "messages"):
+            # Use system prompt from session state if available, otherwise get it
+            system_prompt = getattr(st.session_state, 'system_prompt', None)
+            if not system_prompt:
+                system_prompt = get_system_prompt()
+                st.session_state.system_prompt = system_prompt
+
+            st.session_state.messages = [{"role": "system", "content": system_prompt}]
+
         return getattr(st.session_state, "messages", [])
 
     def add_message(self, role: str, content: Any) -> None:
-        """Legacy method: Add message to session state"""
+        """Add message to session state
+
+        Args:
+            role: Message role (user, assistant, system)
+            content: Message content
+        """
         if not getattr(st.session_state, "initialized", False):
             self.initialize_session_state()
 
         if not hasattr(st.session_state, "messages"):
-            st.session_state.messages = []
+            st.session_state.messages = [
+                {"role": "system", "content": get_system_prompt()}
+            ]
 
         st.session_state.messages.append({"role": role, "content": content})
         self.increment_message_count()
 
     def set_messages(self, messages: List[Dict[str, Any]]) -> None:
-        """Legacy method: Set messages in session state"""
+        """Set messages in session state
+
+        Args:
+            messages: List of message dictionaries
+        """
         if not getattr(st.session_state, "initialized", False):
             self.initialize_session_state()
 
         st.session_state.messages = messages
 
-    # Additional legacy methods for PDF and image handling...
-    # (Keeping existing implementations for backward compatibility)
-
     def store_pdf_document(self, filename: str, pdf_data: dict) -> str:
-        """Legacy method: Store PDF document"""
+        """Store PDF document in session
+
+        Args:
+            filename: PDF filename
+            pdf_data: Processed PDF data
+
+        Returns:
+            PDF ID for retrieval
+        """
         session = self.get_current_session()
 
         pdf_id = self.file_storage.store_pdf(filename, pdf_data, session.session_id)
@@ -567,35 +559,12 @@ class SessionController:
         logging.info(f"Stored PDF document '{filename}' with ID '{pdf_id}'")
         return pdf_id
 
-    def get_pdf_documents(self) -> Dict[str, Any]:
-        """Legacy method: Get PDF documents"""
-        if not getattr(st.session_state, "initialized", False):
-            self.initialize_session_state()
-
-        pdfs = {}
-        for pdf_id in getattr(st.session_state, 'stored_pdfs', []):
-            batch_info_key = f"{pdf_id}_batch_info"
-            if hasattr(st.session_state, batch_info_key):
-                batch_info = getattr(st.session_state, batch_info_key)
-                if batch_info.get('batch_processed', False):
-                    pdfs[pdf_id] = {
-                        'pdf_id': pdf_id,
-                        'filename': batch_info.get('filename', 'Unknown'),
-                        'total_pages': batch_info.get('total_pages', 0),
-                        'batch_processed': True,
-                        'total_batches': batch_info.get('total_batches', 0),
-                        'pages': [],
-                    }
-                    continue
-
-            pdf_data = self.file_storage.get_pdf(pdf_id)
-            if pdf_data:
-                pdfs[pdf_id] = pdf_data
-
-        return pdfs
-
     def get_latest_pdf_document(self) -> Optional[Dict[str, Any]]:
-        """Legacy method: Get latest PDF document"""
+        """Get the most recently uploaded PDF document
+
+        Returns:
+            PDF data dictionary or None
+        """
         if (
             not hasattr(st.session_state, 'stored_pdfs')
             or not st.session_state.stored_pdfs
@@ -620,13 +589,17 @@ class SessionController:
         return self.file_storage.get_pdf(latest_pdf_id)
 
     def clear_pdf_documents(self) -> None:
-        """Legacy method: Clear PDF documents"""
+        """Clear all PDF documents from session"""
         if hasattr(st.session_state, 'stored_pdfs'):
             st.session_state.stored_pdfs = []
             logging.info("Cleared all PDF document references from session state")
 
     def has_pdf_documents(self) -> bool:
-        """Legacy method: Check for PDF documents"""
+        """Check if there are any PDF documents in session
+
+        Returns:
+            True if PDFs are available, False otherwise
+        """
         return (
             hasattr(st.session_state, 'stored_pdfs')
             and len(st.session_state.stored_pdfs) > 0
@@ -635,7 +608,16 @@ class SessionController:
     def store_uploaded_image(
         self, image_data: str, filename: str, file_type: str
     ) -> str:
-        """Legacy method: Store uploaded image"""
+        """Store user-uploaded image
+
+        Args:
+            image_data: Base64 encoded image data
+            filename: Original filename
+            file_type: Image file type
+
+        Returns:
+            Image ID for retrieval
+        """
         session = self.get_current_session()
 
         image_id = self.file_storage.store_uploaded_image(
@@ -660,21 +642,12 @@ class SessionController:
         logging.info(f"Stored uploaded image '{filename}' with ID '{image_id}'")
         return image_id
 
-    def get_uploaded_images(self) -> Dict[str, Any]:
-        """Legacy method: Get uploaded images"""
-        if not getattr(st.session_state, "initialized", False):
-            self.initialize_session_state()
-
-        images = {}
-        for image_id in getattr(st.session_state, 'stored_images', []):
-            image_data = self.file_storage.get_uploaded_image(image_id)
-            if image_data:
-                images[image_id] = image_data
-
-        return images
-
     def get_latest_uploaded_image(self) -> Optional[Dict[str, Any]]:
-        """Legacy method: Get latest uploaded image"""
+        """Get the most recently uploaded image
+
+        Returns:
+            Image data dictionary or None
+        """
         if (
             not hasattr(st.session_state, 'stored_images')
             or not st.session_state.stored_images
@@ -685,14 +658,14 @@ class SessionController:
         return self.file_storage.get_uploaded_image(latest_image_id)
 
     def clear_uploaded_images(self) -> None:
-        """Legacy method: Clear uploaded images"""
+        """Clear all uploaded images from session"""
         if hasattr(st.session_state, 'stored_images'):
             st.session_state.stored_images = []
             logging.info("Cleared all uploaded image references from session state")
 
     def has_uploaded_images(self) -> bool:
         """
-        Legacy method: Check if there are any uploaded images stored in session state
+        Check if there are any uploaded images in session
 
         Returns:
             True if images are available, False otherwise

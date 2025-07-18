@@ -1,11 +1,23 @@
+"""
+Weather Tool - MVC Pattern Implementation
+
+This tool provides weather information for a given location using the Open-Meteo API,
+following the Model-View-Controller pattern.
+"""
+
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 
 import requests
 from pydantic import BaseModel, Field
-from tools.base import BaseTool, BaseToolResponse
+from tools.base import (
+    BaseTool,
+    BaseToolResponse,
+    ExecutionMode,
+    ToolController,
+    ToolView,
+)
 
-# Configure logger
 logger = logging.getLogger(__name__)
 
 
@@ -20,7 +32,7 @@ class CurrentWeather(BaseModel):
     weather_code: Optional[int] = Field(None, description="Weather condition code")
     is_day: Optional[bool] = Field(None, description="Whether it's day or night")
     precipitation_probability: Optional[float] = Field(
-        None, description="Precipitation probability in %"
+        None, description="Current precipitation probability in %"
     )
 
 
@@ -68,26 +80,278 @@ class LocationResult(BaseModel):
     longitude: float
     country: str
     admin1: Optional[str] = None  # State/region
+    admin2: Optional[str] = None  # County
+    admin3: Optional[str] = None  # City district
+    admin4: Optional[str] = None  # Suburb
+    population: Optional[int] = None
+    elevation: Optional[float] = None
+
+
+class WeatherAPIClient:
+    """Repository for weather API interactions"""
+
+    def __init__(self):
+        self.geocoding_url = "https://geocoding-api.open-meteo.com/v1/search"
+        self.weather_url = "https://api.open-meteo.com/v1/forecast"
+
+    def geocode_location(self, location: str) -> LocationResult:
+        """Geocode a location string to coordinates"""
+        params = {
+            "name": location,
+            "count": 10,
+            "language": "en",
+            "format": "json",
+        }
+
+        try:
+            response = requests.get(self.geocoding_url, params=params, timeout=5)
+            response.raise_for_status()
+            data = response.json()
+
+            if "results" in data and len(data["results"]) > 0:
+                result = data["results"][0]
+                return LocationResult(
+                    name=result.get("name", location),
+                    latitude=result["latitude"],
+                    longitude=result["longitude"],
+                    country=result.get("country", ""),
+                    admin1=result.get("admin1"),
+                    admin2=result.get("admin2"),
+                    admin3=result.get("admin3"),
+                    admin4=result.get("admin4"),
+                    population=result.get("population"),
+                    elevation=result.get("elevation"),
+                )
+
+            # If full location didn't work, try just the city
+            city_only = self._extract_city_only(location)
+            if city_only != location:
+                params["name"] = city_only
+                response = requests.get(self.geocoding_url, params=params, timeout=5)
+                response.raise_for_status()
+                data = response.json()
+
+                if "results" in data and len(data["results"]) > 0:
+                    result = data["results"][0]
+                    return LocationResult(
+                        name=result.get("name", city_only),
+                        latitude=result["latitude"],
+                        longitude=result["longitude"],
+                        country=result.get("country", ""),
+                        admin1=result.get("admin1"),
+                        admin2=result.get("admin2"),
+                        admin3=result.get("admin3"),
+                        admin4=result.get("admin4"),
+                        population=result.get("population"),
+                        elevation=result.get("elevation"),
+                    )
+
+            raise ValueError(f"Location '{location}' not found")
+
+        except requests.RequestException as e:
+            logger.error(f"Geocoding request failed: {e}")
+            raise ConnectionError(f"Failed to geocode location: {str(e)}")
+
+    def fetch_weather(
+        self, latitude: float, longitude: float, include_hourly: bool = True
+    ) -> Dict[str, Any]:
+        """Fetch weather data from Open-Meteo API"""
+        params = {
+            "latitude": latitude,
+            "longitude": longitude,
+            "current": [
+                "temperature_2m",
+                "relative_humidity_2m",
+                "is_day",
+                "weather_code",
+                "wind_speed_10m",
+            ],
+            "timezone": "auto",
+            "temperature_unit": "fahrenheit",
+            "wind_speed_unit": "kmh",
+            "precipitation_unit": "inch",
+        }
+
+        if include_hourly:
+            params["hourly"] = [
+                "temperature_2m",
+                "relative_humidity_2m",
+                "weather_code",
+                "wind_speed_10m",
+                "is_day",
+                "precipitation_probability",
+            ]
+            params["forecast_days"] = 2
+
+        try:
+            response = requests.get(self.weather_url, params=params, timeout=10)
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            logger.error(f"Weather request failed: {e}")
+            raise ConnectionError(f"Failed to fetch weather data: {str(e)}")
+
+    def _extract_city_only(self, location: str) -> str:
+        """Extract just the city name from a location string"""
+        parts = location.split(",")
+        city = parts[0].strip()
+
+        words = city.split()
+        if len(words) > 1 and len(words[-1]) <= 3 and words[-1].isupper():
+            city = " ".join(words[:-1])
+
+        return city
+
+
+class WeatherController(ToolController):
+    """Controller handling weather business logic"""
+
+    def __init__(self):
+        self.api_client = WeatherAPIClient()
+
+    def process(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Process the weather request"""
+        location = params['location']
+        include_hourly = params.get('include_hourly', True)
+
+        # Geocode location
+        location_result = self.api_client.geocode_location(location)
+
+        # Get location display name
+        display_name = self._get_display_name(location_result)
+
+        # Fetch weather data
+        weather_data = self.api_client.fetch_weather(
+            location_result.latitude, location_result.longitude, include_hourly
+        )
+
+        # Parse current weather
+        current_weather = self._parse_current_weather(weather_data)
+
+        # Parse hourly weather if included
+        hourly_weather = None
+        if include_hourly and "hourly" in weather_data:
+            hourly_weather = self._parse_hourly_weather(weather_data)
+
+        return {
+            "location": display_name,
+            "latitude": location_result.latitude,
+            "longitude": location_result.longitude,
+            "timezone": weather_data.get("timezone", "UTC"),
+            "current": current_weather,
+            "hourly": hourly_weather,
+            "source": "Open-Meteo API",
+        }
+
+    def _get_display_name(self, location: LocationResult) -> str:
+        """Format location for display"""
+        parts = [location.name]
+
+        if location.admin1 and location.admin1 != location.name:
+            parts.append(location.admin1)
+
+        if location.country:
+            parts.append(location.country)
+
+        return ", ".join(parts)
+
+    def _parse_current_weather(self, data: Dict[str, Any]) -> CurrentWeather:
+        """Parse current weather from API response"""
+        current = data.get("current", {})
+
+        return CurrentWeather(
+            temperature=current.get("temperature_2m", 0),
+            relative_humidity=current.get("relative_humidity_2m"),
+            wind_speed=current.get("wind_speed_10m", 0),
+            weather_code=current.get("weather_code"),
+            is_day=current.get("is_day", 1) == 1,
+            precipitation_probability=None,  # Not available in current weather
+        )
+
+    def _parse_hourly_weather(self, data: Dict[str, Any]) -> HourlyWeather:
+        """Parse hourly weather forecast from API response"""
+        hourly = data.get("hourly", {})
+
+        # Convert is_day from 0/1 to boolean
+        is_day_values = hourly.get("is_day", [])
+        is_day_bools = [val == 1 for val in is_day_values]
+
+        return HourlyWeather(
+            time=hourly.get("time", []),
+            temperature=hourly.get("temperature_2m", []),
+            relative_humidity=hourly.get("relative_humidity_2m", []),
+            wind_speed=hourly.get("wind_speed_10m", []),
+            weather_code=hourly.get("weather_code", []),
+            is_day=is_day_bools,
+            precipitation_probability=hourly.get("precipitation_probability", []),
+        )
+
+
+class WeatherView(ToolView):
+    """View for formatting weather responses"""
+
+    def format_response(
+        self, data: Dict[str, Any], response_type: Type[BaseToolResponse]
+    ) -> BaseToolResponse:
+        """Format raw weather data into WeatherResponse"""
+        try:
+            return WeatherResponse(**data)
+        except Exception as e:
+            logger.error(f"Error formatting weather response: {e}")
+            return WeatherResponse(
+                location="Unknown",
+                latitude=0,
+                longitude=0,
+                timezone="UTC",
+                current=CurrentWeather(temperature=0, wind_speed=0),
+                success=False,
+                error_message=f"Response formatting error: {str(e)}",
+                error_code="FORMAT_ERROR",
+            )
+
+    def format_error(
+        self, error: Exception, response_type: Type[BaseToolResponse]
+    ) -> BaseToolResponse:
+        """Format error into WeatherResponse"""
+        error_code = "UNKNOWN_ERROR"
+        error_message = str(error)
+
+        if isinstance(error, ValueError):
+            error_code = "LOCATION_NOT_FOUND"
+        elif isinstance(error, ConnectionError):
+            error_code = "API_ERROR"
+        elif isinstance(error, TimeoutError):
+            error_code = "TIMEOUT_ERROR"
+
+        return WeatherResponse(
+            location="Unknown",
+            latitude=0,
+            longitude=0,
+            timezone="UTC",
+            current=CurrentWeather(temperature=0, wind_speed=0),
+            success=False,
+            error_message=error_message,
+            error_code=error_code,
+        )
 
 
 class WeatherTool(BaseTool):
-    """Tool for getting weather information using Open-Meteo API"""
+    """Tool for getting weather information following MVC pattern"""
 
     def __init__(self):
         super().__init__()
         self.name = "get_weather"
-        self.description = "ONLY use when the user explicitly asks about current weather, temperature, forecast, or climate conditions for a specific location and time period. For example, use for 'What's the weather in New York?' or 'Will it rain tomorrow in London?'. DO NOT use for general questions, historical weather data, or non-weather related queries - use appropriate tools for those."
-        self.geocoding_url = "https://geocoding-api.open-meteo.com/v1/search"
-        self.weather_url = "https://api.open-meteo.com/v1/forecast"
-        self.source = "[Open-Meteo](https://open-meteo.com/)"
+        self.description = "Get current weather information for a specific location. Use this when users ask about weather conditions, temperature, or weather forecasts for any city or location."
+        self.execution_mode = ExecutionMode.SYNC
+        self.timeout = 10.0
 
-    def to_openai_format(self) -> Dict[str, Any]:
-        """
-        Convert the tool to OpenAI function calling format
+    def _initialize_mvc(self):
+        """Initialize MVC components"""
+        self._controller = WeatherController()
+        self._view = WeatherView()
 
-        Returns:
-            Dict containing the OpenAI-compatible tool definition
-        """
+    def get_definition(self) -> Dict[str, Any]:
+        """Get OpenAI-compatible tool definition"""
         return {
             "type": "function",
             "function": {
@@ -98,7 +362,7 @@ class WeatherTool(BaseTool):
                     "properties": {
                         "location": {
                             "type": "string",
-                            "description": "City name or ZIP code. If provided as 'City, ST', only the city name may be used for weather lookup.",
+                            "description": "The city and state/country to get weather for (e.g., 'New York, NY' or 'London, UK')",
                         },
                         "but_why": {
                             "type": "string",
@@ -110,242 +374,12 @@ class WeatherTool(BaseTool):
             },
         }
 
-    def execute(self, params: Dict[str, Any]):
-        """Execute the tool with given parameters"""
-        return self.run_with_dict(params)
-
-    def _celcius_to_fahrenheit(self, temperature: float) -> float:
-        """
-        Convert temperature from Celsius to Fahrenheit
-        """
-        return round((temperature * 9 / 5) + 32, 1)
-
-    def _extract_city_only(self, location: str) -> str:
-        """
-        Extract just the city name from "City, ST" format input
-
-        Args:
-            location: Location string that may be in "City, ST" format
-
-        Returns:
-            str: Just the city name
-        """
-        # Remove periods first
-        location = location.replace(".", "")
-
-        # If there's a comma, take only the part before it (the city)
-        if "," in location:
-            city = location.split(",")[0].strip()
-            logger.debug(f"Extracted city '{city}' from '{location}'")
-            return city
-
-        # If no comma, return the original location
-        return location.strip()
-
-    def _geocode_location(self, location: str) -> LocationResult:
-        """
-        Convert location string to coordinates using Open-Meteo Geocoding API
-
-        Args:
-            location: Location string like "City, Country"
-
-        Returns:
-            LocationResult: Geocoded location information
-
-        Raises:
-            ValueError: If location cannot be found
-            requests.RequestException: If the API request fails
-        """
-        # Extract only the city name from "City, ST" format
-        location = self._extract_city_only(location)
-        logger.info(f"Geocoding location: '{location}'")
-
-        try:
-            params = {
-                "name": location,
-                "count": 1,
-                "language": "en",
-                "format": "json",
-                "countryCode": "US",
-            }
-
-            response = requests.get(self.geocoding_url, params=params)
-            response.raise_for_status()
-
-            data = response.json()
-
-            if not data.get("results"):
-                logger.error(f"No results found for location: '{location}'")
-                raise ValueError(f"Location '{location}' not found")
-
-            result = data["results"][0]
-            location_result = LocationResult(
-                name=result["name"],
-                latitude=result["latitude"],
-                longitude=result["longitude"],
-                country=result["country"],
-                admin1=result.get("admin1"),
-            )
-
-            logger.info(
-                f"Successfully geocoded '{location}' to {location_result.latitude}, {location_result.longitude}"
-            )
-            return location_result
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Geocoding API request failed: {e}")
-            raise requests.RequestException(f"Failed to geocode location: {str(e)}")
-
-    def get_weather(
-        self, location: str, include_hourly: bool = True
-    ) -> WeatherResponse:
-        """
-        Get weather information for a given location
-
-        Args:
-            location: Location string like "City, Country"
-            include_hourly: Whether to include hourly forecast data
-
-        Returns:
-            WeatherResponse: The weather information in a validated Pydantic model
-
-        Raises:
-            ValueError: If location cannot be found
-            requests.RequestException: If the API request fails
-        """
-        logger.info(f"Getting weather for location: '{location}'")
-
-        # First, geocode the location
-        try:
-            location_info = self._geocode_location(location)
-        except ValueError as e:
-            logger.error(f"Error geocoding location: {e}")
-            location_info = self._geocode_location("48176")
-
-        # Prepare weather API parameters
-        params = {
-            "latitude": location_info.latitude,
-            "longitude": location_info.longitude,
-            "current": "temperature_2m,wind_speed_10m,relative_humidity_2m,weather_code,precipitation_probability,is_day",
-            "timezone": "auto",
-        }
-
-        if include_hourly:
-            params["hourly"] = (
-                "temperature_2m,wind_speed_10m,relative_humidity_2m,weather_code,precipitation_probability,is_day"
-            )
-            params["forecast_days"] = 14  # Only include today's hourly forecast
-
-        try:
-            logger.debug(
-                f"Making weather API request for coordinates: {location_info.latitude}, {location_info.longitude}"
-            )
-
-            response = requests.get(self.weather_url, params=params)
-            response.raise_for_status()
-
-            data = response.json()
-
-            # Parse current weather
-            current_data = data["current"]
-            current_weather = CurrentWeather(
-                temperature=self._celcius_to_fahrenheit(current_data["temperature_2m"]),
-                wind_speed=current_data["wind_speed_10m"],
-                relative_humidity=current_data.get("relative_humidity_2m"),
-                weather_code=current_data.get("weather_code"),
-                precipitation_probability=current_data.get("precipitation_probability"),
-                is_day=(
-                    current_data.get("is_day") == 1
-                    if current_data.get("is_day") is not None
-                    else None
-                ),
-            )
-
-            # Parse hourly weather if requested
-            hourly_weather = None
-            if include_hourly and "hourly" in data:
-                hourly_data = data["hourly"]
-                hourly_weather = HourlyWeather(
-                    time=hourly_data.get("time", []),
-                    temperature=[
-                        self._celcius_to_fahrenheit(temp)
-                        for temp in hourly_data.get("temperature_2m", [])
-                    ],
-                    relative_humidity=hourly_data.get("relative_humidity_2m", []),
-                    wind_speed=hourly_data.get("wind_speed_10m", []),
-                    precipitation_probability=hourly_data.get(
-                        "precipitation_probability", []
-                    ),
-                    weather_code=hourly_data.get("weather_code", []),
-                    is_day=hourly_data.get("is_day", []),
-                )
-
-            # Create the response
-            weather_response = WeatherResponse(
-                location=f"{location_info.name}, {location_info.country}",
-                latitude=location_info.latitude,
-                longitude=location_info.longitude,
-                timezone=data.get("timezone", "UTC"),
-                current=current_weather,
-                hourly=hourly_weather,
-                source=self.source,
-            )
-
-            logger.info(
-                f"Weather data retrieved successfully for '{location}'. Current temperature: {current_weather.temperature}°F"
-            )
-            return weather_response
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Weather API request failed: {e}")
-            raise requests.RequestException(f"Failed to get weather data: {str(e)}")
-        except Exception as e:
-            logger.error(f"Unexpected error during weather lookup: {e}")
-            raise
-
-    def _run(self, location: str = None, **kwargs) -> WeatherResponse:
-        """
-        Execute a weather lookup with the given location.
-
-        Args:
-            location: The location string (for backward compatibility)
-            **kwargs: Can accept a dictionary with 'location' key
-
-        Returns:
-            WeatherResponse: The weather information in a validated Pydantic model
-        """
-        # Support both direct parameter and dictionary input
-        if location is None and "location" in kwargs:
-            location = kwargs["location"]
-        elif location is None:
-            raise ValueError("Location parameter is required")
-
-        logger.debug(f"_run method called with location: '{location}'")
-        return self.get_weather(location)
-
-    def run_with_dict(self, params: Dict[str, Any]) -> WeatherResponse:
-        """
-        Execute a weather lookup with parameters provided as a dictionary.
-
-        Args:
-            params: Dictionary containing the required parameters
-                   Expected keys: 'location'
-
-        Returns:
-            WeatherResponse: The weather information in a validated Pydantic model
-        """
-        if "location" not in params:
-            raise ValueError("'location' key is required in parameters dictionary")
-
-        location = params["location"]
-        logger.debug(f"run_with_dict method called with location: '{location}'")
-        return self.get_weather(location)
+    def get_response_type(self) -> Type[BaseToolResponse]:
+        """Get the response type for this tool"""
+        return WeatherResponse
 
 
-# Create a global instance and helper functions for easy access
-weather_tool = WeatherTool()
-
-
+# Helper functions for backward compatibility
 def get_weather_tool_definition() -> Dict[str, Any]:
     """
     Get the OpenAI-compatible tool definition for weather lookup
@@ -353,34 +387,14 @@ def get_weather_tool_definition() -> Dict[str, Any]:
     Returns:
         Dict containing the OpenAI tool definition
     """
-    return weather_tool.to_openai_format()
+    from tools.registry import get_tool, register_tool_class
 
+    # Register the tool class if not already registered
+    register_tool_class("get_weather", WeatherTool)
 
-def execute_weather_search(
-    location: str, include_hourly: bool = False
-) -> WeatherResponse:
-    """
-    Execute a weather lookup with the given location
-
-    Args:
-        location: The location string
-        include_hourly: Whether to include hourly forecast data
-
-    Returns:
-        WeatherResponse: The weather information
-    """
-    return weather_tool.get_weather(location, include_hourly)
-
-
-def execute_weather_with_dict(params: Dict[str, Any]) -> WeatherResponse:
-    """
-    Execute a weather lookup with parameters provided as a dictionary
-
-    Args:
-        params: Dictionary containing the required parameters
-               Expected keys: 'location'
-
-    Returns:
-        WeatherResponse: The weather information
-    """
-    return weather_tool.run_with_dict(params)
+    # Get the tool instance and return its definition
+    tool = get_tool("get_weather")
+    if tool:
+        return tool.get_definition()
+    else:
+        raise RuntimeError("Failed to get weather tool definition")

@@ -152,26 +152,3 @@ class StreamingService:
         except Exception as e:
             logger.error(f"Completion error: {e}")
             raise StreamingError(f"Failed to get completion: {e}")
-
-    async def simple_stream(
-        self, prompt: str, model_type: str
-    ) -> AsyncGenerator[str, None]:
-        """
-        Simple streaming for basic prompts
-
-        Args:
-            prompt: User prompt
-            model_type: Model type to use
-
-        Yields:
-            Response chunks
-        """
-        messages = [{"role": "user", "content": prompt}]
-        model = self._get_model_name(model_type)
-
-        async for chunk in self.stream_completion(messages, model, model_type):
-            yield chunk
-
-    def _get_model_name(self, model_type: str) -> str:
-        """Get model name for the specified type"""
-        return llm_client_service.get_model_name(model_type)

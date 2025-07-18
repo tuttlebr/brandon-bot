@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 
 import requests
 from pydantic import BaseModel, Field
@@ -43,12 +43,17 @@ class TavilyTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "tavily_internet_search"
-        self.description = "General web search tool for finding current information, facts, definitions, how-to guides, product reviews, and general knowledge from across the internet. Use this for: research topics, technical information, product details, educational content, or any general web search. Avoid using for breaking news or recent events - use the news search tool instead."
-        self.supported_contexts = ['research']
+        self.description = "Search the internet for real-time information using Tavily API. Use this for finding current information and any non-news queries that require up-to-date information from the web. You shouldn't need this for things that are general knowledge or may be determined using logic (use the generalist_conversation tool instead). For news-specific queries, use the tavily_news_search tool instead."
 
-    def to_openai_format(self) -> Dict[str, Any]:
+    def _initialize_mvc(self):
+        """Initialize MVC components"""
+        # This tool doesn't need separate MVC components as it's simple
+        self._controller = None
+        self._view = None
+
+    def get_definition(self) -> Dict[str, Any]:
         """
-        Convert the tool to OpenAI function calling format
+        Return OpenAI-compatible tool definition
 
         Returns:
             Dict containing the OpenAI-compatible tool definition
@@ -63,7 +68,7 @@ class TavilyTool(BaseTool):
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "The search query for general web information, facts, or knowledge (avoid news/current events)",
+                            "description": "The search query to find information about any topic",
                         },
                         "but_why": {
                             "type": "string",
@@ -74,6 +79,10 @@ class TavilyTool(BaseTool):
                 },
             },
         }
+
+    def get_response_type(self) -> Type[TavilyResponse]:
+        """Get the response type for this tool"""
+        return TavilyResponse
 
     def execute(self, params: Dict[str, Any]):
         """Execute the tool with given parameters"""
@@ -339,26 +348,6 @@ class TavilyTool(BaseTool):
             logger.error(f"Unexpected error during Tavily search: {e}")
             raise
 
-    def _run(self, query: str = None, **kwargs) -> TavilyResponse:
-        """
-        Execute a Tavily search with the given query.
-
-        Args:
-            query: The search query (for backward compatibility)
-            **kwargs: Can accept a dictionary with 'query' key
-
-        Returns:
-            TavilyResponse: The search results in a validated Pydantic model
-        """
-        # Support both direct parameter and dictionary input
-        if query is None and "query" in kwargs:
-            query = kwargs["query"]
-        elif query is None:
-            raise ValueError("Query parameter is required")
-
-        logger.debug(f"_run method called with query: '{query}'")
-        return self.search_tavily(query)
-
     def run_with_dict(self, params: Dict[str, Any]) -> TavilyResponse:
         """
         Execute a Tavily search with parameters provided as a dictionary.
@@ -378,10 +367,7 @@ class TavilyTool(BaseTool):
         return self.search_tavily(query)
 
 
-# Create a global instance and helper function for easy access
-tavily_tool = TavilyTool()
-
-
+# Helper functions for backward compatibility
 def get_tavily_tool_definition() -> Dict[str, Any]:
     """
     Get the OpenAI-compatible tool definition for Tavily search
@@ -389,31 +375,14 @@ def get_tavily_tool_definition() -> Dict[str, Any]:
     Returns:
         Dict containing the OpenAI tool definition
     """
-    return tavily_tool.to_openai_format()
+    from tools.registry import get_tool, register_tool_class
 
+    # Register the tool class if not already registered
+    register_tool_class("tavily_internet_search", TavilyTool)
 
-def execute_tavily_search(query: str) -> TavilyResponse:
-    """
-    Execute a Tavily search with the given query
-
-    Args:
-        query: The search query
-
-    Returns:
-        TavilyResponse: The search results
-    """
-    return tavily_tool.search_tavily(query)
-
-
-def execute_tavily_with_dict(params: Dict[str, Any]) -> TavilyResponse:
-    """
-    Execute a Tavily search with parameters provided as a dictionary
-
-    Args:
-        params: Dictionary containing the required parameters
-               Expected keys: 'query'
-
-    Returns:
-        TavilyResponse: The search results
-    """
-    return tavily_tool.run_with_dict(params)
+    # Get the tool instance and return its definition
+    tool = get_tool("tavily_internet_search")
+    if tool:
+        return tool.get_definition()
+    else:
+        raise RuntimeError("Failed to get tavily tool definition")

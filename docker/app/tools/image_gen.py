@@ -1,12 +1,11 @@
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Type
 
 from models.chat_config import ChatConfig
 from openai import OpenAI
 from PIL import Image
 from pydantic import Field
-from tools.base import BaseTool, BaseToolResponse
-from tools.conversation_context import execute_conversation_context_with_dict
+from tools.base import BaseTool, BaseToolResponse, ExecutionMode
 from utils.config import config as app_config
 from utils.image import generate_image
 
@@ -15,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Aspect ratio mappings to dimensions
 ASPECT_RATIO_MAPPINGS = {
-    "square": (1024, 1024),  # 1:1 ratio
+    "square": (768, 768),  # 1:1 ratio
     "portrait": (768, 1024),  # 3:4 ratio (vertical)
     "landscape": (1024, 768),  # 4:3 ratio (horizontal)
 }
@@ -47,13 +46,9 @@ def get_dimensions_from_aspect_ratio(aspect_ratio: str) -> Tuple[int, int]:
 class ImageGenerationResponse(BaseToolResponse):
     """Response from image generation tool"""
 
-    success: bool = Field(description="Whether the image was generated successfully")
     image_data: Optional[str] = Field(None, description="Base64 encoded image data")
     original_prompt: str = Field(description="Original user prompt")
     enhanced_prompt: str = Field(description="Enhanced prompt used for generation")
-    error_message: Optional[str] = Field(
-        None, description="Error message if generation failed"
-    )
     direct_response: bool = Field(
         False, description="Whether this is a direct response"
     )
@@ -70,10 +65,18 @@ class ImageGenerationTool(BaseTool):
         self.name = "generate_image"
         self.description = "ONLY use when explicitly asked to create, generate, or make an image, picture, photo, artwork, or visual content. Creates AI-generated images based on text descriptions, supporting various artistic styles, moods, and aspect ratios. DO NOT use for general questions, information lookup, or non-image requests."
         self.supported_contexts = ['image_generation']
+        self.execution_mode = ExecutionMode.SYNC  # Image generation is synchronous
+        self.timeout = 120.0  # Image generation can take longer
 
-    def to_openai_format(self) -> Dict[str, Any]:
+    def _initialize_mvc(self):
+        """Initialize MVC components"""
+        # This tool doesn't need separate MVC components as it's simple
+        self._controller = None
+        self._view = None
+
+    def get_definition(self) -> Dict[str, Any]:
         """
-        Convert the tool to OpenAI function calling format
+        Return OpenAI-compatible tool definition
 
         Returns:
             Dict containing the OpenAI-compatible tool definition
@@ -136,6 +139,42 @@ class ImageGenerationTool(BaseTool):
             },
         }
 
+    def get_response_type(self) -> Type[ImageGenerationResponse]:
+        """Get the response type for this tool"""
+        return ImageGenerationResponse
+
+    def _execute_sync(self, params: Dict[str, Any]) -> ImageGenerationResponse:
+        """Execute the tool synchronously"""
+        user_prompt = params.get("user_prompt")
+        subject = params.get("subject")
+        style = params.get("style", "photorealistic")
+        mood = params.get("mood", "natural")
+        details = params.get("details", "")
+        aspect_ratio = params.get("aspect_ratio", "square")
+        cfg_scale = params.get("cfg_scale", 3.5)
+        use_conversation_context = params.get("use_conversation_context", True)
+        messages = params.get("messages")
+
+        # Create config from environment
+        config = ChatConfig.from_environment()
+        return self.generate_image_from_prompt(
+            user_prompt,
+            subject,
+            style,
+            mood,
+            details,
+            aspect_ratio,
+            cfg_scale,
+            use_conversation_context,
+            config,
+            messages,
+        )
+
+    def execute(self, params: Dict[str, Any]) -> ImageGenerationResponse:
+        """Execute the tool with given parameters"""
+        # This tool doesn't use MVC pattern, so execute directly
+        return self._execute_sync(params)
+
     def _get_conversation_context(
         self, messages: List[Dict[str, Any]]
     ) -> Optional[Dict[str, Any]]:
@@ -160,9 +199,13 @@ class ImageGenerationTool(BaseTool):
                 "max_messages": 8,  # Look at more messages for richer context
                 "focus_query": "visual elements, story details, characters, settings, artistic themes, and descriptive elements that could be visualized",
                 "messages": messages,
+                "but_why": "Gathering conversation context to enhance image generation prompt with relevant visual details",
             }
 
-            context_response = execute_conversation_context_with_dict(context_params)
+            # Use the tool registry to execute conversation context tool
+            from tools.registry import execute_tool
+
+            context_response = execute_tool("conversation_context", context_params)
             summary = None
             if context_response and context_response.success:
                 summary = context_response.analysis
@@ -224,14 +267,6 @@ class ImageGenerationTool(BaseTool):
             fast_client = OpenAI(
                 api_key=config.api_key, base_url=config.fast_llm_endpoint
             )
-
-            # Build context information
-            context_info = ""
-            if conversation_context:
-                summary = conversation_context.get("summary", "")
-
-                if summary:
-                    context_info += f"\nConversation context: {summary}"
 
             # Create enhancement prompt for the LLM
             enhancement_system_prompt = """detailed thinking off
@@ -505,6 +540,7 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
                 "original_prompt": user_prompt,
                 "enhanced_prompt": enhanced_prompt,
                 "error_message": "Image generation is not configured. Please set the IMAGE_ENDPOINT environment variable.",
+                "error_code": "CONFIGURATION_ERROR",
                 "direct_response": True,
             }
             import json
@@ -563,6 +599,7 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
                     "original_prompt": user_prompt,
                     "enhanced_prompt": enhanced_prompt,
                     "error_message": f"Error processing generated image: {str(e)}",
+                    "error_code": "IMAGE_PROCESSING_ERROR",
                     "direct_response": True,
                 }
                 import json
@@ -576,6 +613,7 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
                 "original_prompt": user_prompt,
                 "enhanced_prompt": enhanced_prompt,
                 "error_message": "Failed to generate image. Please try again with a different prompt.",
+                "error_code": "GENERATION_FAILED",
                 "direct_response": True,
             }
             import json
@@ -587,6 +625,7 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
     def run_with_dict(self, params: Dict[str, Any]) -> ImageGenerationResponse:
         """
         Execute image generation with parameters provided as a dictionary
+        This method exists for backward compatibility.
 
         Args:
             params: Dictionary containing the required parameters
@@ -636,79 +675,18 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
             messages,
         )
 
-    def execute(self, params: Dict[str, Any]) -> ImageGenerationResponse:
-        """Execute the tool with given parameters"""
-        return self.run_with_dict(params)
 
-
-# Create a global instance and helper functions for easy access
-image_generation_tool = ImageGenerationTool()
-
-
+# Helper functions for backward compatibility
 def get_image_generation_tool_definition() -> Dict[str, Any]:
-    """
-    Get the OpenAI-compatible tool definition for image generation
+    """Get the OpenAI-compatible tool definition"""
+    from tools.registry import get_tool, register_tool_class
 
-    Returns:
-        Dict containing the OpenAI tool definition
-    """
-    return image_generation_tool.to_openai_format()
+    # Register the tool class if not already registered
+    register_tool_class("generate_image", ImageGenerationTool)
 
-
-def execute_image_generation(
-    user_prompt: str,
-    subject: str,
-    style: str = "photorealistic",
-    mood: str = "natural",
-    details: str = "",
-    aspect_ratio: str = "square",
-    cfg_scale: float = 3.5,
-    use_conversation_context: bool = True,
-    messages: List[Dict[str, Any]] = None,
-) -> ImageGenerationResponse:
-    """
-    Execute image generation with the given parameters
-
-    Args:
-        user_prompt: Original user prompt
-        subject: Main subject for the image
-        style: Artistic style
-        mood: Mood/atmosphere
-        details: Additional details
-        aspect_ratio: Aspect ratio for the image ("square", "portrait", or "landscape")
-        cfg_scale: Guidance scale for image generation (1.5-4.5)
-        use_conversation_context: Whether to use conversation context
-        messages: Optional conversation messages for context
-
-    Returns:
-        ImageGenerationResponse: The image generation result
-    """
-    config = ChatConfig.from_environment()
-    return image_generation_tool.generate_image_from_prompt(
-        user_prompt,
-        subject,
-        style,
-        mood,
-        details,
-        aspect_ratio,
-        cfg_scale,
-        use_conversation_context,
-        config,
-        messages,
-    )
-
-
-def execute_image_generation_with_dict(
-    params: Dict[str, Any],
-) -> ImageGenerationResponse:
-    """
-    Execute image generation with parameters provided as a dictionary
-
-    Args:
-        params: Dictionary containing the required parameters
-               Expected keys: 'user_prompt', 'subject', optionally 'style', 'mood', 'details', 'aspect_ratio', 'cfg_scale'
-
-    Returns:
-        ImageGenerationResponse: The image generation result
-    """
-    return image_generation_tool.run_with_dict(params)
+    # Get the tool instance and return its definition
+    tool = get_tool("generate_image")
+    if tool:
+        return tool.get_definition()
+    else:
+        raise RuntimeError("Failed to get image generation tool definition")

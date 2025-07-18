@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 from models.chat_config import ChatConfig
 from models.chat_message import ChatMessage
@@ -63,22 +63,6 @@ class ChatService:
 
         logging.debug("Cleaned context and thinking tags from previous chat history")
         return cleaned_messages
-
-    def enhance_prompt_with_context(self, prompt: str) -> Tuple[str, str]:
-        """
-        Enhance prompt with relevant context using vector search
-
-        Note: Retrieval functionality has been moved to the retrieval_search tool.
-        This method now returns empty context to maintain backward compatibility.
-
-        Args:
-            prompt: The user's original prompt
-
-        Returns:
-            Tuple of (original prompt, empty context)
-        """
-        # Retrieval functionality is now handled by the retrieval_search tool
-        return prompt, ""
 
     def prepare_messages_for_api(
         self, messages: List[Dict[str, Any]], context: str = ""

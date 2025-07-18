@@ -8,7 +8,7 @@ It will create summaries on-demand if they don't already exist.
 import asyncio
 import json
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 
 from models.chat_config import ChatConfig
 from pydantic import Field
@@ -57,8 +57,14 @@ class PDFSummaryTool(BaseTool):
         self.supported_contexts = ['pdf_analysis']
         self.summarization_service = None  # Will be initialized on first use
 
-    def to_openai_format(self) -> Dict[str, Any]:
-        """Convert the tool to OpenAI function calling format"""
+    def _initialize_mvc(self):
+        """Initialize MVC components"""
+        # This tool doesn't need separate MVC components as it's simple
+        self._controller = None
+        self._view = None
+
+    def get_definition(self) -> Dict[str, Any]:
+        """Return OpenAI-compatible tool definition"""
         return {
             "type": "function",
             "function": {
@@ -86,6 +92,10 @@ class PDFSummaryTool(BaseTool):
                 },
             },
         }
+
+    def get_response_type(self) -> Type[PDFSummaryResponse]:
+        """Get the response type for this tool"""
+        return PDFSummaryResponse
 
     def execute(self, params: Dict[str, Any]) -> PDFSummaryResponse:
         """Execute the tool with given parameters"""
@@ -507,9 +517,9 @@ class PDFSummaryTool(BaseTool):
                 "instructions": instructions,
             }
 
-            from tools.assistant import execute_assistant_with_dict
+            from tools.registry import execute_tool
 
-            summary_result = execute_assistant_with_dict(summary_params)
+            summary_result = execute_tool("text_assistant", summary_params)
             return (
                 summary_result.result
                 if hasattr(summary_result, 'result')
@@ -564,9 +574,9 @@ class PDFSummaryTool(BaseTool):
                 }
 
                 try:
-                    from tools.assistant import execute_assistant_with_dict
+                    from tools.registry import execute_tool
 
-                    summary_result = execute_assistant_with_dict(summary_params)
+                    summary_result = execute_tool("text_assistant", summary_params)
                     chunk_summary = (
                         summary_result.result
                         if hasattr(summary_result, 'result')
@@ -595,9 +605,9 @@ class PDFSummaryTool(BaseTool):
             }
 
             try:
-                from tools.assistant import execute_assistant_with_dict
+                from tools.registry import execute_tool
 
-                summary_result = execute_assistant_with_dict(summary_params)
+                summary_result = execute_tool("text_assistant", summary_params)
                 return (
                     summary_result.result
                     if hasattr(summary_result, 'result')
@@ -650,9 +660,9 @@ class PDFSummaryTool(BaseTool):
                 "instructions": instructions,
             }
 
-            from tools.assistant import execute_assistant_with_dict
+            from tools.registry import execute_tool
 
-            summary_result = execute_assistant_with_dict(summary_params)
+            summary_result = execute_tool("text_assistant", summary_params)
             return (
                 summary_result.result
                 if hasattr(summary_result, 'result')
@@ -707,15 +717,22 @@ class PDFSummaryTool(BaseTool):
         )
 
 
-# Create global instance
-pdf_summary_tool = PDFSummaryTool()
-
-
+# Helper functions for backward compatibility
 def get_pdf_summary_tool_definition() -> Dict[str, Any]:
-    """Get the OpenAI-compatible tool definition"""
-    return pdf_summary_tool.to_openai_format()
+    """
+    Get the OpenAI-compatible tool definition for PDF summary
 
+    Returns:
+        Dict containing the OpenAI tool definition
+    """
+    from tools.registry import get_tool, register_tool_class
 
-def execute_pdf_summary_with_dict(params: Dict[str, Any]) -> PDFSummaryResponse:
-    """Execute PDF summary retrieval with parameters as dictionary"""
-    return pdf_summary_tool.run_with_dict(params)
+    # Register the tool class if not already registered
+    register_tool_class("retrieve_pdf_summary", PDFSummaryTool)
+
+    # Get the tool instance and return its definition
+    tool = get_tool("retrieve_pdf_summary")
+    if tool:
+        return tool.get_definition()
+    else:
+        raise RuntimeError("Failed to get pdf summary tool definition")

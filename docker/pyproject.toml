@@ -16,6 +16,7 @@ dependencies = [
     "pymilvus==2.5.7",
     "pytz==2025.2",
     "streamlit==1.46.1",
+    "openmeteo-py==0.0.1"
 ]
 
 [project.optional-dependencies]

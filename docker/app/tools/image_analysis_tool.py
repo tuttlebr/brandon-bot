@@ -5,10 +5,10 @@ This tool analyzes uploaded images using vision-capable language models.
 """
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Type
 
 from pydantic import Field
-from tools.base import BaseTool, BaseToolResponse
+from tools.base import BaseTool, BaseToolResponse, ExecutionMode
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 class ImageAnalysisResponse(BaseToolResponse):
     """Response from image analysis tool"""
 
-    success: bool = Field(description="Whether the analysis was successful")
     filename: str = Field(description="Name of the image file")
     analysis: str = Field(description="Analysis result")
     question: str = Field(description="Question asked about the image")
@@ -34,8 +33,16 @@ class ImageAnalysisTool(BaseTool):
         self.name = "analyze_image"
         self.description = "ONLY use when explicitly asked to analyze, describe, or answer questions about an uploaded image. Analyzes uploaded images using vision-capable LLM models to answer questions about image content, describe what is visible, identify objects, or provide insights about visual elements. DO NOT use for PDF documents, text analysis, or general questions - use appropriate tools for those tasks."
         self.llm_type = "vlm"  # Use VLM model for image analysis
+        self.execution_mode = ExecutionMode.SYNC  # Image analysis is synchronous
+        self.timeout = 60.0  # Image analysis can take time
 
-    def to_openai_format(self) -> Dict[str, Any]:
+    def _initialize_mvc(self):
+        """Initialize MVC components"""
+        # This tool doesn't need separate MVC components as it's simple
+        self._controller = None
+        self._view = None
+
+    def get_definition(self) -> Dict[str, Any]:
         """Convert to OpenAI function calling format"""
         return {
             "type": "function",
@@ -59,8 +66,17 @@ class ImageAnalysisTool(BaseTool):
             },
         }
 
+    def get_response_type(self) -> Type[ImageAnalysisResponse]:
+        """Get the response type for this tool"""
+        return ImageAnalysisResponse
+
     def execute(self, params: Dict[str, Any]) -> ImageAnalysisResponse:
         """Execute the tool with given parameters"""
+        # Since this tool doesn't use MVC, override execute directly
+        return self._execute_sync(params)
+
+    def _execute_sync(self, params: Dict[str, Any]) -> ImageAnalysisResponse:
+        """Execute the tool synchronously"""
         question = params.get("question", "What do you see in this image?")
 
         # First check if image data was passed in params
@@ -81,6 +97,8 @@ class ImageAnalysisTool(BaseTool):
                     analysis="",
                     question=question,
                     message="No image found. Please upload an image first using the image uploader in the sidebar.",
+                    error_message="No image data available",
+                    error_code="NO_IMAGE_DATA",
                     direct_response=True,
                 )
 
@@ -123,6 +141,8 @@ class ImageAnalysisTool(BaseTool):
                 analysis="",
                 question=question,
                 message=f"Failed to analyze image: {str(e)}",
+                error_message=f"Failed to analyze image: {str(e)}",
+                error_code="ANALYSIS_ERROR",
                 direct_response=True,
             )
 
@@ -279,15 +299,22 @@ class ImageAnalysisTool(BaseTool):
             raise Exception(f"Failed to analyze image with LLM: {str(e)}")
 
 
-# Create a global instance for backward compatibility
-image_analysis_tool = ImageAnalysisTool()
-
-
+# Helper functions for backward compatibility
 def get_image_analysis_tool_definition() -> Dict[str, Any]:
-    """Get the OpenAI-compatible tool definition"""
-    return image_analysis_tool.to_openai_format()
+    """
+    Get the OpenAI-compatible tool definition for image analysis
 
+    Returns:
+        Dict containing the OpenAI tool definition
+    """
+    from tools.registry import get_tool, register_tool_class
 
-def execute_image_analysis_with_dict(params: Dict[str, Any]) -> ImageAnalysisResponse:
-    """Execute image analysis with parameters as dictionary"""
-    return image_analysis_tool.execute(params)
+    # Register the tool class if not already registered
+    register_tool_class("analyze_image", ImageAnalysisTool)
+
+    # Get the tool instance and return its definition
+    tool = get_tool("analyze_image")
+    if tool:
+        return tool.get_definition()
+    else:
+        raise RuntimeError("Failed to get image analysis tool definition")

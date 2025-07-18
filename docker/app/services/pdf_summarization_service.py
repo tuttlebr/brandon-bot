@@ -8,7 +8,7 @@ to avoid timeout issues by processing pages in batches.
 import asyncio
 import concurrent.futures
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from models.chat_config import ChatConfig
 from utils.batch_processor import BatchProcessor, DocumentProcessor
@@ -121,13 +121,14 @@ class PDFSummarizationService:
                 }
 
                 # Import locally to avoid circular imports
-                from tools.assistant import execute_assistant_with_dict
+                from tools.registry import execute_tool
 
                 loop = asyncio.get_event_loop()
                 summary_result = await loop.run_in_executor(
                     self.executor,
                     run_with_streamlit_context,
-                    execute_assistant_with_dict,
+                    execute_tool,
+                    "text_assistant",
                     summary_params,
                 )
 
@@ -177,13 +178,14 @@ class PDFSummarizationService:
                 }
 
                 # Import locally to avoid circular imports
-                from tools.assistant import execute_assistant_with_dict
+                from tools.registry import execute_tool
 
                 loop = asyncio.get_event_loop()
                 summary_result = await loop.run_in_executor(
                     self.executor,
                     run_with_streamlit_context,
-                    execute_assistant_with_dict,
+                    execute_tool,
+                    "text_assistant",
                     summary_params,
                 )
 
@@ -250,13 +252,14 @@ class PDFSummarizationService:
             }
 
             # Import locally to avoid circular imports
-            from tools.assistant import execute_assistant_with_dict
+            from tools.registry import execute_tool
 
             loop = asyncio.get_event_loop()
             summary_result = await loop.run_in_executor(
                 self.executor,
                 run_with_streamlit_context,
-                execute_assistant_with_dict,
+                execute_tool,
+                "text_assistant",
                 summary_params,
             )
 
@@ -265,87 +268,6 @@ class PDFSummarizationService:
         except Exception as e:
             logger.error(f"Error creating final summary: {e}")
             return "Document summary unavailable due to processing error"
-
-    def get_summary_for_context(self, pdf_data: Dict) -> Optional[str]:
-        """
-        Get a formatted summary for use in conversation context
-
-        Args:
-            pdf_data: PDF data potentially containing summaries
-
-        Returns:
-            Formatted summary string or None
-        """
-        if not pdf_data.get('summarization_complete'):
-            return None
-
-        filename = pdf_data.get('filename', 'Document')
-        doc_summary = pdf_data.get('document_summary', '')
-
-        if doc_summary:
-            return f"Document Summary for '{filename}':\n{doc_summary}"
-
-        return None
-
-    def summarize_pdf_sync(self, pdf_data: Dict) -> Dict:
-        """
-        Synchronous version of PDF summarization (DEPRECATED - use async version instead)
-
-        This method is kept for backward compatibility but should not be used.
-        Use summarize_pdf_recursive for full document processing.
-
-        Args:
-            pdf_data: PDF data from NVINGEST containing pages
-
-        Returns:
-            Dictionary containing original data plus summaries
-        """
-        try:
-            pages = pdf_data.get('pages', [])
-            total_pages = len(pages)
-            filename = pdf_data.get('filename', 'Unknown')
-
-            logger.warning(
-                f"Using deprecated sync summarization for {filename} ({total_pages} pages). Use async version for better results."
-            )
-
-            if total_pages == 0:
-                return pdf_data
-
-            # Process all pages (removed 20-page limit)
-            pages_to_process = pages  # Process all pages instead of limiting to 20
-
-            # Create a quick summary
-            combined_text = "\n\n".join(
-                [
-                    f"Page {page.get('page', i+1)}:\n{page.get('text', '')[:1000]}"  # Limit text per page
-                    for i, page in enumerate(pages_to_process)
-                ]
-            )
-
-            summary_params = {
-                "task_type": "summarize",
-                "text": combined_text,
-                "instructions": f"Create a concise summary of this document '{filename}'. Focus on the main topics and key information.",
-            }
-
-            # Import locally to avoid circular imports
-            from tools.assistant import execute_assistant_with_dict
-
-            summary_result = execute_assistant_with_dict(summary_params)
-
-            # Add basic summary to PDF data
-            enhanced_pdf_data = pdf_data.copy()
-            enhanced_pdf_data['document_summary'] = summary_result.result
-            enhanced_pdf_data['summarization_complete'] = True
-            enhanced_pdf_data['summarization_type'] = 'quick'  # Mark as quick summary
-
-            logger.info(f"Completed synchronous summarization for {filename}")
-            return enhanced_pdf_data
-
-        except Exception as e:
-            logger.error(f"Error in synchronous summarization: {e}")
-            return pdf_data
 
     def __del__(self):
         """Cleanup executor on deletion"""

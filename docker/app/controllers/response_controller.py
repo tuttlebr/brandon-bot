@@ -42,42 +42,6 @@ class ResponseController:
         self.session_controller = session_controller
         self.chat_history_component = chat_history_component
 
-    def generate_and_display_response(self, prepared_messages: List[Dict[str, Any]]):
-        """
-        Generate and display streaming response from LLM with spinner
-
-        Args:
-            prepared_messages: Prepared messages for API call
-        """
-        try:
-            # Generate response chunks (animation is now inside the chat message)
-            self._generate_response_chunks(prepared_messages)
-
-            # Display the response without spinner
-            self._display_response()
-
-        except Exception as e:
-            self._handle_response_error(e)
-
-    def generate_and_display_response_no_spinner(
-        self, prepared_messages: List[Dict[str, Any]]
-    ):
-        """
-        Generate and display streaming response from LLM without spinner (spinner handled elsewhere)
-
-        Args:
-            prepared_messages: Prepared messages for API call
-        """
-        try:
-            # Generate response chunks
-            self._generate_response_chunks(prepared_messages)
-
-            # Display the response
-            self._display_response()
-
-        except Exception as e:
-            self._handle_response_error(e)
-
     def generate_response_with_cleanup_separation(
         self, prepared_messages: List[Dict[str, Any]]
     ):
@@ -383,7 +347,7 @@ class ResponseController:
             history_message = {
                 "type": "image",
                 "image_id": image_id,
-                "text": f"🎨 Generated image with prompt: **{enhanced_prompt}**",
+                # "text": f"🎨 Generated image with prompt: **{enhanced_prompt}**",
                 "enhanced_prompt": enhanced_prompt,
                 "original_prompt": original_prompt,
             }
@@ -681,7 +645,7 @@ class ResponseController:
                         history_message = {
                             "type": "image",
                             "image_id": image_id,
-                            "text": f"🎨 Generated image with prompt: {image_data['enhanced_prompt']}",
+                            # "text": f"Generated image with prompt: {image_data['enhanced_prompt']}",
                             "enhanced_prompt": image_data["enhanced_prompt"],
                             "original_prompt": image_data["original_prompt"],
                         }

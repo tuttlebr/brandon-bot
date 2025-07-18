@@ -13,6 +13,5 @@ def extract_context_regex(text, start_token=START_CONTEXT, end_token=END_CONTEXT
     match = re.search(pattern, text, re.DOTALL)
     if match:
         before_text = match.group(1)  # Text before START_TOKEN
-        context = match.group(2)  # Text between tokens
         return before_text
     return text

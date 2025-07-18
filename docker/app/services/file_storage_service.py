@@ -617,21 +617,3 @@ class FileStorageService:
             logger.error(f"Unexpected error checking storage limits: {e}")
             # Don't suppress the error, let it propagate
             raise
-
-    def get_storage_stats(self) -> Dict[str, Any]:
-        """Get storage statistics"""
-        try:
-            stats = {
-                "total_images": len(list(self.images_dir.glob("*.png"))),
-                "total_pdfs": len(list(self.pdfs_dir.glob("*.json"))),
-                "total_size_mb": sum(
-                    f.stat().st_size
-                    for f in self.storage_path.rglob("*")
-                    if f.is_file()
-                )
-                / (1024 * 1024),
-            }
-            return stats
-        except Exception as e:
-            logger.error(f"Failed to get storage stats: {e}")
-            return {"error": str(e)}

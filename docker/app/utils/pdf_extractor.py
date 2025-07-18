@@ -87,40 +87,6 @@ class PDFDataExtractor:
         return None
 
     @staticmethod
-    def _is_json_pdf_data(content: str) -> bool:
-        """Check if content is JSON-formatted PDF data"""
-        if not content.strip().startswith("{") or not content.strip().endswith("}"):
-            return False
-
-        try:
-            data = json.loads(content)
-            return (
-                isinstance(data, dict)
-                and data.get("type") == "pdf_data"
-                and data.get("tool_name") == "process_pdf_document"
-            )
-        except (json.JSONDecodeError, TypeError):
-            return False
-
-    @staticmethod
-    def _parse_json_pdf_data(content: str) -> Optional[Dict[str, Any]]:
-        """Parse JSON-formatted PDF data"""
-        try:
-            data = json.loads(content)
-            pages = data.get("pages", [])
-            filename = data.get("filename", "Unknown")
-
-            if pages:
-                logger.info(
-                    f"Extracted PDF data from JSON: {filename} with {len(pages)} pages"
-                )
-                return {"filename": filename, "pages": pages}
-        except Exception as e:
-            logger.error(f"Error parsing JSON PDF data: {e}")
-
-        return None
-
-    @staticmethod
     def _parse_pdf_context_message(content: str) -> Optional[Dict[str, Any]]:
         """Parse PDF content from context message format"""
         try:

@@ -13,8 +13,7 @@ from services.conversation_context_service import ConversationContextService
 from services.response_parsing_service import ResponseParsingService
 from services.streaming_service import StreamingService
 from services.tool_execution_service import ToolExecutionService
-from services.translation_service import TranslationService
-from tools.registry import tool_registry
+from tools.registry import get_all_tool_definitions
 from tools.tool_llm_config import DEFAULT_LLM_TYPE, get_tool_llm_type
 from utils.config import config
 
@@ -119,13 +118,16 @@ class LLMService:
             windowed_messages = self._filter_messages_for_llm(windowed_messages)
 
             # Get tool definitions
-            tools = tool_registry.get_all_definitions()
+            tools = get_all_tool_definitions()
+
+            # Insert the guidance right before tool selection
+            windowed_messages_with_guidance = windowed_messages
 
             # First, get non-streaming response to check for tool calls
             tool_selection_model_type = get_tool_llm_type("tool_selection")
             tool_selection_model = self._get_model_for_type(tool_selection_model_type)
             response = self.streaming_service.sync_completion(
-                windowed_messages,
+                windowed_messages_with_guidance,
                 tool_selection_model,
                 tool_selection_model_type,
                 tools=tools,
@@ -209,11 +211,9 @@ class LLMService:
         # Collect direct response tools with UI elements (like images)
         # instead of returning immediately
         ui_elements = []
-        has_direct_responses = False
 
         for response in tool_responses:
             if response.get("role") == "direct_response":
-                has_direct_responses = True
                 # Check if this is an image generation response
                 if response.get("tool_name") == "generate_image":
                     tool_result = response.get("tool_result")
@@ -394,31 +394,6 @@ class LLMService:
         # Return with system and tool messages preserved
         return system_messages + tool_messages + conversation_messages
 
-    def _validate_and_clean_messages(
-        self, messages: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
-        """Validate and clean messages"""
-        cleaned = []
-
-        for msg in messages:
-            # Skip empty messages
-            if not msg.get("content"):
-                continue
-
-            # Clean tool instructions from content
-            content = msg["content"]
-            if isinstance(content, str):
-                if self.parsing_service.contains_tool_calls(content):
-                    content = self.parsing_service._clean_tool_instructions(content)
-
-                # Filter think tags
-                content = self.parsing_service.filter_think_tags(content)
-
-            if content:
-                cleaned.append({"role": msg["role"], "content": content})
-
-        return cleaned
-
     def _filter_messages_for_llm(
         self, messages: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
@@ -452,16 +427,6 @@ class LLMService:
                 filtered.append(msg)
 
         return filtered
-
-    # Backward compatibility methods
-    def _filter_think_tags(self, content: str) -> str:
-        """Backward compatibility wrapper"""
-        return self.parsing_service.filter_think_tags(content)
-
-    async def _generate_simple_response(self, message: str) -> AsyncGenerator[str, str]:
-        """Simple response generation for backward compatibility"""
-        async for chunk in self.streaming_service.simple_stream(message):
-            yield chunk
 
     def _estimate_tokens(self, text: str) -> int:
         """

@@ -121,39 +121,3 @@ class DocumentProcessor:
             formatted_pages.append(f"Page {page_num}:\n{page_text}")
 
         return "\n\n".join(formatted_pages)
-
-    @staticmethod
-    def extract_page_numbers_from_text(
-        text: str, valid_range: Optional[tuple] = None
-    ) -> List[int]:
-        """
-        Extract page numbers mentioned in text
-
-        Args:
-            text: Text to search for page numbers
-            valid_range: Optional (start, end) tuple for valid page numbers
-
-        Returns:
-            List of unique page numbers found
-        """
-        import re
-
-        if 'none' in text.lower() or 'no pages' in text.lower():
-            return []
-
-        # Find all numbers that could be page numbers
-        numbers = re.findall(r'\b(\d+)\b', text)
-        page_numbers = []
-
-        for num_str in numbers:
-            num = int(num_str)
-
-            # Check if in valid range
-            if valid_range:
-                start, end = valid_range
-                if start <= num <= end:
-                    page_numbers.append(num)
-            else:
-                page_numbers.append(num)
-
-        return list(set(page_numbers))  # Remove duplicates

@@ -9,10 +9,6 @@ class ChatConfig:
     """Configuration wrapper for chat application - uses centralized config"""
 
     @property
-    def bot_title(self) -> str:
-        return config.env.BOT_TITLE
-
-    @property
     def assistant_avatar(self) -> str:
         return config.ui.ASSISTANT_AVATAR_PATH
 
@@ -53,28 +49,12 @@ class ChatConfig:
         return config.env.VLM_ENDPOINT or config.env.LLM_ENDPOINT
 
     @property
-    def embedding_endpoint(self) -> str:
-        return config.env.EMBEDDING_ENDPOINT
-
-    @property
     def api_key(self) -> str:
         return config.env.NVIDIA_API_KEY
 
     @property
-    def embedding_model(self) -> str:
-        return config.env.EMBEDDING_MODEL
-
-    @property
     def collection_name(self) -> str:
         return config.env.COLLECTION_NAME
-
-    @property
-    def database_url(self) -> str:
-        return config.env.DATABASE_URL
-
-    @property
-    def default_db(self) -> str:
-        return config.env.DEFAULT_DB
 
     @property
     def image_endpoint(self) -> str:

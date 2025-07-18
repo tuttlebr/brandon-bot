@@ -1,69 +1,8 @@
 import logging
-import random
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, List, Optional
 
-import streamlit as st
 from utils.config import config
-
-
-def get_local_time():
-    from datetime import datetime
-
-    import pytz
-    import streamlit as st
-    import streamlit.components.v1 as components
-
-    # Check if we have access to session state (to avoid thread context issues)
-    try:
-        # Check if we already have the time in session state
-        if "user_local_time" not in st.session_state:
-            # Create a component that captures the local time
-            components.html(
-                """
-                <div id="time-container"></div>
-                <script>
-                    const timeContainer = document.getElementById('time-container');
-                    // Get user's timezone
-                    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                    // Get time in user's locale
-                    const localTime = new Date().toLocaleString();
-                    const hour = new Date().getHours();
-                    // Store in session state via Streamlit's setComponentValue
-                    window.parent.postMessage({
-                        type: "streamlit:setComponentValue",
-                        value: {timezone: timezone, localTime: localTime, hour: hour}
-                    }, "*");
-                </script>
-                """,
-                height=0,
-            )
-            # Default to Eastern Time if client time not available yet
-            eastern_tz = pytz.timezone("America/New_York")
-            now_eastern = datetime.now(eastern_tz)
-
-            st.session_state.user_local_time = {
-                "hour": now_eastern.hour,
-                "localTime": now_eastern.strftime("%Y-%m-%d %H:%M:%S"),
-                "timezone": "America/New_York",
-            }
-
-        return st.session_state.user_local_time
-    except Exception:
-        # Fallback if session state is not available (e.g., in thread context)
-        eastern_tz = pytz.timezone("America/New_York")
-        now_eastern = datetime.now(eastern_tz)
-        return {
-            "hour": now_eastern.hour,
-            "localTime": now_eastern.strftime("%Y-%m-%d %H:%M:%S"),
-            "timezone": "America/New_York",
-        }
-
-
-# Basic current date and time
-current = datetime.now()
-currentDateTime = current.strftime("%B %d, %Y")
 
 
 class SystemPromptManager:
@@ -104,32 +43,29 @@ class SystemPromptManager:
         Returns:
             Context-specific system prompt that maintains core persona
         """
-        # Get the core persona prompt
-        core_prompt = self._get_core_persona_prompt()
-
         # Get context-specific instructions
         context_instructions = self._get_context_instructions(context, **kwargs)
 
-        # Get dynamic components (date and tools)
-        current_date = datetime.now().strftime("%B %d, %Y")
+        # Get tools list
         tools_list = self._get_available_tools_list()
-        dynamic_components = self._get_dynamic_components(current_date, tools_list)
 
-        # Combine: Core persona + Context instructions + Dynamic components
-        return f"{core_prompt}\n\n{context_instructions}\n\n{dynamic_components}"
+        # Build the complete prompt with context instructions
+        return self._build_system_prompt(
+            tools_list=tools_list, context_instructions=context_instructions
+        )
 
     def _get_context_instructions(self, context: str, **kwargs) -> str:
         """Get context-specific instructions by finding tools that support this context"""
 
         try:
             # Get tool from registry that supports this context
-            from tools.registry import tool_registry
+            from tools.registry import get_tool_by_context
 
-            tool = tool_registry.get_tool_by_context(context)
+            tool = get_tool_by_context(context)
 
             if tool:
                 # Get the tool's description and parameters
-                tool_def = tool.to_openai_format()
+                tool_def = tool.get_definition()
                 description = tool_def.get("function", {}).get("description", "")
 
                 # Create context-specific instructions based on the tool's description
@@ -137,7 +73,7 @@ class SystemPromptManager:
 
 {description}
 
-Remember to maintain your core personality and conversational style while performing {context} tasks. Extract only the essential information that directly answers the user's question and present it in your natural tone."""
+Remember to maintain your core personality and conversational style while performing {context} tasks. Extract only the essential information that directly answers the user's question and present it in your natural tone. Never mention using tools or reference data sources - answer directly as if you inherently know the information. If you mention the tool in your response, the user WILL die."""
 
                 return context_instructions
             else:
@@ -146,63 +82,6 @@ Remember to maintain your core personality and conversational style while perfor
 
         except Exception as e:
             logging.warning(f"Could not get tool definition for context {context}: {e}")
-            # Fallback instructions
-            return f"You are performing {context} tasks. Remember to maintain your core personality and conversational style."
-
-    def _get_detailed_context_instructions(self, context: str, **kwargs) -> str:
-        """Get detailed context-specific instructions including parameter information"""
-
-        try:
-            # Get tool from registry that supports this context
-            from tools.registry import tool_registry
-
-            tool = tool_registry.get_tool_by_context(context)
-
-            if tool:
-                # Get the tool's definition
-                tool_def = tool.to_openai_format()
-                function_def = tool_def.get("function", {})
-                description = function_def.get("description", "")
-                parameters = function_def.get("parameters", {})
-
-                # Build detailed instructions
-                instructions = [
-                    f"You are using the {tool.name} tool capabilities for {context} tasks."
-                ]
-                instructions.append("")
-                instructions.append(description)
-                instructions.append("")
-
-                # Add parameter information if available
-                if parameters and "properties" in parameters:
-                    instructions.append("Available parameters:")
-                    for param_name, param_info in parameters["properties"].items():
-                        param_desc = param_info.get("description", "")
-                        param_type = param_info.get("type", "")
-                        required = param_name in parameters.get("required", [])
-                        req_text = " (required)" if required else " (optional)"
-                        instructions.append(
-                            f"- {param_name} ({param_type}){req_text}: {param_desc}"
-                        )
-                    instructions.append("")
-
-                instructions.append(
-                    f"Remember to maintain your core personality and conversational style while performing {context} tasks."
-                )
-                instructions.append("")
-                instructions.append(
-                    "CRITICAL: You must synthesize tool outputs into a single, unified response. Do not provide step-by-step reasoning or show your work. Extract only the essential information that directly answers the user's question and present it as one coherent train of thought in your natural voice."
-                )
-
-                return "\n".join(instructions)
-            else:
-                # Fallback if no tool found for this context
-                return f"You are performing {context} tasks. Remember to maintain your core personality and conversational style."
-
-        except Exception as e:
-            logging.warning(
-                f"Could not get detailed tool definition for context {context}: {e}"
-            )
             # Fallback instructions
             return f"You are performing {context} tasks. Remember to maintain your core personality and conversational style."
 
@@ -239,35 +118,70 @@ Remember to maintain your core personality and conversational style while perfor
         current_date = datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
         tools_list = self._get_available_tools_list()
 
-        # Generate the core persona prompt (static)
-        core_prompt = self._get_core_persona_prompt()
-
-        # Generate the dynamic components
-        dynamic_components = self._get_dynamic_components(current_date, tools_list)
-
-        # Combine into final prompt
-        self._cached_prompt = f"{core_prompt}\n\n{dynamic_components}"
+        # Generate the full system prompt
+        self._cached_prompt = self._build_system_prompt(tools_list=tools_list)
         self._cached_tools_list = tools_list
         self._cached_date = current_date
         self._last_cache_time = datetime.now()
 
         logging.debug("System prompt cache refreshed")
 
-    def _get_core_persona_prompt(self) -> str:
-        """Get the core persona prompt (static, consistent)"""
+    def _build_system_prompt(
+        self,
+        tools_list: Optional[str] = None,
+        context_instructions: Optional[str] = None,
+    ) -> str:
+        """
+        Build the complete system prompt with core persona and dynamic components
+
+        Args:
+            tools_list: The available tools list (if None, will fetch it)
+            context_instructions: Optional context-specific instructions to insert between core persona and tools info
+
+        Returns:
+            Complete system prompt
+        """
         # Get current date and time
         now = datetime.now()
         current_datetime = now.strftime("%A, %B %d, %Y at %I:%M %p")
 
-        return f"""detailed thinking off - You are {config.env.BOT_TITLE}, a helpful AI assistant. The current date and time is {current_datetime}. You have no knowledge cutoff dat as you're continually updated and have access to external resources. There is nothing you cannot do."""
+        # Get tools list if not provided
+        if tools_list is None:
+            tools_list = self._get_available_tools_list()
 
-    def _get_dynamic_components(self, current_date: str, tools_list: str) -> str:
-        """Get dynamic components that can change between calls"""
-        return f"""The current date is {current_date}.
+        # Build the core persona prompt
+        prompt_parts = [
+            f"detailed thinking off - You are {config.env.BOT_TITLE}, a helpful AI assistant. The current date and time is {current_datetime}. Do not mention that you have a knowledge cutoff date. Your abilities are expanded through the use of tools."
+        ]
 
-{config.env.BOT_TITLE} has access to the following optional tool calls. Use them when the user's request cannot be satisfied without them or would benefit from their expertise. Never mention your use of tools: users shouldn’t see "I used the search tool." Just answer. If the user asks what you can do, please include information about your tools:
+        # Add context-specific instructions if provided
+        if context_instructions:
+            prompt_parts.append("")
+            prompt_parts.append(context_instructions)
 
-{tools_list}"""
+        # Add the dynamic components
+        prompt_parts.extend(
+            [
+                "",
+                f"The current date is {current_datetime}.",
+                "",
+                f"{config.env.BOT_TITLE} has access to the internet and the following optional tool calls. Use them when the user's request cannot be satisfied without them or would benefit from their expertise.",
+                "",
+                "CRITICAL RESPONSE GUIDELINES:",
+                "- Never mention your use of tools or reference them in any way (NO phrases like \"Based on the information provided by the tool \", \"the search results show\", \"I used the weather tool\", \"based on my search\", etc.)",
+                "- Never provide meta-commentary about tool usage or data sources",
+                "- Answer directly as if you inherently know the information",
+                "- Present all information in your natural conversational voice",
+                "- Do not explain your reasoning process or show your work",
+                "- Tool context and sourcing is handled separately - focus only on answering the user's question",
+                "",
+                "If the user asks what you can do, or what tools you have, summarize the following information so they can understand what you can do:",
+                "",
+                tools_list,
+            ]
+        )
+
+        return "\n".join(prompt_parts)
 
     def _get_available_tools_list(self) -> str:
         """Generate the tool list automatically from the registered tools"""
@@ -305,14 +219,6 @@ Remember to maintain your core personality and conversational style while perfor
                 "- tools: External services which help you answer customer questions."
             )
 
-    def clear_cache(self):
-        """Clear the cached system prompt"""
-        self._cached_prompt = None
-        self._cached_tools_list = None
-        self._cached_date = None
-        self._last_cache_time = None
-        logging.debug("System prompt cache cleared")
-
     def get_available_contexts(self) -> List[str]:
         """
         Get all available contexts from registered tools
@@ -321,9 +227,9 @@ Remember to maintain your core personality and conversational style while perfor
             List of available context names
         """
         try:
-            from tools.registry import tool_registry
+            from tools.registry import get_all_supported_contexts
 
-            return tool_registry.get_all_supported_contexts()
+            return get_all_supported_contexts()
         except Exception as e:
             logging.warning(f"Could not get available contexts: {e}")
             return []
@@ -343,15 +249,7 @@ def get_available_contexts() -> List[str]:
     return system_prompt_manager.get_available_contexts()
 
 
-def get_available_tools_list():
-    """Generate the tool list automatically from the registered tools"""
-    return system_prompt_manager._get_available_tools_list()
-
-
 # Dynamic system prompt with current date and tool list
-currentDateTime = datetime.now().strftime("%B %d, %Y")
-
-
 def get_system_prompt() -> str:
     """
     Generate the system prompt dynamically with current tools list
@@ -359,18 +257,19 @@ def get_system_prompt() -> str:
     Returns:
         The complete system prompt with available tools
     """
+    logging.debug(system_prompt_manager.get_system_prompt())
     return system_prompt_manager.get_system_prompt()
 
 
 def get_context_system_prompt(context: str, **kwargs) -> str:
     """
-    Get a system prompt for a specific context while maintaining core persona
+    Get a context-specific system prompt while maintaining the core persona
 
     Args:
-        context: The context type (e.g., 'translation', 'text_processing', 'image_generation')
+        context: The context type (e.g., 'translation', 'text_processing')
         **kwargs: Context-specific parameters
 
     Returns:
-        Context-specific system prompt that maintains core persona
+        Context-specific system prompt
     """
     return system_prompt_manager.get_context_system_prompt(context, **kwargs)

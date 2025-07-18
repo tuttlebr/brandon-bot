@@ -7,7 +7,7 @@ from typing import Optional
 # Third-party imports
 import requests
 from PIL import Image
-from pydantic import BaseModel, validator
+from pydantic import BaseModel
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -20,28 +20,9 @@ DEFAULT_WIDTH = 512
 DEFAULT_HEIGHT = 512
 DEFAULT_SEED = 42
 DEFAULT_STEPS = 50
-DEFAULT_FORMAT = "PNG"
-MIME_FORMAT = "image/{}"
-DATA_URI_FORMAT = "data:{};base64,{}"
+
 BASE64_PREFIX_PATTERN = r"^data:image/.+;base64,"
 
-# Allowed values for width and height
-ALLOWED_DIMENSIONS = [
-    512,
-    576,
-    640,
-    704,
-    768,
-    832,
-    896,
-    960,
-    1024,
-    1088,
-    1152,
-    1216,
-    1280,
-    1344,
-]
 
 # Allowed modes for image generation
 ALLOWED_MODES = ["base"]
@@ -73,44 +54,10 @@ class ImageProcessingRequest(BaseModel):
     steps: Optional[int] = DEFAULT_STEPS
     disable_safety_checker: Optional[bool] = True
 
-    class Config:
+    class Config:  # dead: disable
         """Configuration for the ImageProcessingRequest model."""
 
-        arbitrary_types_allowed = True
-        json_schema_extra = {
-            "example": {
-                "prompt": DEFAULT_PROMPT,
-                "mode": DEFAULT_MODE,
-                "cfg_scale": DEFAULT_CFG_SCALE,
-                "width": DEFAULT_WIDTH,
-                "height": DEFAULT_HEIGHT,
-                "seed": DEFAULT_SEED,
-                "steps": DEFAULT_STEPS,
-            }
-        }
-
-    @validator("width", "height")
-    def validate_dimensions(cls, value, values, **kwargs):
-        """Validate that width and height are among the allowed values."""
-        if value is not None and value not in ALLOWED_DIMENSIONS:
-            allowed_values = ", ".join(map(str, ALLOWED_DIMENSIONS))
-            raise ValueError(f"Value must be one of the following: {allowed_values}")
-        return value
-
-    @validator("mode")
-    def validate_mode(cls, value, values, **kwargs):
-        """Validate that mode is among the allowed values."""
-        if value is not None and value not in ALLOWED_MODES:
-            allowed_values = ", ".join(map(str, ALLOWED_MODES))
-            raise ValueError(f"Value must be one of the following: {allowed_values}")
-        return value
-
-    # @validator('cfg_scale')
-    # def validate_mode(cls, value, values, **kwargs):
-    #     """Validate that cfg_scale is among the allowed values."""
-    #     if 0 < value <= 9:
-    #         return value
-    #     raise ValueError("Value must be between 0 and 9")
+        arbitrary_types_allowed = True  # dead: disable
 
 
 def generate_image(
@@ -194,41 +141,6 @@ def generate_image(
     except Exception as e:
         logger.error(f"Error generating image: {str(e)}")
         raise ImageProcessingError(f"Failed to generate image: {str(e)}") from e
-
-
-def pil_image_to_base64(pil_image: Image.Image, format: str = DEFAULT_FORMAT) -> str:
-    """
-    Convert a PIL Image to a base64 encoded string.
-
-    Args:
-        pil_image: The PIL Image object
-        format: Image format to save as (default: "PNG")
-
-    Returns:
-        Base64 encoded string of the image
-
-    Raises:
-        ImageProcessingError: If conversion fails
-    """
-    try:
-        # Create a BytesIO object
-        buffered = BytesIO()
-
-        # Save the image to the BytesIO object
-        pil_image.save(buffered, format=format)
-
-        # Get the binary content from the BytesIO object
-        img_binary = buffered.getvalue()
-
-        # Encode the binary data to base64
-        img_base64 = base64.b64encode(img_binary).decode("utf-8")
-
-        return img_base64
-    except Exception as e:
-        logger.error(f"Error converting PIL image to base64: {str(e)}")
-        raise ImageProcessingError(
-            f"Failed to convert image to base64: {str(e)}"
-        ) from e
 
 
 def base64_to_pil_image(base64_str: str) -> Optional[Image.Image]:

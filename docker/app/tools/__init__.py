@@ -1,115 +1,97 @@
-from .assistant import (
-    AssistantTool,
-    execute_assistant_task,
-    execute_assistant_with_dict,
-    get_assistant_tool_definition,
-)
+# Import tool classes for registration
+# Import helper functions for backward compatibility - only the definitions
+from .assistant import AssistantResponse, AssistantTool, get_assistant_tool_definition
 from .conversation_context import (
+    ConversationContextResponse,
     ConversationContextTool,
-    execute_conversation_context_with_dict,
     get_conversation_context_tool_definition,
 )
-from .extract import (
-    WebExtractTool,
-    execute_web_extract,
-    execute_web_extract_with_dict,
-    get_web_extract_tool_definition,
-)
+from .extract import ExtractResult, WebExtractTool, get_web_extract_tool_definition
 from .generalist import (
+    GeneralistResponse,
     GeneralistTool,
-    execute_generalist_conversation,
-    execute_generalist_with_dict,
     get_generalist_tool_definition,
 )
 from .image_analysis_tool import (
+    ImageAnalysisResponse,
     ImageAnalysisTool,
-    execute_image_analysis_with_dict,
     get_image_analysis_tool_definition,
 )
 from .image_gen import (
+    ImageGenerationResponse,
     ImageGenerationTool,
-    execute_image_generation,
-    execute_image_generation_with_dict,
     get_image_generation_tool_definition,
 )
-from .news import (
-    NewsTool,
-    execute_news_search,
-    execute_news_with_dict,
-    get_news_tool_definition,
+from .news import NewsTool
+from .news import TavilyResponse as NewsResponse
+from .news import get_news_tool_definition
+from .pdf_summary import (
+    PDFSummaryResponse,
+    PDFSummaryTool,
+    get_pdf_summary_tool_definition,
 )
-from .pdf_summary import execute_pdf_summary_with_dict, get_pdf_summary_tool_definition
 from .pdf_text_processor import (
+    PDFTextProcessorResponse,
     PDFTextProcessorTool,
-    execute_pdf_text_processor_with_dict,
     get_pdf_text_processor_tool_definition,
 )
-from .registry import get_all_tool_definitions, get_tools_list_text
-from .retriever import (
-    RetrieverTool,
-    execute_retrieval_search,
-    execute_retrieval_with_dict,
-    get_retrieval_tool_definition,
-    get_simple_search_results,
+
+# Import registry functions
+from .registry import (
+    execute_tool,
+    get_all_tool_definitions,
+    get_tool,
+    get_tools_list_text,
+    register_tool_class,
 )
-from .tavily import (
-    TavilyTool,
-    execute_tavily_search,
-    execute_tavily_with_dict,
-    get_tavily_tool_definition,
-)
-from .weather import (
-    WeatherTool,
-    execute_weather_search,
-    execute_weather_with_dict,
-    get_weather_tool_definition,
-)
+from .retriever import RetrievalResponse, RetrieverTool, get_retrieval_tool_definition
+from .tavily import TavilyResponse, TavilyTool, get_tavily_tool_definition
+from .weather import WeatherResponse, WeatherTool, get_weather_tool_definition
 
 __all__ = [
+    # Tool classes
     "AssistantTool",
-    "get_assistant_tool_definition",
-    "execute_assistant_task",
-    "execute_assistant_with_dict",
     "ConversationContextTool",
-    "get_conversation_context_tool_definition",
-    "execute_conversation_context_with_dict",
     "WebExtractTool",
-    "get_web_extract_tool_definition",
-    "execute_web_extract",
-    "execute_web_extract_with_dict",
-    "ImageGenerationTool",
-    "get_image_generation_tool_definition",
-    "execute_image_generation",
-    "execute_image_generation_with_dict",
-    "ImageAnalysisTool",
-    "get_image_analysis_tool_definition",
-    "execute_image_analysis_with_dict",
-    "PDFTextProcessorTool",
-    "get_pdf_text_processor_tool_definition",
-    "execute_pdf_text_processor_with_dict",
-    "TavilyTool",
-    "get_tavily_tool_definition",
-    "execute_tavily_search",
-    "execute_tavily_with_dict",
-    "WeatherTool",
-    "get_weather_tool_definition",
-    "execute_weather_search",
-    "execute_weather_with_dict",
-    "RetrieverTool",
-    "get_retrieval_tool_definition",
-    "execute_retrieval_search",
-    "execute_retrieval_with_dict",
-    "get_simple_search_results",
-    "NewsTool",
-    "get_news_tool_definition",
-    "execute_news_search",
-    "execute_news_with_dict",
-    "get_all_tool_definitions",
-    "get_tools_list_text",
-    "execute_pdf_summary_with_dict",
-    "get_pdf_summary_tool_definition",
     "GeneralistTool",
+    "ImageAnalysisTool",
+    "ImageGenerationTool",
+    "NewsTool",
+    "PDFSummaryTool",
+    "PDFTextProcessorTool",
+    "RetrieverTool",
+    "TavilyTool",
+    "WeatherTool",
+    # Response classes
+    "AssistantResponse",
+    "ConversationContextResponse",
+    "ExtractResult",
+    "GeneralistResponse",
+    "ImageAnalysisResponse",
+    "ImageGenerationResponse",
+    "NewsResponse",
+    "PDFSummaryResponse",
+    "PDFTextProcessorResponse",
+    "RetrievalResponse",
+    "TavilyResponse",
+    "WeatherResponse",
+    # Helper functions - only definitions
+    "get_assistant_tool_definition",
+    "get_conversation_context_tool_definition",
+    "get_web_extract_tool_definition",
     "get_generalist_tool_definition",
-    "execute_generalist_conversation",
-    "execute_generalist_with_dict",
+    "get_image_analysis_tool_definition",
+    "get_image_generation_tool_definition",
+    "get_news_tool_definition",
+    "get_pdf_summary_tool_definition",
+    "get_pdf_text_processor_tool_definition",
+    "get_retrieval_tool_definition",
+    "get_tavily_tool_definition",
+    "get_weather_tool_definition",
+    # Registry functions
+    "get_all_tool_definitions",
+    "get_tool",
+    "get_tools_list_text",
+    "register_tool_class",
+    "execute_tool",
 ]

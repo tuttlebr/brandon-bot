@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 import os
@@ -194,7 +193,6 @@ class FileController:
             self.mark_file_as_processing(uploaded_file.name)
 
             # Display user action in chat
-            # self._display_upload_message(uploaded_file.name)
 
             # Add user action to chat history
             # self.message_controller.safe_add_message_to_history("user", f"📄 Uploaded PDF: {uploaded_file.name}")
@@ -315,11 +313,6 @@ class FileController:
                 os.unlink(temp_file_path)
             except OSError:
                 pass
-
-    def _display_upload_message(self, filename: str):
-        """Display upload message in chat UI"""
-        with st.chat_message("user", avatar=self.config_obj.user_avatar):
-            st.markdown(f"📄 **Uploaded PDF:** {filename}")
 
     def _make_resilient_request(
         self, url: str, files: dict, base_timeout: int = None
@@ -550,118 +543,6 @@ class FileController:
 
         except Exception as e:
             logging.error(f"Error adding PDF content to history: {e}")
-
-    def _run_async_summarization(self, pdf_id: str, pdf_data: dict):
-        """
-        Run async summarization in a new event loop in a background thread
-
-        This method creates a new event loop in a background thread to handle
-        async operations, which is necessary because Streamlit runs in a
-        synchronous context without an event loop.
-
-        Args:
-            pdf_id: ID of the stored PDF
-            pdf_data: PDF data to summarize
-
-        Note:
-            This runs in a daemon thread, so it will be terminated when the
-            main program exits. Session state updates need to be handled
-            carefully as Streamlit's session state is not thread-safe.
-        """
-        try:
-            # Create a new event loop for this thread
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-            # Run the async summarization
-            loop.run_until_complete(self._async_summarize_pdf(pdf_id, pdf_data))
-
-        except Exception as e:
-            logging.error(f"Error in background summarization thread: {e}")
-        finally:
-            loop.close()
-
-    async def _async_summarize_pdf(self, pdf_id: str, pdf_data: dict):
-        """
-        Asynchronously summarize PDF for large documents
-
-        Args:
-            pdf_id: ID of the stored PDF
-            pdf_data: PDF data to summarize
-        """
-        try:
-            filename = pdf_data.get("filename", "Unknown")
-            logging.info(f"Starting async summarization for PDF: {filename}")
-
-            # Perform recursive summarization
-            enhanced_pdf_data = (
-                await self.pdf_summarization_service.summarize_pdf_recursive(pdf_data)
-            )
-
-            # Update the stored PDF data with summaries
-            # Note: We need to be careful with session state in background threads
-            if self.session_controller:
-                try:
-                    # Instead of directly accessing session state from thread,
-                    # we'll use a thread-safe approach
-                    self._update_pdf_with_summary(pdf_id, enhanced_pdf_data)
-
-                    # Notify in chat that summarization is complete
-                    summary_complete_msg = (
-                        f"✨ Document summary complete for **{filename}**! "
-                        f"I now have a better understanding of the document's content, "
-                        f"which will help me respond more quickly to your questions.\n\n"
-                        f"💡 You can ask me to 'show the summary of the document' to see the AI-generated overview."
-                    )
-                    self.message_controller.safe_add_message_to_history(
-                        "assistant", summary_complete_msg
-                    )
-
-                except Exception as e:
-                    logging.error(f"Error updating PDF data with summary: {e}")
-
-        except Exception as e:
-            logging.error(f"Error in async PDF summarization: {e}")
-
-    def _update_pdf_with_summary(self, pdf_id: str, enhanced_pdf_data: dict):
-        """
-        Thread-safe method to update PDF data with summary
-
-        Args:
-            pdf_id: ID of the PDF to update
-            enhanced_pdf_data: PDF data with summaries
-        """
-        try:
-            # This method should be called from the main thread or use proper synchronization
-            # For now, we'll log the update and let the session controller handle it
-            # when it's safe to do so
-            logging.info(f"PDF summarization complete for ID: {pdf_id}")
-
-            # Store the enhanced data in a way that's safe for the session controller to pick up
-            # You could use a queue, file, or database for thread-safe communication
-            # For simplicity, we'll just log it for now
-
-            # In a production system, you might want to:
-            # 1. Use a thread-safe queue to communicate back to the main thread
-            # 2. Store the summary in a database that the main thread can poll
-            # 3. Use Redis or another external store
-
-            # For now, we'll update if we can safely access the session state
-            if (
-                hasattr(st.session_state, "uploaded_pdfs")
-                and pdf_id in st.session_state.uploaded_pdfs
-            ):
-                st.session_state.uploaded_pdfs[pdf_id] = enhanced_pdf_data
-                logging.info(
-                    f"Updated PDF '{enhanced_pdf_data.get('filename')}' with summarization data"
-                )
-            else:
-                logging.warning(
-                    f"Could not update PDF {pdf_id} - session state not accessible"
-                )
-
-        except Exception as e:
-            logging.error(f"Error in _update_pdf_with_summary: {e}")
 
     def _handle_processing_error(self, error_result: dict):
         """

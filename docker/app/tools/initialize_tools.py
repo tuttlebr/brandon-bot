@@ -6,7 +6,7 @@ with the tool registry at application startup.
 """
 
 import logging
-from tools.registry import ToolRegistry
+from tools.registry import ToolRegistry, register_tool_class
 
 logger = logging.getLogger(__name__)
 
@@ -18,120 +18,45 @@ def initialize_all_tools():
         tool_registry = ToolRegistry.get_instance()
 
         # Check if tools are already initialized to prevent re-registration
-        if len(tool_registry._tools) > 0:
+        registered_tools = tool_registry._factory.get_registered_tools()
+        if len(registered_tools) > 0:
             logger.debug(
-                f"Tools already initialized ({len(tool_registry._tools)} tools found), skipping re-initialization"
+                f"Tools already initialized ({len(registered_tools)} tools found), skipping re-initialization"
             )
             return
 
-        # Clear any existing tools (shouldn't be any if check above works)
-        tool_registry._tools.clear()
-
-        # Assistant Tool
+        # Import tool classes
         from tools.assistant import AssistantTool
-
-        assistant = AssistantTool()
-        tool_registry.register(assistant)
-
-        # Conversation Context Tool
         from tools.conversation_context import ConversationContextTool
-
-        context = ConversationContextTool()
-        tool_registry.register(context)
-
-        # Web Extract Tool
         from tools.extract import WebExtractTool
-
-        extract = WebExtractTool()
-        tool_registry.register(extract)
-
-        # Image Generation Tool
-        from tools.image_gen import ImageGenerationTool
-
-        image_gen = ImageGenerationTool()
-        tool_registry.register(image_gen)
-
-        # Image Analysis Tool
+        from tools.generalist import GeneralistTool
         from tools.image_analysis_tool import ImageAnalysisTool
-
-        image_analysis = ImageAnalysisTool()
-        tool_registry.register(image_analysis)
-
-        # News Tool
+        from tools.image_gen import ImageGenerationTool
         from tools.news import NewsTool
-
-        news = NewsTool()
-        tool_registry.register(news)
-
-        # PDF Summary Tool
         from tools.pdf_summary import PDFSummaryTool
-
-        pdf_summary = PDFSummaryTool()
-        tool_registry.register(pdf_summary)
-
-        # PDF Text Processor Tool
         from tools.pdf_text_processor import PDFTextProcessorTool
-
-        pdf_text_processor = PDFTextProcessorTool()
-        tool_registry.register(pdf_text_processor)
-
-        # Retriever Tool
         from tools.retriever import RetrieverTool
-
-        retriever = RetrieverTool()
-        tool_registry.register(retriever)
-
-        # Tavily Tool
         from tools.tavily import TavilyTool
-
-        tavily = TavilyTool()
-        tool_registry.register(tavily)
-
-        # Weather Tool
         from tools.weather import WeatherTool
 
-        weather = WeatherTool()
-        tool_registry.register(weather)
+        # Register tool classes with lazy loading (instances created on demand)
+        register_tool_class("text_assistant", AssistantTool)
+        register_tool_class("conversation_context", ConversationContextTool)
+        register_tool_class("extract_web_content", WebExtractTool)
+        register_tool_class("generalist_conversation", GeneralistTool)
+        register_tool_class("analyze_image", ImageAnalysisTool)
+        register_tool_class("generate_image", ImageGenerationTool)
+        register_tool_class("tavily_news_search", NewsTool)
+        register_tool_class("retrieve_pdf_summary", PDFSummaryTool)
+        register_tool_class("process_pdf_text", PDFTextProcessorTool)
+        register_tool_class("retrieval_search", RetrieverTool)
+        register_tool_class("tavily_internet_search", TavilyTool)
+        register_tool_class("get_weather", WeatherTool)
 
-        # Generalist Tool
-        from tools.generalist import GeneralistTool
-
-        generalist = GeneralistTool()
-        tool_registry.register(generalist)
-
-        logger.info(f"Successfully initialized {len(tool_registry._tools)} tools")
+        logger.info(
+            f"Successfully registered {len(tool_registry._factory.get_registered_tools())} tool classes"
+        )
 
     except Exception as e:
         logger.error(f"Error initializing tools: {e}")
         raise
-
-
-def get_tool_by_name(name: str):
-    """
-    Get a tool instance by name
-
-    Args:
-        name: Tool name
-
-    Returns:
-        Tool instance or None
-    """
-    registry = ToolRegistry.get_instance()
-    return registry.get_tool(name)
-
-
-# Optional: Function to get all initialized tool names
-def get_initialized_tool_names():
-    """Get list of all initialized tool names"""
-    registry = ToolRegistry.get_instance()
-    return list(registry._tools.keys())
-
-
-# Optional: Function to verify all tools are properly initialized
-def verify_tools_initialized():
-    """Verify all tools have been properly initialized"""
-    registry = ToolRegistry.get_instance()
-    tool_count = len(registry._tools)
-    if tool_count == 0:
-        raise RuntimeError("No tools have been initialized!")
-    return tool_count

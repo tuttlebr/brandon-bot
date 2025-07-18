@@ -1,19 +1,23 @@
 """
-Generalist Tool
+Generalist Tool - MVC Pattern Implementation
 
 This tool handles general conversation and thoughtful discussion on any topic
-that doesn't require external data or specialized tools.
+that doesn't require external data or specialized tools, following MVC pattern.
 """
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
 
-from models.chat_config import ChatConfig
 from pydantic import Field
 from services.llm_client_service import llm_client_service
-from tools.base import BaseTool, BaseToolResponse
-from utils.config import config as app_config
+from tools.base import (
+    BaseTool,
+    BaseToolResponse,
+    ExecutionMode,
+    ToolController,
+    ToolView,
+)
 from utils.text_processing import strip_think_tags
 
 logger = logging.getLogger(__name__)
@@ -30,65 +34,17 @@ class GeneralistResponse(BaseToolResponse):
     )
 
 
-class GeneralistTool(BaseTool):
-    """
-    Generalist Tool for General Conversation
+class GeneralistController(ToolController):
+    """Controller handling generalist conversation logic"""
 
-    This tool handles thoughtful discussion on any topic that doesn't require
-    external data, specialized tools, or real-time information. Use this for
-    philosophical discussions, explanations of concepts, creative writing,
-    general advice, and casual conversation.
-    """
+    def __init__(self, llm_type: str):
+        self.llm_type = llm_type
 
-    def __init__(self):
-        super().__init__()
-        self.name = "generalist_conversation"
-        self.description = "ONLY use for general conversation, explanations, discussions, advice, or topics that don't require external data, real-time information, or specialized tools. Use for: philosophical discussions, explaining concepts, creative writing, general advice, casual conversation, or when the user wants to have a thoughtful discussion about any topic. DO NOT use for current events, weather, searches, image analysis, document processing, or any task that requires external data - use appropriate specialized tools for those."
-        self.supported_contexts = ['general_conversation', 'discussion', 'explanation']
+    def process(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Process the generalist conversation request"""
+        query = params['query']
+        messages = params.get('messages')
 
-    def to_openai_format(self) -> Dict[str, Any]:
-        """Convert the tool to OpenAI function calling format"""
-        return {
-            "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.description,
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query": {
-                            "type": "string",
-                            "description": "The user's message or question exactly as they provided it",
-                        },
-                        "but_why": {
-                            "type": "string",
-                            "description": "A single sentence explaining why this tool was selected for the query.",
-                        },
-                    },
-                    "required": ["query", "but_why"],
-                },
-            },
-        }
-
-    def execute(self, params: Dict[str, Any]) -> GeneralistResponse:
-        """Execute the tool with given parameters"""
-        return self.run_with_dict(params)
-
-    def generate_response(
-        self,
-        query: str,
-        messages: Optional[List[Dict[str, Any]]] = None,
-    ) -> GeneralistResponse:
-        """
-        Generate a thoughtful conversational response
-
-        Args:
-            query: The user's query or message exactly as provided
-            messages: Optional conversation context
-
-        Returns:
-            GeneralistResponse with the conversational response
-        """
         try:
             # Get LLM client and model based on tool configuration
             client = llm_client_service.get_client(self.llm_type)
@@ -116,35 +72,39 @@ class GeneralistTool(BaseTool):
             # Strip think tags from response
             cleaned_result = strip_think_tags(result)
 
-            return GeneralistResponse(
-                query=query,
-                response=cleaned_result,
-                direct_response=True,
-            )
+            return {
+                "query": query,
+                "response": cleaned_result,
+                "direct_response": True,
+            }
 
         except Exception as e:
             logger.error(f"Error generating generalist response: {e}")
-            return GeneralistResponse(
-                query=query,
-                response=f"I apologize, but I encountered an error while processing your message: {str(e)}",
-                success=False,
-                error_message=str(e),
-                direct_response=True,
-            )
+            raise
 
     def _get_system_prompt(self) -> str:
         """Get the system prompt for general conversation"""
-
         # Get current date and time
         current_date = datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
 
-        return (
+        # Get configured system prompt if available
+        from tools.tool_llm_config import get_tool_system_prompt
+
+        # Default prompt for generalist conversation
+        default_prompt = (
             f"""detailed thinking off - The current date and time is {current_date}."""
         )
 
+        # Use the configured system prompt if set, otherwise use default
+        system_prompt = get_tool_system_prompt(
+            "generalist_conversation", default_prompt
+        )
+
+        return system_prompt
+
     def _build_conversation_messages(
         self, system_prompt: str, query: str, messages: Optional[List[Dict[str, Any]]]
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Dict[str, str]]:
         """Build the conversation messages for the LLM"""
 
         final_messages = [{"role": "system", "content": system_prompt}]
@@ -177,61 +137,112 @@ class GeneralistTool(BaseTool):
 
         return final_messages
 
-    def run_with_dict(self, params: Dict[str, Any]) -> GeneralistResponse:
-        """
-        Execute generalist conversation with parameters provided as a dictionary
 
-        Args:
-            params: Dictionary containing the required parameters
-                   Expected keys: 'query', optionally 'messages'
+class GeneralistView(ToolView):
+    """View for formatting generalist responses"""
 
-        Returns:
-            GeneralistResponse: The conversational response
-        """
-        if "query" not in params:
-            raise ValueError("'query' key is required in parameters dictionary")
+    def format_response(
+        self, data: Dict[str, Any], response_type: Type[BaseToolResponse]
+    ) -> BaseToolResponse:
+        """Format raw data into GeneralistResponse"""
+        try:
+            return GeneralistResponse(**data)
+        except Exception as e:
+            logger.error(f"Error formatting generalist response: {e}")
+            return GeneralistResponse(
+                query=data.get("query", ""),
+                response=f"I apologize, but I encountered an error while processing your message.",
+                success=False,
+                error_message=f"Response formatting error: {str(e)}",
+                error_code="FORMAT_ERROR",
+                direct_response=True,
+            )
 
-        query = params["query"]
-        messages = params.get("messages", None)
+    def format_error(
+        self, error: Exception, response_type: Type[BaseToolResponse]
+    ) -> BaseToolResponse:
+        """Format error into GeneralistResponse"""
+        error_code = "UNKNOWN_ERROR"
+        if isinstance(error, ValueError):
+            error_code = "VALIDATION_ERROR"
+        elif isinstance(error, TimeoutError):
+            error_code = "TIMEOUT_ERROR"
+        elif isinstance(error, ConnectionError):
+            error_code = "CONNECTION_ERROR"
 
-        logger.debug(f"Generalist conversation: query='{query[:100]}...'")
+        return GeneralistResponse(
+            query="",
+            response=f"I apologize, but I encountered an error while processing your message: {str(error)}",
+            success=False,
+            error_message=str(error),
+            error_code=error_code,
+            direct_response=True,
+        )
 
-        return self.generate_response(query, messages)
+
+class GeneralistTool(BaseTool):
+    """
+    Generalist Tool for General Conversation
+
+    This tool handles thoughtful discussion on any topic that doesn't require
+    external data, specialized tools, or real-time information. Use this for
+    philosophical discussions, explanations of concepts, creative writing,
+    general advice, and casual conversation.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.name = "generalist_conversation"
+        self.description = "ONLY use for general conversation, explanations, discussions, advice, or topics that don't require external data, real-time information, or specialized tools. Use for: philosophical discussions, explaining concepts, creative writing, general advice, casual conversation, or when the user wants to have a thoughtful discussion about any topic. DO NOT use for current events, weather, searches, image analysis, document processing, or any task that requires external data - use appropriate specialized tools for those."
+        self.supported_contexts = ['general_conversation', 'discussion', 'explanation']
+        self.execution_mode = ExecutionMode.SYNC
+        self.timeout = 30.0
+
+    def _initialize_mvc(self):
+        """Initialize MVC components"""
+        self._controller = GeneralistController(self.llm_type)
+        self._view = GeneralistView()
+
+    def get_definition(self) -> Dict[str, Any]:
+        """Get OpenAI-compatible tool definition"""
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "The user's message or question exactly as they provided it",
+                        },
+                        "but_why": {
+                            "type": "string",
+                            "description": "A single sentence explaining why this tool was selected for the query.",
+                        },
+                    },
+                    "required": ["query", "but_why"],
+                },
+            },
+        }
+
+    def get_response_type(self) -> Type[BaseToolResponse]:
+        """Get the response type for this tool"""
+        return GeneralistResponse
 
 
-# Create a global instance and helper functions
-generalist_tool = GeneralistTool()
-
-
+# Helper functions for backward compatibility
 def get_generalist_tool_definition() -> Dict[str, Any]:
     """Get the OpenAI-compatible tool definition for generalist conversation"""
-    return generalist_tool.to_openai_format()
+    from tools.registry import get_tool, register_tool_class
 
+    # Register the tool class if not already registered
+    register_tool_class("generalist_conversation", GeneralistTool)
 
-def execute_generalist_conversation(
-    query: str, messages: Optional[List[Dict[str, Any]]] = None
-) -> GeneralistResponse:
-    """
-    Execute a generalist conversation
-
-    Args:
-        query: The user's query or message exactly as provided
-        messages: Optional conversation context
-
-    Returns:
-        GeneralistResponse: The conversational response
-    """
-    return generalist_tool.generate_response(query, messages)
-
-
-def execute_generalist_with_dict(params: Dict[str, Any]) -> GeneralistResponse:
-    """
-    Execute generalist conversation with parameters as dictionary
-
-    Args:
-        params: Dictionary containing parameters
-
-    Returns:
-        GeneralistResponse: The conversational response
-    """
-    return generalist_tool.run_with_dict(params)
+    # Get the tool instance and return its definition
+    tool = get_tool("generalist_conversation")
+    if tool:
+        return tool.get_definition()
+    else:
+        raise RuntimeError("Failed to get generalist tool definition")
