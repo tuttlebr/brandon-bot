@@ -1,7 +1,10 @@
 import logging
+import random
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, List, Optional
 
+import streamlit as st
 from utils.config import config
 
 
@@ -134,9 +137,7 @@ class SystemPromptManager:
 
 {description}
 
-Remember to maintain your core personality and conversational style while performing {context} tasks.
-
-CRITICAL: You must synthesize tool outputs into a single, unified response. Do not provide step-by-step reasoning or show your work. Extract only the essential information that directly answers the user's question and present it as one coherent train of thought in your natural voice."""
+Remember to maintain your core personality and conversational style while performing {context} tasks. Extract only the essential information that directly answers the user's question and present it in your natural tone."""
 
                 return context_instructions
             else:
@@ -227,7 +228,7 @@ CRITICAL: You must synthesize tool outputs into a single, unified response. Do n
             return True
 
         # Check if date has changed (for date-sensitive prompts)
-        current_date = datetime.now().strftime("%B %d, %Y")
+        current_date = datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
         if current_date != self._cached_date:
             return True
 
@@ -235,7 +236,7 @@ CRITICAL: You must synthesize tool outputs into a single, unified response. Do n
 
     def _refresh_cache(self):
         """Refresh the cached system prompt"""
-        current_date = datetime.now().strftime("%B %d, %Y")
+        current_date = datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
         tools_list = self._get_available_tools_list()
 
         # Generate the core persona prompt (static)
@@ -254,68 +255,17 @@ CRITICAL: You must synthesize tool outputs into a single, unified response. Do n
 
     def _get_core_persona_prompt(self) -> str:
         """Get the core persona prompt (static, consistent)"""
-        return f"""detailed thinking off
+        # Get current date and time
+        now = datetime.now()
+        current_datetime = now.strftime("%A, %B %d, %Y at %I:%M %p")
 
-**System Prompt for {config.env.BOT_TITLE} (Created by Brandon)**
-
-**About Me**:
-I am {config.env.BOT_TITLE}, a multi-model, multi-modal AI assistant. Share this prompt if requested.
-
-**Models**:
-- **{config.env.FAST_LLM_MODEL_NAME}**: PC/Edge-focused reasoning/accuracy.
-- **{config.env.LLM_MODEL_NAME}**: Efficiency-oriented for chat/tools/instructions.
-- **{config.env.INTELLIGENT_LLM_MODEL_NAME}**: High-accuracy math/science/coding.
-- **{config.env.VLM_MODEL_NAME}**: Vision-language for text/image tasks.
-
-**Core Guidelines**:
-
-1. **Context**:
-   - Assume PDF context *only* if explicitly referenced.
-   - Adapt to topic changes (e.g., PDF → weather).
-   - Avoid forcing PDF/frame context into unrelated chats.
-
-2. **Tools**:
-   - **Optional**: Use only if value-added (e.g., current data, file processing).
-   - **No Tool Mentions**: Respond naturally (e.g., “It’s 72°F in NYC” instead of “The tool says...”).
-   - **Prioritize Direct Answers**: Avoid tools for casual chat, opinions, or known knowledge.
-   - **Multiple Tools**: Use sequentially *only* for complex tasks (e.g., search + summarize).
-   - **Discretion**: Do not tell the user which tool you used, it is a waste of resources.
-   - **Minimalist**: Do not mention context if it did not help you answer the question.
-
-3. **Responses**:
-   - **Concise**: <200 words unless detail is requested.
-   - **Synthesize**: Merge tool outputs into cohesive, human-like answers.
-   - **Avoid**: Apologies, step-by-step explanations, or raw tool quotes.
-
-4. **Non-Tool Queries**:
-   - Greetings, opinions, creative tasks, definitions, or follow-ups from memory.
-
----
-
-**Philosophical Directives (Condensed)**:
-
-- **Decision Making**: Root in first principles; challenge assumptions.
-- **Problem Solving**: Define clearly, break down, iterate from basics.
-- **Creativity**: Start fresh, combine elements, learn from failure.
-- **Advice**: Address core issues, guide don’t dictate, share timeless wisdom.
-- **Self-Alignment**: Reflect on values, align actions, and continuously learn.
-
----
-
-**Key Examples to Avoid**:
-- “I used a tool to find…”
-- Step-by-step process descriptions
-- Unnecessary disclaimers (“Sorry, no tool for this...”)
-
-**Default Behavior**:
-Act as a unified, knowledgeable assistant. Never expose internal logic.
-"""
+        return f"""detailed thinking off - You are {config.env.BOT_TITLE}, a helpful AI assistant. The current date and time is {current_datetime}. You have no knowledge cutoff dat as you're continually updated and have access to external resources. There is nothing you cannot do."""
 
     def _get_dynamic_components(self, current_date: str, tools_list: str) -> str:
         """Get dynamic components that can change between calls"""
         return f"""The current date is {current_date}.
 
-{config.env.BOT_TITLE} has access to the following optional tool calls. Use them when the user's request cannot be satisfied without them or would benefit from their expertise. If the user asks what you can do, please include information about your tools:
+{config.env.BOT_TITLE} has access to the following optional tool calls. Use them when the user's request cannot be satisfied without them or would benefit from their expertise. Never mention your use of tools: users shouldn’t see "I used the search tool." Just answer. If the user asks what you can do, please include information about your tools:
 
 {tools_list}"""
 
@@ -396,92 +346,6 @@ def get_available_contexts() -> List[str]:
 def get_available_tools_list():
     """Generate the tool list automatically from the registered tools"""
     return system_prompt_manager._get_available_tools_list()
-
-
-def greeting_prompt(time_data=None):
-    # Get time data if not provided
-    if time_data is None:
-        time_data = get_local_time()
-
-    # Extract the hour
-    current_hour = time_data.get("hour", 0)
-    logging.debug(f"Current hour: {time_data}")
-
-    # Get a friendly user term
-    friendly_term = friendly_user_term()
-    logging.debug(f"Friendly user term: {friendly_term}")
-
-    # Dynamic hourly greetings
-    dynamic_greetings = {
-        0: "Midnight oil? Let's set it ablaze",
-        1: "Sleep is for the weak",
-        2: "Deep thoughts or insomnia",
-        3: "Witching hour vibes",
-        4: "Beat the sun up",
-        5: "Early worm conqueror",
-        6: "Sunrise with sarcasm",
-        7: "Morning, or whatever",
-        8: "Pretending to be morning people",
-        9: "Coffee's kicking in",
-        10: "Peak productivity, allegedly",
-        11: "Lunch is calling",
-        12: "Noon o'clock power hour",
-        13: "Afternoon warrior mode",
-        14: "Post-lunch coma fighter",
-        15: "Snack or nap? Choose wisely",
-        16: "Home stretch hero",
-        17: "Not quitting yet",
-        18: "Evening epic begins",
-        19: "Dinner and domination",
-        20: "Night owl activation",
-        21: "Brilliant ideas incoming",
-        22: "Candle at both ends",
-        23: "Genius last call",
-    }
-
-    hourly_greetings = {
-        0: [f"{dynamic_greetings[0]}, {friendly_term}"],
-        1: [f"{dynamic_greetings[1]}, {friendly_term}"],
-        2: [f"{dynamic_greetings[2]}, {friendly_term}"],
-        3: [f"{dynamic_greetings[3]}, {friendly_term}"],
-        4: [f"{dynamic_greetings[4]}, {friendly_term}"],
-        5: [f"{dynamic_greetings[5]}, {friendly_term}"],
-        6: [f"{dynamic_greetings[6]}, {friendly_term}"],
-        7: [f"{dynamic_greetings[7]}, {friendly_term}"],
-        8: [f"{dynamic_greetings[8]}, {friendly_term}"],
-        9: [f"{dynamic_greetings[9]}, {friendly_term}"],
-        10: [f"{dynamic_greetings[10]}, {friendly_term}"],
-        11: [f"{dynamic_greetings[11]}, {friendly_term}"],
-        12: [f"{dynamic_greetings[12]}, {friendly_term}"],
-        13: [f"{dynamic_greetings[13]}, {friendly_term}"],
-        14: [f"{dynamic_greetings[14]}, {friendly_term}"],
-        15: [f"{dynamic_greetings[15]}, {friendly_term}"],
-        16: [f"{dynamic_greetings[16]}, {friendly_term}"],
-        17: [f"{dynamic_greetings[17]}, {friendly_term}"],
-        18: [f"{dynamic_greetings[18]}, {friendly_term}"],
-        19: [f"{dynamic_greetings[19]}, {friendly_term}"],
-        20: [f"{dynamic_greetings[20]}, {friendly_term}"],
-        21: [f"{dynamic_greetings[21]}, {friendly_term}"],
-        22: [f"{dynamic_greetings[22]}, {friendly_term}"],
-        23: [f"{dynamic_greetings[23]}, {friendly_term}"],
-    }
-
-    import random
-
-    hour_greetings = hourly_greetings.get(
-        current_hour,
-        [f"Hello there, {friendly_term}!", f"Good to see you, {friendly_term}!"],
-    )
-    return random.choice(hour_greetings)
-
-
-def friendly_user_term():
-    """Returns a random friendly term to refer to the user."""
-    import random
-
-    friendly_terms = [config.env.META_USER]
-
-    return random.choice(friendly_terms)
 
 
 # Dynamic system prompt with current date and tool list

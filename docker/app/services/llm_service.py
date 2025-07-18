@@ -330,8 +330,19 @@ class LLMService:
             logger.info(
                 "All tools are direct response tools - skipping LLM synthesis to avoid redundant commentary"
             )
-            # For direct response tools, we don't need additional LLM commentary
-            # The tools have provided their final response, just return without generating more text
+            # For direct response tools, yield their content directly to the UI
+            # BUT skip image generation tools since they're handled by the response controller
+            for response in tool_responses:
+                if response.get("role") == "direct_response":
+                    tool_name = response.get("tool_name", "")
+                    # Skip image generation tools - they're handled separately by response controller
+                    if tool_name == "generate_image":
+                        continue
+
+                    content = response.get("content", "")
+                    if content and content.strip():
+                        # Yield the direct response content as chunks
+                        yield content
             return
         else:
             # Stream the final synthesized response using the tool's configured LLM type

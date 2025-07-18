@@ -182,6 +182,8 @@ class ToolExecutionService:
                 content = result.message
             elif hasattr(result, "result"):
                 content = result.result
+            elif hasattr(result, "response"):
+                content = result.response
             else:
                 content = str(result)
 

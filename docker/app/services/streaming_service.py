@@ -84,7 +84,7 @@ class StreamingService:
             if tools:
                 api_params["tools"] = tools
                 api_params["tool_choice"] = "auto"
-                api_params["parallel_tool_calls"] = True
+                api_params["parallel_tool_calls"] = False
 
             # Create streaming response
             response = await client.chat.completions.create(**api_params)
@@ -140,8 +140,7 @@ class StreamingService:
             if tools:
                 api_params["tools"] = tools
                 api_params["tool_choice"] = tool_choice
-                api_params["parallel_tool_calls"] = True
-                # Generates more concise responses without extended chain-of-thought or thinking tokens.
+                api_params["parallel_tool_calls"] = False
                 api_params["temperature"] = 0.0
                 api_params["max_tokens"] = 200
                 del api_params["top_p"]

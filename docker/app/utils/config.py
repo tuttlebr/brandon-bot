@@ -113,14 +113,14 @@ class LLMConfig:
     """LLM service configuration"""
 
     # Default model parameters
-    DEFAULT_TEMPERATURE: float = 0.2
+    DEFAULT_TEMPERATURE: float = 0.6
     DEFAULT_TOP_P: float = 0.95
     DEFAULT_FREQUENCY_PENALTY: float = 0.0
     DEFAULT_PRESENCE_PENALTY: float = 0.0
     DEFAULT_MAX_TOKENS: int = 4096
 
     # Context and token limits
-    SLIDING_WINDOW_MAX_TURNS: int = 20  # Increased from 6 to prevent context loss
+    SLIDING_WINDOW_MAX_TURNS: int = 20
     MAX_CONTEXT_TOKENS: int = field(
         default_factory=lambda: int(os.getenv("MAX_CONTEXT_TOKENS", "128000"))
     )  # Maximum context length for LLM (tokens)

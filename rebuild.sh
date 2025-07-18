@@ -113,7 +113,7 @@ build_with_uv() {
         ghcr.io/astral-sh/uv:python3.13-bookworm-slim \
         sync --no-progress --quiet --link-mode=copy --compile-bytecode ${extra_deps} || { echo -e "${RED}❌ UV sync failed for $service_name${NC}"; exit 1; }
 
-    COMPOSE_BAKE=true docker compose build $target || { echo -e "${RED}❌ Docker build failed for $service_name${NC}"; exit 1; }
+    COMPOSE_BAKE=true docker compose build -q $target || { echo -e "${RED}❌ Docker build failed for $service_name${NC}"; exit 1; }
 
     echo -e "${GREEN}✅ $service_name build completed${NC}"
 }
@@ -173,33 +173,33 @@ main() {
     fi
 
     # Start services
-    if [[ "${DRY_RUN:-false}" != "true" ]]; then
-        echo -e "${BLUE}🚀 Starting services...${NC}"
-        docker compose up app docs nginx -d || { echo -e "${RED}❌ Failed to start services${NC}"; exit 1; }
+    # if [[ "${DRY_RUN:-false}" != "true" ]]; then
+    #     echo -e "${BLUE}🚀 Starting services...${NC}"
+    #     docker compose up app docs nginx -d || { echo -e "${RED}❌ Failed to start services${NC}"; exit 1; }
 
-        # echo -e "${BLUE}📋 Service status:${NC}"
-        # docker compose ps
+    #     # echo -e "${BLUE}📋 Service status:${NC}"
+    #     # docker compose ps
 
-        # Health checks
-        if health_check; then
-            echo -e "${GREEN}🎉 Rebuild completed successfully!${NC}"
-        else
-            echo -e "${RED}❌ Some services failed health checks${NC}"
-            exit 1
-        fi
-    else
-        echo -e "${YELLOW}DRY RUN: Would start services with 'docker compose up app docs nginx -d'${NC}"
-    fi
+    #     # Health checks
+    #     if health_check; then
+    #         echo -e "${GREEN}🎉 Rebuild completed successfully!${NC}"
+    #     else
+    #         echo -e "${RED}❌ Some services failed health checks${NC}"
+    #         exit 1
+    #     fi
+    # else
+    #     echo -e "${YELLOW}DRY RUN: Would start services with 'docker compose up app docs nginx -d'${NC}"
+    # fi
 
-    # Calculate and display timing
-    end_time=$(date +%s)
-    duration=$((end_time - start_time))
-    echo -e "${GREEN}✅ Rebuild completed in ${duration} seconds${NC}"
+    # # Calculate and display timing
+    # end_time=$(date +%s)
+    # duration=$((end_time - start_time))
+    # echo -e "${GREEN}✅ Rebuild completed in ${duration} seconds${NC}"
 
-    if [[ "${DRY_RUN:-false}" != "true" ]]; then
-        echo -e "${BLUE}📋 Following app logs (Ctrl+C to stop):${NC}"
-        docker compose logs -f app
-    fi
+    # if [[ "${DRY_RUN:-false}" != "true" ]]; then
+    #     echo -e "${BLUE}📋 Following app logs (Ctrl+C to stop):${NC}"
+    #     docker compose logs -f app
+    # fi
 }
 
 # Run main function

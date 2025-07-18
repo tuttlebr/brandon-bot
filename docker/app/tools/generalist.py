@@ -6,6 +6,7 @@ that doesn't require external data or specialized tools.
 """
 
 import logging
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from models.chat_config import ChatConfig
@@ -134,7 +135,12 @@ class GeneralistTool(BaseTool):
     def _get_system_prompt(self) -> str:
         """Get the system prompt for general conversation"""
 
-        return """detailed thinking off"""
+        # Get current date and time
+        current_date = datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
+
+        return (
+            f"""detailed thinking off - The current date and time is {current_date}."""
+        )
 
     def _build_conversation_messages(
         self, system_prompt: str, query: str, messages: Optional[List[Dict[str, Any]]]

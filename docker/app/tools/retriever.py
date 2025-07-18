@@ -14,7 +14,7 @@ from utils.text_processing import strip_think_tags
 # Configure logger
 logger = logging.getLogger(__name__)
 
-MAX_RESULTS = 10
+MAX_RESULTS = 15
 
 
 @dataclass
@@ -391,7 +391,7 @@ class SimilaritySearch:
             cut_position = gap_positions[max_gap_idx]
 
             # The cutoff is the value just before the largest gap
-            cutoff = sorted_scores[cut_position]
+            cutoff = sorted_scores[cut_position - 1]
 
             # Always keep at least the lowest value (most relevant)
             min_score = np.min(scores)
@@ -499,7 +499,7 @@ class RetrieverTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "retrieval_search"
-        self.description = "ONLY use for questions about NVIDIA products, technologies, mental health topics, or specialized knowledge base content. Searches a specialized knowledge base for information about NVIDIA products, technologies, and mental health topics using vector similarity search. DO NOT use for general web searches, current events, or topics outside the specialized knowledge base - use web search tools instead."
+        self.description = "ONLY use for questions about NVIDIA products, technologies, mental health topics, or specialized knowledge base content. Searches a specialized knowledge base for information about NVIDIA products, technologies, and mental health topics using vector similarity search. This tool works well when paired with the tavily_internet_search tool."
 
         # Initialize embedding creator and similarity search using centralized config
         self.embedding_creator = EmbeddingCreator(

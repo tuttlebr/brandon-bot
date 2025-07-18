@@ -2,6 +2,7 @@ import logging
 import time
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 # Import the controller classes
 from controllers.file_controller import FileController
@@ -14,9 +15,9 @@ from services import ChatService, ImageService, LLMService
 from services.pdf_context_service import PDFContextService
 from tools.initialize_tools import initialize_all_tools
 from ui import ChatHistoryComponent
+from utils.animated_loading import get_galaxy_animation_html
 from utils.config import config
 from utils.exceptions import ChatbotException, ConfigurationError
-from utils.system_prompt import greeting_prompt
 
 
 class ProductionStreamlitChatApp:
@@ -35,10 +36,13 @@ class ProductionStreamlitChatApp:
                 initialize_all_tools()
 
             # Apply custom styling using centralized configuration
-            st.markdown(
-                f'<h1 style="color: {config.ui.BRAND_COLOR}; text-align: center;">{greeting_prompt()}</h1>',
-                unsafe_allow_html=True,
+            custom_galaxy = get_galaxy_animation_html(
+                center_dot_size=100,  # Larger galactic core
+                container_size=250,  # Bigger galaxy
+                animation_duration=12.0,  # Slower, more majestic rotation
+                enable_3d_depth=True,  # Keep the 3D effects
             )
+            components.html(custom_galaxy, height=300)
 
             # Initialize services
             self.chat_service = ChatService(self.config_obj)

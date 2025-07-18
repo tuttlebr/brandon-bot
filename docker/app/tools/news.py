@@ -90,8 +90,8 @@ class NewsTool(BaseTool):
         Returns:
             List of high-scoring search results with extracted content added
         """
-        # Filter results with score >= 0.8
-        high_scoring_results = [result for result in results if result.score >= 0.75]
+        # Filter results with score >= 0.5
+        high_scoring_results = [result for result in results if result.score >= 0.5]
 
         if not high_scoring_results:
             logger.debug(

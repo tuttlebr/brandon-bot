@@ -681,7 +681,7 @@ class ResponseController:
                         history_message = {
                             "type": "image",
                             "image_id": image_id,
-                            "text": f"🎨 Generated image with prompt: **{image_data['enhanced_prompt']}**",
+                            "text": f"🎨 Generated image with prompt: {image_data['enhanced_prompt']}",
                             "enhanced_prompt": image_data["enhanced_prompt"],
                             "original_prompt": image_data["original_prompt"],
                         }

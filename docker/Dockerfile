@@ -8,7 +8,16 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=uv.lock,target=uv.lock \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
     uv sync --locked --no-install-project --no-dev
-COPY --exclude=**/docs app/ .
+# Copy each directory separately for better layer caching
+COPY app/main.py .
+COPY app/assets/ ./assets/
+COPY app/services/ ./services/
+COPY app/utils/ ./utils/
+COPY app/tools/ ./tools/
+COPY app/models/ ./models/
+COPY app/controllers/ ./controllers/
+COPY app/ui/ ./ui/
+COPY app/.streamlit/ ./.streamlit/
 ENV PATH="/app/.venv/bin:$PATH"
 EXPOSE 8501
 HEALTHCHECK --interval=10s --timeout=5s --retries=3 \

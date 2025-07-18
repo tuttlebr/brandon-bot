@@ -115,7 +115,7 @@ class ConversationContextTool(BaseTool):
             ContextType.CONVERSATION_SUMMARY: """detailed thinking off
             You are summarizing the conversation history to provide context.
 
-Create a concise overview that captures the main themes, user objectives, and ongoing tasks. Include critical background information needed for immediate context. Keep the summary focused and within 200 words.""",
+Create a concise overview that captures the main themes and user objectives. Clearly distinguish between COMPLETED tasks (already finished) and ONGOING tasks (still in progress). Focus on what the user is currently working on or likely to ask about next. Keep the summary focused and within 200 words.""",
             ContextType.RECENT_TOPICS: """detailed thinking off
             You are identifying and listing the main topics discussed in the conversation.
 
