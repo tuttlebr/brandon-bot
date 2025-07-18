@@ -55,6 +55,20 @@ class StreamlitViewInterface(IViewInterface):
     def __init__(self):
         self.current_loading_context = None
 
+    def show_message(self, message: UIMessage) -> None:  # dead: disable
+        """Display a message using Streamlit components"""
+        if not message.content:
+            return
+
+        if message.message_type == "success":
+            st.success(message.content)
+        elif message.message_type == "warning":
+            st.warning(message.content)
+        elif message.message_type == "error":
+            st.error(message.content)
+        else:  # info or default
+            st.info(message.content)
+
     def show_loading(self, message: str = "Loading...") -> Any:  # dead: disable
         """Show loading indicator using Streamlit spinner"""
         return st.spinner(message)
