@@ -227,11 +227,19 @@ CRITICAL: For the most recent user message, clearly identify:
 2. ACKNOWLEDGMENTS: Messages that acknowledge or respond to completed actions
    - Example: "Thank you" → ACKNOWLEDGMENT (no action needed)
    - Example: "Perfect!" → ACKNOWLEDGMENT (no action needed)
+   - Example: "Thanks!" → ACKNOWLEDGMENT (no action needed)
+   - Example: "Great" → ACKNOWLEDGMENT (no action needed)
 
 3. MIXED MESSAGES: Acknowledgment + new request
    - Example: "Thanks! Now create a blue cat" → ACKNOWLEDGMENT + ACTION REQUEST
+   - Example: "Perfect! Can you make another one?" → ACKNOWLEDGMENT + ACTION REQUEST
 
 For completed tasks, note them as COMPLETED only if they were actually executed (not just discussed).
+
+MOST IMPORTANT: Clearly state if the latest user message is:
+- ACKNOWLEDGMENT_ONLY: Just thanking or commenting, no new action needed
+- ACTION_REQUEST: Requesting a new action to be performed
+- MIXED: Contains both acknowledgment and new request
 
 Be explicit: Does the latest message require action? YES or NO.
 Keep the summary focused and within 200 words.""",

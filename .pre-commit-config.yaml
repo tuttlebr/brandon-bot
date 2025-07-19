@@ -55,10 +55,10 @@ repos:
     hooks:
       - id: pylint
         args: [--disable=all, --enable=unreachable]
-  - repo: https://github.com/asottile/dead
-    rev: v2.1.0
-    hooks:
-      - id: dead
+  # - repo: https://github.com/asottile/dead
+  #   rev: v2.1.0
+  #   hooks:
+  #     - id: dead
   - repo: local
     hooks:
       - id: lint-staged

@@ -120,6 +120,39 @@ class LLMService:
             # Get tool definitions
             tools = get_all_tool_definitions()
 
+            # Inject enhanced descriptions to improve tool selection
+            try:
+                from tools.tool_description_injector import inject_enhanced_descriptions
+
+                tools = inject_enhanced_descriptions(tools)
+            except ImportError:
+                logger.debug("Enhanced tool descriptions not available")
+
+            # Check if the user message is an acknowledgment
+            from tools.tool_descriptions import (
+                extract_actual_request,
+                is_acknowledgment,
+            )
+
+            is_user_acknowledging = is_acknowledgment(current_user_message)
+            actual_request = (
+                extract_actual_request(current_user_message)
+                if is_user_acknowledging
+                else None
+            )
+
+            # If it's just an acknowledgment, don't use tools
+            if is_user_acknowledging and not actual_request:
+                logger.info(
+                    "User message is an acknowledgment - skipping tool selection"
+                )
+                # Stream response without tools
+                async for chunk in self.streaming_service.stream_completion(
+                    windowed_messages, model, model_type, tools=None
+                ):
+                    yield chunk
+                return
+
             # Insert the guidance right before tool selection
             windowed_messages_with_guidance = windowed_messages
 

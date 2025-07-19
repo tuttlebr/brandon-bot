@@ -16,11 +16,6 @@ from typing import Any, Dict, List, Optional
 class UIConfig:
     """UI-related configuration constants"""
 
-    # Spinner and loading indicators
-    SPINNER_ICONS: List[str] = field(
-        default_factory=lambda: ["🤖", "🧠", "🤔", "🤓", "⚡"]
-    )
-
     # Display limits and formatting
     MAX_PROMPT_DISPLAY_LENGTH: int = 4096
 
@@ -129,7 +124,7 @@ class LLMConfig:
     AUTO_INJECT_CONVERSATION_CONTEXT: bool = (
         True  # Automatically inject conversation context
     )
-    MIN_TURNS_FOR_CONTEXT_INJECTION: int = 1  # Minimum turns before injecting context
+    MIN_TURNS_FOR_CONTEXT_INJECTION: int = 7  # Minimum turns before injecting context
 
 
 @dataclass

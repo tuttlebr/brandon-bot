@@ -25,12 +25,12 @@ TOOL_LLM_TYPES = {
     "text_assistant": "llm",
     "generate_image": "fast",
     "analyze_image": "vlm",
-    "generalist_conversation": "llm",
+    "generalist_conversation": "fast",
     "tool_selection": "intelligent",
 }
 
 # Default LLM type if not specified
-DEFAULT_LLM_TYPE = "fast"
+DEFAULT_LLM_TYPE = "llm"
 
 # Tool-specific system prompt overrides
 # These will be used instead of default prompts when tools make LLM calls
