@@ -168,7 +168,7 @@ Remember to maintain your core personality and conversational style while perfor
                 f"{config.env.BOT_TITLE} has access to the internet and the following optional tool calls. Use them when the user's request cannot be satisfied without them or would benefit from their expertise.",
                 "",
                 "CRITICAL TOOL SELECTION GUIDELINES:",
-                "1. **Acknowledgments = NO TOOLS**: If the user is saying thanks, acknowledging, or commenting on previous output, DO NOT use any tool. Just respond conversationally.",
+                "1. **Acknowledgments = NO TOOLS**: If the user is greeting you, saying thanks, acknowledging, or commenting on previous output, DO NOT use any tool. Just respond conversationally.",
                 "2. **Action vs Non-Action**: ACTION requests contain verbs like create, generate, analyze, search. NON-ACTION includes thanks, comments, general questions.",
                 "3. **Context Awareness**: If you just completed a task and user says 'thanks' or 'great', they're acknowledging, NOT requesting another action.",
                 "4. **Default to No Tool**: When in doubt, especially for acknowledgments or general conversation, use NO tool.",

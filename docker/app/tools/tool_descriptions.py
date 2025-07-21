@@ -77,7 +77,8 @@ class ToolDescriptionEnhancer:
                 "Translate this to Spanish",
             ],
             "example_non_uses": [
-                "What is machine learning? (general question - use generalist)",
+                "What is machine learning?",
+                "How are you?",
                 "Thanks for the help (acknowledgment - no tool needed)",
             ],
         },
@@ -122,7 +123,8 @@ class ToolDescriptionEnhancer:
                 "Find information about recent events",
             ],
             "example_non_uses": [
-                "What is Python? (general knowledge - use generalist)",
+                "What is Python?",
+                "How are you?",
                 "Thanks for the search results (acknowledgment - no tool needed)",
             ],
         },
@@ -156,11 +158,12 @@ class ToolDescriptionEnhancer:
             ],
             "example_non_uses": [
                 "Thanks for the weather info (acknowledgment - no tool needed)",
-                "What causes rain? (general question - use generalist)",
+                "What causes rain?",
+                "How are you?",
             ],
         },
         "retrieval_search": {
-            "description": "Searches specialized knowledge base for NVIDIA products, technologies, and mental health topics. ONLY use for queries specifically about these topics. DO NOT use for: general questions, acknowledgments, or topics outside the knowledge base.",
+            "description": "Searches a special database containing ONLY information about mental health, NVIDIA products and NVIDIA blogs.",
             "trigger_words": [
                 "nvidia",
                 "gpu",
@@ -177,7 +180,8 @@ class ToolDescriptionEnhancer:
                 "Information about depression treatment",
             ],
             "example_non_uses": [
-                "What is a computer? (too general - use generalist)",
+                "What is a computer?",
+                "How are you?",
                 "Thanks! (acknowledgment - no tool needed)",
             ],
         },

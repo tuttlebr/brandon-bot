@@ -265,7 +265,7 @@ class ImageGenerationTool(BaseTool):
         try:
             # Initialize fast LLM client for prompt enhancement
             fast_client = OpenAI(
-                api_key=config.api_key, base_url=config.fast_llm_endpoint
+                api_key=config.fast_llm_api_key, base_url=config.fast_llm_endpoint
             )
 
             # Create enhancement prompt for the LLM
@@ -314,7 +314,7 @@ Acting as a seasoned imaging specialist, your task is to elevate a user's founda
                     {"role": "system", "content": enhancement_system_prompt},
                     {"role": "user", "content": user_message},
                 ],
-                temperature=app_config.llm.DEFAULT_TEMPERATURE,  # Some creativity but controlled
+                temperature=app_config.llm.DEFAULT_TEMPERATURE,
                 top_p=app_config.llm.DEFAULT_TOP_P,
                 presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,
                 frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,

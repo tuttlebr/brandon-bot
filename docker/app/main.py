@@ -3,6 +3,8 @@ import time
 
 import streamlit as st
 import streamlit.components.v1 as components
+import streamlit_authenticator as stauth
+import yaml
 
 # Import the controller classes
 from controllers.file_controller import FileController
@@ -14,11 +16,11 @@ from models import ChatConfig
 from services import ChatService, ImageService, LLMService
 from services.pdf_context_service import PDFContextService
 from tools.initialize_tools import initialize_all_tools
-from tools.tool_llm_config import configure_tool_prompt
 from ui import ChatHistoryComponent
 from utils.animated_loading import get_galaxy_animation_html
 from utils.config import config
 from utils.exceptions import ChatbotException, ConfigurationError
+from yaml.loader import SafeLoader
 
 
 class ProductionStreamlitChatApp:
@@ -75,20 +77,6 @@ class ProductionStreamlitChatApp:
 
             # Initialize session state using controller
             self.session_controller.initialize_session_state()
-
-            # Configure tool prompt AFTER tools are initialized and session state is ready
-            if hasattr(st.session_state, 'system_prompt'):
-                configure_tool_prompt(
-                    "generalist_conversation",
-                    st.session_state.system_prompt.replace(
-                        "detailed thinking off", "detailed thinking on"
-                    ),
-                )
-                logging.info(
-                    f"Configured generalist_conversation tool with system prompt ({len(st.session_state.system_prompt)} chars)"
-                )
-            else:
-                logging.warning("System prompt not found in session state")
 
         except Exception as e:
             logging.error(f"Failed to initialize application: {e}")
@@ -504,7 +492,6 @@ class ProductionStreamlitChatApp:
 
 def main():
     """Main function to run the production-ready Streamlit app"""
-    # Logging is already configured in config.py
 
     # Initialize app startup settings (including warning suppression)
     from utils.startup import initialize_app
@@ -539,4 +526,24 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    with open(".streamlit/auth.yaml") as file:
+        auth_config = yaml.load(file, Loader=SafeLoader)
+
+    authenticator = stauth.Authenticate(
+        auth_config["credentials"],
+        auth_config["cookie"]["name"],
+        auth_config["cookie"]["key"],
+        auth_config["cookie"]["expiry_days"],
+    )
+
+    try:
+        authenticator.login(location="sidebar")
+        if st.session_state.get("authentication_status"):
+            authenticator.logout(location="sidebar")
+            main()
+        elif st.session_state.get("authentication_status") is False:
+            st.error("Username/password is incorrect")
+        elif st.session_state.get("authentication_status") is None:
+            st.warning("Please enter your username and password")
+    except Exception as e:
+        st.error(e)

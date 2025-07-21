@@ -79,7 +79,7 @@ class BaseTool(ABC):
         self._name: str = ""
         self.description: str = ""
         # LLM type configuration - which LLM this tool should use
-        self.llm_type: Literal["fast", "llm", "intelligent", "vlm"] = "intelligent"
+        self.llm_type: Literal["fast", "llm", "intelligent", "vlm"] = "llm"
         # Contexts this tool supports (for system prompt context mapping)
         self.supported_contexts: List[str] = []
         # Execution mode

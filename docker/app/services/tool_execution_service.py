@@ -212,12 +212,7 @@ class ToolExecutionService:
         modified_args = tool_args.copy()
 
         # Add conversation context for specific tools
-        context_tools = [
-            "conversation_context",
-            "text_assistant",
-            "generate_image",
-            "generalist_conversation",
-        ]
+        context_tools = ["conversation_context", "text_assistant", "generate_image"]
         if tool_name in context_tools and messages:
             # Special handling for image generation in multi-tool scenarios
             if tool_name == "generate_image" and is_multi_tool_call:

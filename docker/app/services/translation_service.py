@@ -30,7 +30,7 @@ SUPPORTED_LANGUAGES = [
 class TranslationService:
     """Service for language translation operations"""
 
-    def __init__(self, config: ChatConfig, llm_type: str = "intelligent"):
+    def __init__(self, config: ChatConfig, llm_type: str = "llm"):
         """
         Initialize translation service
 

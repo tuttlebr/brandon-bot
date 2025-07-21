@@ -133,7 +133,7 @@ class SimilaritySearch:
 
         try:
             reranker_response = self._call_reranker_service(
-                payload, config.env.RERANKER_ENDPOINT, config.env.NVIDIA_API_KEY
+                payload, config.env.RERANKER_ENDPOINT, config.env.RERANKER_API_KEY
             )
             combined_results = self._combine_results(
                 embedding_response, reranker_response
@@ -491,14 +491,14 @@ class RetrieverTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "retrieval_search"
-        self.description = "ONLY use for questions about NVIDIA products, technologies, mental health topics, or specialized knowledge base content. Searches a specialized knowledge base for information about NVIDIA products, technologies, and mental health topics using vector similarity search. This tool works well when paired with the tavily_internet_search tool."
+        self.description = "ONLY for mental health, NVIDIA products and NVIDIA blogs. Searches a special database containing ONLY information about mental health, NVIDIA products and NVIDIA blogs."
 
     def _initialize_mvc(self):
         """Initialize MVC components"""
         # Initialize embedding creator and similarity search using centralized config
         self.embedding_creator = EmbeddingCreator(
             base_url=config.env.EMBEDDING_ENDPOINT,
-            api_key=config.env.NVIDIA_API_KEY,
+            api_key=config.env.EMBEDDING_API_KEY,
             model=config.env.EMBEDDING_MODEL,
         )
 

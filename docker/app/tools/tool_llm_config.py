@@ -17,15 +17,15 @@ TOOL_LLM_TYPES = {
     "conversation_context": "llm",
     "extract_web_content": "llm",
     "get_weather": "fast",
-    "tavily_news_search": "fast",
-    "tavily_internet_search": "fast",
-    "retrieval_search": "fast",
-    "retrieve_pdf_summary": "fast",
-    "process_pdf_text": "fast",
+    "tavily_news_search": "llm",
+    "tavily_internet_search": "llm",
+    "retrieval_search": "llm",
+    "retrieve_pdf_summary": "llm",
+    "process_pdf_text": "llm",
     "text_assistant": "llm",
     "generate_image": "fast",
     "analyze_image": "vlm",
-    "generalist_conversation": "fast",
+    "generalist_conversation": "llm",
     "tool_selection": "intelligent",
 }
 
@@ -38,7 +38,7 @@ TOOL_SYSTEM_PROMPTS: Dict[str, str] = {}
 
 # Global system prompt prefix for all tool LLM calls
 # This will be prepended to all tool-specific prompts
-GLOBAL_TOOL_PROMPT_PREFIX = """detailed thinking off - You are an internal tool component processing data.
+GLOBAL_TOOL_PROMPT_PREFIX = """You are an internal tool component processing data.
 Return only the requested information without meta-commentary or explanations about your process.
 Never mention that you are a tool or reference data sources. You have access to real-time data and the internet."""
 

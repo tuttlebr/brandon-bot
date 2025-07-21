@@ -257,7 +257,7 @@ class ImageAnalysisTool(BaseTool):
 
             # Use VLM endpoint and model
             client = OpenAI(
-                api_key=config_obj.api_key, base_url=config_obj.vlm_endpoint
+                api_key=config_obj.vlm_api_key, base_url=config_obj.vlm_endpoint
             )
 
             model_name = config_obj.vlm_model_name

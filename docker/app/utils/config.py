@@ -108,7 +108,7 @@ class LLMConfig:
     """LLM service configuration"""
 
     # Default model parameters
-    DEFAULT_TEMPERATURE: float = 0.6
+    DEFAULT_TEMPERATURE: float = 0.0
     DEFAULT_TOP_P: float = 0.95
     DEFAULT_FREQUENCY_PENALTY: float = 0.0
     DEFAULT_PRESENCE_PENALTY: float = 0.0
@@ -168,6 +168,97 @@ class SystemConfig:
 
 
 @dataclass
+class ToolConfig:
+    """Tool availability configuration for A/B testing and feature toggling
+
+    Tools not listed here or set to False will not be available to the LLM.
+    This allows easy enabling/disabling of tools for testing purposes.
+    """
+
+    # Tool availability mapping - tool_name: enabled
+    # Default configuration enables all standard tools
+    ENABLED_TOOLS: Dict[str, bool] = field(
+        default_factory=lambda: {
+            # Core text processing tools
+            "text_assistant": True,
+            "conversation_context": False,
+            # Web and search tools
+            "extract_web_content": True,
+            "tavily_internet_search": True,
+            "tavily_news_search": True,
+            "retrieval_search": True,
+            # Document processing tools
+            "retrieve_pdf_summary": True,
+            "process_pdf_text": True,
+            # Media tools
+            "analyze_image": True,
+            "generate_image": True,
+            # Utility tools
+            "get_weather": True,
+            # Experimental tools (disabled by default)
+            "generalist_conversation": False,
+        }
+    )
+
+    def __post_init__(self):
+        """Load tool configuration from environment or config file"""
+        # Allow environment variable override for each tool
+        # Format: TOOL_ENABLE_<TOOL_NAME>=true/false
+        for tool_name in list(self.ENABLED_TOOLS.keys()):
+            env_var = f"TOOL_ENABLE_{tool_name.upper()}"
+            env_value = os.getenv(env_var)
+            if env_value is not None:
+                self.ENABLED_TOOLS[tool_name] = env_value.lower() == "true"
+                logging.info(
+                    f"Tool '{tool_name}' enabled: {self.ENABLED_TOOLS[tool_name]} (from {env_var})"
+                )
+
+        # Load from external config file if provided
+        config_file = os.getenv("TOOL_CONFIG_FILE")
+        if config_file and os.path.exists(config_file):
+            self._load_from_file(config_file)
+
+    def _load_from_file(self, config_file: str):
+        """Load tool configuration from JSON or YAML file"""
+        import json
+        import yaml
+
+        try:
+            with open(config_file, 'r') as f:
+                if config_file.endswith('.json'):
+                    config_data = json.load(f)
+                elif config_file.endswith(('.yaml', '.yml')):
+                    config_data = yaml.safe_load(f)
+                else:
+                    logging.warning(f"Unsupported config file format: {config_file}")
+                    return
+
+                # Update enabled tools from file
+                if "enabled_tools" in config_data:
+                    for tool_name, enabled in config_data["enabled_tools"].items():
+                        self.ENABLED_TOOLS[tool_name] = bool(enabled)
+                        logging.info(
+                            f"Tool '{tool_name}' enabled: {enabled} (from {config_file})"
+                        )
+
+        except Exception as e:
+            logging.error(f"Failed to load tool config from {config_file}: {e}")
+
+    def is_tool_enabled(self, tool_name: str) -> bool:
+        """Check if a tool is enabled"""
+        return self.ENABLED_TOOLS.get(tool_name, False)
+
+    def get_enabled_tools(self) -> List[str]:
+        """Get list of all enabled tools"""
+        return [name for name, enabled in self.ENABLED_TOOLS.items() if enabled]
+
+    def set_tool_enabled(self, tool_name: str, enabled: bool):
+        """Enable or disable a tool at runtime"""
+        self.ENABLED_TOOLS[tool_name] = enabled
+        logging.info(f"Tool '{tool_name}' dynamically set to: {enabled}")
+
+
+@dataclass
 class EnvironmentConfig:
     """Environment variable configuration with defaults"""
 
@@ -201,10 +292,34 @@ class EnvironmentConfig:
         default_factory=lambda: os.getenv("VLM_ENDPOINT")
     )
 
-    # API keys
+    # API keys - backward compatible with single NVIDIA_API_KEY
     NVIDIA_API_KEY: str = field(
         default_factory=lambda: os.getenv("NVIDIA_API_KEY", "None")
     )
+
+    # Per-model API keys (fall back to NVIDIA_API_KEY if not specified)
+    FAST_LLM_API_KEY: Optional[str] = field(
+        default_factory=lambda: os.getenv(
+            "FAST_LLM_API_KEY", os.getenv("NVIDIA_API_KEY", "None")
+        )
+    )
+    LLM_API_KEY: Optional[str] = field(
+        default_factory=lambda: os.getenv(
+            "LLM_API_KEY", os.getenv("NVIDIA_API_KEY", "None")
+        )
+    )
+    INTELLIGENT_LLM_API_KEY: Optional[str] = field(
+        default_factory=lambda: os.getenv(
+            "INTELLIGENT_LLM_API_KEY", os.getenv("NVIDIA_API_KEY", "None")
+        )
+    )
+    VLM_API_KEY: Optional[str] = field(
+        default_factory=lambda: os.getenv(
+            "VLM_API_KEY", os.getenv("NVIDIA_API_KEY", "None")
+        )
+    )
+
+    # Other API keys
     TAVILY_API_KEY: Optional[str] = field(
         default_factory=lambda: os.getenv("TAVILY_API_KEY")
     )
@@ -215,6 +330,11 @@ class EnvironmentConfig:
     )
     EMBEDDING_MODEL: Optional[str] = field(
         default_factory=lambda: os.getenv("EMBEDDING_MODEL")
+    )
+    EMBEDDING_API_KEY: Optional[str] = field(
+        default_factory=lambda: os.getenv(
+            "EMBEDDING_API_KEY", os.getenv("NVIDIA_API_KEY", "None")
+        )
     )
 
     # Database configuration
@@ -236,10 +356,20 @@ class EnvironmentConfig:
     RERANKER_MODEL: Optional[str] = field(
         default_factory=lambda: os.getenv("RERANKER_MODEL")
     )
+    RERANKER_API_KEY: Optional[str] = field(
+        default_factory=lambda: os.getenv(
+            "RERANKER_API_KEY", os.getenv("NVIDIA_API_KEY", "None")
+        )
+    )
 
     # Image generation
     IMAGE_ENDPOINT: Optional[str] = field(
         default_factory=lambda: os.getenv("IMAGE_ENDPOINT")
+    )
+    IMAGE_API_KEY: Optional[str] = field(
+        default_factory=lambda: os.getenv(
+            "IMAGE_API_KEY", os.getenv("NVIDIA_API_KEY", "None")
+        )
     )
 
     # PDF processing
@@ -257,7 +387,20 @@ class EnvironmentConfig:
         required_vars = [
             ('FAST_LLM_MODEL_NAME', self.FAST_LLM_MODEL_NAME),
             ('FAST_LLM_ENDPOINT', self.FAST_LLM_ENDPOINT),
-            ('NVIDIA_API_KEY', self.NVIDIA_API_KEY),
+            # Only require NVIDIA_API_KEY if no individual API keys are set
+            (
+                'NVIDIA_API_KEY or individual model API keys',
+                (
+                    self.NVIDIA_API_KEY
+                    if (
+                        not self.FAST_LLM_API_KEY
+                        or self.FAST_LLM_API_KEY == "None"
+                        or not self.LLM_API_KEY
+                        or self.LLM_API_KEY == "None"
+                    )
+                    else "Set"
+                ),
+            ),
         ]
 
         missing = []
@@ -287,6 +430,7 @@ class AppConfig:
         self.api = APIConfig()
         self.system = SystemConfig()
         self.env = EnvironmentConfig()
+        self.tools = ToolConfig()
 
         # Validate environment variables
         missing_vars = self.env.validate_required_env_vars()

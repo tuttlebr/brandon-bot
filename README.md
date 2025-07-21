@@ -265,7 +265,7 @@ All configuration is managed through environment variables and centralized in `u
 ### Required Environment Variables
 
 ```bash
-# NVIDIA API Configuration
+# Global NVIDIA API Configuration (used as default for all models)
 NVIDIA_API_KEY=your_api_key_here
 
 # LLM Model Configuration
@@ -285,6 +285,28 @@ VLM_MODEL_NAME=nvidia/llama-3.1-nemotron-nano-vl-8b-v1
 # Application Settings
 BOT_TITLE=Streamlit Agentic Chatbot
 ```
+
+### Per-Model API Keys (Optional)
+
+You can now specify different API keys for different models. If not specified, all models will use the global `NVIDIA_API_KEY`.
+
+```bash
+# Individual model API keys (optional - defaults to NVIDIA_API_KEY if not set)
+FAST_LLM_API_KEY=your_fast_llm_api_key
+LLM_API_KEY=your_standard_llm_api_key
+INTELLIGENT_LLM_API_KEY=your_intelligent_llm_api_key
+VLM_API_KEY=your_vision_model_api_key
+EMBEDDING_API_KEY=your_embedding_api_key
+RERANKER_API_KEY=your_reranker_api_key
+IMAGE_API_KEY=your_image_generation_api_key
+```
+
+This allows you to:
+
+- Use different API providers for different models
+- Apply different rate limits or quotas per model type
+- Track usage per model type with separate API keys
+- Maintain backward compatibility with a single NVIDIA_API_KEY
 
 ### Optional Services
 
@@ -660,12 +682,26 @@ docker compose logs -f app
 Create a `.env` file with your configuration:
 
 ```bash
+# Copy the example file
+cp env.example .env
+
+# Edit with your API keys
+nano .env
+```
+
+Basic configuration:
+
+```bash
 # Required
 NVIDIA_API_KEY=your_key_here
 
 # Optional services
 TAVILY_API_KEY=your_key_here
 IMAGE_ENDPOINT=your_endpoint_here
+
+# Optional per-model API keys (see env.example for full list)
+# FAST_LLM_API_KEY=your_key_here
+# LLM_API_KEY=your_key_here
 ```
 
 ### Production Features
@@ -675,6 +711,64 @@ IMAGE_ENDPOINT=your_endpoint_here
 3. **Error Recovery**: Comprehensive error handling at all layers
 4. **Resource Management**: Efficient streaming and batch processing
 5. **Monitoring**: Built-in logging and error tracking
+
+### Kubernetes Deployment
+
+The application includes complete Kubernetes deployment configurations:
+
+#### 1. Create the namespace and secrets
+
+```bash
+# Create namespace
+kubectl create namespace streamlit-chatbot
+
+# Create app secrets with per-model API keys
+./create-app-secrets.sh
+```
+
+The `create-app-secrets.sh` script now supports per-model API keys:
+
+- First, it prompts for the global NVIDIA_API_KEY (used as default)
+- Then optionally allows you to set individual API keys for each model
+- Press Enter to skip any individual API key and use the global default
+
+#### 2. Deploy the application
+
+```bash
+# Apply the Kubernetes manifests
+kubectl apply -f kubernetes-deployment.yaml
+
+# Check deployment status
+kubectl get pods -n streamlit-chatbot
+kubectl get services -n streamlit-chatbot
+```
+
+#### 3. Managing API Keys in Kubernetes
+
+To update API keys after deployment:
+
+```bash
+# Delete existing secret
+kubectl delete secret app-secrets -n streamlit-chatbot
+
+# Re-run the script with new keys
+./create-app-secrets.sh
+
+# Restart the deployment to pick up new keys
+kubectl rollout restart deployment/app -n streamlit-chatbot
+```
+
+#### 4. Using env-to-k8s.sh for bulk configuration
+
+If you have a `.env` file with all your settings:
+
+```bash
+# Convert .env to Kubernetes ConfigMap and Secret
+./env-to-k8s.sh .env
+
+# The script automatically identifies sensitive values (API keys)
+# and creates appropriate ConfigMap and Secret resources
+```
 
 ### Performance Considerations
 

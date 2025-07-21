@@ -100,8 +100,8 @@ class NewsTool(BaseTool):
         Returns:
             List of high-scoring search results with extracted content added
         """
-        # Filter results with score >= 0.5
-        high_scoring_results = [result for result in results if result.score >= 0.5]
+        # Filter results with score >= 0.4
+        high_scoring_results = [result for result in results if result.score >= 0.4]
 
         if not high_scoring_results:
             logger.debug(
@@ -278,6 +278,7 @@ class NewsTool(BaseTool):
         logger.debug("API key found, preparing search parameters")
 
         # Default search parameters matching the shell script
+        # TODO: add more tavily API friendly domains to the include_domains list
         default_params = {
             "query": query,
             "topic": "news",
@@ -285,7 +286,15 @@ class NewsTool(BaseTool):
             "include_raw_content": False,
             "max_results": 5,
             "include_images": False,
-            "country": "united states",
+            "include_domains": [
+                "apnews.com",
+                "reuters.com",
+                "freep.com",
+                "bbc.com",
+                "propublica.org",
+                "espn.com",
+                "mlb.com",
+            ],
         }
 
         # Update with any provided kwargs

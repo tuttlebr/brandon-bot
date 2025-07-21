@@ -91,9 +91,7 @@ class GeneralistController(ToolController):
         from tools.tool_llm_config import get_tool_system_prompt
 
         # Default prompt for generalist conversation
-        default_prompt = (
-            f"""detailed thinking off - The current date and time is {current_date}."""
-        )
+        default_prompt = f"""The current date and time is {current_date}."""
 
         # Use the configured system prompt if set, otherwise use default
         system_prompt = get_tool_system_prompt(

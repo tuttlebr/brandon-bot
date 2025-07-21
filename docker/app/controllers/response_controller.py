@@ -495,7 +495,7 @@ class ResponseController:
             location = tool_data.get("location", "Unknown")
             current = tool_data.get("current", {})
             temp = current.get("temperature", "N/A")
-            return f"**Weather data for {location}** (Current: {temp}°F)"
+            return f"Weather data for {location} (Current: {temp}°F)"
 
         # Handle PDF content retrieval
         if (

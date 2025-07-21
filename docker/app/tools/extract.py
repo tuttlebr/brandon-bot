@@ -201,9 +201,7 @@ class WebExtractController(ToolController):
                     f"Truncated HTML content to 300k characters for LLM processing"
                 )
 
-            system_prompt = """detailed thinking off
-
-You are an expert HTML to markdown converter. Your task is to extract the main content from web pages and convert it to clean, readable markdown format.
+            system_prompt = """You are an expert HTML to markdown converter. Your task is to extract the main content from web pages and convert it to clean, readable markdown format.
 
 Instructions:
 1. Extract ONLY the main article/content from the webpage

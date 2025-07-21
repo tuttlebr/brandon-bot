@@ -481,14 +481,14 @@ class AssistantTool(BaseTool):
                         "source_language": {
                             "type": "string",
                             "enum": TranslationService(
-                                ChatConfig.from_environment(), "intelligent"
+                                ChatConfig.from_environment(), "llm"
                             ).get_supported_languages(),
                             "description": "The source language for translation (optional - will auto-detect if not provided)",
                         },
                         "target_language": {
                             "type": "string",
                             "enum": TranslationService(
-                                ChatConfig.from_environment(), "intelligent"
+                                ChatConfig.from_environment(), "llm"
                             ).get_supported_languages(),
                             "description": "The target language for translation (required for translation tasks)",
                         },

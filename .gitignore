@@ -275,3 +275,4 @@ kubernetes-deployment-guide.md
 kubernetes-deployment.yaml
 undeploy.sh
 examples/
+auth.yaml

@@ -212,8 +212,7 @@ class ConversationContextController(ToolController):
         """Get the appropriate system prompt for context analysis"""
 
         base_prompts = {
-            ContextType.CONVERSATION_SUMMARY: """detailed thinking off
-            You are summarizing the conversation history to provide context.
+            ContextType.CONVERSATION_SUMMARY: """You are summarizing the conversation history to provide context.
 
 Create a concise overview that captures the main themes and user objectives.
 
@@ -243,24 +242,19 @@ MOST IMPORTANT: Clearly state if the latest user message is:
 
 Be explicit: Does the latest message require action? YES or NO.
 Keep the summary focused and within 200 words.""",
-            ContextType.RECENT_TOPICS: """detailed thinking off
-            You are identifying and listing the main topics discussed in the conversation.
+            ContextType.RECENT_TOPICS: """You are identifying and listing the main topics discussed in the conversation.
 
 Extract and enumerate the primary discussion threads. Note recurring themes and the current focus of engagement. Include relevant related topics that may be important. Prioritize topics that are most relevant to ongoing tasks or questions.""",
-            ContextType.USER_PREFERENCES: """detailed thinking off
-            You are analyzing user interaction patterns and preferences.
+            ContextType.USER_PREFERENCES: """You are analyzing user interaction patterns and preferences.
 
 Identify the user's communication style, typical request types, and preferred response formats. Note any stated constraints or preferences. Assess the user's apparent expertise level and information needs based on their interactions.""",
-            ContextType.TASK_CONTINUITY: """detailed thinking on
-            You are tracking task progression and continuity.
+            ContextType.TASK_CONTINUITY: """You are tracking task progression and continuity.
 
 Identify the main task or objective being pursued. Document completed steps and current progress. Determine what stage the user is at in their task. Anticipate likely next steps and information needs. Provide essential context for seamless task continuation.""",
-            ContextType.CREATIVE_DIRECTOR: """detailed thinking on
-            You are maintaining creative project continuity and coherence.
+            ContextType.CREATIVE_DIRECTOR: """You are maintaining creative project continuity and coherence.
 
 Track the creative project's vision, scope, and goals. Document the evolution of core ideas and concepts. Ensure consistency in tone, style, and narrative direction. Identify opportunities for enhancement or new perspectives. Maintain an awareness of referenced materials and inspirations.""",
-            ContextType.DOCUMENT_ANALYSIS: """detailed thinking on
-            You are analyzing document content in relation to the conversation.
+            ContextType.DOCUMENT_ANALYSIS: """You are analyzing document content in relation to the conversation.
 
 Summarize key points, themes, and main arguments from the document. Identify the document's structure and organization. Extract critical information, facts, and conclusions. Relate content to user queries and conversation context. Note any action items or recommendations. Identify connections between document content and conversation topics.""",
         }

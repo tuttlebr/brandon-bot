@@ -210,9 +210,15 @@ class ToolRegistry:
             Tool execution result
 
         Raises:
-            ValueError: If tool not found
+            ValueError: If tool not found or disabled
             Exception: If tool execution fails
         """
+        from utils.config import config
+
+        # Check if tool is enabled
+        if not config.tools.is_tool_enabled(name):
+            raise ValueError(f"Tool '{name}' is disabled in configuration")
+
         tool = self.get_tool(name)
         if not tool:
             raise ValueError(f"Tool not found: {name}")
@@ -225,6 +231,8 @@ class ToolRegistry:
 
     def get_all_definitions(self) -> List[Dict[str, Any]]:
         """Get OpenAI-compatible definitions for all registered tools"""
+        from utils.config import config
+
         definitions = []
 
         # Get all registered tool names (including lazy-loaded ones)
@@ -233,18 +241,29 @@ class ToolRegistry:
         )
 
         for name in all_tool_names:
+            # Check if tool is enabled in configuration
+            if not config.tools.is_tool_enabled(name):
+                logger.debug(f"Tool '{name}' is disabled in configuration, skipping")
+                continue
+
             tool = self.get_tool(name)
             if tool:
                 try:
                     definition = tool.get_definition()
                     definitions.append(definition)
+                    logger.debug(f"Added tool definition for '{name}'")
                 except Exception as e:
                     logger.error(f"Error getting definition for tool {name}: {e}")
 
+        logger.info(
+            f"Returning {len(definitions)} tool definitions (out of {len(all_tool_names)} registered)"
+        )
         return definitions
 
     def get_tools_list_text(self) -> str:
         """Get formatted text list of all available tools"""
+        from utils.config import config
+
         all_tool_names = sorted(
             set(self._tools.keys()) | set(self._factory.get_registered_tools())
         )
@@ -253,11 +272,21 @@ class ToolRegistry:
             return "No tools available."
 
         lines = ["Available tools:"]
+        enabled_count = 0
+
         for name in all_tool_names:
+            # Check if tool is enabled
+            if not config.tools.is_tool_enabled(name):
+                continue
+
             tool = self.get_tool(name)
             if tool:
                 description = tool.description or "No description available"
                 lines.append(f"- {name}: {description}")
+                enabled_count += 1
+
+        if enabled_count == 0:
+            return "No tools are currently enabled."
 
         return "\n".join(lines)
 

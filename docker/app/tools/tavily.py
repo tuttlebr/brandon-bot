@@ -4,7 +4,8 @@ from typing import Any, Dict, List, Optional, Type
 import requests
 from pydantic import BaseModel, Field
 from tools.base import BaseTool, BaseToolResponse
-from utils.text_processing import strip_think_tags
+
+# from utils.text_processing import strip_think_tags  # Not needed without extraction
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -43,7 +44,7 @@ class TavilyTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "tavily_internet_search"
-        self.description = "Search the internet for real-time information using Tavily API. Use this for finding current information and any non-news queries that require up-to-date information from the web. You shouldn't need this for things that are general knowledge or may be determined using logic (use the generalist_conversation tool instead). For news-specific queries, use the tavily_news_search tool instead."
+        self.description = "Search the internet for real-time information using Tavily API. Use this for finding current information and any non-news queries that require up-to-date information from the web. You shouldn't need this for things that are general knowledge or may be determined using logic. For news-specific queries, use the tavily_news_search tool instead."
 
     def _initialize_mvc(self):
         """Initialize MVC components"""
@@ -114,28 +115,29 @@ class TavilyTool(BaseTool):
             top_result = results[0]
             fallback_results = [top_result]
 
-            # Import extract tool
-            from tools.extract import execute_web_extract_batch
+            # Import extract tool (disabled for reduced latency)
+            # from tools.extract import execute_web_extract_batch
 
-            try:
-                # Attempt extraction for the top result
-                extract_results = execute_web_extract_batch([top_result.url])
+            # Extraction disabled for reduced latency
+            # try:
+            #     # Attempt extraction for the top result
+            #     extract_results = execute_web_extract_batch([top_result.url])
 
-                # Update with extracted content if successful
-                for extract_result in extract_results:
-                    if extract_result.success and extract_result.content:
-                        top_result.extracted_content = extract_result.content
-                        logger.info(
-                            f"Successfully extracted content from fallback result: {extract_result.url}"
-                        )
-                    else:
-                        logger.warning(
-                            f"Failed to extract content from fallback result: {extract_result.url}"
-                        )
+            #     # Update with extracted content if successful
+            #     for extract_result in extract_results:
+            #         if extract_result.success and extract_result.content:
+            #             top_result.extracted_content = extract_result.content
+            #             logger.info(
+            #                 f"Successfully extracted content from fallback result: {extract_result.url}"
+            #             )
+            #         else:
+            #             logger.warning(
+            #                 f"Failed to extract content from fallback result: {extract_result.url}"
+            #             )
 
-            except Exception as e:
-                logger.error(f"Error in fallback extraction: {e}")
-                # Continue without extracted content - don't fail the entire search
+            # except Exception as e:
+            #     logger.error(f"Error in fallback extraction: {e}")
+            #     # Continue without extracted content - don't fail the entire search
 
             return fallback_results
 
@@ -143,41 +145,42 @@ class TavilyTool(BaseTool):
             f"Extracting content for {len(high_scoring_results)} high-scoring results"
         )
 
-        # Import extract tool
-        from tools.extract import execute_web_extract_batch
+        # Import extract tool (disabled for reduced latency)
+        # from tools.extract import execute_web_extract_batch
 
-        try:
-            # Get URLs for high-scoring results
-            urls = [result.url for result in high_scoring_results]
+        # Extraction disabled for reduced latency
+        # try:
+        #     # Get URLs for high-scoring results
+        #     urls = [result.url for result in high_scoring_results]
 
-            # Perform batch extraction
-            extract_results = execute_web_extract_batch(urls)
+        #     # Perform batch extraction
+        #     extract_results = execute_web_extract_batch(urls)
 
-            # Create a mapping of URL to extracted content
-            url_to_content = {}
-            for extract_result in extract_results:
-                if extract_result.success and extract_result.content:
-                    url_to_content[extract_result.url] = extract_result.content
-                    logger.info(
-                        f"Successfully extracted content from {extract_result.url}"
-                    )
-                else:
-                    logger.warning(
-                        f"Failed to extract content from {extract_result.url}: {extract_result.error_message}"
-                    )
+        #     # Create a mapping of URL to extracted content
+        #     url_to_content = {}
+        #     for extract_result in extract_results:
+        #         if extract_result.success and extract_result.content:
+        #             url_to_content[extract_result.url] = extract_result.content
+        #             logger.info(
+        #                 f"Successfully extracted content from {extract_result.url}"
+        #             )
+        #         else:
+        #             logger.warning(
+        #                 f"Failed to extract content from {extract_result.url}: {extract_result.error_message}"
+        #             )
 
-            # Update only the high-scoring results with extracted content
-            for result in high_scoring_results:
-                if result.url in url_to_content:
-                    result.extracted_content = url_to_content[result.url]
+        #     # Update only the high-scoring results with extracted content
+        #     for result in high_scoring_results:
+        #         if result.url in url_to_content:
+        #             result.extracted_content = url_to_content[result.url]
 
-            logger.info(
-                f"Batch extraction completed. {len(url_to_content)} successful extractions"
-            )
+        #     logger.info(
+        #         f"Batch extraction completed. {len(url_to_content)} successful extractions"
+        #     )
 
-        except Exception as e:
-            logger.error(f"Error in batch extraction: {e}")
-            # Continue without extracted content - don't fail the entire search
+        # except Exception as e:
+        #     logger.error(f"Error in batch extraction: {e}")
+        #     # Continue without extracted content - don't fail the entire search
 
         return high_scoring_results
 
@@ -201,12 +204,11 @@ class TavilyTool(BaseTool):
             # Format as: 1. [title](url): content
             entry = f"{i}. [{result.title}]({result.url}): {clean_content}\n___"
 
-            # Add extracted content if available
-            if result.extracted_content:
-                # Strip think tags from extracted content before display
-                cleaned_extract = strip_think_tags(result.extracted_content)
-
-                entry += f"\n\n**Extracted Content:**\n{cleaned_extract}"
+            # Skip displaying extracted content (removed for reduced latency)
+            # if result.extracted_content:
+            #     # Strip think tags from extracted content before display
+            #     cleaned_extract = strip_think_tags(result.extracted_content)
+            #     entry += f"\n\n**Extracted Content:**\n{cleaned_extract}"
 
             formatted_entries.append(entry)
 
@@ -289,7 +291,7 @@ class TavilyTool(BaseTool):
             "exclude_domains": [
                 "youtube.com",
                 "reddit.com",
-            ],  # excluded because it is a video platform but keeps coming up in searches...
+            ],  # excluded domains which can't really be extracted well.
         }
 
         # Update with any provided kwargs
@@ -316,10 +318,10 @@ class TavilyTool(BaseTool):
             response_data = response.json()
             tavily_response = TavilyResponse(**response_data)
 
-            # Extract content for high-scoring results
-            tavily_response.results = self._extract_content_for_results(
-                tavily_response.results
-            )
+            # Skip extraction process for reduced latency
+            # tavily_response.results = self._extract_content_for_results(
+            #     tavily_response.results
+            # )
 
             # Format the results for display
             tavily_response.formatted_results = self.format_results(

@@ -103,21 +103,21 @@ class LLMClientService:
         try:
             if llm_type == "fast":
                 client = OpenAI(
-                    api_key=self._config.api_key,
+                    api_key=self._config.fast_llm_api_key,
                     base_url=self._config.fast_llm_endpoint,
                 )
             elif llm_type == "llm":
                 client = OpenAI(
-                    api_key=self._config.api_key, base_url=self._config.llm_endpoint
+                    api_key=self._config.llm_api_key, base_url=self._config.llm_endpoint
                 )
             elif llm_type == "intelligent":
                 client = OpenAI(
-                    api_key=self._config.api_key,
+                    api_key=self._config.intelligent_llm_api_key,
                     base_url=self._config.intelligent_llm_endpoint,
                 )
             elif llm_type == "vlm":
                 client = OpenAI(
-                    api_key=self._config.api_key, base_url=self._config.vlm_endpoint
+                    api_key=self._config.vlm_api_key, base_url=self._config.vlm_endpoint
                 )
             else:
                 raise ValueError(f"Invalid LLM type: {llm_type}")
@@ -166,25 +166,25 @@ class LLMClientService:
 
             if llm_type == "fast":
                 client = AsyncOpenAI(
-                    api_key=self._config.api_key,
+                    api_key=self._config.fast_llm_api_key,
                     base_url=self._config.fast_llm_endpoint,
                     http_client=http_client,
                 )
             elif llm_type == "llm":
                 client = AsyncOpenAI(
-                    api_key=self._config.api_key,
+                    api_key=self._config.llm_api_key,
                     base_url=self._config.llm_endpoint,
                     http_client=http_client,
                 )
             elif llm_type == "intelligent":
                 client = AsyncOpenAI(
-                    api_key=self._config.api_key,
+                    api_key=self._config.intelligent_llm_api_key,
                     base_url=self._config.intelligent_llm_endpoint,
                     http_client=http_client,
                 )
             elif llm_type == "vlm":
                 client = AsyncOpenAI(
-                    api_key=self._config.api_key,
+                    api_key=self._config.vlm_api_key,
                     base_url=self._config.vlm_endpoint,
                     http_client=http_client,
                 )
