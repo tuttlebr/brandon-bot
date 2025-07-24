@@ -181,7 +181,7 @@ class ToolConfig:
         default_factory=lambda: {
             # Core text processing tools
             "text_assistant": True,
-            "conversation_context": False,
+            "conversation_context": True,
             # Web and search tools
             "extract_web_content": True,
             "tavily_internet_search": True,
@@ -195,9 +195,17 @@ class ToolConfig:
             "generate_image": True,
             # Utility tools
             "get_weather": True,
-            # Experimental tools (disabled by default)
-            "generalist_conversation": False,
+            # Experimental tools
+            "generalist_conversation": True,
         }
+    )
+
+    # Use enhanced tool descriptions from centralized source
+    USE_ENHANCED_DESCRIPTIONS: bool = field(
+        default_factory=lambda: os.getenv(
+            "USE_ENHANCED_TOOL_DESCRIPTIONS", "true"
+        ).lower()
+        == "true"
     )
 
     def __post_init__(self):

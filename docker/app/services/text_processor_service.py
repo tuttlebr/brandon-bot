@@ -109,7 +109,101 @@ class TextProcessorService:
             }
 
         except Exception as e:
-            logger.error(f"Error processing text with {task_type}: {e}")
+            logger.error(f"Error processing text: {e}")
+            return {"success": False, "error": str(e), "task_type": task_type}
+
+    async def process_text_streaming(
+        self,
+        task_type: TextTaskType,
+        text: str,
+        instructions: Optional[str] = None,
+        messages: Optional[List[Dict]] = None,
+    ) -> Dict[str, any]:
+        """
+        Process text with streaming response from LLM
+
+        Args:
+            task_type: Type of processing to perform
+            text: Text to process
+            instructions: Additional instructions for processing
+            messages: Optional conversation messages for context
+
+        Returns:
+            Dictionary with processing result
+        """
+        from utils.text_processing import StreamingThinkTagFilter
+
+        try:
+            # Check if the text is too large for direct processing
+            estimated_tokens = len(text) // 4  # Rough token estimation
+            max_tokens = 100000  # Conservative limit to stay well under model limits
+
+            if estimated_tokens > max_tokens:
+                logger.warning(
+                    f"Text too large ({estimated_tokens} estimated tokens), processing in chunks"
+                )
+                return await self._process_large_text_chunked(
+                    task_type, text, instructions, messages
+                )
+
+            client = llm_client_service.get_async_client(self.llm_type)
+            model_name = llm_client_service.get_model_name(self.llm_type)
+            system_prompt = self._get_system_prompt(task_type, instructions)
+
+            # Build messages
+            if messages:
+                final_messages = self._build_messages_with_context(
+                    messages, system_prompt, text
+                )
+            else:
+                final_messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": text},
+                ]
+
+            logger.debug(
+                f"Processing text with streaming {task_type} using {model_name}"
+            )
+
+            response = await client.chat.completions.create(
+                model=model_name,
+                messages=final_messages,
+                temperature=app_config.llm.DEFAULT_TEMPERATURE,
+                top_p=app_config.llm.DEFAULT_TOP_P,
+                frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
+                presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,
+                stream=True,  # Enable streaming
+            )
+
+            # Create think tag filter for streaming
+            think_filter = StreamingThinkTagFilter()
+            collected_result = ""
+
+            # Process stream with think tag filtering
+            async for chunk in response:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    chunk_content = chunk.choices[0].delta.content
+                    # Filter think tags from the chunk
+                    filtered_content = think_filter.process_chunk(chunk_content)
+                    if filtered_content:
+                        collected_result += filtered_content
+
+            # Get any remaining content from the filter
+            final_content = think_filter.flush()
+            if final_content:
+                collected_result += final_content
+
+            return {
+                "success": True,
+                "result": collected_result,
+                "task_type": task_type,
+                "processing_notes": self._get_processing_notes(
+                    task_type, text, collected_result
+                ),
+            }
+
+        except Exception as e:
+            logger.error(f"Error processing text with streaming: {e}")
             return {"success": False, "error": str(e), "task_type": task_type}
 
     async def _process_large_text_chunked(

@@ -50,7 +50,7 @@ class PDFTextProcessorTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "process_pdf_text"
-        self.description = "ONLY use this when explicitly asked to perform text processing on PDF pages or when the user specifically mentions processing, analyzing, or working with specific pages of a PDF document. Performs text processing operations (summarize, proofread, rewrite, translate, Q&A) on specific pages or sections of PDF documents. For Q&A tasks, use when the user asks questions about the PDF content. DO NOT use for general questions, web searches, or when no PDF is being discussed. Only answer the question the user asks, do not provide any other information and ignore irrelevant or confusing information."
+        self.description = "Process specific pages or answer questions about uploaded PDFs. Use for detailed PDF analysis, specific page extraction, or Q&A about PDF content."
         self.supported_contexts = ['pdf_analysis']
 
     def _initialize_mvc(self):
@@ -78,7 +78,6 @@ class PDFTextProcessorTool(BaseTool):
                                 "critic",
                                 "writer",
                                 "translate",
-                                "qa",
                             ],
                             "description": "The type of text processing task to perform",
                         },
@@ -104,8 +103,8 @@ class PDFTextProcessorTool(BaseTool):
                             "description": "Target language for translation (required for translation tasks)",
                         },
                         "but_why": {
-                            "type": "string",
-                            "description": "A single sentence explaining why this tool was selected for the query.",
+                            "type": "integer",
+                            "description": "An integer from 1-5 where a larger number indicates confidence this is the right tool to help the user.",
                         },
                     },
                     "required": ["task_type", "but_why"],

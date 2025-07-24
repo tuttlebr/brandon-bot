@@ -30,7 +30,11 @@ class ChatHistoryComponent:
             messages: List of messages to display
             messages_per_page: Number of messages to show per page
         """
-        current_page = st.session_state.get("current_page", 0)
+        # Defensive check for current_page
+        if not hasattr(st.session_state, "current_page"):
+            st.session_state.current_page = 0
+
+        current_page = st.session_state.current_page
 
         # Filter out system messages and tool messages (PDF content is now automatically injected)
         display_messages = []

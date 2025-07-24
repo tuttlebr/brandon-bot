@@ -7,12 +7,18 @@ following the Model-View-Controller pattern.
 
 import logging
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, AsyncGenerator, Dict, List, Optional, Type
 
 from models.chat_config import ChatConfig
 from pydantic import Field
 from services.llm_client_service import llm_client_service
-from tools.base import BaseTool, BaseToolResponse, ToolController, ToolView
+from tools.base import (
+    BaseTool,
+    BaseToolResponse,
+    StreamingToolResponse,
+    ToolController,
+    ToolView,
+)
 from utils.config import config as app_config
 from utils.pdf_extractor import PDFDataExtractor
 from utils.text_processing import strip_think_tags
@@ -56,6 +62,24 @@ class ConversationContextResponse(BaseToolResponse):
     def result(self) -> str:
         """Get the analysis result for direct responses"""
         return self.analysis
+
+
+class StreamingConversationContextResponse(StreamingToolResponse):
+    """Streaming response from conversation context analysis"""
+
+    user_intent: Optional[str] = Field(None, description="Identified user intent")
+    conversation_type: Optional[str] = Field(None, description="Type of conversation")
+    key_topics: Optional[List[str]] = Field(None, description="Key topics identified")
+    has_document: bool = Field(
+        default=False, description="Whether a document is being discussed"
+    )
+    document_info: Optional[str] = Field(
+        None, description="Information about the document if present"
+    )
+    direct_response: bool = Field(
+        default=True,
+        description="Flag indicating this response should be returned directly to user",
+    )
 
 
 class ConversationContextController(ToolController):
@@ -107,6 +131,65 @@ class ConversationContextController(ToolController):
             params.get("pdf_data"),
         )
 
+    async def process_async(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Process the conversation context analysis request asynchronously"""
+        if "query" not in params:
+            raise ValueError("'query' key is required in parameters dictionary")
+        if "max_messages" not in params:
+            raise ValueError("'max_messages' key is required in parameters dictionary")
+
+        # Validate context type
+        try:
+            context_enum = ContextType(params["query"].lower())
+        except ValueError:
+            raise ValueError(
+                f"Invalid query: {params['query']}. Must be one of: {[t.value for t in ContextType]}"
+            )
+
+        # Limit messages to the requested count, excluding system messages
+        messages = params.get("messages", [])
+        filtered_messages = []
+        for msg in reversed(messages):
+            if msg.get("role") != "system":
+                filtered_messages.append(msg)
+                if len(filtered_messages) >= params["max_messages"]:
+                    break
+
+        # Reverse back to chronological order
+        filtered_messages.reverse()
+
+        logger.debug(
+            f"Context analysis: {params['query']}, {len(filtered_messages)} messages"
+        )
+
+        # Create config from environment
+        config = ChatConfig.from_environment()
+
+        # Create streaming generator
+        content_generator = self._analyze_conversation_context_streaming(
+            context_enum,
+            filtered_messages,
+            config,
+            params.get("focus_query"),
+            params.get("pdf_data"),
+        )
+
+        # Return streaming response data
+        return {
+            "content_generator": content_generator,
+            "conversation_type": context_enum.value,
+            "has_document": params.get("pdf_data") is not None,
+            "document_info": (
+                params.get("pdf_data", {}).get(
+                    "info", "No additional document information"
+                )
+                if params.get("pdf_data")
+                else "No additional document information"
+            ),
+            "direct_response": True,
+            "is_streaming": True,
+        }
+
     def _analyze_conversation_context(
         self,
         context_type: ContextType,
@@ -115,24 +198,28 @@ class ConversationContextController(ToolController):
         focus_query: Optional[str] = None,
         pdf_data: Dict[str, Any] = None,
     ) -> Dict[str, Any]:
-        """Analyze conversation messages to generate context"""
+        """
+        Analyze conversation context using LLM (non-streaming)
 
-        logger.info(
-            f"Analyzing {len(messages)} messages for context type: {context_type}"
-        )
+        Args:
+            context_type: Type of context analysis
+            messages: Conversation messages
+            config: Chat configuration
+            focus_query: Optional specific aspect to focus on
+            pdf_data: Optional PDF data being discussed
 
+        Returns:
+            Analysis results dictionary
+        """
         try:
-            # Get the appropriate client and model based on this tool's LLM type
+            # Get LLM client and model
             client = llm_client_service.get_client(self.llm_type)
             model_name = llm_client_service.get_model_name(self.llm_type)
 
-            # Get system prompt with tool-specific override support
-            from tools.tool_llm_config import get_tool_system_prompt
+            logger.info(f"Analyzing {context_type.value} context")
 
-            default_prompt = self._get_system_prompt(context_type, focus_query)
-            system_prompt = get_tool_system_prompt(
-                "conversation_context", default_prompt
-            )
+            # Get system prompt for the specific context type
+            system_prompt = self._get_system_prompt(context_type, focus_query)
 
             # Prepare conversation history for analysis
             conversation_text = self._format_messages_for_analysis(messages)
@@ -140,23 +227,20 @@ class ConversationContextController(ToolController):
             if context_type == ContextType.RECENT_TOPICS:
                 user_message = f"Extract and list the main topics from this conversation:\n\n{conversation_text}"
             elif context_type == ContextType.USER_PREFERENCES:
-                user_message = f"Analyze user preferences and patterns from this conversation:\n\n{conversation_text}"
+                user_message = f"Analyze the user's preferences and interaction patterns from this conversation:\n\n{conversation_text}"
             elif context_type == ContextType.TASK_CONTINUITY:
-                user_message = f"Analyze the ongoing task or goal in this conversation:\n\n{conversation_text}"
-            elif context_type == ContextType.DOCUMENT_ANALYSIS:
-                # For document analysis, we need to get the document content and analyze it
-                document_content = self._get_document_content(messages, pdf_data)
-                if document_content:
-                    if focus_query:
-                        user_message = f"Analyze this document content focusing specifically on '{focus_query}' and relate it to the conversation context:\n\nDocument Content:\n{document_content}\n\nConversation Context:\n{conversation_text}"
-                    else:
-                        user_message = f"Analyze this document content concisely in relation to the user's conversation context:\n\nDocument Content:\n{document_content}\n\nConversation Context:\n{conversation_text}"
-                else:
-                    user_message = f"Analyze the conversation for document-related queries and provide guidance (no document content found):\n\n{conversation_text}"
+                user_message = f"Track the task progression and identify next steps from this conversation:\n\n{conversation_text}"
             elif context_type == ContextType.CREATIVE_DIRECTOR:
-                user_message = f"Analyze this creative project conversation for continuity and guidance:\n\n{conversation_text}"
+                user_message = f"Maintain creative continuity and track project evolution from this conversation:\n\n{conversation_text}"
+            elif context_type == ContextType.DOCUMENT_ANALYSIS:
+                # Include document content if available
+                doc_content = self._get_document_content(messages, pdf_data)
+                if doc_content:
+                    user_message = f"Analyze this document in relation to the conversation:\n\nDocument Content:\n{doc_content}\n\nConversation:\n{conversation_text}"
+                else:
+                    user_message = f"Analyze document-related aspects of this conversation:\n\n{conversation_text}"
             else:  # CONVERSATION_SUMMARY
-                user_message = f"Provide a concise summary of this conversation:\n\n{conversation_text}"
+                user_message = f"Summarize this conversation and identify if the latest message requires action:\n\n{conversation_text}"
 
             if focus_query:
                 user_message += f"\n\nFocus particularly on: {focus_query}"
@@ -181,13 +265,16 @@ class ConversationContextController(ToolController):
 
             result = response.choices[0].message.content.strip()
 
+            # Strip think tags from result
+            result = strip_think_tags(result)
+
             # Extract key topics from the result
             key_topics = self._extract_key_topics(result, context_type)
 
             # Try to identify user intent
             user_intent = self._extract_user_intent(result, messages)
 
-            logger.info(f"Successfully generated {context_type} context")
+            logger.info(f"Successfully generated {context_type} context analysis")
 
             return {
                 "analysis": result,
@@ -206,62 +293,162 @@ class ConversationContextController(ToolController):
             logger.error(f"Error analyzing conversation context: {e}")
             raise
 
+    async def _analyze_conversation_context_async(
+        self,
+        context_type: ContextType,
+        messages: List[Dict[str, Any]],
+        config: ChatConfig,
+        focus_query: Optional[str] = None,
+        pdf_data: Dict[str, Any] = None,
+    ) -> Dict[str, Any]:
+        """
+        Analyze conversation context using LLM with streaming (collects full response)
+
+        This method is kept for compatibility but collects the full response.
+        For true streaming, use _analyze_conversation_context_streaming.
+        """
+        collected_result = ""
+        async for chunk in self._analyze_conversation_context_streaming(
+            context_type, messages, config, focus_query, pdf_data
+        ):
+            collected_result += chunk
+
+        # Extract metadata after collecting full response
+        key_topics = self._extract_key_topics(collected_result, context_type)
+        user_intent = self._extract_user_intent(collected_result, messages)
+
+        return {
+            "analysis": collected_result,
+            "user_intent": user_intent,
+            "conversation_type": context_type.value,
+            "key_topics": key_topics,
+            "has_document": pdf_data is not None,
+            "document_info": (
+                pdf_data.get("info", "No additional document information")
+                if pdf_data
+                else "No additional document information"
+            ),
+        }
+
+    async def _analyze_conversation_context_streaming(
+        self,
+        context_type: ContextType,
+        messages: List[Dict[str, Any]],
+        config: ChatConfig,
+        focus_query: Optional[str] = None,
+        pdf_data: Dict[str, Any] = None,
+    ) -> AsyncGenerator[str, None]:
+        """
+        Stream conversation context analysis using LLM
+
+        Args:
+            context_type: Type of context analysis
+            messages: Conversation messages
+            config: Chat configuration
+            focus_query: Optional specific aspect to focus on
+            pdf_data: Optional PDF data being discussed
+
+        Yields:
+            Analysis response chunks
+        """
+        from utils.text_processing import StreamingThinkTagFilter
+
+        try:
+            # Get async LLM client and model
+            client = llm_client_service.get_async_client(self.llm_type)
+            model_name = llm_client_service.get_model_name(self.llm_type)
+
+            logger.info(f"Analyzing {context_type.value} context with streaming")
+
+            # Get system prompt for the specific context type
+            system_prompt = self._get_system_prompt(context_type, focus_query)
+
+            # Prepare conversation history for analysis
+            conversation_text = self._format_messages_for_analysis(messages)
+
+            if context_type == ContextType.RECENT_TOPICS:
+                user_message = f"Extract and list the main topics from this conversation:\n\n{conversation_text}"
+            elif context_type == ContextType.USER_PREFERENCES:
+                user_message = f"Analyze the user's preferences and interaction patterns from this conversation:\n\n{conversation_text}"
+            elif context_type == ContextType.TASK_CONTINUITY:
+                user_message = f"Track the task progression and identify next steps from this conversation:\n\n{conversation_text}"
+            elif context_type == ContextType.CREATIVE_DIRECTOR:
+                user_message = f"Maintain creative continuity and track project evolution from this conversation:\n\n{conversation_text}"
+            elif context_type == ContextType.DOCUMENT_ANALYSIS:
+                # Include document content if available
+                doc_content = self._get_document_content(messages, pdf_data)
+                if doc_content:
+                    user_message = f"Analyze this document in relation to the conversation:\n\nDocument Content:\n{doc_content}\n\nConversation:\n{conversation_text}"
+                else:
+                    user_message = f"Analyze document-related aspects of this conversation:\n\n{conversation_text}"
+            else:  # CONVERSATION_SUMMARY
+                user_message = f"Summarize this conversation and identify if the latest message requires action:\n\n{conversation_text}"
+
+            if focus_query:
+                user_message += f"\n\nFocus particularly on: {focus_query}"
+
+            analysis_messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ]
+
+            logger.debug(
+                f"Making streaming context analysis request with model: {model_name} (type: {self.llm_type})"
+            )
+
+            response = await client.chat.completions.create(
+                model=model_name,
+                messages=analysis_messages,
+                temperature=app_config.llm.DEFAULT_TEMPERATURE,
+                top_p=app_config.llm.DEFAULT_TOP_P,
+                presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,
+                frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
+                stream=True,  # Enable streaming
+            )
+
+            # Create think tag filter for streaming
+            think_filter = StreamingThinkTagFilter()
+
+            # Process stream with think tag filtering and yield chunks
+            async for chunk in response:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    chunk_content = chunk.choices[0].delta.content
+                    # Filter think tags from the chunk
+                    filtered_content = think_filter.process_chunk(chunk_content)
+                    if filtered_content:
+                        yield filtered_content
+
+            # Yield any remaining content from the filter
+            final_content = think_filter.flush()
+            if final_content:
+                yield final_content
+
+        except Exception as e:
+            logger.error(f"Error in streaming conversation context analysis: {e}")
+            yield f"Error analyzing context: {str(e)}"
+
     def _get_system_prompt(
         self, context_type: ContextType, focus_query: Optional[str] = None
     ) -> str:
         """Get the appropriate system prompt for context analysis"""
+        from tools.tool_llm_config import get_tool_system_prompt
 
-        base_prompts = {
-            ContextType.CONVERSATION_SUMMARY: """You are summarizing the conversation history to provide context.
-
-Create a concise overview that captures the main themes and user objectives.
-
-CRITICAL: For the most recent user message, clearly identify:
-
-1. ACTION REQUESTS: Messages that explicitly ask for something to be done
-   - Contains action verbs: create, generate, make, analyze, search, etc.
-   - Example: "Create an image of a purple duck" → ACTION REQUEST
-   - Example: "Generate another one" → ACTION REQUEST
-
-2. ACKNOWLEDGMENTS: Messages that acknowledge or respond to completed actions
-   - Example: "Thank you" → ACKNOWLEDGMENT (no action needed)
-   - Example: "Perfect!" → ACKNOWLEDGMENT (no action needed)
-   - Example: "Thanks!" → ACKNOWLEDGMENT (no action needed)
-   - Example: "Great" → ACKNOWLEDGMENT (no action needed)
-
-3. MIXED MESSAGES: Acknowledgment + new request
-   - Example: "Thanks! Now create a blue cat" → ACKNOWLEDGMENT + ACTION REQUEST
-   - Example: "Perfect! Can you make another one?" → ACKNOWLEDGMENT + ACTION REQUEST
-
-For completed tasks, note them as COMPLETED only if they were actually executed (not just discussed).
-
-MOST IMPORTANT: Clearly state if the latest user message is:
-- ACKNOWLEDGMENT_ONLY: Just thanking or commenting, no new action needed
-- ACTION_REQUEST: Requesting a new action to be performed
-- MIXED: Contains both acknowledgment and new request
-
-Be explicit: Does the latest message require action? YES or NO.
-Keep the summary focused and within 200 words.""",
-            ContextType.RECENT_TOPICS: """You are identifying and listing the main topics discussed in the conversation.
-
-Extract and enumerate the primary discussion threads. Note recurring themes and the current focus of engagement. Include relevant related topics that may be important. Prioritize topics that are most relevant to ongoing tasks or questions.""",
-            ContextType.USER_PREFERENCES: """You are analyzing user interaction patterns and preferences.
-
-Identify the user's communication style, typical request types, and preferred response formats. Note any stated constraints or preferences. Assess the user's apparent expertise level and information needs based on their interactions.""",
-            ContextType.TASK_CONTINUITY: """You are tracking task progression and continuity.
-
-Identify the main task or objective being pursued. Document completed steps and current progress. Determine what stage the user is at in their task. Anticipate likely next steps and information needs. Provide essential context for seamless task continuation.""",
-            ContextType.CREATIVE_DIRECTOR: """You are maintaining creative project continuity and coherence.
-
-Track the creative project's vision, scope, and goals. Document the evolution of core ideas and concepts. Ensure consistency in tone, style, and narrative direction. Identify opportunities for enhancement or new perspectives. Maintain an awareness of referenced materials and inspirations.""",
-            ContextType.DOCUMENT_ANALYSIS: """You are analyzing document content in relation to the conversation.
-
-Summarize key points, themes, and main arguments from the document. Identify the document's structure and organization. Extract critical information, facts, and conclusions. Relate content to user queries and conversation context. Note any action items or recommendations. Identify connections between document content and conversation topics.""",
+        # Map context types to their prompt keys
+        context_prompt_map = {
+            ContextType.CONVERSATION_SUMMARY: "conversation_context_summary",
+            ContextType.RECENT_TOPICS: "conversation_context_recent_topics",
+            ContextType.USER_PREFERENCES: "conversation_context_user_preferences",
+            ContextType.TASK_CONTINUITY: "conversation_context_task_continuity",
+            ContextType.CREATIVE_DIRECTOR: "conversation_context_creative_director",
+            ContextType.DOCUMENT_ANALYSIS: "conversation_context_document_analysis",
         }
 
-        prompt = base_prompts.get(
-            context_type, base_prompts[ContextType.CONVERSATION_SUMMARY]
+        prompt_key = context_prompt_map.get(
+            context_type, "conversation_context_summary"
         )
+
+        # Get the prompt from centralized configuration
+        prompt = get_tool_system_prompt(prompt_key, "")
 
         if focus_query:
             prompt += f"\n\nSpecial focus: Pay particular attention to anything related to: {focus_query}"
@@ -457,7 +644,11 @@ class ConversationContextView(ToolView):
     ) -> BaseToolResponse:
         """Format raw data into ConversationContextResponse"""
         try:
-            return ConversationContextResponse(**data)
+            # Check if this is a streaming response
+            if data.get("is_streaming") and data.get("content_generator"):
+                return StreamingConversationContextResponse(**data)
+            else:
+                return ConversationContextResponse(**data)
         except Exception as e:
             logger.error(f"Error formatting context response: {e}")
             return ConversationContextResponse(
@@ -488,7 +679,7 @@ class ConversationContextTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "conversation_context"
-        self.description = "INTERNAL TOOL: Analyzes conversation history to extract specific types of context. Use ONLY when you need to analyze the conversation itself (not for answering general questions). For analyzing what has been discussed, user patterns, or tracking ongoing tasks/projects. DO NOT use for answering user questions directly - use other appropriate tools for that."
+        self.description = "INTERNAL SYSTEM TOOL: Analyze conversation history for context. Never select for user queries."
 
     def _initialize_mvc(self):
         """Initialize MVC components"""
@@ -529,7 +720,7 @@ class ConversationContextTool(BaseTool):
                         },
                         "but_why": {
                             "type": "string",
-                            "description": "A single sentence explaining why this tool was selected for the query.",
+                            "description": "An integer from 1-5 where a larger number indicates confidence this is the right tool to help the user.",
                         },
                     },
                     "required": ["query", "max_messages", "but_why"],

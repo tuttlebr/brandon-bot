@@ -120,14 +120,6 @@ class LLMService:
             # Get tool definitions
             tools = get_all_tool_definitions()
 
-            # Inject enhanced descriptions to improve tool selection
-            try:
-                from tools.tool_description_injector import inject_enhanced_descriptions
-
-                tools = inject_enhanced_descriptions(tools)
-            except ImportError:
-                logger.debug("Enhanced tool descriptions not available")
-
             # Check if the user message is an acknowledgment
             from tools.tool_descriptions import (
                 extract_actual_request,
@@ -372,10 +364,19 @@ class LLMService:
                     if tool_name == "generate_image":
                         continue
 
-                    content = response.get("content", "")
-                    if content and content.strip():
-                        # Yield the direct response content as chunks
-                        yield content
+                    # Check if this is a streaming response
+                    if response.get("is_streaming") and response.get(
+                        "content_generator"
+                    ):
+                        # Yield chunks from the streaming generator
+                        async for chunk in response["content_generator"]:
+                            yield chunk
+                    else:
+                        # Non-streaming direct response
+                        content = response.get("content", "")
+                        if content and content.strip():
+                            # Yield the direct response content as chunks
+                            yield content
             return
         else:
             # Stream the final synthesized response using the tool's configured LLM type

@@ -87,6 +87,13 @@ class SessionController:
             # Store models in session state
             self._store_session_state(session, user)
 
+            # Initialize UI state
+            if not hasattr(st.session_state, "current_page"):
+                st.session_state.current_page = config.ui.CURRENT_PAGE_DEFAULT
+                logging.info(
+                    f"Initialized current_page to {config.ui.CURRENT_PAGE_DEFAULT}"
+                )
+
             # Initialize system prompt with full tools list
             # Ensure tools are initialized first
             from tools.registry import get_all_tool_definitions

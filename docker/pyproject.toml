@@ -18,6 +18,7 @@ dependencies = [
     "streamlit==1.46.1",
     "openmeteo-py==0.0.1",
     "streamlit-authenticator==0.4.2",
+    "aiohttp==3.12.14"
 ]
 
 [project.optional-dependencies]

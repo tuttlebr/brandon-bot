@@ -30,6 +30,9 @@ class ProductionStreamlitChatApp:
             # Initialize configuration using centralized system
             self.config_obj = ChatConfig.from_environment()
 
+            # Apply mobile optimization styles
+            # apply_mobile_styles() # Removed as per edit hint
+
             # Tools and LLM client service are already initialized in startup.initialize_app()
             # Just verify they're available
             from tools.registry import get_all_tool_definitions
@@ -45,6 +48,7 @@ class ProductionStreamlitChatApp:
                 animation_duration=12.0,  # Slower, more majestic rotation
                 enable_3d_depth=True,  # Keep the 3D effects
             )
+
             components.html(custom_galaxy, height=300)
 
             # Initialize services

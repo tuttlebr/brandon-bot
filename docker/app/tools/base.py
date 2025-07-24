@@ -48,6 +48,24 @@ class BaseToolResponse(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
+class StreamingToolResponse(BaseToolResponse):
+    """Base response model for tools that support streaming
+
+    This response type allows tools to return an async generator that yields
+    content chunks as they arrive, enabling true end-to-end streaming.
+    """
+
+    content_generator: Optional[Any] = Field(
+        None, description="Async generator that yields content chunks"
+    )
+    is_streaming: bool = Field(
+        default=True, description="Flag indicating this is a streaming response"
+    )
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
 class ToolController(ABC):
     """Abstract controller for tool business logic"""
 

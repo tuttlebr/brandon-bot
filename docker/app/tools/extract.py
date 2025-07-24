@@ -7,7 +7,7 @@ following the Model-View-Controller pattern.
 
 import logging
 import re
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, AsyncGenerator, Dict, List, Optional, Type
 from urllib.parse import urlparse
 
 import requests
@@ -18,24 +18,41 @@ from tools.base import (
     BaseTool,
     BaseToolResponse,
     ExecutionMode,
+    StreamingToolResponse,
     ToolController,
     ToolView,
 )
-from utils.text_processing import strip_think_tags
+from utils.text_processing import StreamingThinkTagFilter, strip_think_tags
+from utils.web_extractor import WebDataExtractor
 
 # Configure logger
 logger = logging.getLogger(__name__)
 
 
-class ExtractResult(BaseToolResponse):
-    """Result from URL extraction"""
+class WebExtractResponse(BaseToolResponse):
+    """Response from URL extraction"""
 
-    url: str = Field(description="The URL that was extracted")
-    content: str = Field(description="Extracted content in markdown format")
+    url: str = Field(description="The extracted URL")
+    content: str = Field(description="The extracted and processed content")
+    title: Optional[str] = Field(None, description="Page title if found")
     raw_content: Optional[str] = Field(
-        None, description="Raw HTML content if available"
+        None, description="Raw content before processing"
     )
-    response_time: float = Field(description="Response time for the extraction")
+    direct_response: bool = Field(
+        default=True,
+        description="Flag indicating this response should be returned directly to user",
+    )
+
+
+class StreamingExtractResponse(StreamingToolResponse):
+    """Streaming response from URL extraction"""
+
+    url: str = Field(description="The extracted URL")
+    title: Optional[str] = Field(None, description="Page title if found")
+    direct_response: bool = Field(
+        default=True,
+        description="Flag indicating this response should be returned directly to user",
+    )
 
 
 class WebExtractController(ToolController):
@@ -57,52 +74,154 @@ class WebExtractController(ToolController):
     def process(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Process the web extraction request"""
         url = params['url']
-        messages = params.get('messages', [])
-
-        # Validate URL format
-        if not self._validate_url(url):
-            raise ValueError(
-                f"Invalid URL format: '{url}'. Please provide a valid HTTP or HTTPS URL."
-            )
-
-        # Check if URL was provided by user (if messages are available)
-        if messages and not self._check_user_provided_url(url, messages):
-            raise ValueError(
-                "I can only extract content from URLs that you directly provide in your message."
-            )
+        request = params.get('request', '')
 
         try:
-            # Fetch HTML content
-            logger.debug(f"Fetching HTML content from: '{url}'")
-            html_content, response_time = self._fetch_html_content(url)
+            # Extract content from URL
+            extractor = WebDataExtractor(
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                }
+            )
 
-            # Extract content using LLM
-            logger.debug(f"Extracting content using LLM for: '{url}'")
-            extracted_content = self._extract_with_llm(html_content, url)
+            # Extract content from URL synchronously
+            result = extractor.extract_sync(url)
+
+            if not result["success"]:
+                raise RuntimeError(
+                    f"Failed to extract content from {url}: {result.get('error', 'Unknown error')}"
+                )
+
+            content = result["content"]
+            title = result.get("title", "")
+            raw_content = content  # Store raw content for reference
+
+            # If no specific request, return raw content
+            if not request:
+                formatted_content = f"# {title}\n\n{content}" if title else content
+                return {
+                    "url": url,
+                    "content": formatted_content,
+                    "title": title,
+                    "raw_content": raw_content,
+                }
+
+            # Process with LLM using streaming internally for faster latency
+            processed_content = self._extract_with_llm(url, content, request, title)
 
             return {
                 "url": url,
-                "content": extracted_content,
-                "raw_content": html_content,
-                "response_time": response_time,
+                "content": processed_content,
+                "title": title,
+                "raw_content": raw_content,
             }
 
-        except requests.exceptions.Timeout:
-            raise TimeoutError(
-                f"Request timeout: The webpage at '{url}' took too long to respond."
-            )
-        except requests.exceptions.HTTPError as e:
-            raise ConnectionError(
-                f"HTTP error {e.response.status_code}: Unable to access '{url}'."
-            )
-        except requests.exceptions.RequestException as e:
-            raise ConnectionError(f"Network error: Unable to connect to '{url}'.")
-        except ValueError:
-            # Re-raise ValueError for content type errors
-            raise
         except Exception as e:
-            logger.error(f"Unexpected error during web extraction: {e}")
-            raise RuntimeError(f"An unexpected error occurred: {str(e)}")
+            logger.error(f"Error processing URL {url}: {e}")
+            raise RuntimeError(f"Failed to process {url}: {str(e)}")
+
+    async def process_async(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Process the URL extraction request asynchronously with streaming"""
+        url = params["url"]
+        request = params.get("request", "")
+        stream = params.get("stream", True)  # Default to streaming
+
+        try:
+            # Extract content from URL
+            extractor = WebDataExtractor(
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                }
+            )
+
+            # Extract content from URL with timeout
+            import asyncio
+
+            try:
+                extraction_task = asyncio.create_task(extractor.extract(url))
+                result = await asyncio.wait_for(extraction_task, timeout=30.0)
+            except asyncio.TimeoutError:
+                logger.error(f"Timeout extracting content from {url}")
+
+                # Return error with streaming response
+                async def error_generator():
+                    yield f"Failed to extract content from {url}: Request timed out after 30 seconds"
+
+                return {
+                    "url": url,
+                    "content_generator": error_generator(),
+                    "title": None,
+                    "success": False,
+                    "error_message": "Request timed out",
+                    "is_streaming": True,
+                    "direct_response": True,
+                }
+
+            if not result["success"]:
+                # Return error with streaming response
+                async def error_generator():
+                    yield f"Failed to extract content from {url}: {result.get('error', 'Unknown error')}"
+
+                return {
+                    "url": url,
+                    "content_generator": error_generator(),
+                    "title": result.get("title"),
+                    "success": False,
+                    "error_message": result.get("error", "Unknown error"),
+                    "is_streaming": True,
+                    "direct_response": True,
+                }
+
+            content = result["content"]
+            title = result.get("title", "")
+            raw_content = content  # Store raw content for reference
+
+            # If no specific request, create streaming response with raw content
+            if not request:
+
+                async def content_generator():
+                    yield f"# {title}\n\n" if title else ""
+                    yield content
+
+                return {
+                    "url": url,
+                    "content_generator": content_generator(),
+                    "title": title,
+                    "success": True,
+                    "is_streaming": True,
+                    "direct_response": True,
+                }
+
+            # Process with LLM using streaming
+            content_generator = self._extract_with_llm_streaming(
+                url, content, request, title
+            )
+
+            return {
+                "url": url,
+                "content_generator": content_generator,
+                "title": title,
+                "success": True,
+                "is_streaming": True,
+                "direct_response": True,
+            }
+
+        except Exception as e:
+            logger.error(f"Error processing URL {url}: {e}")
+
+            # Return error with streaming response
+            async def error_generator():
+                yield f"Failed to process {url}: {str(e)}"
+
+            return {
+                "url": url,
+                "content_generator": error_generator(),
+                "title": None,
+                "success": False,
+                "error_message": str(e),
+                "is_streaming": True,
+                "direct_response": True,
+            }
 
     def _extract_urls_from_text(self, text: str) -> List[str]:
         """Extract URLs from text using regex"""
@@ -183,14 +302,106 @@ class WebExtractController(ToolController):
             logger.error(f"Error fetching URL {url}: {e}")
             raise
 
-    def _extract_with_llm(self, html_content: str, url: str) -> str:
-        """Extract content from HTML using LLM"""
+    def _extract_with_llm(
+        self, url: str, content: str, request: str, title: str = ""
+    ) -> str:
+        """
+        Extract content using sync LLM with streaming for faster first token
+
+        Args:
+            url: The URL being processed
+            content: The extracted content
+            request: The user's request
+            title: The page title
+
+        Returns:
+            Processed content as string
+        """
         try:
-            client = llm_client_service.get_client(self.llm_type)
+            # Get sync LLM client and model
+            from models.chat_config import ChatConfig
+            from openai import OpenAI
+
+            config_obj = ChatConfig.from_environment()
+
+            # Get appropriate client based on tool's llm_type
+            if self.llm_type == "fast":
+                client = OpenAI(
+                    api_key=config_obj.fast_api_key, base_url=config_obj.fast_endpoint
+                )
+                model_name = config_obj.fast_model_name
+            else:  # default
+                client = OpenAI(
+                    api_key=config_obj.api_key, base_url=config_obj.endpoint
+                )
+                model_name = config_obj.model_name
+
+            # Create system prompt for extraction
+            system_prompt = f"""You are a helpful assistant that processes web content.
+Your task is to respond to the user's request based on the provided web content.
+
+Content URL: {url}
+Content Title: {title}
+
+Instructions:
+- Focus on the user's specific request
+- Provide clear, well-structured responses
+- Maintain accuracy to the source content
+- Include relevant quotes when appropriate
+- If the content doesn't contain information to answer the request, say so clearly"""
+
+            # Prepare messages
+            user_message = f"""Based on the following web content, {request}:
+
+{content}"""
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ]
+
+            logger.debug(f"Processing web content with {model_name} for {url}")
+
+            # Generate response with streaming for faster first token
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                temperature=0.0,
+                stream=True,  # Enable streaming for faster latency
+            )
+
+            # Create think tag filter for streaming
+            think_filter = StreamingThinkTagFilter()
+            collected_response = ""
+
+            # Process stream with think tag filtering
+            for chunk in response:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    chunk_content = chunk.choices[0].delta.content
+                    # Filter think tags from the chunk
+                    filtered_content = think_filter.process_chunk(chunk_content)
+                    if filtered_content:
+                        collected_response += filtered_content
+
+            # Get any remaining content from the filter
+            final_content = think_filter.flush()
+            if final_content:
+                collected_response += final_content
+
+            return collected_response.strip()
+
+        except Exception as e:
+            logger.error(f"Error extracting content with LLM: {e}")
+            raise
+
+    async def _extract_with_llm_async(self, html_content: str, url: str) -> str:
+        """Extract content from HTML using LLM asynchronously"""
+        try:
+            client = llm_client_service.get_async_client(self.llm_type)
             model_name = llm_client_service.get_model_name(self.llm_type)
 
             logger.debug(
-                f"Using LLM type '{self.llm_type}' for web extraction (configured in tool_llm_config.py)"
+                f"Using LLM type '{self.llm_type}' for async web extraction (configured in tool_llm_config.py)"
             )
 
             if len(html_content) > 200000:
@@ -198,24 +409,13 @@ class WebExtractController(ToolController):
                     html_content[:200000] + "\n[Content truncated due to length]"
                 )
                 logger.info(
-                    f"Truncated HTML content to 300k characters for LLM processing"
+                    f"Truncated HTML content to 200k characters for LLM processing"
                 )
 
-            system_prompt = """You are an expert HTML to markdown converter. Your task is to extract the main content from web pages and convert it to clean, readable markdown format.
+            # Get system prompt from centralized configuration
+            from tools.tool_llm_config import get_tool_system_prompt
 
-Instructions:
-1. Extract ONLY the main article/content from the webpage
-2. Ignore navigation menus, sidebars, advertisements, headers, footers, and other peripheral content
-3. Convert the content to clean markdown format
-4. Preserve the structure and hierarchy of the content using appropriate markdown headers
-5. Include any relevant images, links, and formatting from the main content
-6. Do not add any commentary, explanations, or meta-information about the extraction process
-7. Never mention that you extracted content or reference the source URL in the output
-8. If the page contains mostly navigation or non-content elements, extract what meaningful content you can find
-9. Remove any JavaScript, CSS, or other non-content elements
-10. The content should be returned verbatim, not summarized
-
-Output only the extracted markdown content with no additional commentary."""
+            system_prompt = get_tool_system_prompt("extract_web_content", "")
 
             user_message = f"Extract the main content from this webpage and convert it to markdown:\n\nURL: {url}\n\nHTML Content:\n{html_content}"
 
@@ -224,28 +424,123 @@ Output only the extracted markdown content with no additional commentary."""
                 {"role": "user", "content": user_message},
             ]
 
-            logger.debug(f"Processing HTML content with LLM model: {model_name}")
+            logger.info(
+                f"Extracting content from URL using {model_name} (async non-streaming)"
+            )
 
-            response = client.chat.completions.create(
+            response = await client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                temperature=0.3,
+                max_tokens=10000,
+                top_p=0.9,
+            )
+
+            result = response.choices[0].message.content.strip()
+
+            # Clean and validate the extracted content
+            cleaned_result = self._clean_extracted_content(result)
+
+            logger.info(
+                f"Successfully extracted {len(cleaned_result)} characters from URL (async)"
+            )
+
+            return cleaned_result
+
+        except Exception as e:
+            logger.error(f"Error extracting content with async LLM: {e}")
+            raise
+
+    async def _extract_with_llm_streaming(
+        self, url: str, content: str, request: str, title: str = ""
+    ) -> AsyncGenerator[str, None]:
+        """
+        Stream extraction using LLM to transform/summarize/answer questions
+
+        Args:
+            url: The URL being processed
+            content: The extracted content
+            request: The user's request
+            title: The page title
+
+        Yields:
+            Processed content chunks
+        """
+        try:
+            # Get async LLM client and model
+            client = llm_client_service.get_async_client(self.llm_type)
+            model_name = llm_client_service.get_model_name(self.llm_type)
+
+            # Create system prompt for extraction
+            system_prompt = f"""You are a helpful assistant that processes web content.
+Your task is to respond to the user's request based on the provided web content.
+
+Content URL: {url}
+Content Title: {title}
+
+Instructions:
+- Focus on the user's specific request
+- Provide clear, well-structured responses
+- Maintain accuracy to the source content
+- Include relevant quotes when appropriate
+- If the content doesn't contain information to answer the request, say so clearly"""
+
+            # Prepare messages
+            user_message = f"""Based on the following web content, {request}:
+
+{content}"""
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ]
+
+            logger.debug(
+                f"Streaming web content transformation with {model_name} for {url}"
+            )
+
+            # Generate response with streaming
+            response = await client.chat.completions.create(
                 model=model_name,
                 messages=messages,
                 temperature=0.0,
-                stream=False,
+                stream=True,  # Enable streaming
             )
 
-            extracted_content = response.choices[0].message.content.strip()
+            # Create think tag filter for streaming
+            think_filter = StreamingThinkTagFilter()
 
-            # Strip think tags immediately after LLM response
-            extracted_content = strip_think_tags(extracted_content)
+            # Process stream with think tag filtering and yield chunks
+            async for chunk in response:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    chunk_content = chunk.choices[0].delta.content
+                    # Filter think tags from the chunk
+                    filtered_content = think_filter.process_chunk(chunk_content)
+                    if filtered_content:
+                        yield filtered_content
 
-            # Clean up any remaining HTML artifacts and thinking tags
-            extracted_content = self._clean_extracted_content(extracted_content)
-
-            return extracted_content
+            # Yield any remaining content from the filter
+            final_content = think_filter.flush()
+            if final_content:
+                yield final_content
 
         except Exception as e:
-            logger.error(f"Error extracting content with LLM: {e}")
-            raise
+            logger.error(f"Error in streaming extraction: {e}")
+            yield f"Error processing content: {str(e)}"
+
+    async def _extract_with_llm_streaming_collected(
+        self, url: str, content: str, request: str, title: str = ""
+    ) -> str:
+        """
+        Process extraction using LLM with streaming but collect the full response.
+        This method is kept for compatibility.
+        """
+        collected_result = ""
+        async for chunk in self._extract_with_llm_streaming(
+            url, content, request, title
+        ):
+            collected_result += chunk
+        return collected_result
 
     def _clean_extracted_content(self, content: str) -> str:
         """Clean up extracted content for better readability"""
@@ -277,24 +572,27 @@ class WebExtractView(ToolView):
     def format_response(
         self, data: Dict[str, Any], response_type: Type[BaseToolResponse]
     ) -> BaseToolResponse:
-        """Format raw data into ExtractResult"""
+        """Format raw data into WebExtractResponse"""
         try:
-            return ExtractResult(**data)
+            # Check if this is a streaming response
+            if data.get("is_streaming") and data.get("content_generator"):
+                return StreamingExtractResponse(**data)
+            else:
+                return WebExtractResponse(**data)
         except Exception as e:
-            logger.error(f"Error formatting extract response: {e}")
-            return ExtractResult(
+            logger.error(f"Error formatting extraction response: {e}")
+            return WebExtractResponse(
                 url=data.get("url", ""),
                 content="",
                 success=False,
                 error_message=f"Response formatting error: {str(e)}",
                 error_code="FORMAT_ERROR",
-                response_time=0.0,
             )
 
     def format_error(
         self, error: Exception, response_type: Type[BaseToolResponse]
     ) -> BaseToolResponse:
-        """Format error into ExtractResult"""
+        """Format error into WebExtractResponse"""
         error_code = "UNKNOWN_ERROR"
         error_message = str(error)
 
@@ -313,7 +611,7 @@ class WebExtractView(ToolView):
             else:
                 error_code = "NETWORK_ERROR"
 
-        return ExtractResult(
+        return WebExtractResponse(
             url="",
             content="",
             success=False,
@@ -329,8 +627,10 @@ class WebExtractTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "extract_web_content"
-        self.description = "ONLY use when explicitly asked to read, extract, or analyze content from a specific web URL that the user provides. Extracts and reads content from web URLs provided by the user, converting web pages into clean, readable markdown format using LLM-based processing. DO NOT use for general questions, information lookup, or when no specific URL is provided."
-        self.execution_mode = ExecutionMode.SYNC
+        self.description = "Extract and read content from a specific URL. Use when user provides a URL AND asks to read or analyze it."
+        self.execution_mode = (
+            ExecutionMode.AUTO
+        )  # Changed to AUTO to support both sync and async
         self.timeout = 60.0
 
     def _initialize_mvc(self):
@@ -352,9 +652,13 @@ class WebExtractTool(BaseTool):
                             "type": "string",
                             "description": "The web URL to extract content from. Must be a valid HTTP or HTTPS URL.",
                         },
-                        "but_why": {
+                        "request": {
                             "type": "string",
-                            "description": "A single sentence explaining why this tool was selected for the query.",
+                            "description": "Optional specific request about what to extract or how to process the content (e.g., 'summarize the main points', 'extract pricing information'). If empty, returns the full extracted content.",
+                        },
+                        "but_why": {
+                            "type": "integer",
+                            "description": "An integer from 1-5 where a larger number indicates confidence this is the right tool to help the user.",
                         },
                     },
                     "required": ["url", "but_why"],
@@ -364,7 +668,7 @@ class WebExtractTool(BaseTool):
 
     def get_response_type(self) -> Type[BaseToolResponse]:
         """Get the response type for this tool"""
-        return ExtractResult
+        return WebExtractResponse
 
 
 # Helper functions for backward compatibility
@@ -386,7 +690,7 @@ def get_web_extract_tool_definition() -> Dict[str, Any]:
 # Internal helper function used by other tools
 def execute_web_extract_batch(
     urls: List[str], messages: Optional[List[Dict[str, Any]]] = None
-) -> List[ExtractResult]:
+) -> List[WebExtractResponse]:
     """
     Execute batch web content extraction
 
@@ -395,7 +699,7 @@ def execute_web_extract_batch(
         messages: Optional conversation messages to verify URL sources
 
     Returns:
-        List of ExtractResult objects, one for each URL
+        List of WebExtractResponse objects, one for each URL
     """
     from tools.registry import execute_tool
 
@@ -414,7 +718,7 @@ def execute_web_extract_batch(
         except Exception as e:
             logger.error(f"Failed to extract {url}: {e}")
             results.append(
-                ExtractResult(
+                WebExtractResponse(
                     url=url,
                     content="",
                     success=False,

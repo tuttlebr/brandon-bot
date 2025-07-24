@@ -66,7 +66,12 @@ class DocumentAnalyzerService:
             client = llm_client_service.get_async_client(self.llm_type)
             model_name = llm_client_service.get_model_name(self.llm_type)
 
-            system_prompt = f"""You are analyzing a {document_type} to gather information and omit irrelevant or confusing information which will be used to provide a direct answer to the user's question or instructions: {instructions}"""
+            # Get system prompt from centralized configuration
+            from tools.tool_llm_config import get_tool_system_prompt
+
+            base_prompt = get_tool_system_prompt("document_analysis", "")
+            # Interpolate document type into the prompt
+            system_prompt = base_prompt.replace("a document", f"a {document_type}")
 
             if filename:
                 user_message = f"Based on the document '{filename}', please answer this question: {instructions}\n\nDocument:\n{document_text}"
@@ -99,6 +104,100 @@ class DocumentAnalyzerService:
 
         except Exception as e:
             logger.error(f"Error analyzing document: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def analyze_document_streaming(
+        self,
+        document_text: str,
+        instructions: str,
+        document_type: str = "document",
+        filename: Optional[str] = None,
+    ) -> Dict[str, any]:
+        """
+        Analyze a document using LLM with streaming response
+
+        Args:
+            document_text: The document text to analyze
+            instructions: Analysis instructions or questions
+            document_type: Type of document (default: "document")
+            filename: Optional filename for context
+
+        Returns:
+            Dictionary with analysis results
+        """
+        from utils.text_processing import StreamingThinkTagFilter
+
+        try:
+            # Check if the document is too large
+            estimated_tokens = len(document_text) // 4
+            max_tokens = 50000  # Conservative limit for analysis
+
+            if estimated_tokens > max_tokens:
+                logger.warning(
+                    f"Document too large ({estimated_tokens} estimated tokens), analyzing in chunks"
+                )
+                return await self._analyze_large_document_chunked(
+                    document_text, instructions, document_type, filename
+                )
+
+            client = llm_client_service.get_async_client(self.llm_type)
+            model_name = llm_client_service.get_model_name(self.llm_type)
+
+            # Get system prompt from centralized configuration
+            from tools.tool_llm_config import get_tool_system_prompt
+
+            base_prompt = get_tool_system_prompt("document_analysis", "")
+            # Interpolate document type into the prompt
+            system_prompt = base_prompt.replace("a document", f"a {document_type}")
+
+            if filename:
+                user_message = f"Based on the document '{filename}', please answer this question: {instructions}\n\nDocument:\n{document_text}"
+            else:
+                user_message = f"Please analyze the following document and answer this question: {instructions}\n\nDocument:\n{document_text}"
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ]
+
+            logger.info(f"Analyzing document with streaming {model_name}")
+
+            response = await client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                temperature=app_config.llm.DEFAULT_TEMPERATURE,
+                top_p=app_config.llm.DEFAULT_TOP_P,
+                frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
+                presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,
+                stream=True,  # Enable streaming
+            )
+
+            # Create think tag filter for streaming
+            think_filter = StreamingThinkTagFilter()
+            collected_result = ""
+
+            # Process stream with think tag filtering
+            async for chunk in response:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    chunk_content = chunk.choices[0].delta.content
+                    # Filter think tags from the chunk
+                    filtered_content = think_filter.process_chunk(chunk_content)
+                    if filtered_content:
+                        collected_result += filtered_content
+
+            # Get any remaining content from the filter
+            final_content = think_filter.flush()
+            if final_content:
+                collected_result += final_content
+
+            return {
+                "success": True,
+                "result": collected_result,
+                "processing_notes": f"Document analysis completed for query: {instructions[:100]}{'...' if len(instructions) > 100 else ''}",
+            }
+
+        except Exception as e:
+            logger.error(f"Error analyzing document with streaming: {e}")
             return {"success": False, "error": str(e)}
 
     async def _analyze_large_document_chunked(
@@ -214,7 +313,12 @@ class DocumentAnalyzerService:
             client = llm_client_service.get_async_client(self.llm_type)
             model_name = llm_client_service.get_model_name(self.llm_type)
 
-            system_prompt = f"""You are analyzing a {document_type} to answer specific questions or provide analysis. Your response should be a concise response to the user's question or instructions. Similar to an executive summary."""
+            # Get system prompt from centralized configuration
+            from tools.tool_llm_config import get_tool_system_prompt
+
+            base_prompt = get_tool_system_prompt("document_analysis", "")
+            # Interpolate document type into the prompt
+            system_prompt = base_prompt.replace("a document", f"a {document_type}")
 
             if filename:
                 user_message = f"Based on the document '{filename}', please answer this question: {instructions}\n\nDocument:\n{chunk_text}"

@@ -250,6 +250,18 @@ class ToolRegistry:
             if tool:
                 try:
                     definition = tool.get_definition()
+
+                    # Override description with enhanced version if configured
+                    if config.tools.USE_ENHANCED_DESCRIPTIONS:
+                        from tools.tool_descriptions import get_tool_description
+
+                        enhanced_desc = get_tool_description(name)
+                        if enhanced_desc and not enhanced_desc.startswith("Tool '"):
+                            definition["function"]["description"] = enhanced_desc
+                            logger.debug(
+                                f"Using enhanced description for tool '{name}'"
+                            )
+
                     definitions.append(definition)
                     logger.debug(f"Added tool definition for '{name}'")
                 except Exception as e:

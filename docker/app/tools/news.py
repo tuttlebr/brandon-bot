@@ -43,7 +43,7 @@ class NewsTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "tavily_news_search"
-        self.description = "Specialized news search tool for finding recent news articles, breaking news, current events, and latest developments from trusted news sources. Use this for: breaking news, recent events, political updates, sports scores, market updates, celebrity news, or any time-sensitive current events. Only use for news-related queries, not general information or facts."
+        self.description = "Search specifically for news articles and breaking events. Use when user explicitly asks for news, headlines, or current events."
 
     def _initialize_mvc(self):
         """Initialize MVC components"""
@@ -71,8 +71,8 @@ class NewsTool(BaseTool):
                             "description": "The search query for recent news, breaking news, or current events (only use for news-related topics)",
                         },
                         "but_why": {
-                            "type": "string",
-                            "description": "A single sentence explaining why this tool was selected for the query.",
+                            "type": "integer",
+                            "description": "An integer from 1-5 where a larger number indicates confidence this is the right tool to help the user.",
                         },
                     },
                     "required": ["query", "but_why"],
@@ -101,7 +101,7 @@ class NewsTool(BaseTool):
             List of high-scoring search results with extracted content added
         """
         # Filter results with score >= 0.4
-        high_scoring_results = [result for result in results if result.score >= 0.4]
+        high_scoring_results = [result for result in results if result.score >= 0.2]
 
         if not high_scoring_results:
             logger.debug(

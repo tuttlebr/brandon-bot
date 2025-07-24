@@ -7,7 +7,7 @@ that doesn't require external data or specialized tools, following MVC pattern.
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, AsyncGenerator, Dict, List, Optional, Type
 
 from pydantic import Field
 from services.llm_client_service import llm_client_service
@@ -15,10 +15,11 @@ from tools.base import (
     BaseTool,
     BaseToolResponse,
     ExecutionMode,
+    StreamingToolResponse,
     ToolController,
     ToolView,
 )
-from utils.text_processing import strip_think_tags
+from utils.text_processing import StreamingThinkTagFilter, strip_think_tags
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,16 @@ class GeneralistResponse(BaseToolResponse):
 
     query: str = Field(description="The original user query")
     response: str = Field(description="The conversational response")
+    direct_response: bool = Field(
+        default=True,
+        description="Flag indicating this response should be returned directly to user",
+    )
+
+
+class StreamingGeneralistResponse(StreamingToolResponse):
+    """Streaming response from the generalist tool"""
+
+    query: str = Field(description="The original user query")
     direct_response: bool = Field(
         default=True,
         description="Flag indicating this response should be returned directly to user",
@@ -81,6 +92,76 @@ class GeneralistController(ToolController):
         except Exception as e:
             logger.error(f"Error generating generalist response: {e}")
             raise
+
+    async def process_async(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Process the generalist conversation request asynchronously with streaming"""
+        query = params['query']
+        messages = params.get('messages')
+
+        try:
+            # Create streaming generator
+            content_generator = self._generate_streaming_response(query, messages)
+
+            return {
+                "query": query,
+                "content_generator": content_generator,
+                "direct_response": True,
+                "is_streaming": True,
+            }
+
+        except Exception as e:
+            logger.error(f"Error setting up streaming generalist response: {e}")
+            raise
+
+    async def _generate_streaming_response(
+        self, query: str, messages: Optional[List[Dict[str, Any]]]
+    ) -> AsyncGenerator[str, None]:
+        """Generate streaming response for generalist conversation"""
+        try:
+            # Get async LLM client and model based on tool configuration
+            client = llm_client_service.get_async_client(self.llm_type)
+            model_name = llm_client_service.get_model_name(self.llm_type)
+
+            # Create system prompt for general conversation
+            system_prompt = self._get_system_prompt()
+
+            # Build conversation messages
+            final_messages = self._build_conversation_messages(
+                system_prompt, query, messages
+            )
+
+            logger.debug(
+                f"Generating streaming conversational response using {model_name}"
+            )
+
+            # Generate response with streaming
+            response = await client.chat.completions.create(
+                model=model_name,
+                messages=final_messages,
+                temperature=0.0,
+                stream=True,  # Enable streaming
+            )
+
+            # Create think tag filter for streaming
+            think_filter = StreamingThinkTagFilter()
+
+            # Process stream with think tag filtering and yield chunks
+            async for chunk in response:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    chunk_content = chunk.choices[0].delta.content
+                    # Filter think tags from the chunk
+                    filtered_content = think_filter.process_chunk(chunk_content)
+                    if filtered_content:
+                        yield filtered_content
+
+            # Yield any remaining content from the filter
+            final_content = think_filter.flush()
+            if final_content:
+                yield final_content
+
+        except Exception as e:
+            logger.error(f"Error in streaming generalist response: {e}")
+            yield f"Error generating response: {str(e)}"
 
     def _get_system_prompt(self) -> str:
         """Get the system prompt for general conversation"""
@@ -144,16 +225,19 @@ class GeneralistView(ToolView):
     ) -> BaseToolResponse:
         """Format raw data into GeneralistResponse"""
         try:
-            return GeneralistResponse(**data)
+            # Check if this is a streaming response
+            if data.get("is_streaming") and data.get("content_generator"):
+                return StreamingGeneralistResponse(**data)
+            else:
+                return GeneralistResponse(**data)
         except Exception as e:
             logger.error(f"Error formatting generalist response: {e}")
             return GeneralistResponse(
                 query=data.get("query", ""),
-                response=f"I apologize, but I encountered an error while processing your message.",
+                response="",
                 success=False,
                 error_message=f"Response formatting error: {str(e)}",
                 error_code="FORMAT_ERROR",
-                direct_response=True,
             )
 
     def format_error(
@@ -191,9 +275,9 @@ class GeneralistTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "generalist_conversation"
-        self.description = "ONLY use for general conversation, explanations, discussions, advice, or topics that don't require external data, real-time information, or specialized tools. Use for: philosophical discussions, explaining concepts, creative writing, general advice, casual conversation, or when the user wants to have a thoughtful discussion about any topic. DO NOT use for current events, weather, searches, image analysis, document processing, or any task that requires external data - use appropriate specialized tools for those."
+        self.description = "Handle general conversation without external tools. Use for explanations, discussions, advice, creative writing, and casual chat."
         self.supported_contexts = ['general_conversation', 'discussion', 'explanation']
-        self.execution_mode = ExecutionMode.SYNC
+        self.execution_mode = ExecutionMode.AUTO  # Support both sync and async
         self.timeout = 30.0
 
     def _initialize_mvc(self):
@@ -216,8 +300,8 @@ class GeneralistTool(BaseTool):
                             "description": "The user's message or question exactly as they provided it",
                         },
                         "but_why": {
-                            "type": "string",
-                            "description": "A single sentence explaining why this tool was selected for the query.",
+                            "type": "integer",
+                            "description": "An integer from 1-5 where a larger number indicates confidence this is the right tool to help the user.",
                         },
                     },
                     "required": ["query", "but_why"],

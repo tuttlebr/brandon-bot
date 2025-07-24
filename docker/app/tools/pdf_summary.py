@@ -53,7 +53,7 @@ class PDFSummaryTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "retrieve_pdf_summary"
-        self.description = "ONLY use this when explicitly asked to summarize a PDF document or when the user specifically mentions 'summarize the PDF', 'summarize the document', or similar phrases. Generates executive summaries of PDF documents, providing both document-level overviews and page-by-page summaries for large PDFs. DO NOT use for general questions, web searches, or when no PDF is being discussed. If someone provides a URL, this is not the correct tool as you cannot download PDF URLs."
+        self.description = "Get quick summary of uploaded PDF documents. Use when user uploads a PDF AND wants an overview or summary."
         self.supported_contexts = ['pdf_analysis']
         self.summarization_service = None  # Will be initialized on first use
 
@@ -84,8 +84,8 @@ class PDFSummaryTool(BaseTool):
                             "description": "Type of summary to retrieve: 'document' for overall summary, 'pages' for page-level summaries, 'all' for both, 'debug' for troubleshooting",
                         },
                         "but_why": {
-                            "type": "string",
-                            "description": "A single sentence explaining why this tool was selected for the query.",
+                            "type": "integer",
+                            "description": "An integer from 1-5 where a larger number indicates confidence this is the right tool to help the user.",
                         },
                     },
                     "required": ["but_why"],

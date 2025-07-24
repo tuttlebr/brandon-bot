@@ -44,7 +44,7 @@ class TavilyTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "tavily_internet_search"
-        self.description = "Search the internet for real-time information using Tavily API. Use this for finding current information and any non-news queries that require up-to-date information from the web. You shouldn't need this for things that are general knowledge or may be determined using logic. For news-specific queries, use the tavily_news_search tool instead."
+        self.description = "Search the internet for current information and real-time data. Use for up-to-date facts, current events, or information that changes frequently."
 
     def _initialize_mvc(self):
         """Initialize MVC components"""
@@ -72,8 +72,8 @@ class TavilyTool(BaseTool):
                             "description": "The search query to find information about any topic",
                         },
                         "but_why": {
-                            "type": "string",
-                            "description": "A single sentence explaining why this tool was selected for the query.",
+                            "type": "integer",
+                            "description": "An integer from 1-5 where a larger number indicates confidence this is the right tool to help the user.",
                         },
                     },
                     "required": ["query", "but_why"],

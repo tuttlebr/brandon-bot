@@ -1,269 +1,301 @@
 """
 Tool Descriptions and Selection Guidelines
 
-This module provides enhanced tool descriptions and decision logic to help
-the primary tool-calling LLM make better tool selection choices.
+This module provides the SINGLE SOURCE OF TRUTH for all tool descriptions,
+metadata, and decision logic to help the primary tool-calling LLM make better
+tool selection choices.
 """
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
+
+# SINGLE SOURCE OF TRUTH for all tool descriptions and metadata
+TOOL_DEFINITIONS = {
+    "generate_image": {
+        "description": "Generate AI images from text descriptions. Use when user requests creating, generating, making, or drawing images.",
+        "trigger_words": [
+            "generate",
+            "create",
+            "make",
+            "draw",
+            "design",
+            "produce",
+            "render",
+        ],
+        "anti_trigger_words": [
+            "thanks",
+            "thank you",
+            "great",
+            "nice",
+            "good",
+            "perfect",
+            "looks",
+            "is",
+            "what",
+            "how",
+            "why",
+            "can you",
+        ],
+        "requires_action_verb": True,
+        "example_uses": [
+            "Generate an image of a sunset",
+            "Create a picture of a cat",
+            "Make me a logo design",
+        ],
+        "example_non_uses": [
+            "Thanks! (acknowledgment - no tool needed)",
+            "That looks great (comment - no tool needed)",
+            "Perfect! (acknowledgment - no tool needed)",
+        ],
+    },
+    "text_assistant": {
+        "description": "Process text with specific operations: summarize, translate, proofread, rewrite, analyze documents, or develop code. Use when user provides text AND requests processing.",
+        "trigger_words": [
+            "analyze",
+            "summarize",
+            "proofread",
+            "rewrite",
+            "translate",
+            "critic",
+            "develop",
+            "process",
+            "edit",
+        ],
+        "anti_trigger_words": [
+            "thanks",
+            "what is",
+            "how does",
+            "tell me about",
+            "explain",
+        ],
+        "requires_target_text": True,
+        "example_uses": [
+            "Summarize this article: [text]",
+            "Proofread my essay: [text]",
+            "Translate this to Spanish: [text]",
+            "Analyze this document: [text]",
+        ],
+        "example_non_uses": [
+            "What is machine learning? (general question - no tool needed)",
+            "How are you? (conversation - no tool needed)",
+            "Thanks for the help (acknowledgment - no tool needed)",
+        ],
+    },
+    "analyze_image": {
+        "description": "Analyze uploaded images to describe content or answer visual questions. Use when user uploads an image AND asks about it.",
+        "trigger_words": [
+            "look at",
+            "analyze",
+            "describe",
+            "what's in",
+            "identify",
+            "examine",
+        ],
+        "context_requirement": "uploaded_image",
+        "example_uses": [
+            "What's in this image? (with uploaded image)",
+            "Describe what you see (with uploaded image)",
+            "Is there a cat in this picture? (with uploaded image)",
+        ],
+        "example_non_uses": [
+            "Generate an image (use generate_image instead)",
+            "What is a cat? (no image uploaded - no tool needed)",
+            "Thanks for analyzing (acknowledgment - no tool needed)",
+        ],
+    },
+    "tavily_internet_search": {
+        "description": "Search the internet for current information and real-time data. Use for up-to-date facts, current events, or information that changes frequently.",
+        "trigger_words": [
+            "search",
+            "find",
+            "look up",
+            "current",
+            "latest",
+            "recent",
+            "today",
+            "now",
+        ],
+        "anti_trigger_words": ["thanks", "what is", "explain", "tell me about"],
+        "requires_specific_query": True,
+        "example_uses": [
+            "What's happening in tech today?",
+            "Search for latest AI developments",
+            "Find current stock prices",
+        ],
+        "example_non_uses": [
+            "What is Python? (general knowledge - no tool needed)",
+            "How does gravity work? (general knowledge - no tool needed)",
+            "Thanks for the search results (acknowledgment - no tool needed)",
+        ],
+    },
+    "generalist_conversation": {
+        "description": "DEFAULT: Handle general conversation without external tools. Use for explanations, discussions, advice, creative writing, and casual chat.",
+        "is_default": True,
+        "example_uses": [
+            "What is machine learning?",
+            "Tell me about philosophy",
+            "Can you explain quantum physics?",
+            "Thanks for your help!",
+            "That's interesting!",
+            "How are you?",
+        ],
+    },
+    "get_weather": {
+        "description": "Get current weather for a specific location. Use when user asks for weather, temperature, or forecast AND provides a city/location.",
+        "trigger_words": [
+            "weather",
+            "temperature",
+            "forecast",
+            "rain",
+            "snow",
+            "sunny",
+            "cloudy",
+        ],
+        "requires_location": True,
+        "example_uses": [
+            "What's the weather in Paris?",
+            "Is it raining in Seattle?",
+            "Temperature in Tokyo today?",
+        ],
+        "example_non_uses": [
+            "Thanks for the weather info (acknowledgment - no tool needed)",
+            "What causes rain? (general question - no tool needed)",
+            "Tell me about weather patterns (general topic - no tool needed)",
+        ],
+    },
+    "retrieval_search": {
+        "description": "Search specialized knowledge base for mental health resources or NVIDIA technical documentation. Use ONLY for these specific domains.",
+        "trigger_words": [
+            "nvidia",
+            "gpu",
+            "cuda",
+            "mental health",
+            "therapy",
+            "depression",
+            "anxiety",
+        ],
+        "specialized_domains": ["nvidia", "mental_health"],
+        "example_uses": [
+            "Tell me about NVIDIA GPUs",
+            "What is CUDA programming?",
+            "Information about depression treatment",
+        ],
+        "example_non_uses": [
+            "What is a computer? (general topic - no tool needed)",
+            "How does AI work? (general topic - no tool needed)",
+            "Thanks! (acknowledgment - no tool needed)",
+        ],
+    },
+    "conversation_context": {
+        "description": "INTERNAL SYSTEM TOOL: Analyze conversation history for context. Never select for user queries.",
+        "is_internal": True,
+        "never_use_for_user_queries": True,
+    },
+    "extract_web_content": {
+        "description": "Extract and read content from a specific URL. Use when user provides a URL AND asks to read or analyze it.",
+        "trigger_words": ["read", "extract", "analyze", "check", "look at"],
+        "requires_url": True,
+        "example_uses": [
+            "Read this article: https://example.com",
+            "Extract content from https://example.com",
+            "What does this webpage say: [URL]",
+        ],
+        "example_non_uses": [
+            "Search for information about X (use tavily_internet_search)",
+            "Find me articles about Y (use tavily_internet_search)",
+            "Thanks! (acknowledgment - no tool needed)",
+        ],
+    },
+    "retrieve_pdf_summary": {
+        "description": "Get quick summary of uploaded PDF documents. Use when user uploads a PDF AND wants an overview or summary.",
+        "context_requirement": "uploaded_pdf",
+        "trigger_words": ["summary", "summarize", "overview", "brief"],
+        "example_uses": [
+            "Summarize this PDF (with uploaded PDF)",
+            "Give me an overview of the document (with uploaded PDF)",
+            "What's the main point of this PDF? (with uploaded PDF)",
+        ],
+    },
+    "process_pdf_text": {
+        "description": "Process specific pages or answer questions about uploaded PDFs. Use for detailed PDF analysis, specific page extraction, or Q&A about PDF content.",
+        "context_requirement": "uploaded_pdf",
+        "trigger_words": [
+            "page",
+            "section",
+            "extract",
+            "process",
+            "question",
+            "analyze",
+        ],
+        "requires_page_specification": False,  # Changed to allow general Q&A
+        "example_uses": [
+            "Extract text from page 5",
+            "What does the PDF say about methodology?",
+            "Analyze the conclusions section",
+        ],
+    },
+    "tavily_news_search": {
+        "description": "Search specifically for news articles and breaking events. Use when user explicitly asks for news, headlines, or current events.",
+        "trigger_words": ["news", "headlines", "breaking", "events", "happening"],
+        "is_specialized_search": True,
+        "example_uses": [
+            "What's in the news today?",
+            "Latest headlines about AI",
+            "Breaking news from tech industry",
+        ],
+    },
+}
 
 
 class ToolDescriptionEnhancer:
     """Enhances tool descriptions with context-aware guidance"""
 
-    # Enhanced descriptions that emphasize when NOT to use each tool
-    ENHANCED_DESCRIPTIONS = {
-        "generate_image": {
-            "description": "Creates AI-generated images based on text descriptions. ONLY use when user explicitly asks to 'create', 'generate', 'make', or 'draw' an image. DO NOT use for: acknowledgments ('thanks', 'great'), follow-up comments, questions about existing images, or any non-creation requests.",
-            "trigger_words": [
-                "generate",
-                "create",
-                "make",
-                "draw",
-                "design",
-                "produce",
-                "render",
-            ],
-            "anti_trigger_words": [
-                "thanks",
-                "thank you",
-                "great",
-                "nice",
-                "good",
-                "perfect",
-                "looks",
-                "is",
-                "what",
-                "how",
-                "why",
-                "can you",
-            ],
-            "requires_action_verb": True,
-            "example_uses": [
-                "Generate an image of a sunset",
-                "Create a picture of a cat",
-                "Make me a logo design",
-            ],
-            "example_non_uses": [
-                "Thanks! (acknowledgment - no tool needed)",
-                "That looks great (comment - no tool needed)",
-                "Perfect! (acknowledgment - no tool needed)",
-            ],
-        },
-        "text_assistant": {
-            "description": "Processes text and documents through various operations. ONLY use when user explicitly requests text processing: analyze, summarize, proofread, rewrite, translate, critique, or code development. DO NOT use for: general questions, acknowledgments, or when no text processing is explicitly requested.",
-            "trigger_words": [
-                "analyze",
-                "summarize",
-                "proofread",
-                "rewrite",
-                "translate",
-                "critic",
-                "develop",
-                "process",
-                "edit",
-            ],
-            "anti_trigger_words": [
-                "thanks",
-                "what is",
-                "how does",
-                "tell me about",
-                "explain",
-            ],
-            "requires_target_text": True,
-            "example_uses": [
-                "Summarize this article",
-                "Proofread my essay",
-                "Translate this to Spanish",
-            ],
-            "example_non_uses": [
-                "What is machine learning?",
-                "How are you?",
-                "Thanks for the help (acknowledgment - no tool needed)",
-            ],
-        },
-        "analyze_image": {
-            "description": "Analyzes uploaded images to describe content, identify objects, or answer visual questions. ONLY use when user asks about an image they've uploaded. DO NOT use for: generating images, text analysis, or general questions.",
-            "trigger_words": [
-                "look at",
-                "analyze",
-                "describe",
-                "what's in",
-                "identify",
-                "examine",
-            ],
-            "context_requirement": "uploaded_image",
-            "example_uses": [
-                "What's in this image?",
-                "Describe what you see",
-                "Is there a cat in this picture?",
-            ],
-            "example_non_uses": [
-                "Generate an image (use generate_image)",
-                "Thanks for analyzing (acknowledgment - no tool needed)",
-            ],
-        },
-        "tavily_internet_search": {
-            "description": "Searches the internet for current information, facts, and real-time data. ONLY use when user needs up-to-date information, current events, or facts that require web search. DO NOT use for: general knowledge, acknowledgments, or when information can be answered without search.",
-            "trigger_words": [
-                "search",
-                "find",
-                "look up",
-                "current",
-                "latest",
-                "recent",
-                "today",
-                "news",
-            ],
-            "anti_trigger_words": ["thanks", "what is", "explain", "tell me about"],
-            "requires_specific_query": True,
-            "example_uses": [
-                "What's the current weather in NYC?",
-                "Search for latest AI news",
-                "Find information about recent events",
-            ],
-            "example_non_uses": [
-                "What is Python?",
-                "How are you?",
-                "Thanks for the search results (acknowledgment - no tool needed)",
-            ],
-        },
-        "generalist_conversation": {
-            "description": "Engages in general conversation, explanations, and discussions without needing external data. Use for: philosophical discussions, concept explanations, general advice, creative writing, or casual chat. This is the DEFAULT tool when no specific action is requested.",
-            "is_default": True,
-            "example_uses": [
-                "What is machine learning?",
-                "Tell me about philosophy",
-                "Can you explain quantum physics?",
-                "Thanks for your help!",
-                "That's interesting!",
-            ],
-        },
-        "get_weather": {
-            "description": "Retrieves current weather data for specific locations. ONLY use when user explicitly asks for weather information. DO NOT use for: general climate questions, acknowledgments, or non-weather queries.",
-            "trigger_words": [
-                "weather",
-                "temperature",
-                "forecast",
-                "rain",
-                "snow",
-                "sunny",
-                "cloudy",
-            ],
-            "requires_location": True,
-            "example_uses": [
-                "What's the weather in Paris?",
-                "Is it raining in Seattle?",
-                "Temperature in Tokyo today?",
-            ],
-            "example_non_uses": [
-                "Thanks for the weather info (acknowledgment - no tool needed)",
-                "What causes rain?",
-                "How are you?",
-            ],
-        },
-        "retrieval_search": {
-            "description": "Searches a special database containing ONLY information about mental health, NVIDIA products and NVIDIA blogs.",
-            "trigger_words": [
-                "nvidia",
-                "gpu",
-                "cuda",
-                "mental health",
-                "therapy",
-                "depression",
-                "anxiety",
-            ],
-            "specialized_domains": ["nvidia", "mental_health"],
-            "example_uses": [
-                "Tell me about NVIDIA GPUs",
-                "What is CUDA programming?",
-                "Information about depression treatment",
-            ],
-            "example_non_uses": [
-                "What is a computer?",
-                "How are you?",
-                "Thanks! (acknowledgment - no tool needed)",
-            ],
-        },
-        "conversation_context": {
-            "description": "INTERNAL TOOL: Analyzes conversation history. NEVER use for direct user queries. Only for system-level conversation analysis when explicitly needed for continuity.",
-            "is_internal": True,
-            "never_use_for_user_queries": True,
-        },
-        "extract_web_content": {
-            "description": "Extracts and reads content from specific URLs provided by user. ONLY use when user provides a URL and asks to read/extract/analyze it. DO NOT use for: general web searches, acknowledgments, or when no URL is provided.",
-            "trigger_words": ["read", "extract", "analyze", "check"],
-            "requires_url": True,
-            "example_uses": [
-                "Read this article: https://example.com",
-                "Extract content from [URL]",
-                "What does this webpage say?",
-            ],
-            "example_non_uses": [
-                "Search for information (use tavily_internet_search)",
-                "Thanks! (acknowledgment - no tool needed)",
-            ],
-        },
-        "retrieve_pdf_summary": {
-            "description": "Retrieves summaries of uploaded PDF documents. ONLY use when user has uploaded a PDF and asks for a summary. DO NOT use for: general text, acknowledgments, or non-PDF content.",
-            "context_requirement": "uploaded_pdf",
-            "trigger_words": ["summary", "summarize", "overview"],
-            "example_uses": [
-                "Summarize this PDF",
-                "Give me an overview of the document",
-                "What's the main point of this PDF?",
-            ],
-        },
-        "process_pdf_text": {
-            "description": "Processes specific pages or sections of uploaded PDFs. ONLY use for detailed PDF text operations on specific pages. DO NOT use for: general summaries, acknowledgments, or non-PDF content.",
-            "context_requirement": "uploaded_pdf",
-            "trigger_words": ["page", "section", "extract", "process"],
-            "requires_page_specification": True,
-            "example_uses": [
-                "Extract text from page 5",
-                "Analyze pages 10-15",
-                "Process the methodology section",
-            ],
-        },
-        "tavily_news_search": {
-            "description": "Searches specifically for news articles and current events. ONLY use when user explicitly asks for news or recent events. DO NOT use for: general web search, acknowledgments, or non-news queries.",
-            "trigger_words": ["news", "headlines", "breaking", "events", "happening"],
-            "is_specialized_search": True,
-            "example_uses": [
-                "What's in the news today?",
-                "Latest headlines about AI",
-                "Breaking news from tech industry",
-            ],
-        },
-    }
+    # Use the single source of truth
+    ENHANCED_DESCRIPTIONS = TOOL_DEFINITIONS
 
     @classmethod
     def get_decision_prompt(cls) -> str:
         """Get the decision-making prompt for tool selection"""
         return """## Tool Selection Guidelines
 
-CRITICAL: Analyze the user's message carefully before selecting any tool.
+IMPORTANT: Tool selection is OPTIONAL. Most user messages do NOT require any tool. Default to NO TOOL selection unless clearly needed.
 
-1. **Acknowledgments and Comments**: If the user is saying thanks, acknowledging, or making a comment about previous output, DO NOT use any tool. Just respond conversationally.
+### Decision Process:
 
-2. **Action vs. Non-Action**: Determine if the user is requesting an ACTION or just making a statement/asking a general question.
-   - ACTION requests contain verbs like: create, generate, analyze, search, extract, etc.
-   - NON-ACTION includes: thanks, comments, general questions, acknowledgments
+1. **No Tool Needed (Most Common)**:
+   - Acknowledgments: "thanks", "great", "perfect", "nice", etc.
+   - General questions that can be answered from knowledge
+   - Casual conversation and chat
+   - Comments about previous responses
+   - Explanations of concepts
+   - Any message where you can provide a helpful response without external tools
 
-3. **Context Awareness**: Consider what just happened in the conversation.
-   - If you just generated an image and user says "thanks", they're acknowledging, not requesting another image
-   - If you just searched and user says "great", they're commenting, not requesting another search
+2. **Tool Selection Criteria**:
+   - User makes an EXPLICIT request matching tool functionality
+   - Request contains BOTH action verb AND target (e.g., "generate" + "image")
+   - Required context is present (e.g., uploaded file for file analysis)
+   - Information genuinely requires external data (e.g., current weather, today's news)
 
-4. **Default to No Tool**: When in doubt, especially for acknowledgments or general conversation, use NO tool and respond directly.
+3. **Red Flags Against Tool Use**:
+   - Message is primarily acknowledgment or comment
+   - General knowledge question
+   - No clear action requested
+   - Missing required context (no URL for extract_web_content, no image for analyze_image)
+   - Can be answered without external data
 
-5. **Specific Tool Requirements**:
-   - Image Generation: ONLY when explicitly asked to create/generate/make an image
-   - Text Processing: ONLY when given text to process with specific operation
-   - Search Tools: ONLY when user needs current/external information
-   - Weather: ONLY when asking for weather in a specific location
-   - PDF Tools: ONLY when user has uploaded a PDF and asks about it
+4. **Examples of NO TOOL Needed**:
+   - "Thanks!" → Just acknowledge
+   - "What is machine learning?" → Explain from knowledge
+   - "That's perfect" → Acknowledge their satisfaction
+   - "How does X work?" → Explain the concept
+   - "Tell me about Y" → Share knowledge
 
-Remember: Most "thanks", "great", "perfect", "nice" responses need NO tools - just acknowledge politely."""
+5. **Examples Requiring Tools**:
+   - "Generate an image of a cat" → generate_image
+   - "What's the weather in NYC?" → get_weather
+   - "Search for latest AI news" → tavily_internet_search
+   - "Analyze this image [uploaded]" → analyze_image
+
+Remember: When in doubt, NO TOOL is usually correct. Only select a tool when the user's request clearly matches its specific purpose AND cannot be fulfilled without it."""
 
     @classmethod
     def should_use_tool(
@@ -361,6 +393,34 @@ Remember: Most "thanks", "great", "perfect", "nice" responses need NO tools - ju
                 "dont_use": tool_info.get("example_non_uses", []),
             }
         return {"use": [], "dont_use": []}
+
+
+def get_tool_description(tool_name: str) -> str:
+    """
+    Get the description for a specific tool from the single source of truth.
+
+    Args:
+        tool_name: The name of the tool
+
+    Returns:
+        The tool description, or a default message if not found
+    """
+    if tool_name in TOOL_DEFINITIONS:
+        return TOOL_DEFINITIONS[tool_name]["description"]
+    return f"Tool '{tool_name}' - No description available"
+
+
+def get_tool_metadata(tool_name: str) -> Dict[str, Any]:
+    """
+    Get all metadata for a specific tool from the single source of truth.
+
+    Args:
+        tool_name: The name of the tool
+
+    Returns:
+        The tool metadata dictionary, or empty dict if not found
+    """
+    return TOOL_DEFINITIONS.get(tool_name, {})
 
 
 # Acknowledgment patterns that should NOT trigger tools

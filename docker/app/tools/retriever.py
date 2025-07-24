@@ -491,7 +491,7 @@ class RetrieverTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "retrieval_search"
-        self.description = "ONLY for mental health, NVIDIA products and NVIDIA blogs. Searches a special database containing ONLY information about mental health, NVIDIA products and NVIDIA blogs."
+        self.description = "Search specialized knowledge base for mental health resources or NVIDIA technical documentation. Use ONLY for these specific domains."
 
     def _initialize_mvc(self):
         """Initialize MVC components"""
@@ -533,8 +533,8 @@ class RetrieverTool(BaseTool):
                             "description": "The search query to find relevant documents",
                         },
                         "but_why": {
-                            "type": "string",
-                            "description": "A single sentence explaining why this tool was selected for the query.",
+                            "type": "integer",
+                            "description": "An integer from 1-5 where a larger number indicates confidence this is the right tool to help the user.",
                         },
                     },
                     "required": ["query", "but_why"],

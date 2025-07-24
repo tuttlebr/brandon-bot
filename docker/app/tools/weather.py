@@ -341,7 +341,7 @@ class WeatherTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "get_weather"
-        self.description = "Get current weather information for a specific location. Use this when users ask about weather conditions, temperature, or weather forecasts for any city or location."
+        self.description = "Get current weather for a specific location. Use when user asks for weather, temperature, or forecast AND provides a city/location."
         self.execution_mode = ExecutionMode.SYNC
         self.timeout = 10.0
 
@@ -365,8 +365,8 @@ class WeatherTool(BaseTool):
                             "description": "The city and state/country to get weather for (e.g., 'New York, NY' or 'London, UK')",
                         },
                         "but_why": {
-                            "type": "string",
-                            "description": "A single sentence explaining why this tool was selected for the query.",
+                            "type": "integer",
+                            "description": "An integer from 1-5 where a larger number indicates confidence this is the right tool to help the user.",
                         },
                     },
                     "required": ["location", "but_why"],

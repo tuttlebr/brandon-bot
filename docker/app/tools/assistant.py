@@ -250,7 +250,8 @@ class AssistantController(ToolController):
         if not text_task_type:
             raise ValueError(f"Unsupported text processing task: {task_type}")
 
-        result = await self.text_processor.process_text(
+        # Use streaming version for better performance
+        result = await self.text_processor.process_text_streaming(
             text_task_type, text, instructions, messages
         )
 
@@ -446,7 +447,7 @@ class AssistantTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "text_assistant"
-        self.description = "ONLY use for text and document processing tasks when explicitly requested. Use 'analyze' for document insights and PDF analysis, 'summarize' to condense long content into key points, 'proofread' to correct errors and improve writing quality, 'rewrite' to enhance clarity and impact while preserving meaning, 'critic' for constructive feedback and improvement suggestions, 'translate' to convert text between languages, or 'develop' for programming assistance and code writing. DO NOT use for image analysis, general questions, web searches, or information lookup - use appropriate specialized tools for those tasks."
+        self.description = "Process text with specific operations: summarize, translate, proofread, rewrite, analyze documents, or develop code. Use when user provides text AND requests processing."
         self.supported_contexts = ['translation', 'text_processing', 'code_generation']
 
     def _initialize_mvc(self):
@@ -493,8 +494,8 @@ class AssistantTool(BaseTool):
                             "description": "The target language for translation (required for translation tasks)",
                         },
                         "but_why": {
-                            "type": "string",
-                            "description": "A single sentence explaining why this tool was selected for the query.",
+                            "type": "integer",
+                            "description": "An integer from 1-5 where a larger number indicates confidence this is the right tool to help the user.",
                         },
                     },
                     "required": ["task_type", "text", "but_why"],

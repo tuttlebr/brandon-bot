@@ -6,7 +6,7 @@ from .conversation_context import (
     ConversationContextTool,
     get_conversation_context_tool_definition,
 )
-from .extract import ExtractResult, WebExtractTool, get_web_extract_tool_definition
+from .extract import WebExtractResponse, WebExtractTool, get_web_extract_tool_definition
 from .generalist import (
     GeneralistResponse,
     GeneralistTool,
@@ -65,7 +65,7 @@ __all__ = [
     # Response classes
     "AssistantResponse",
     "ConversationContextResponse",
-    "ExtractResult",
+    "WebExtractResponse",
     "GeneralistResponse",
     "ImageAnalysisResponse",
     "ImageGenerationResponse",

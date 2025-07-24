@@ -63,7 +63,7 @@ class ImageGenerationTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "generate_image"
-        self.description = "ONLY use when explicitly asked to create, generate, or make an image, picture, photo, artwork, or visual content. Creates AI-generated images based on text descriptions, supporting various artistic styles, moods, and aspect ratios. DO NOT use for general questions, information lookup, or non-image requests."
+        self.description = "Generate AI images from text descriptions. Use when user requests creating, generating, making, or drawing images."
         self.supported_contexts = ['image_generation']
         self.execution_mode = ExecutionMode.SYNC  # Image generation is synchronous
         self.timeout = 120.0  # Image generation can take longer
@@ -130,8 +130,8 @@ class ImageGenerationTool(BaseTool):
                             "default": True,
                         },
                         "but_why": {
-                            "type": "string",
-                            "description": "A single sentence explaining why this tool was selected for the query.",
+                            "type": "integer",
+                            "description": "An integer from 1-5 where a larger number indicates confidence this is the right tool to help the user.",
                         },
                     },
                     "required": ["user_prompt", "subject", "but_why"],
@@ -268,32 +268,12 @@ class ImageGenerationTool(BaseTool):
                 api_key=config.fast_llm_api_key, base_url=config.fast_llm_endpoint
             )
 
-            # Create enhancement prompt for the LLM
-            enhancement_system_prompt = """detailed thinking off
-            **Expert Prompt Refinement for AI Image Generation**
+            # Get enhancement prompt from centralized configuration
+            from tools.tool_llm_config import get_tool_system_prompt
 
-Acting as a seasoned imaging specialist, your task is to elevate a user's foundational image request into a sophisticated, visually evocative prompt that consistently yields high-impact results. Synergize technical precision with artistic nuance to meet the user's creative vision without imposing undue constraints.
-
-**CRITICAL RULE:** The user's original request MUST be the primary focus. Conversation context should only be used to add subtle enhancements, NOT to replace or overwhelm the original request.
-
-**CORE DIRECTIVES:**
-- **Vivid Specification:** Convert basic input into immersive, detailed descriptions that stimulate superior visual outputs.
-- **Artistic & Technical Integration:** Seamlessly incorporate relevant techniques (e.g., chiaroscuro, impasto), lighting dynamics, compositional principles, and atmospheric conditions.
-- **Contextual Harmony:** Naturally assimilate contextual information to enrich the prompt's narrative or conceptual depth WITHOUT changing the core subject.
-- **Creative Fidelity:** Preserve the user's core intent while augmenting with discipline-specific terminology (e.g., 'tenebrism' for dramatic lighting).
-- **Linguistic Precision:** Employ visceral, evocative language to supplant generic descriptors, amplifying visual impact.
-- **Visual Hierarchy:** Prioritize key elements: chromatic schemes, textural contrasts, luminous qualities, spatial composition, and perspectival choices.
-- **Concise Elegance:** Balance descriptive richness with brevity to avoid prompt fatigue. response should be only one or two sentences.
-- **Quality Signaling:** Embed style-appropriate quality indicators (e.g., '8K resolution' for photorealism, 'intricate linework' for digital art).
-
-**STYLE-SPECIFIC ENHANCEMENT PROTOCOLS:**
-- **Photorealistic:** Specify camera parameters (aperture, shutter speed), lighting setups (golden hour, rim lighting), and professional capture terminology.
-- **Digital Art:** Detail rendering methodologies (e.g., cel-shading, volumetric lighting), artistic software effects, and post-processing techniques.
-- **Oil Painting:** Reference classical approaches (e.g., alla prima, glazing), brushwork characteristics (visible strokes, impasto textures), and art historical periods (Baroque, Impressionist).
-- **Fantasy:** Integrate magical phenomena, ethereal luminosity, and mythopoeic motifs while maintaining visual coherence.
-- **Minimalist:** Emphasize austere composition, strategic negative space, and the strategic deployment of simple, potent visual elements.
-
-**OUTPUT PARAMETERS:** Deliver the refined prompt ONLY as sentences, no lists, no markdown, ensuring adherence to the aforementioned standards. Do not include any other text or comments regarding what you did to improved the prompt. The output MUST be about the original subject requested, not about conversation history or other topics."""
+            enhancement_system_prompt = get_tool_system_prompt(
+                "generate_image_enhancement", ""
+            )
 
             user_message = f"""**Original Request:** "{user_prompt}"
 **Subject:** {subject}

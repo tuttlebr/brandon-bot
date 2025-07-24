@@ -177,22 +177,34 @@ class ToolExecutionService:
 
         # Format response
         if hasattr(result, "direct_response") and result.direct_response:
-            # Get the content from the appropriate field
-            if hasattr(result, "message"):
-                content = result.message
-            elif hasattr(result, "result"):
-                content = result.result
-            elif hasattr(result, "response"):
-                content = result.response
+            # Check if this is a streaming response
+            if hasattr(result, "is_streaming") and result.is_streaming:
+                # Return streaming response with generator
+                return {
+                    "role": "direct_response",
+                    "content": "",  # Empty for streaming
+                    "content_generator": result.content_generator,
+                    "tool_name": tool_name,
+                    "tool_result": result,
+                    "is_streaming": True,
+                }
             else:
-                content = str(result)
+                # Get the content from the appropriate field for non-streaming
+                if hasattr(result, "message"):
+                    content = result.message
+                elif hasattr(result, "result"):
+                    content = result.result
+                elif hasattr(result, "response"):
+                    content = result.response
+                else:
+                    content = str(result)
 
-            return {
-                "role": "direct_response",
-                "content": content,
-                "tool_name": tool_name,
-                "tool_result": result,
-            }
+                return {
+                    "role": "direct_response",
+                    "content": content,
+                    "tool_name": tool_name,
+                    "tool_result": result,
+                }
         else:
             return {
                 "role": "tool",
