@@ -73,8 +73,8 @@ class WebExtractController(ToolController):
 
     def process(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Process the web extraction request"""
-        url = params['url']
-        request = params.get('request', '')
+        url = params["url"]
+        request = params.get("request", "")
 
         try:
             # Extract content from URL
@@ -273,7 +273,7 @@ class WebExtractController(ToolController):
 
         try:
             response = requests.get(
-                url, headers=self.headers, timeout=30, allow_redirects=True
+                url, headers=self.headers, timeout=5, allow_redirects=True
             )
             response.raise_for_status()
 
@@ -708,11 +708,7 @@ def execute_web_extract_batch(
         try:
             result = execute_tool(
                 "extract_web_content",
-                {
-                    "url": url,
-                    "messages": messages,
-                    "but_why": "Extracting web content as part of search result enrichment",
-                },
+                {"url": url, "messages": messages, "but_why": 5},
             )
             results.append(result)
         except Exception as e:

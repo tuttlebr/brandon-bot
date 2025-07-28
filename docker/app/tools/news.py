@@ -104,7 +104,7 @@ class NewsTool(BaseTool):
         high_scoring_results = [result for result in results if result.score >= 0.2]
 
         if not high_scoring_results:
-            logger.debug(
+            logger.warning(
                 "No high-scoring results found, attempting extraction for top result only"
             )
             if not results:
@@ -123,8 +123,46 @@ class NewsTool(BaseTool):
 
                 # Update with extracted content if successful
                 for extract_result in extract_results:
-                    if extract_result.success and extract_result.content:
-                        top_result.extracted_content = extract_result.content
+                    # Handle both WebExtractResponse and StreamingExtractResponse
+                    content = None
+                    if extract_result.success:
+                        if (
+                            hasattr(extract_result, 'content')
+                            and extract_result.content
+                        ):
+                            # Regular WebExtractResponse
+                            content = extract_result.content
+                        elif (
+                            hasattr(extract_result, 'content_generator')
+                            and extract_result.content_generator
+                        ):
+                            # StreamingExtractResponse - we need to collect the content
+                            try:
+                                import asyncio
+
+                                # Create a new event loop if one doesn't exist
+                                try:
+                                    loop = asyncio.get_event_loop()
+                                except RuntimeError:
+                                    loop = asyncio.new_event_loop()
+                                    asyncio.set_event_loop(loop)
+
+                                # Collect content from the async generator
+                                async def collect_content():
+                                    collected = ""
+                                    async for chunk in extract_result.content_generator:
+                                        collected += chunk
+                                    return collected
+
+                                content = loop.run_until_complete(collect_content())
+                            except Exception as e:
+                                logger.error(
+                                    f"Failed to collect streaming content from fallback result {extract_result.url}: {e}"
+                                )
+                                content = None
+
+                    if content:
+                        top_result.extracted_content = content
                         logger.debug(
                             f"Successfully extracted content from fallback result: {extract_result.url}"
                         )
@@ -156,8 +194,45 @@ class NewsTool(BaseTool):
             # Create a mapping of URL to extracted content
             url_to_content = {}
             for extract_result in extract_results:
-                if extract_result.success and extract_result.content:
-                    url_to_content[extract_result.url] = extract_result.content
+                logger.debug(f"Extract result: {extract_result}")
+
+                # Handle both WebExtractResponse and StreamingExtractResponse
+                content = None
+                if extract_result.success:
+                    if hasattr(extract_result, 'content') and extract_result.content:
+                        # Regular WebExtractResponse
+                        content = extract_result.content
+                    elif (
+                        hasattr(extract_result, 'content_generator')
+                        and extract_result.content_generator
+                    ):
+                        # StreamingExtractResponse - we need to collect the content
+                        try:
+                            import asyncio
+
+                            # Create a new event loop if one doesn't exist
+                            try:
+                                loop = asyncio.get_event_loop()
+                            except RuntimeError:
+                                loop = asyncio.new_event_loop()
+                                asyncio.set_event_loop(loop)
+
+                            # Collect content from the async generator
+                            async def collect_content():
+                                collected = ""
+                                async for chunk in extract_result.content_generator:
+                                    collected += chunk
+                                return collected
+
+                            content = loop.run_until_complete(collect_content())
+                        except Exception as e:
+                            logger.error(
+                                f"Failed to collect streaming content from {extract_result.url}: {e}"
+                            )
+                            content = None
+
+                if content:
+                    url_to_content[extract_result.url] = content
                     logger.debug(
                         f"Successfully extracted content from {extract_result.url}"
                     )
@@ -286,15 +361,15 @@ class NewsTool(BaseTool):
             "include_raw_content": False,
             "max_results": 5,
             "include_images": False,
-            "include_domains": [
-                "apnews.com",
-                "reuters.com",
-                "freep.com",
-                "bbc.com",
-                "propublica.org",
-                "espn.com",
-                "mlb.com",
-            ],
+            # "include_domains": [
+            #     "apnews.com",
+            #     "reuters.com",
+            #     "freep.com",
+            #     "bbc.com",
+            #     "propublica.org",
+            #     "espn.com",
+            #     "mlb.com",
+            # ],
         }
 
         # Update with any provided kwargs

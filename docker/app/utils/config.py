@@ -179,23 +179,17 @@ class ToolConfig:
     # Default configuration enables all standard tools
     ENABLED_TOOLS: Dict[str, bool] = field(
         default_factory=lambda: {
-            # Core text processing tools
             "text_assistant": True,
             "conversation_context": True,
-            # Web and search tools
             "extract_web_content": True,
             "tavily_internet_search": True,
             "tavily_news_search": True,
             "retrieval_search": True,
-            # Document processing tools
             "retrieve_pdf_summary": True,
             "process_pdf_text": True,
-            # Media tools
             "analyze_image": True,
             "generate_image": True,
-            # Utility tools
             "get_weather": True,
-            # Experimental tools
             "generalist_conversation": True,
         }
     )
