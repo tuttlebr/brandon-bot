@@ -21,9 +21,9 @@ def strip_think_tags(text: Optional[str]) -> str:
     pattern = r'<think>.*?</think>'
     cleaned_text = re.sub(pattern, '', text, flags=re.DOTALL | re.IGNORECASE)
 
-    # Clean up any double spaces or extra newlines that might be left
-    cleaned_text = re.sub(r'\n\s*\n\s*\n', '\n\n', cleaned_text)
-    cleaned_text = re.sub(r'  +', ' ', cleaned_text)
+    # # Clean up any double spaces or extra newlines that might be left
+    # cleaned_text = re.sub(r'\n\s*\n\s*\n', '\n\n', cleaned_text)
+    # cleaned_text = re.sub(r'  +', ' ', cleaned_text)
 
     return cleaned_text.strip()
 
