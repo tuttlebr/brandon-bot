@@ -188,35 +188,13 @@ class AssistantController(ToolController):
     ) -> Dict[str, Any]:
         """Handle document analysis tasks"""
 
-        # Check if this is PDF content
-        if self._is_pdf_content(text) and instructions:
-            # Parse PDF pages from context
-            pages = self._parse_pdf_content(text)
-            if pages:
-                # For analysis, try to load the complete document
-                complete_pages = self._load_complete_document_for_analysis(pages)
-                if complete_pages:
-                    logger.info(
-                        f"Loaded complete document with {len(complete_pages)} pages for analysis"
-                    )
-                    result = await self.document_analyzer.analyze_pdf_pages(
-                        complete_pages, instructions, "Document"
-                    )
-                else:
-                    # Fallback to context pages
-                    result = await self.document_analyzer.analyze_pdf_pages(
-                        pages, instructions, "Document"
-                    )
-            else:
-                # Fallback to regular document analysis
-                result = await self.document_analyzer.analyze_document(
-                    text, instructions or "Analyze this document"
-                )
-        else:
-            # Regular document analysis
-            result = await self.document_analyzer.analyze_document(
-                text, instructions or "Analyze this text"
-            )
+        # Note: PDF handling has been moved to pdf_assistant tool
+        # This now only handles plain text analysis
+
+        # Regular document analysis
+        result = await self.document_analyzer.analyze_document(
+            text, instructions or "Analyze this text"
+        )
 
         if result["success"]:
             return {
@@ -462,22 +440,23 @@ class AssistantTool(BaseTool):
             "type": "function",
             "function": {
                 "name": self.name,
-                "description": self.description,
+                "description": self.description
+                + " Important: For PDF operations, use the pdf_assistant tool instead.",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "task_type": {
                             "type": "string",
                             "enum": [t.value for t in AssistantTaskType],
-                            "description": "The type of text processing task to perform. Choose 'analyze' for document analysis and insights, 'summarize' to condense long text into key points, 'proofread' to correct errors and improve style, 'rewrite' to enhance clarity and impact, 'critic' for constructive feedback and improvement suggestions, 'translate' to convert between languages, or 'develop' for programming and code assistance.",
+                            "description": "The type of text processing task to perform. Choose 'analyze' for text analysis, 'summarize' to condense text, 'proofread' to correct errors, 'rewrite' to enhance clarity, 'critic' for feedback, 'translate' for language conversion, or 'develop' for code assistance.",
                         },
                         "text": {
                             "type": "string",
-                            "description": "The text content to be processed. Use 'the PDF' or 'the document' when referring to uploaded PDF content.",
+                            "description": "The plain text content to be processed. Note: For PDF documents, use the pdf_assistant tool instead.",
                         },
                         "instructions": {
                             "type": "string",
-                            "description": "REQUIRED when analyzing PDF content: The specific task or analysis request about the document. For other tasks, use to provide specific guidance (e.g., 'focus on technical accuracy' for proofreading, 'make it more formal' for rewriting, 'target audience: executives' for summarize).",
+                            "description": "Specific guidance for the task (e.g., 'focus on technical accuracy' for proofreading, 'make it more formal' for rewriting, 'target audience: executives' for summarize).",
                         },
                         "source_language": {
                             "type": "string",

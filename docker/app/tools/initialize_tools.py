@@ -33,8 +33,7 @@ def initialize_all_tools():
         from tools.image_analysis_tool import ImageAnalysisTool
         from tools.image_gen import ImageGenerationTool
         from tools.news import NewsTool
-        from tools.pdf_summary import PDFSummaryTool
-        from tools.pdf_text_processor import PDFTextProcessorTool
+        from tools.pdf_assistant import PDFAssistantTool  # New unified PDF tool
         from tools.retriever import RetrieverTool
         from tools.tavily import TavilyTool
         from tools.weather import WeatherTool
@@ -47,11 +46,13 @@ def initialize_all_tools():
         register_tool_class("analyze_image", ImageAnalysisTool)
         register_tool_class("generate_image", ImageGenerationTool)
         register_tool_class("tavily_news_search", NewsTool)
-        register_tool_class("retrieve_pdf_summary", PDFSummaryTool)
-        register_tool_class("process_pdf_text", PDFTextProcessorTool)
+        register_tool_class("pdf_assistant", PDFAssistantTool)  # Single PDF tool
         register_tool_class("retrieval_search", RetrieverTool)
         register_tool_class("tavily_internet_search", TavilyTool)
         register_tool_class("get_weather", WeatherTool)
+
+        # Note: The old PDF tools (retrieve_pdf_summary, process_pdf_text) are deprecated
+        # All PDF functionality is now handled by pdf_assistant
 
         logger.info(
             f"Successfully registered {len(tool_registry._factory.get_registered_tools())} tool classes"

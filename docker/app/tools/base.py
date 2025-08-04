@@ -208,12 +208,18 @@ class BaseTool(ABC):
         try:
             if loop.is_running():
                 # If loop is already running, use run_coroutine_threadsafe
+                logger.info(
+                    f"Executing {self.name} async with timeout={self.timeout}s in running loop"
+                )
                 future = asyncio.run_coroutine_threadsafe(
                     self._execute_controller_async(params), loop
                 )
-                return future.result(timeout=self.timeout)
+                result = future.result(timeout=self.timeout)
+                logger.info(f"Async execution of {self.name} completed successfully")
+                return result
             else:
                 # If no loop is running, use run_until_complete
+                logger.info(f"Executing {self.name} async in new loop")
                 return loop.run_until_complete(self._execute_controller_async(params))
         except asyncio.TimeoutError:
             logger.error(f"Timeout executing {self.name} after {self.timeout}s")
@@ -254,8 +260,20 @@ class BaseTool(ABC):
         # Special handling for 'but_why' parameter - provide default for internal calls
         if "but_why" in required and "but_why" not in params:
             if "but_why" in properties:
-                params["but_why"] = f"Internal call to {self.name} tool for processing"
-                logger.debug(f"Added default but_why for internal {self.name} call")
+                but_why_property = properties["but_why"]
+                but_why_type = but_why_property.get("type")
+
+                # Set appropriate default based on expected type
+                if but_why_type == "integer":
+                    params["but_why"] = 5  # High confidence for internal calls
+                else:
+                    params["but_why"] = (
+                        f"Internal call to {self.name} tool for processing"
+                    )
+
+                logger.debug(
+                    f"Added default but_why ({params['but_why']}) for internal {self.name} call"
+                )
 
         # Check required parameters
         missing = [param for param in required if param not in params]

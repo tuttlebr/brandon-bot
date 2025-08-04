@@ -36,10 +36,7 @@ class LLMService:
         self.tool_execution_service = ToolExecutionService(config)
         self.conversation_context_service = ConversationContextService(config)
 
-        # Add PDF context service for context injection after tool execution
-        from services.pdf_context_service import PDFContextService
-
-        self.pdf_context_service = PDFContextService(config)
+        # PDF context is now automatically handled by ChatService
 
         # For backward compatibility
         self.last_tool_responses = []
@@ -104,7 +101,17 @@ class LLMService:
             current_user_message = ""
             for msg in reversed(windowed_messages):
                 if msg.get("role") == "user":
-                    current_user_message = msg.get("content", "")
+                    content = msg.get("content", "")
+                    # Handle case where content might be a dict (e.g., for images)
+                    if isinstance(content, dict):
+                        # Try to get text content from dict
+                        current_user_message = (
+                            content.get("text", "") if "text" in content else ""
+                        )
+                    elif content is None:
+                        current_user_message = ""
+                    else:
+                        current_user_message = str(content)
                     break
 
             # Inject conversation context automatically
@@ -113,6 +120,8 @@ class LLMService:
                     windowed_messages, current_user_message
                 )
             )
+
+            # PDF context is now automatically injected by ChatService
 
             # Filter messages to ensure LLM compatibility
             windowed_messages = self._filter_messages_for_llm(windowed_messages)
@@ -148,6 +157,68 @@ class LLMService:
             # Insert the guidance right before tool selection
             windowed_messages_with_guidance = windowed_messages
 
+            # Add PDF-specific guidance if a PDF is active
+            from services.session_state import get_active_pdf_id
+            from utils.pdf_upload_handler import get_active_pdf_info
+
+            pdf_id = get_active_pdf_id()
+            if pdf_id:
+                pdf_info = get_active_pdf_info()
+                if pdf_info:
+                    # Add a system message about the active PDF
+                    pdf_guidance = {
+                        "role": "system",
+                        "content": (
+                            f"A PDF document '{pdf_info['filename']}' is active. "
+                            f"For ANY PDF-related requests, use the 'pdf_assistant' tool immediately. "
+                            f"Do not provide commentary about the PDF or what you see. "
+                            f"Execute the tool with the user's exact request."
+                        ),
+                    }
+                    # Insert at the beginning after any existing system messages
+                    windowed_messages_with_guidance = windowed_messages.copy()
+                    # Find where to insert (after existing system messages)
+                    insert_idx = 0
+                    for i, msg in enumerate(windowed_messages_with_guidance):
+                        if msg.get("role") != "system":
+                            insert_idx = i
+                            break
+                        insert_idx = i + 1
+                    windowed_messages_with_guidance.insert(insert_idx, pdf_guidance)
+
+            # Force PDF assistant tool when a PDF is active
+            tool_choice = "auto"
+            if pdf_id and pdf_info:
+                # Check if pdf_assistant is in the available tools
+                pdf_tool = next(
+                    (
+                        t
+                        for t in tools
+                        if t.get("function", {}).get("name") == "pdf_assistant"
+                    ),
+                    None,
+                )
+                if pdf_tool:
+                    logger.info(
+                        f"Active PDF detected: '{pdf_info['filename']}'. Forcing pdf_assistant tool."
+                    )
+                    # Force specific tool
+                    tool_choice = {
+                        "type": "function",
+                        "function": {"name": "pdf_assistant"},
+                    }
+                    # Put pdf_assistant first in the list to prioritize it
+                    tools = [pdf_tool] + [
+                        t
+                        for t in tools
+                        if t.get("function", {}).get("name") != "pdf_assistant"
+                    ]
+                else:
+                    logger.error(
+                        "pdf_assistant tool not found in available tools! PDF functionality will not function."
+                    )
+                    # Fall back to context injection only
+
             # First, get non-streaming response to check for tool calls
             tool_selection_model_type = get_tool_llm_type("tool_selection")
             tool_selection_model = self._get_model_for_type(tool_selection_model_type)
@@ -156,7 +227,7 @@ class LLMService:
                 tool_selection_model,
                 tool_selection_model_type,
                 tools=tools,
-                tool_choice="auto",
+                tool_choice=tool_choice,
             )
 
             # Parse response for content and tool calls
@@ -164,6 +235,33 @@ class LLMService:
 
             # If there are tool calls, execute them and stream the response
             logger.info(f"All tool calls: {tool_calls}")
+
+            # Special handling when PDF is active but no PDF tool was selected
+            if (
+                pdf_id
+                and pdf_info
+                and not any(
+                    tc.get("name") == "pdf_assistant" for tc in (tool_calls or [])
+                )
+            ):
+                # Only force if pdf_assistant was available in the tools list
+                pdf_tool_available = any(
+                    t.get("function", {}).get("name") == "pdf_assistant" for t in tools
+                )
+                if pdf_tool_available:
+                    logger.warning(
+                        f"PDF active but pdf_assistant not selected. Forcing it now."
+                    )
+                    # Force the PDF assistant tool
+                    tool_calls = [
+                        {
+                            "name": "pdf_assistant",
+                            "arguments": {
+                                "operation": "auto",
+                                "query": current_user_message,
+                            },
+                        }
+                    ]
             if tool_calls:
                 # Log which tools were selected (without arguments to avoid logging base64 data)
                 tool_names = [tc.get("name", "unknown") for tc in tool_calls]
@@ -314,15 +412,7 @@ class LLMService:
                         }
                     )
 
-        # Re-inject PDF context after tool execution to ensure PDF content is available
-        # for the final response generation, especially after PDF-related tool calls
-        if current_user_message:
-            # Use forced context injection after tool execution to ensure PDF content is available
-            extended_messages = self.pdf_context_service.inject_pdf_context_forced(
-                extended_messages
-            )
-            logger.info("Re-injected text context after tool execution")
-
+        # PDF context is automatically handled by ChatService
         # Check token count after adding tool responses and truncate if necessary
         max_tokens = config.llm.MAX_CONTEXT_TOKENS
         estimated_tokens = self._count_message_tokens(extended_messages)

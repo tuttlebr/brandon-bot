@@ -1,5 +1,4 @@
 import logging
-import time
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -14,12 +13,14 @@ from controllers.response_controller import ResponseController
 from controllers.session_controller import SessionController
 from models import ChatConfig
 from services import ChatService, ImageService, LLMService
-from services.pdf_context_service import PDFContextService
+
+# PDFContextService replaced by SimplePDFContextService
 from tools.initialize_tools import initialize_all_tools
 from ui import ChatHistoryComponent
 from utils.animated_loading import get_galaxy_animation_html
 from utils.config import config
 from utils.exceptions import ChatbotException, ConfigurationError
+from utils.pdf_upload_handler import get_active_pdf_info, handle_pdf_upload
 from yaml.loader import SafeLoader
 
 
@@ -55,7 +56,7 @@ class ProductionStreamlitChatApp:
             self.chat_service = ChatService(self.config_obj)
             self.image_service = ImageService(self.config_obj)
             self.llm_service = LLMService(self.config_obj)
-            self.pdf_context_service = PDFContextService(self.config_obj)
+            # PDF context is now automatically handled by ChatService
 
             # Initialize UI components
             self.chat_history_component = ChatHistoryComponent(self.config_obj)
@@ -90,10 +91,11 @@ class ProductionStreamlitChatApp:
         """Display the chat history using the chat history component"""
         try:
             # Show PDF info if available
-            if hasattr(self, "pdf_context_service"):
-                pdf_info = self.pdf_context_service.get_pdf_info_for_display()
-                if pdf_info:
-                    st.info(pdf_info)
+            pdf_info = get_active_pdf_info()
+            if pdf_info:
+                st.success(
+                    f"📄 **Active PDF**: {pdf_info['filename']} ({pdf_info['total_pages']} pages)"
+                )
 
             # Use session controller's safe message access
             messages = self.session_controller.get_messages()
@@ -142,10 +144,7 @@ class ProductionStreamlitChatApp:
                 messages
             )
 
-            # Inject PDF context if available
-            prepared_messages = self.pdf_context_service.inject_pdf_context(
-                prepared_messages, prompt
-            )
+            # PDF context is now automatically injected by ChatService
 
             # Generate and display response using controller with centralized spinner
             cleanup_fn = None
@@ -173,28 +172,38 @@ class ProductionStreamlitChatApp:
         """
         Fragment to show real-time PDF analysis progress
         """
-        if (
+        # Only perform operations if there's active PDF analysis
+        if not (
             hasattr(st.session_state, "pdf_analysis_progress")
             and st.session_state.pdf_analysis_progress
         ):
-            progress_info = st.session_state.pdf_analysis_progress
+            return  # Exit early if no analysis in progress
 
-            if progress_info.get("status") in ["starting", "analyzing"]:
-                # st.info("🔍 **Intelligent PDF Analysis in Progress**")
+        progress_info = st.session_state.pdf_analysis_progress
 
-                message = progress_info.get("message", "Processing...")
+        if progress_info.get("status") in ["starting", "analyzing"]:
+            st.info("🔍 **Intelligent PDF Analysis in Progress**")
+            message = progress_info.get("message", "Processing...")
+            # Only log when status changes to reduce log noise
+            if not hasattr(
+                st.session_state, "_last_pdf_analysis_status"
+            ) or st.session_state._last_pdf_analysis_status != progress_info.get(
+                "status"
+            ):
+                st.session_state._last_pdf_analysis_status = progress_info.get("status")
+                logging.debug(f"PDF analysis status changed: {message}")
 
-                logging.debug(f"PDF analysis message: {message}")
-
-            elif progress_info.get("status") == "completed":
+        elif progress_info.get("status") == "completed":
+            # Clear progress after a brief moment
+            if not hasattr(st.session_state, "analysis_completion_shown"):
+                st.session_state.analysis_completion_shown = True
                 logging.debug("PDF analysis completed")
-                # Clear progress after a brief moment
-                if not hasattr(st.session_state, "analysis_completion_shown"):
-                    st.session_state.analysis_completion_shown = True
-                else:
-                    # Clear the progress info
-                    st.session_state.pdf_analysis_progress = None
-                    del st.session_state.analysis_completion_shown
+            else:
+                # Clear the progress info and status tracking
+                st.session_state.pdf_analysis_progress = None
+                if hasattr(st.session_state, "_last_pdf_analysis_status"):
+                    del st.session_state._last_pdf_analysis_status
+                del st.session_state.analysis_completion_shown
 
     @st.fragment(run_every=1)
     def pdf_processing_fragment(self):
@@ -202,6 +211,8 @@ class ProductionStreamlitChatApp:
         Self-contained PDF processing fragment that runs independently
         Uses st.fragment to poll every second and update status
         """
+        import time  # Import locally to ensure availability in fragment scope
+
         st.subheader("📄 PDF Document Upload")
 
         # Get current processing status
@@ -282,12 +293,10 @@ class ProductionStreamlitChatApp:
                                 f"Starting synchronous PDF processing for: {uploaded_file.name}"
                             )
 
-                            # Use file controller for processing - this is blocking
-                            success = self.file_controller.process_pdf_upload(
-                                uploaded_file
-                            )
+                            # Use pdf_upload_handler for complete ingestion pipeline
+                            result = handle_pdf_upload(uploaded_file)
 
-                            if success:
+                            if result:
                                 self.file_controller.mark_file_as_processed(
                                     uploaded_file.name
                                 )
@@ -320,6 +329,26 @@ class ProductionStreamlitChatApp:
                     filename = latest_pdf.get("filename", "Unknown")
                     pages = latest_pdf.get("total_pages", 0)
                     st.success(f"✅ Current PDF: {filename} ({pages} pages)")
+
+                    # Check if PDF has been uploaded to Milvus
+                    if (
+                        hasattr(st.session_state, "pdf_milvus_upload_complete")
+                        and st.session_state.pdf_milvus_upload_complete
+                        and st.session_state.pdf_milvus_upload_filename == filename
+                    ):
+                        st.info(
+                            f"🚀 **PDF fully indexed in Milvus!** "
+                            f"{st.session_state.pdf_milvus_upload_chunks} chunks ready for semantic search"
+                        )
+                        # Clear the upload flag after displaying
+                        if not hasattr(st.session_state, "_milvus_upload_shown"):
+                            st.session_state._milvus_upload_shown = True
+                            time.sleep(0.01)
+                        else:
+                            # Reset flags after showing
+                            st.session_state.pdf_milvus_upload_complete = False
+                            del st.session_state._milvus_upload_shown
+
                     if pages > config.file_processing.PDF_SUMMARIZATION_THRESHOLD:
                         st.markdown(
                             "💡 This is a large document. You can ask me to 'summarize the PDF' for a quick overview!"
@@ -475,17 +504,27 @@ class ProductionStreamlitChatApp:
     def run(self):
         """Run the production-ready application using controller pattern"""
         try:
+            # Initialize session state if needed
+            if "current_page" not in st.session_state:
+                st.session_state.current_page = 0
+
             # Display chat history
             self.display_chat_history()
 
-            # Show PDF analysis progress if active
-            self.pdf_analysis_progress_fragment()
+            # Show PDF analysis progress if active (only when needed)
+            if (
+                hasattr(st.session_state, "pdf_analysis_progress")
+                and st.session_state.pdf_analysis_progress
+            ):
+                self.pdf_analysis_progress_fragment()
 
             # Handle user input with centralized configuration
+            # This is the primary interaction point and should always be responsive
             if prompt := st.chat_input():
                 self.process_prompt(prompt)
 
-            # Handle PDF upload and processing via fragment
+            # Handle PDF upload and processing via fragment in sidebar
+            # This runs independently and shouldn't block main chat functionality
             with st.sidebar:
                 self.pdf_processing_fragment()
 

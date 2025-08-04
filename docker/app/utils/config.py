@@ -89,6 +89,13 @@ class FileProcessingConfig:
         100000  # Maximum characters per context injection (increased from 100000)
     )
 
+    # PDF Chunking settings
+    PDF_CHUNK_SIZE: int = 4096  # Target chunk size in characters
+    PDF_CHUNK_OVERLAP: int = 0  # Overlap between chunks
+    PDF_MIN_CHUNK_SIZE: int = 500  # Minimum chunk size
+    PDF_MAX_CHUNKS_PER_QUERY: int = 10  # Maximum chunks to retrieve per query
+    PDF_SIMILARITY_THRESHOLD: float = 3.0  # L2 distance threshold for similarity
+
 
 @dataclass
 class ToolContextConfig:
@@ -185,8 +192,7 @@ class ToolConfig:
             "tavily_internet_search": True,
             "tavily_news_search": True,
             "retrieval_search": True,
-            "retrieve_pdf_summary": True,
-            "process_pdf_text": True,
+            "pdf_assistant": True,  # New unified PDF tool
             "analyze_image": True,
             "generate_image": True,
             "get_weather": True,

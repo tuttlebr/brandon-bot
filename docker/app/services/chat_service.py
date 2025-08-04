@@ -96,11 +96,18 @@ class ChatService:
                     {"role": msg["role"], "content": msg["content"]}
                 )
 
-        # Add context if available
+        # PDF context is now handled by LLM service via pdf_assistant tool calls
+        # The tool response will be captured and displayed in the tool context expander
+
+        # Add any explicitly provided context to the last user message if provided
         if context and self.verbose_messages:
-            self.verbose_messages[-1][
-                "content"
-            ] += f"{START_CONTEXT}{context}{END_CONTEXT}"
+            # Find the last user message
+            for i in range(len(self.verbose_messages) - 1, -1, -1):
+                if self.verbose_messages[i].get("role") == "user":
+                    self.verbose_messages[i][
+                        "content"
+                    ] += f"{START_CONTEXT}{context}{END_CONTEXT}"
+                    break
 
         return self.verbose_messages
 

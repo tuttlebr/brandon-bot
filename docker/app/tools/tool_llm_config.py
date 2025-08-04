@@ -20,8 +20,7 @@ TOOL_LLM_TYPES = {
     "tavily_news_search": "intelligent",
     "tavily_internet_search": "llm",
     "retrieval_search": "intelligent",
-    "retrieve_pdf_summary": "intelligent",
-    "process_pdf_text": "intelligent",
+    "pdf_assistant": "llm",
     "text_assistant": "intelligent",
     "generate_image": "fast",
     "analyze_image": "vlm",
@@ -58,6 +57,14 @@ Never change the core subject. Context is for subtle enhancement only.""",
     "document_analysis": """Analyze documents to answer specific questions concisely.
 
 Provide focused, executive-summary style responses that directly address the user's question.""",
+    "text_processing_summarize": """Create a concise summary of the provided text.
+
+Important:
+- Start directly with the summary content
+- Do not acknowledge what was provided or explain what you're doing
+- Do not use phrases like "This document contains..." or "The text describes..."
+- Focus on the key points and main ideas
+- Be concise and direct""",
     "conversation_context_summary": """Summarize conversation history with focus on latest message.
 
 Create a concise overview capturing main themes and objectives.

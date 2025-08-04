@@ -163,17 +163,53 @@ class ToolExecutionService:
             tool_name, tool_args, current_user_message, messages, is_multi_tool_call
         )
 
-        # Execute tool through registry with Streamlit context preserved
-        loop = asyncio.get_event_loop()
-
-        # Execute in thread pool with context preservation
-        result = await loop.run_in_executor(
-            self.executor,
-            run_with_streamlit_context,
-            execute_tool,
-            tool_name,
-            modified_args,
+        logger.info(
+            f"Executing tool '{tool_name}' with args: {list(modified_args.keys())}"
         )
+
+        # Check if tool has async implementation to avoid deadlock
+        from tools.registry import get_tool
+
+        tool = get_tool(tool_name)
+        has_async = (
+            tool and hasattr(tool._controller, 'process_async')
+            if hasattr(tool, '_controller')
+            else False
+        )
+
+        if has_async:
+            # For async tools, execute the controller directly to avoid event loop deadlock
+            logger.info(
+                f"Tool '{tool_name}' has async implementation, executing controller directly"
+            )
+            try:
+                # Validate parameters (normally done in BaseTool.execute)
+                if hasattr(tool, '_validate_params'):
+                    tool._validate_params(modified_args)
+
+                # Execute the async controller method directly
+                raw_data = await tool._controller.process_async(modified_args)
+                # Format the response using the view
+                result = tool._view.format_response(raw_data, tool.get_response_type())
+            except Exception as e:
+                logger.error(
+                    f"Error executing async tool {tool_name}: {e}", exc_info=True
+                )
+                if hasattr(tool, '_view'):
+                    result = tool._view.format_error(e, tool.get_response_type())
+                else:
+                    raise
+        else:
+            # Execute sync tools in thread pool with context preservation
+            logger.info(f"Tool '{tool_name}' is sync, executing in thread pool")
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(
+                self.executor,
+                run_with_streamlit_context,
+                execute_tool,
+                tool_name,
+                modified_args,
+            )
 
         # Format response
         if hasattr(result, "direct_response") and result.direct_response:
@@ -237,25 +273,11 @@ class ToolExecutionService:
             else:
                 modified_args["messages"] = messages
 
-        # Add messages and PDF data for PDF tools
-        pdf_tools = ["retrieve_pdf_summary", "process_pdf_text"]
-        if tool_name in pdf_tools:
+        # Add messages for PDF assistant tool
+        if tool_name == "pdf_assistant":
             if messages:
                 modified_args["messages"] = messages
-
-            # Also try to get PDF data directly
-            try:
-                from models.chat_config import ChatConfig
-                from services.pdf_context_service import PDFContextService
-
-                config = ChatConfig.from_environment()
-                pdf_service = PDFContextService(config)
-                pdf_data = pdf_service.get_latest_pdf_data()
-                if pdf_data:
-                    modified_args["pdf_data"] = pdf_data
-                    logger.debug(f"Added PDF data to {tool_name} arguments")
-            except Exception as e:
-                logger.debug(f"Could not add PDF data to tool: {e}")
+            # Note: pdf_assistant now handles PDF detection internally via session state
 
         # Add original prompt for assistant tool
         if tool_name == "text_assistant" and current_user_message:

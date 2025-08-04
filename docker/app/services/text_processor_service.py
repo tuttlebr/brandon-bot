@@ -63,7 +63,7 @@ class TextProcessorService:
         try:
             # Check if the text is too large for direct processing
             estimated_tokens = len(text) // 4  # Rough token estimation
-            max_tokens = 100000  # Conservative limit to stay well under model limits
+            max_tokens = 32000  # Conservative limit to stay well under model limits
 
             if estimated_tokens > max_tokens:
                 logger.warning(
@@ -88,18 +88,47 @@ class TextProcessorService:
                     {"role": "user", "content": text},
                 ]
 
-            logger.debug(f"Processing text with {task_type} using {model_name}")
-
-            response = await client.chat.completions.create(
-                model=model_name,
-                messages=final_messages,
-                temperature=app_config.llm.DEFAULT_TEMPERATURE,
-                top_p=app_config.llm.DEFAULT_TOP_P,
-                frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
-                presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,
+            logger.info(
+                f"Processing text with {task_type} using {model_name} - Text length: {len(text)} chars"
             )
 
+            # Log message details
+            num_messages = len(final_messages)
+            total_chars = sum(len(msg.get("content", "")) for msg in final_messages)
+            logger.info(
+                f"📤 Sending to LLM endpoint: {num_messages} messages, ~{total_chars} total chars"
+            )
+            logger.info(f"   Model: {model_name}")
+            logger.info(f"   Task: {task_type}")
+            logger.debug(
+                f"   System prompt preview: {final_messages[0]['content'][:100]}..."
+            )
+
+            # Add timeout to prevent hanging
+            import asyncio
+
+            try:
+                logger.info(f"🔄 Making LLM API call to {model_name}...")
+                response = await asyncio.wait_for(
+                    client.chat.completions.create(
+                        model=model_name,
+                        messages=final_messages,
+                        temperature=0.0,
+                    ),
+                    timeout=60.0,  # 60 second timeout
+                )
+            except asyncio.TimeoutError:
+                logger.error(f"LLM request timed out after 60 seconds for {task_type}")
+                return {
+                    "success": False,
+                    "error": "Request timed out - the document might be too large or the service is slow",
+                    "task_type": task_type,
+                }
+
+            logger.info(f"✅ LLM response received for {task_type}")
             result = response.choices[0].message.content.strip()
+            logger.info(f"   Response length: {len(result)} chars")
+            logger.info(f"   Response preview: {result[:100]}...")
 
             return {
                 "success": True,
@@ -161,17 +190,28 @@ class TextProcessorService:
                     {"role": "user", "content": text},
                 ]
 
-            logger.debug(
+            logger.info(
                 f"Processing text with streaming {task_type} using {model_name}"
             )
+
+            # Log message details for streaming
+            num_messages = len(final_messages)
+            total_chars = sum(len(msg.get("content", "")) for msg in final_messages)
+            logger.info(
+                f"📤 Sending to LLM endpoint (streaming): {num_messages} messages, ~{total_chars} total chars"
+            )
+            logger.info(f"   Model: {model_name}")
+            logger.info(f"   Task: {task_type}")
+            logger.debug(
+                f"   System prompt preview: {final_messages[0]['content'][:100]}..."
+            )
+
+            logger.info(f"🔄 Making streaming LLM API call to {model_name}...")
 
             response = await client.chat.completions.create(
                 model=model_name,
                 messages=final_messages,
-                temperature=app_config.llm.DEFAULT_TEMPERATURE,
-                top_p=app_config.llm.DEFAULT_TOP_P,
-                frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
-                presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,
+                temperature=0.0,
                 stream=True,  # Enable streaming
             )
 
@@ -192,6 +232,10 @@ class TextProcessorService:
             final_content = think_filter.flush()
             if final_content:
                 collected_result += final_content
+
+            logger.info(f"✅ Streaming LLM response complete for {task_type}")
+            logger.info(f"   Response length: {len(collected_result)} chars")
+            logger.info(f"   Response preview: {collected_result[:100]}...")
 
             return {
                 "success": True,
@@ -419,9 +463,20 @@ class TextProcessorService:
         self, task_type: TextTaskType, instructions: Optional[str] = None
     ) -> str:
         """Get the appropriate system prompt for text processing tasks"""
+        from tools.tool_llm_config import get_tool_system_prompt
         from utils.system_prompt import get_context_system_prompt
 
-        # Use the new context-aware system prompt
+        # Check if there's a specific prompt for this text processing task
+        specific_prompt_key = f"text_processing_{task_type.value}"
+        specific_prompt = get_tool_system_prompt(specific_prompt_key, None)
+
+        if specific_prompt:
+            # If instructions are provided, append them
+            if instructions:
+                return f"{specific_prompt}\n\nAdditional instructions: {instructions}"
+            return specific_prompt
+
+        # Fall back to the context-aware system prompt
         return get_context_system_prompt(
             context='text_processing',
             task_type=task_type.value,

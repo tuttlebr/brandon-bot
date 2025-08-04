@@ -401,38 +401,80 @@ class ResponseController:
 
     def _extract_tool_context_from_llm_responses(self) -> str:
         """
-        Extract context from the LLM service's last tool responses
+        Extract context from the LLM service's last tool responses and recent tool messages in chat history
 
         Returns:
             Formatted context string from tool responses, empty if none found
         """
-        if (
-            not hasattr(self.llm_service, 'last_tool_responses')
-            or not self.llm_service.last_tool_responses
-        ):
-            return ""
-
         tool_contexts = []
 
-        for tool_response in self.llm_service.last_tool_responses:
-            # Only include regular tool responses, skip direct responses
-            if tool_response.get("role") == "tool":
-                try:
-                    # Skip image generation responses
-                    if tool_response.get("tool_name") == "generate_image":
+        # First, check LLM service's last tool responses
+        if (
+            hasattr(self.llm_service, 'last_tool_responses')
+            and self.llm_service.last_tool_responses
+        ):
+            for tool_response in self.llm_service.last_tool_responses:
+                # Only include regular tool responses, skip direct responses
+                if tool_response.get("role") == "tool":
+                    try:
+                        # Skip image generation responses
+                        if tool_response.get("tool_name") == "generate_image":
+                            continue
+
+                        context = self._extract_context_from_tool_response(
+                            tool_response
+                        )
+                        if context:
+                            tool_contexts.append(context)
+
+                    except Exception as e:
+                        logging.error(f"Error extracting tool context: {e}")
                         continue
 
-                    context = self._extract_context_from_tool_response(tool_response)
-                    if context:
-                        tool_contexts.append(context)
+        # Also check recent tool messages in chat history (e.g., injected PDF search results)
+        messages = self.session_controller.get_messages()
+        # Look for tool messages after the last user message
+        last_user_idx = -1
+        for i, msg in enumerate(messages):
+            if msg.get("role") == "user":
+                last_user_idx = i
 
-                except Exception as e:
-                    logging.error(f"Error extracting tool context: {e}")
-                    continue
+        if last_user_idx >= 0:
+            # Check messages after the last user message
+            for msg in messages[last_user_idx + 1 :]:
+                if msg.get("role") == "tool":
+                    try:
+                        # Skip if already processed in last_tool_responses
+                        tool_name = msg.get("tool_name", "")
+                        if tool_name == "generate_image":
+                            continue
+
+                        # Create a tool response structure
+                        tool_response = {
+                            "role": "tool",
+                            "tool_name": tool_name,
+                            "content": msg.get("content", ""),
+                        }
+
+                        context = self._extract_context_from_tool_response(
+                            tool_response
+                        )
+                        if context:
+                            tool_contexts.append(context)
+
+                    except Exception as e:
+                        logging.error(
+                            f"Error extracting tool context from chat history: {e}"
+                        )
+                        continue
 
         if tool_contexts:
             combined_context = config.tool_context.CONTEXT_SEPARATOR.join(tool_contexts)
-            logging.info(f"Extracted tool context with {len(tool_contexts)} entries")
+            # Count actual tool responses (not chunks within responses)
+            tool_count = len(tool_contexts)
+            logging.info(
+                f"Extracted tool context from {tool_count} tool response{'s' if tool_count != 1 else ''}"
+            )
             return combined_context
 
         return ""
@@ -504,6 +546,29 @@ class ResponseController:
             and isinstance(tool_data.get("content"), list)
         ):
             return self._format_pdf_content_context(tool_data)
+
+        # Handle PDF assistant tool response
+        if (
+            "operation" in tool_data
+            and "filename" in tool_data
+            and "result" in tool_data
+        ):
+            operation = tool_data.get("operation", "unknown")
+            filename = tool_data.get("filename", "Unknown PDF")
+            result = tool_data.get("result", "")
+            processing_notes = tool_data.get("processing_notes", "")
+
+            context_parts = [f"**PDF {operation.title()} Results from:** {filename}"]
+
+            if processing_notes:
+                context_parts.append(f"**{processing_notes}**")
+
+            if result.strip():
+                # The result contains all chunks formatted together
+                context_parts.append("---")
+                context_parts.append(result.strip())
+
+            return "\n\n".join(context_parts)
 
         # Handle web extraction results
         if "url" in tool_data and "content" in tool_data and "success" in tool_data:
