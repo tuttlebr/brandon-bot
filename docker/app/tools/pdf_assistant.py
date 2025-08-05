@@ -129,6 +129,7 @@ class PDFAssistantController(ToolController):
                     'success': True,
                     'result': result['summary'],
                     'processing_notes': f"Used {result['strategy']} summarization strategy",
+                    'direct_response': True,
                 }
 
             elif operation == 'query':
@@ -219,7 +220,7 @@ class PDFAssistantView(ToolView):
             pages_processed=data.get('pages_processed'),
             used_vector_search=data.get('used_vector_search', False),
             processing_notes=data.get('processing_notes'),
-            direct_response=False,  # Changed to show in tool context expander
+            direct_response=data.get('direct_response', False),
         )
 
     def format_error(

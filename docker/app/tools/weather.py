@@ -168,7 +168,7 @@ class WeatherAPIClient:
             ],
             "timezone": "auto",
             "temperature_unit": "fahrenheit",
-            "wind_speed_unit": "kmh",
+            "wind_speed_unit": "mph",
             "precipitation_unit": "inch",
         }
 

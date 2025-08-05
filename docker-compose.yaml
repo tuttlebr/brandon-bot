@@ -28,6 +28,27 @@ services:
     networks:
       - chatbot-network
 
+  api:
+    image: daedalus.ddns.me:5050/btuttle/streamlit-chatbot:latest
+    build:
+      context: ./docker
+      dockerfile: Dockerfile
+      target: app
+    environment:
+      WATCHMAN_VERSION: none
+    shm_size: 16G
+    volumes:
+      - ./tmp:/tmp
+    user: "1000:1000"
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    restart: unless-stopped
+    entrypoint: ["python", "api.py"]
+    networks:
+      - chatbot-network
+
   docs:
     image: daedalus.ddns.me:5050/btuttle/streamlit-chatbot-docs:latest
     build:

@@ -53,12 +53,17 @@ def handle_pdf_upload(uploaded_file) -> Optional[Dict[str, Any]]:
         # Now ingest the extracted data with content-based ID
         ingestion_service = PDFIngestionService(config)
 
+        # Use configuration to determine whether to check for existing PDFs
+        from utils.config import config as app_config
+
+        check_existing = app_config.file_processing.PDF_REUPLOAD_EXISTING
+
         result = ingestion_service.ingest(
             pdf_data=pdf_data,
             filename=filename,
             session_id=session_id,
             pdf_content=uploaded_file,  # Pass the file for content-based ID generation
-            check_existing=True,  # Enable deduplication
+            check_existing=check_existing,  # Use configurable setting
         )
 
         # Set as active PDF
@@ -77,7 +82,17 @@ def handle_pdf_upload(uploaded_file) -> Optional[Dict[str, Any]]:
         logger.info(f"PDF ingestion complete: {result}")
 
         # Display success message
-        if result.get('replaced_existing'):
+        if result.get('skipped_existing'):
+            st.success(f"✅ PDF already exists, using existing: {filename}")
+            st.info(
+                f"📄 **{filename}** (Already Processed)\n"
+                f"- Pages: {result['total_pages']}\n"
+                f"- Characters: {result['char_count']:,}\n"
+                f"- Chunks: {result['chunk_count']}\n"
+                f"- PDF ID: `{pdf_id}`\n"
+                f"- Status: Using existing document chunks"
+            )
+        elif result.get('replaced_existing'):
             st.success(f"✅ Successfully replaced existing PDF: {filename}")
             st.info(
                 f"📄 **{filename}** (Updated)\n"

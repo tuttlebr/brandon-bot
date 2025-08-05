@@ -282,6 +282,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "aiohttp" },
     { name = "beautifulsoup4" },
+    { name = "fastapi" },
     { name = "html2text" },
     { name = "langchain" },
     { name = "langchain-openai" },
@@ -293,6 +294,7 @@ dependencies = [
     { name = "pytz" },
     { name = "streamlit" },
     { name = "streamlit-authenticator" },
+    { name = "uvicorn" },
 ]
 
 [package.optional-dependencies]
@@ -321,6 +323,7 @@ streamlit-docs = [
 requires-dist = [
     { name = "aiohttp", specifier = "==3.12.14" },
     { name = "beautifulsoup4", specifier = "==4.13.4" },
+    { name = "fastapi", specifier = "==0.104.1" },
     { name = "fastapi", marker = "extra == 'streamlit-docs'", specifier = "==0.104.1" },
     { name = "html2text", specifier = "==2025.4.15" },
     { name = "ipympl", marker = "extra == 'jupyterlab'", specifier = "==0.9.7" },
@@ -347,6 +350,7 @@ requires-dist = [
     { name = "streamlit", specifier = "==1.46.1" },
     { name = "streamlit-authenticator", specifier = "==0.4.2" },
     { name = "theme-darcula", marker = "extra == 'jupyterlab'", specifier = "==4.0.0" },
+    { name = "uvicorn", specifier = "==0.24.0" },
     { name = "uvicorn", marker = "extra == 'streamlit-docs'", specifier = "==0.24.0" },
 ]
 provides-extras = ["jupyterlab", "streamlit-docs"]

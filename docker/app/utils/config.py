@@ -96,6 +96,13 @@ class FileProcessingConfig:
     PDF_MAX_CHUNKS_PER_QUERY: int = 10  # Maximum chunks to retrieve per query
     PDF_SIMILARITY_THRESHOLD: float = 3.0  # L2 distance threshold for similarity
 
+    # PDF Upload behavior
+    PDF_REUPLOAD_EXISTING: bool = field(
+        default_factory=lambda: os.getenv("PDF_REUPLOAD_EXISTING", "true").lower()
+        == "true"
+    )  # Whether to re-upload existing PDFs (True=delete & re-upload, False=skip existing)
+    # Set PDF_REUPLOAD_EXISTING=false to skip re-uploading existing PDFs and use existing chunks
+
 
 @dataclass
 class ToolContextConfig:

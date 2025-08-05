@@ -89,19 +89,37 @@ class PDFIngestionService:
             pdf_id = f"pdf_{uuid.uuid4().hex[:12]}"
             logger.warning(f"No PDF content provided, using random ID: {pdf_id}")
 
-        # 3. Check if PDF already exists and optionally replace it
+        # 3. Check if PDF already exists and handle based on configuration
         pdf_exists = False
-        if check_existing and pdf_content:
+        if pdf_content:
             existing_info = get_existing_pdf_info(pdf_id, self.file_storage)
             if existing_info:
-                logger.info(f"PDF already exists: {pdf_id} - will replace it")
-                pdf_exists = True
-                # Delete existing chunks from Milvus before re-ingesting
-                try:
-                    deleted = self.chunking_service.delete_pdf_chunks(pdf_id)
-                    logger.info(f"Deleted {deleted} existing chunks for PDF {pdf_id}")
-                except Exception as e:
-                    logger.warning(f"Failed to delete existing chunks: {e}")
+                if check_existing:
+                    # Configuration says to re-upload existing PDFs
+                    logger.info(f"PDF already exists: {pdf_id} - will replace it")
+                    pdf_exists = True
+                    # Delete existing chunks from Milvus before re-ingesting
+                    try:
+                        deleted = self.chunking_service.delete_pdf_chunks(pdf_id)
+                        logger.info(
+                            f"Deleted {deleted} existing chunks for PDF {pdf_id}"
+                        )
+                    except Exception as e:
+                        logger.warning(f"Failed to delete existing chunks: {e}")
+                else:
+                    # Configuration says to skip existing PDFs
+                    logger.info(
+                        f"PDF already exists: {pdf_id} - skipping upload (using existing)"
+                    )
+                    # Return existing PDF information without re-processing
+                    return {
+                        "pdf_id": pdf_id,
+                        "total_pages": existing_info.get("total_pages", len(pages)),
+                        "char_count": existing_info.get("char_count", total_chars),
+                        "chunk_count": existing_info.get("chunk_count", 0),
+                        "replaced_existing": False,
+                        "skipped_existing": True,
+                    }
 
         # 4. Prepare data structure for storage and chunking
         storage_data = {

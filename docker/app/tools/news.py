@@ -101,7 +101,7 @@ class NewsTool(BaseTool):
             List of high-scoring search results with extracted content added
         """
         # Filter results with score >= 0.4
-        high_scoring_results = [result for result in results if result.score >= 0.2]
+        high_scoring_results = [result for result in results if result.score >= 0.15]
 
         if not high_scoring_results:
             logger.warning(
@@ -359,17 +359,8 @@ class NewsTool(BaseTool):
             "topic": "news",
             "auto_parameters": True,
             "include_raw_content": False,
-            "max_results": 5,
+            "max_results": 10,
             "include_images": False,
-            # "include_domains": [
-            #     "apnews.com",
-            #     "reuters.com",
-            #     "freep.com",
-            #     "bbc.com",
-            #     "propublica.org",
-            #     "espn.com",
-            #     "mlb.com",
-            # ],
         }
 
         # Update with any provided kwargs

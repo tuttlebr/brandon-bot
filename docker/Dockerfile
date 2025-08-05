@@ -10,6 +10,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-install-project --no-dev
 # Copy each directory separately for better layer caching
 COPY app/main.py .
+COPY app/api.py .
 COPY app/assets/ ./assets/
 COPY app/services/ ./services/
 COPY app/utils/ ./utils/

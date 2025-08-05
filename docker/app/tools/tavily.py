@@ -4,8 +4,7 @@ from typing import Any, Dict, List, Optional, Type
 import requests
 from pydantic import BaseModel, Field
 from tools.base import BaseTool, BaseToolResponse
-
-# from utils.text_processing import strip_think_tags  # Not needed without extraction
+from utils.text_processing import strip_think_tags
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -101,7 +100,7 @@ class TavilyTool(BaseTool):
         Returns:
             List of high-scoring search results with extracted content added
         """
-        # Filter results with score >= 0.7
+        # Filter results with score >= 0.6
         high_scoring_results = [result for result in results if result.score >= 0.6]
 
         if not high_scoring_results:
@@ -115,29 +114,66 @@ class TavilyTool(BaseTool):
             top_result = results[0]
             fallback_results = [top_result]
 
-            # Import extract tool (disabled for reduced latency)
-            # from tools.extract import execute_web_extract_batch
+            # Import extract tool
+            from tools.extract import execute_web_extract_batch
 
-            # Extraction disabled for reduced latency
-            # try:
-            #     # Attempt extraction for the top result
-            #     extract_results = execute_web_extract_batch([top_result.url])
+            try:
+                # Attempt extraction for the top result
+                extract_results = execute_web_extract_batch([top_result.url])
 
-            #     # Update with extracted content if successful
-            #     for extract_result in extract_results:
-            #         if extract_result.success and extract_result.content:
-            #             top_result.extracted_content = extract_result.content
-            #             logger.info(
-            #                 f"Successfully extracted content from fallback result: {extract_result.url}"
-            #             )
-            #         else:
-            #             logger.warning(
-            #                 f"Failed to extract content from fallback result: {extract_result.url}"
-            #             )
+                # Update with extracted content if successful
+                for extract_result in extract_results:
+                    # Handle both WebExtractResponse and StreamingExtractResponse
+                    content = None
+                    if extract_result.success:
+                        if (
+                            hasattr(extract_result, 'content')
+                            and extract_result.content
+                        ):
+                            # Regular WebExtractResponse
+                            content = extract_result.content
+                        elif (
+                            hasattr(extract_result, 'content_generator')
+                            and extract_result.content_generator
+                        ):
+                            # StreamingExtractResponse - we need to collect the content
+                            try:
+                                import asyncio
 
-            # except Exception as e:
-            #     logger.error(f"Error in fallback extraction: {e}")
-            #     # Continue without extracted content - don't fail the entire search
+                                # Create a new event loop if one doesn't exist
+                                try:
+                                    loop = asyncio.get_event_loop()
+                                except RuntimeError:
+                                    loop = asyncio.new_event_loop()
+                                    asyncio.set_event_loop(loop)
+
+                                # Collect content from the async generator
+                                async def collect_content():
+                                    collected = ""
+                                    async for chunk in extract_result.content_generator:
+                                        collected += chunk
+                                    return collected
+
+                                content = loop.run_until_complete(collect_content())
+                            except Exception as e:
+                                logger.error(
+                                    f"Failed to collect streaming content from fallback result {extract_result.url}: {e}"
+                                )
+                                content = None
+
+                    if content:
+                        top_result.extracted_content = content
+                        logger.debug(
+                            f"Successfully extracted content from fallback result: {extract_result.url}"
+                        )
+                    else:
+                        logger.warning(
+                            f"Failed to extract content from fallback result: {extract_result.url}"
+                        )
+
+            except Exception as e:
+                logger.error(f"Error in fallback extraction: {e}")
+                # Continue without extracted content - don't fail the entire search
 
             return fallback_results
 
@@ -145,42 +181,78 @@ class TavilyTool(BaseTool):
             f"Extracting content for {len(high_scoring_results)} high-scoring results"
         )
 
-        # Import extract tool (disabled for reduced latency)
-        # from tools.extract import execute_web_extract_batch
+        # Import extract tool
+        from tools.extract import execute_web_extract_batch
 
-        # Extraction disabled for reduced latency
-        # try:
-        #     # Get URLs for high-scoring results
-        #     urls = [result.url for result in high_scoring_results]
+        try:
+            # Get URLs for high-scoring results
+            urls = [result.url for result in high_scoring_results]
 
-        #     # Perform batch extraction
-        #     extract_results = execute_web_extract_batch(urls)
+            # Perform batch extraction
+            extract_results = execute_web_extract_batch(urls)
 
-        #     # Create a mapping of URL to extracted content
-        #     url_to_content = {}
-        #     for extract_result in extract_results:
-        #         if extract_result.success and extract_result.content:
-        #             url_to_content[extract_result.url] = extract_result.content
-        #             logger.info(
-        #                 f"Successfully extracted content from {extract_result.url}"
-        #             )
-        #         else:
-        #             logger.warning(
-        #                 f"Failed to extract content from {extract_result.url}: {extract_result.error_message}"
-        #             )
+            # Create a mapping of URL to extracted content
+            url_to_content = {}
+            for extract_result in extract_results:
+                logger.debug(f"Extract result: {extract_result}")
 
-        #     # Update only the high-scoring results with extracted content
-        #     for result in high_scoring_results:
-        #         if result.url in url_to_content:
-        #             result.extracted_content = url_to_content[result.url]
+                # Handle both WebExtractResponse and StreamingExtractResponse
+                content = None
+                if extract_result.success:
+                    if hasattr(extract_result, 'content') and extract_result.content:
+                        # Regular WebExtractResponse
+                        content = extract_result.content
+                    elif (
+                        hasattr(extract_result, 'content_generator')
+                        and extract_result.content_generator
+                    ):
+                        # StreamingExtractResponse - we need to collect the content
+                        try:
+                            import asyncio
 
-        #     logger.info(
-        #         f"Batch extraction completed. {len(url_to_content)} successful extractions"
-        #     )
+                            # Create a new event loop if one doesn't exist
+                            try:
+                                loop = asyncio.get_event_loop()
+                            except RuntimeError:
+                                loop = asyncio.new_event_loop()
+                                asyncio.set_event_loop(loop)
 
-        # except Exception as e:
-        #     logger.error(f"Error in batch extraction: {e}")
-        #     # Continue without extracted content - don't fail the entire search
+                            # Collect content from the async generator
+                            async def collect_content():
+                                collected = ""
+                                async for chunk in extract_result.content_generator:
+                                    collected += chunk
+                                return collected
+
+                            content = loop.run_until_complete(collect_content())
+                        except Exception as e:
+                            logger.error(
+                                f"Failed to collect streaming content from {extract_result.url}: {e}"
+                            )
+                            content = None
+
+                if content:
+                    url_to_content[extract_result.url] = content
+                    logger.debug(
+                        f"Successfully extracted content from {extract_result.url}"
+                    )
+                else:
+                    logger.warning(
+                        f"Failed to extract content from {extract_result.url}: {extract_result.error_message}"
+                    )
+
+            # Update only the high-scoring results with extracted content
+            for result in high_scoring_results:
+                if result.url in url_to_content:
+                    result.extracted_content = url_to_content[result.url]
+
+            logger.info(
+                f"Batch extraction completed. {len(url_to_content)} successful extractions"
+            )
+
+        except Exception as e:
+            logger.error(f"Error in batch extraction: {e}")
+            # Continue without extracted content - don't fail the entire search
 
         return high_scoring_results
 
@@ -204,11 +276,11 @@ class TavilyTool(BaseTool):
             # Format as: 1. [title](url): content
             entry = f"{i}. [{result.title}]({result.url}): {clean_content}\n___"
 
-            # Skip displaying extracted content (removed for reduced latency)
-            # if result.extracted_content:
-            #     # Strip think tags from extracted content before display
-            #     cleaned_extract = strip_think_tags(result.extracted_content)
-            #     entry += f"\n\n**Extracted Content:**\n{cleaned_extract}"
+            # Add extracted content if available
+            if result.extracted_content:
+                # Strip think tags from extracted content before display
+                cleaned_extract = strip_think_tags(result.extracted_content)
+                entry += f"\n\n**Extracted Content:**\n{cleaned_extract}"
 
             formatted_entries.append(entry)
 
@@ -285,13 +357,13 @@ class TavilyTool(BaseTool):
             "topic": "general",
             "auto_parameters": True,
             "include_raw_content": False,
-            "max_results": 5,
+            "max_results": 10,
             "country": "united states",
             "include_images": False,
             "exclude_domains": [
                 "youtube.com",
                 "reddit.com",
-            ],  # excluded domains which can't really be extracted well.
+            ],  # excluded domains which cannot be extracted.
         }
 
         # Update with any provided kwargs
@@ -318,10 +390,10 @@ class TavilyTool(BaseTool):
             response_data = response.json()
             tavily_response = TavilyResponse(**response_data)
 
-            # Skip extraction process for reduced latency
-            # tavily_response.results = self._extract_content_for_results(
-            #     tavily_response.results
-            # )
+            # Extract content for high-scoring results
+            tavily_response.results = self._extract_content_for_results(
+                tavily_response.results
+            )
 
             # Format the results for display
             tavily_response.formatted_results = self.format_results(
