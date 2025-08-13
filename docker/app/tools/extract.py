@@ -366,7 +366,10 @@ Instructions:
             response = client.chat.completions.create(
                 model=model_name,
                 messages=messages,
-                temperature=0.0,
+                temperature=0.6,
+                top_p=0.95,
+                presence_penalty=0.0,
+                frequency_penalty=0.0,
                 stream=True,  # Enable streaming for faster latency
             )
 
@@ -431,9 +434,11 @@ Instructions:
             response = await client.chat.completions.create(
                 model=model_name,
                 messages=messages,
-                temperature=0.3,
-                max_tokens=10000,
-                top_p=0.9,
+                temperature=0.6,
+                top_p=0.95,
+                presence_penalty=0.0,
+                frequency_penalty=0.0,
+                max_tokens=65536,
             )
 
             result = response.choices[0].message.content.strip()
@@ -503,7 +508,10 @@ Instructions:
             response = await client.chat.completions.create(
                 model=model_name,
                 messages=messages,
-                temperature=0.0,
+                temperature=0.6,
+                top_p=0.95,
+                presence_penalty=0.0,
+                frequency_penalty=0.0,
                 stream=True,  # Enable streaming
             )
 

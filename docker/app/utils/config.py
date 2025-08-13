@@ -126,13 +126,16 @@ class LLMConfig:
     DEFAULT_TOP_P: float = 0.95
     DEFAULT_FREQUENCY_PENALTY: float = 0.0
     DEFAULT_PRESENCE_PENALTY: float = 0.0
-    DEFAULT_MAX_TOKENS: int = 4096
+    DEFAULT_MAX_TOKENS: int = 65536
 
     # Context and token limits
     SLIDING_WINDOW_MAX_TURNS: int = 20
     MAX_CONTEXT_TOKENS: int = field(
-        default_factory=lambda: int(os.getenv("MAX_CONTEXT_TOKENS", "128000"))
+        default_factory=lambda: int(os.getenv("MAX_CONTEXT_TOKENS", "116000"))
     )  # Maximum context length for LLM (tokens)
+    MAX_TOOL_RESPONSE_TOKENS: int = field(
+        default_factory=lambda: int(os.getenv("MAX_TOOL_RESPONSE_TOKENS", "16000"))
+    )  # Maximum tokens for individual tool responses
 
     # Conversation context injection
     AUTO_INJECT_CONVERSATION_CONTEXT: bool = (

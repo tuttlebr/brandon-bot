@@ -75,7 +75,10 @@ class GeneralistController(ToolController):
             response = client.chat.completions.create(
                 model=model_name,
                 messages=final_messages,
-                temperature=0.0,
+                temperature=0.6,
+                top_p=0.95,
+                presence_penalty=0.0,
+                frequency_penalty=0.0,
             )
 
             result = response.choices[0].message.content.strip()
@@ -123,7 +126,10 @@ class GeneralistController(ToolController):
             model_name = llm_client_service.get_model_name(self.llm_type)
 
             # Create system prompt for general conversation
-            system_prompt = self._get_system_prompt()
+            # Get configured system prompt if available
+            from tools.tool_llm_config import get_tool_system_prompt
+
+            system_prompt = get_tool_system_prompt("generalist_conversation", None)
 
             # Build conversation messages
             final_messages = self._build_conversation_messages(
@@ -138,8 +144,11 @@ class GeneralistController(ToolController):
             response = await client.chat.completions.create(
                 model=model_name,
                 messages=final_messages,
-                temperature=0.0,
-                stream=True,  # Enable streaming
+                temperature=0.6,
+                top_p=0.95,
+                presence_penalty=0.0,
+                frequency_penalty=0.0,
+                stream=True,
             )
 
             # Create think tag filter for streaming

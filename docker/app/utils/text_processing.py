@@ -18,14 +18,40 @@ def strip_think_tags(text: Optional[str]) -> str:
     # Use regex to remove <think>...</think> tags and everything between them
     # The (?s) flag makes . match newlines as well
     # The *? makes it non-greedy to handle multiple think tags correctly
-    pattern = r'<think>.*?</think>'
-    cleaned_text = re.sub(pattern, '', text, flags=re.DOTALL | re.IGNORECASE)
+    pattern = r"<think>.*?</think>"
+    cleaned_text = re.sub(pattern, "", text, flags=re.DOTALL | re.IGNORECASE)
 
     # # Clean up any double spaces or extra newlines that might be left
     # cleaned_text = re.sub(r'\n\s*\n\s*\n', '\n\n', cleaned_text)
     # cleaned_text = re.sub(r'  +', ' ', cleaned_text)
 
     return cleaned_text.strip()
+
+
+def sanitize_python_input(text: str) -> str:
+    """
+    Sanitize user input to make it safer for Python processing.
+
+    Args:
+        text: The text to sanitize
+
+    Returns:
+        Sanitized text safe for Python processing
+    """
+    if not text:
+        return ""
+
+    # Remove or escape potentially dangerous characters
+    text = re.sub(r"[^\x20-\x7E\n\t]", "", text)  # Only printable ASCII + newlines/tabs
+
+    # Normalize whitespace
+    text = re.sub(r"\r\n", "\n", text)  # Normalize line endings
+    text = re.sub(r"\r", "\n", text)  # Convert carriage returns to newlines
+
+    # Remove null bytes
+    text = text.replace("\x00", "")
+
+    return text.strip()
 
 
 class StreamingThinkTagFilter:
@@ -59,7 +85,7 @@ class StreamingThinkTagFilter:
         while i < len(self.buffer):
             if self.in_think_tag:
                 # Look for closing tag
-                close_index = self.buffer.find('</think>', i)
+                close_index = self.buffer.find("</think>", i)
                 if close_index != -1:
                     # Found closing tag, skip to after it
                     i = close_index + 8  # len('</think>')
@@ -69,7 +95,7 @@ class StreamingThinkTagFilter:
                     break
             else:
                 # Look for opening tag
-                open_index = self.buffer.find('<think>', i)
+                open_index = self.buffer.find("<think>", i)
                 if open_index != -1:
                     # Output text before the tag
                     output += self.buffer[i:open_index]
@@ -80,12 +106,12 @@ class StreamingThinkTagFilter:
                     partial_tag_start = max(i, len(self.buffer) - 7)
                     for j in range(partial_tag_start, len(self.buffer)):
                         if (
-                            self.buffer[j:].startswith('<')
-                            or self.buffer[j:].startswith('<t')
-                            or self.buffer[j:].startswith('<th')
-                            or self.buffer[j:].startswith('<thi')
-                            or self.buffer[j:].startswith('<thin')
-                            or self.buffer[j:].startswith('<think')
+                            self.buffer[j:].startswith("<")
+                            or self.buffer[j:].startswith("<t")
+                            or self.buffer[j:].startswith("<th")
+                            or self.buffer[j:].startswith("<thi")
+                            or self.buffer[j:].startswith("<thin")
+                            or self.buffer[j:].startswith("<think")
                         ):
                             # Might be start of tag, output up to this point
                             output += self.buffer[i:j]

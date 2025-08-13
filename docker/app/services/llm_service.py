@@ -370,10 +370,31 @@ class LLMService:
         # Add tool responses in a way that the LLM can understand
         for response in tool_responses:
             if response.get("role") == "tool":
+                # Truncate tool response content to prevent token limit issues
+                tool_content = response.get('content', '')
+                tool_name = response.get('tool_name', 'unknown')
+
+                # Limit tool response content based on configured max tokens
+                max_tool_tokens = config.llm.MAX_TOOL_RESPONSE_TOKENS
+                # Use the same token estimation as elsewhere in the code (4 chars = 1 token)
+                max_tool_content_chars = max_tool_tokens * 4
+
+                if len(tool_content) > max_tool_content_chars:
+                    logger.warning(
+                        f"Tool '{tool_name}' response too long ({len(tool_content)} chars, "
+                        f"~{self._estimate_tokens(tool_content)} tokens). "
+                        f"Truncating to {max_tool_content_chars} characters (~{max_tool_tokens} tokens)."
+                    )
+                    # Keep first part of content and add truncation notice
+                    tool_content = (
+                        tool_content[:max_tool_content_chars]
+                        + f"\n\n[Tool response truncated due to length. First ~{max_tool_tokens} tokens shown.]"
+                    )
+
                 extended_messages.append(
                     {
                         "role": "assistant",
-                        "content": f"Tool {response.get('tool_name')} returned: {response.get('content')}",
+                        "content": f"Tool {tool_name} returned: {tool_content}",
                     }
                 )
             elif response.get("role") == "direct_response":
@@ -405,10 +426,22 @@ class LLMService:
                 else:
                     # For other direct response tools
                     content = response.get("content", "")
+                    # Apply same truncation logic for consistency
+                    max_tool_tokens = config.llm.MAX_TOOL_RESPONSE_TOKENS
+                    max_tool_content_chars = max_tool_tokens * 4
+
+                    if len(content) > max_tool_content_chars:
+                        logger.warning(
+                            f"Direct response tool '{tool_name}' content too long. Truncating for message history."
+                        )
+                        content = (
+                            content[:max_tool_content_chars] + "\n\n[Content truncated]"
+                        )
+
                     extended_messages.append(
                         {
                             "role": "assistant",
-                            "content": f"Tool {tool_name} returned: {content[:200]}...",  # Truncate long responses
+                            "content": f"Tool {tool_name} returned: {content}",
                         }
                     )
 

@@ -113,7 +113,10 @@ class TextProcessorService:
                     client.chat.completions.create(
                         model=model_name,
                         messages=final_messages,
-                        temperature=0.0,
+                        temperature=0.6,
+                        top_p=0.95,
+                        presence_penalty=0.0,
+                        frequency_penalty=0.0,
                     ),
                     timeout=60.0,  # 60 second timeout
                 )
@@ -211,7 +214,10 @@ class TextProcessorService:
             response = await client.chat.completions.create(
                 model=model_name,
                 messages=final_messages,
-                temperature=0.0,
+                temperature=0.6,
+                top_p=0.95,
+                presence_penalty=0.0,
+                frequency_penalty=0.0,
                 stream=True,  # Enable streaming
             )
 
@@ -478,7 +484,7 @@ class TextProcessorService:
 
         # Fall back to the context-aware system prompt
         return get_context_system_prompt(
-            context='text_processing',
+            context="text_processing",
             task_type=task_type.value,
             instructions=instructions,
         )

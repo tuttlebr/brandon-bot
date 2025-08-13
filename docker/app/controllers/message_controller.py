@@ -5,7 +5,7 @@ from typing import Any, Dict, List
 import streamlit as st
 from models.chat_config import ChatConfig
 from services import ChatService
-from utils.text_processing import strip_think_tags
+from utils.text_processing import sanitize_python_input, strip_think_tags
 
 
 class MessageController:
@@ -30,20 +30,24 @@ class MessageController:
             r'<TOOLCALL(?:[-"\s])*\[.*?\]</TOOLCALL>', re.DOTALL | re.IGNORECASE
         )
 
-    def validate_prompt(self, prompt: str) -> bool:
+    def validate_prompt(self, prompt: str) -> tuple[bool, str]:
         """
-        Validate user prompt for safety and correctness
+        Enhanced validation for user prompts with Python syntax checking
 
         Args:
             prompt: User input prompt
 
         Returns:
-            True if valid, False if contains issues
+            Tuple of (is_valid, error_message)
         """
         if not prompt or not prompt.strip():
-            return False
+            return False, "Input cannot be empty"
 
-        return not self.contains_tool_call_instructions(prompt)
+        # First check for tool call instructions
+        if self.contains_tool_call_instructions(prompt):
+            return False, "Tool call instructions are not allowed"
+
+        return True, "Input is valid"
 
     def contains_tool_call_instructions(self, content: str) -> bool:
         """
@@ -110,7 +114,7 @@ class MessageController:
 
     def safe_add_message_to_history(self, role: str, content: Any) -> bool:
         """
-        Safely add a message to chat history with validation
+        Enhanced safe message addition with Python validation
 
         Args:
             role: The role of the message sender
@@ -121,22 +125,26 @@ class MessageController:
         """
         # Handle different content types
         if isinstance(content, str):
-            # String content - validate it's not empty and doesn't contain tool calls
-            if not content or not content.strip():
+            # Sanitize the content first
+            sanitized_content = sanitize_python_input(content)
+
+            if not sanitized_content:
                 logging.warning(
                     f"Attempted to add empty {role} message to chat history, skipping"
                 )
                 return False
 
             # Check for tool call instructions (but allow tool responses)
-            if role != "tool" and self.contains_tool_call_instructions(content):
+            if role != "tool" and self.contains_tool_call_instructions(
+                sanitized_content
+            ):
                 logging.warning(
                     f"Attempted to add {role} message with tool call instructions to chat history, skipping"
                 )
                 return False
 
             # Strip think tags before adding to history
-            content = strip_think_tags(content).strip()
+            content = strip_think_tags(sanitized_content).strip()
         elif isinstance(content, dict):
             # Dict content (like image messages) - ensure it has meaningful data
             if not content:

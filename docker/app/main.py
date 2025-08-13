@@ -118,17 +118,16 @@ class ProductionStreamlitChatApp:
             # Clean and validate the prompt
             prompt = prompt.strip()
 
+            # Enhanced validation with detailed error messages
+            is_valid, error_message = self.message_controller.validate_prompt(prompt)
+            if not is_valid:
+                st.error(f"Invalid input: {error_message}")
+                self.session_controller.set_processing_state(False)
+                return
+
             # Display user message with centralized configuration
             with st.chat_message("user", avatar=self.config_obj.user_avatar):
                 st.markdown(prompt)
-
-            # Validate prompt using controller with proper error handling
-            if not self.message_controller.validate_prompt(prompt):
-                st.error(
-                    "Invalid input detected. Please try again with a different message."
-                )
-                self.session_controller.set_processing_state(False)
-                return
 
             # Clear previous context and tool responses using controllers
             self.session_controller.clear_tool_context()

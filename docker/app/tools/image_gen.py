@@ -2,11 +2,9 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple, Type
 
 from models.chat_config import ChatConfig
-from openai import OpenAI
 from PIL import Image
 from pydantic import Field
 from tools.base import BaseTool, BaseToolResponse, ExecutionMode
-from utils.config import config as app_config
 from utils.image import generate_image
 
 # Configure logger
@@ -14,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 # Aspect ratio mappings to dimensions
 ASPECT_RATIO_MAPPINGS = {
-    "square": (768, 768),  # 1:1 ratio
+    "square": (1024, 1024),  # 1:1 ratio
     "portrait": (768, 1024),  # 3:4 ratio (vertical)
     "landscape": (1024, 768),  # 4:3 ratio (horizontal)
 }
@@ -63,7 +61,7 @@ class ImageGenerationTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "generate_image"
-        self.description = "Generate AI images from text descriptions. Use when user requests creating, generating, making, or drawing images."
+        self.description = "Generate images or visualizations from text descriptions. Use when user requests creating, generating, making, or drawing images or other visuals. OK to use for graphs, charts or signs with text."
         self.supported_contexts = ['image_generation']
         self.execution_mode = ExecutionMode.SYNC  # Image generation is synchronous
         self.timeout = 120.0  # Image generation can take longer
@@ -93,24 +91,6 @@ class ImageGenerationTool(BaseTool):
                             "type": "string",
                             "description": "The user's original message requesting image generation",
                         },
-                        "subject": {
-                            "type": "string",
-                            "description": "Main subject or object to be depicted in the image",
-                        },
-                        "style": {
-                            "type": "string",
-                            "description": "Artistic style or aesthetic (e.g., 'photorealistic', 'digital art', 'oil painting', 'minimalist', 'fantasy')",
-                            "default": "photorealistic",
-                        },
-                        "mood": {
-                            "type": "string",
-                            "description": "Mood or atmosphere (e.g., 'bright and cheerful', 'dark and moody', 'serene', 'dramatic')",
-                            "default": "natural",
-                        },
-                        "details": {
-                            "type": "string",
-                            "description": "Additional details, lighting, colors, or specific elements to include",
-                        },
                         "aspect_ratio": {
                             "type": "string",
                             "description": "Aspect ratio for the image. Choose based on the content: 'square' for balanced compositions, social media posts, or general purpose images; 'portrait' for vertical subjects like people, tall buildings, or phone wallpapers; 'landscape' for wide scenes, natural vistas, or desktop wallpapers.",
@@ -133,8 +113,19 @@ class ImageGenerationTool(BaseTool):
                             "type": "integer",
                             "description": "An integer from 1-5 where a larger number indicates confidence this is the right tool to help the user.",
                         },
+                        "enhanced_prompt": {
+                            "type": "string",
+                            "description": "The enhanced/rewritten prompt to use for image generation. If the original user prompt is already detailed and well-formed, you can use it as-is. Otherwise, enhance it with more specific details, artistic direction, and visual elements to improve the image generation result.",
+                        },
                     },
-                    "required": ["user_prompt", "subject", "but_why"],
+                    "required": [
+                        "user_prompt",
+                        "aspect_ratio",
+                        "cfg_scale",
+                        "use_conversation_context",
+                        "but_why",
+                        "enhanced_prompt",
+                    ],
                 },
             },
         }
@@ -146,26 +137,20 @@ class ImageGenerationTool(BaseTool):
     def _execute_sync(self, params: Dict[str, Any]) -> ImageGenerationResponse:
         """Execute the tool synchronously"""
         user_prompt = params.get("user_prompt")
-        subject = params.get("subject")
-        style = params.get("style", "photorealistic")
-        mood = params.get("mood", "natural")
-        details = params.get("details", "")
         aspect_ratio = params.get("aspect_ratio", "square")
         cfg_scale = params.get("cfg_scale", 3.5)
         use_conversation_context = params.get("use_conversation_context", True)
+        enhanced_prompt = params.get("enhanced_prompt", user_prompt)
         messages = params.get("messages")
 
         # Create config from environment
         config = ChatConfig.from_environment()
         return self.generate_image_from_prompt(
             user_prompt,
-            subject,
-            style,
-            mood,
-            details,
             aspect_ratio,
             cfg_scale,
             use_conversation_context,
+            enhanced_prompt,
             config,
             messages,
         )
@@ -220,190 +205,6 @@ class ImageGenerationTool(BaseTool):
             logger.error(f"Error retrieving conversation context: {e}")
             return None
 
-    def _enhance_prompt_with_llm(
-        self,
-        user_prompt: str,
-        subject: str,
-        style: str = "photorealistic",
-        mood: str = "natural",
-        details: str = "",
-        conversation_context: Optional[Dict[str, Any]] = None,
-        config: ChatConfig = None,
-    ) -> str:
-        """
-        Use LLM to intelligently enhance the user's prompt for better image generation
-
-        Args:
-            user_prompt: Original user prompt
-            subject: Main subject of the image
-            style: Artistic style
-            mood: Mood/atmosphere
-            details: Additional details
-            conversation_context: Optional conversation context dictionary with 'raw_details' and 'summary'
-            config: Chat configuration for LLM access
-
-        Returns:
-            LLM-enhanced prompt for image generation
-        """
-        if config is None:
-            config = ChatConfig.from_environment()
-
-        # Debug logging
-        logger.debug(f"_enhance_prompt_with_llm called with:")
-        logger.debug(f"user_prompt: '{user_prompt}'")
-        logger.debug(f"subject: '{subject}'")
-        logger.debug(f"has conversation_context: {conversation_context is not None}")
-        if conversation_context:
-            summary = conversation_context.get("summary", "")
-            logger.debug(f"context summary length: {len(summary)} chars")
-            logger.debug(
-                f"context summary preview: {summary[:200]}..."
-                if len(summary) > 200
-                else f"context summary: {summary}"
-            )
-
-        try:
-            # Initialize fast LLM client for prompt enhancement
-            fast_client = OpenAI(
-                api_key=config.fast_llm_api_key, base_url=config.fast_llm_endpoint
-            )
-
-            # Get enhancement prompt from centralized configuration
-            from tools.tool_llm_config import get_tool_system_prompt
-
-            enhancement_system_prompt = get_tool_system_prompt(
-                "generate_image_enhancement", ""
-            )
-
-            user_message = f"""**Original Request:** "{user_prompt}"
-**Subject:** {subject}
-**Style:** {style}
-**Mood:** {mood}
-{f'**Details:** {details}' if details else ''}
-
-**Task:** Transform the original request into a single, vivid image generation prompt. Focus ONLY on generating an image of "{subject}" as requested. Any context should be used subtly for atmosphere only."""
-
-            # Add conversation context at the end if available, but make it clear it's secondary
-            if conversation_context and conversation_context.get("summary"):
-                user_message += f"\n\n**Background Context (use sparingly for subtle enhancement only):**\n{conversation_context['summary']}"
-
-            # Call the fast LLM for enhancement
-            response = fast_client.chat.completions.create(
-                model=config.fast_llm_model_name,
-                messages=[
-                    {"role": "system", "content": enhancement_system_prompt},
-                    {"role": "user", "content": user_message},
-                ],
-                temperature=app_config.llm.DEFAULT_TEMPERATURE,
-                top_p=app_config.llm.DEFAULT_TOP_P,
-                presence_penalty=app_config.llm.DEFAULT_PRESENCE_PENALTY,
-                frequency_penalty=app_config.llm.DEFAULT_FREQUENCY_PENALTY,
-                max_tokens=128,  # Keep prompts reasonable length
-                stream=False,
-            )
-
-            enhanced_prompt = response.choices[0].message.content.strip()
-
-            # Debug logging to see what the LLM returned
-            logger.debug(f"LLM returned enhanced prompt: '{enhanced_prompt}'")
-            logger.debug(f"Enhanced prompt length: {len(enhanced_prompt)} chars")
-
-            # Fallback validation - ensure we got a reasonable response
-            if not enhanced_prompt or len(enhanced_prompt) < 20:
-                logger.warning(
-                    "LLM enhancement produced insufficient result, falling back to basic enhancement"
-                )
-                return self._basic_prompt_fallback(
-                    user_prompt, subject, style, mood, details, conversation_context
-                )
-
-            logger.debug(f"LLM Enhanced prompt: '{user_prompt}' -> '{enhanced_prompt}'")
-            return enhanced_prompt
-
-        except Exception as e:
-            logger.error(f"Error in LLM prompt enhancement: {e}")
-            # Fallback to basic enhancement if LLM fails
-            return self._basic_prompt_fallback(
-                user_prompt, subject, style, mood, details, conversation_context
-            )
-
-    def _basic_prompt_fallback(
-        self,
-        user_prompt: str,
-        subject: str,
-        style: str = "photorealistic",
-        mood: str = "natural",
-        details: str = "",
-        conversation_context: Optional[Dict[str, Any]] = None,
-    ) -> str:
-        """
-        Fallback basic prompt enhancement if LLM enhancement fails
-
-        Args:
-            user_prompt: Original user prompt
-            subject: Main subject of the image
-            style: Artistic style
-            mood: Mood/atmosphere
-            details: Additional details
-            conversation_context: Optional conversation context dictionary
-
-        Returns:
-            Basic enhanced prompt for image generation
-        """
-        enhanced_parts = [subject]
-
-        # Add style information
-        if style and style.lower() != "natural":
-            enhanced_parts.append(f"in {style} style")
-
-        # Add mood/atmosphere
-        if mood and mood.lower() != "natural":
-            enhanced_parts.append(f"with {mood} atmosphere")
-
-        # Add specific details
-        if details:
-            enhanced_parts.append(details)
-
-        # Add basic conversation context
-        if conversation_context:
-            summary = conversation_context.get("summary", "")
-            if summary:
-                # Extract key words from summary for basic enhancement
-                summary_words = summary.lower().split()
-                visual_keywords = [
-                    word
-                    for word in summary_words
-                    if word
-                    in [
-                        "bright",
-                        "dark",
-                        "colorful",
-                        "vibrant",
-                        "scenic",
-                        "beautiful",
-                        "dramatic",
-                        "peaceful",
-                        "stormy",
-                        "sunny",
-                        "cloudy",
-                        "misty",
-                        "clear",
-                        "natural",
-                    ]
-                ]
-                enhanced_parts.extend(
-                    visual_keywords[:2]
-                )  # Add up to 2 relevant keywords
-
-        # Add quality enhancers for better results
-        quality_enhancers = ["high quality", "detailed", "sharp focus", "professional"]
-        enhanced_prompt = ", ".join(enhanced_parts + quality_enhancers)
-
-        logger.info(
-            f"Basic fallback enhanced prompt: '{user_prompt}' -> '{enhanced_prompt}'"
-        )
-        return enhanced_prompt
-
     def _generate_image_with_config(
         self,
         enhanced_prompt: str,
@@ -457,13 +258,10 @@ class ImageGenerationTool(BaseTool):
     def generate_image_from_prompt(
         self,
         user_prompt: str,
-        subject: str,
-        style: str = "photorealistic",
-        mood: str = "natural",
-        details: str = "",
-        aspect_ratio: str = "square",
-        cfg_scale: float = 3.5,
-        use_conversation_context: bool = True,
+        aspect_ratio: str,
+        cfg_scale: float,
+        use_conversation_context: bool,
+        enhanced_prompt: str,
         config: ChatConfig = None,
         messages: List[Dict[str, Any]] = None,
     ) -> ImageGenerationResponse:
@@ -472,13 +270,10 @@ class ImageGenerationTool(BaseTool):
 
         Args:
             user_prompt: Original user prompt
-            subject: Main subject for the image
-            style: Artistic style
-            mood: Mood/atmosphere
-            details: Additional details
             aspect_ratio: Aspect ratio for the image ("square", "portrait", or "landscape")
             cfg_scale: Guidance scale for image generation (1.5-4.5)
             use_conversation_context: Whether to use conversation context
+            enhanced_prompt: The enhanced/rewritten prompt to use for image generation
             config: Chat configuration
             messages: Optional conversation messages for context
 
@@ -508,10 +303,12 @@ class ImageGenerationTool(BaseTool):
         if use_conversation_context and messages:
             conversation_context = self._get_conversation_context(messages)
 
-        # Enhance the prompt using LLM-driven intelligent enhancement
-        enhanced_prompt = self._enhance_prompt_with_llm(
-            user_prompt, subject, style, mood, details, conversation_context, config
-        )
+        # Use the provided enhanced prompt, or fall back to user_prompt if not provided
+        if enhanced_prompt is None:
+            enhanced_prompt = user_prompt
+            logger.info(f"No enhanced prompt provided, using original: '{user_prompt}'")
+        else:
+            logger.info(f"Using provided enhanced prompt: '{enhanced_prompt}'")
 
         # Check if image endpoint is configured
         if not config.image_endpoint:
@@ -549,7 +346,7 @@ class ImageGenerationTool(BaseTool):
                     "dimensions": f"{width}x{height}",
                     "cfg_scale": cfg_scale,
                     "direct_response": True,
-                    "message": f"Successfully generated {aspect_ratio} ({width}x{height}) image with cfg_scale {cfg_scale} and enhanced prompt: {enhanced_prompt}",
+                    "message": f"Successfully generated {aspect_ratio} ({width}x{height}) image with cfg_scale {cfg_scale} and prompt: {enhanced_prompt}",
                 }
 
                 # Add context info if used
@@ -609,34 +406,32 @@ class ImageGenerationTool(BaseTool):
 
         Args:
             params: Dictionary containing the required parameters
-                   Expected keys: 'user_prompt', 'subject', optionally 'style', 'mood', 'details', 'aspect_ratio', 'cfg_scale', 'use_conversation_context', 'messages', 'chain_context'
+                   Expected keys: 'user_prompt', 'aspect_ratio', 'cfg_scale', 'use_conversation_context', 'enhanced_prompt', optionally 'messages'
 
         Returns:
             ImageGenerationResponse: The image generation result
         """
         if "user_prompt" not in params:
             raise ValueError("'user_prompt' key is required in parameters dictionary")
-        if "subject" not in params:
-            raise ValueError("'subject' key is required in parameters dictionary")
+        if "enhanced_prompt" not in params:
+            raise ValueError(
+                "'enhanced_prompt' key is required in parameters dictionary"
+            )
 
         user_prompt = params["user_prompt"]
-        subject = params["subject"]
-        style = params.get("style", "photorealistic")
-        mood = params.get("mood", "natural")
-        details = params.get("details", "")
         aspect_ratio = params.get("aspect_ratio", "square")
         cfg_scale = params.get("cfg_scale", 3.5)
         use_conversation_context = params.get("use_conversation_context", True)
+        enhanced_prompt = params["enhanced_prompt"]
         messages = params.get("messages", None)
 
         logger.debug(
-            f"run_with_dict called with user_prompt: '{user_prompt}', subject: '{subject}', aspect_ratio: {aspect_ratio}, cfg_scale: {cfg_scale}, use_context: {use_conversation_context}"
+            f"run_with_dict called with user_prompt: '{user_prompt}', aspect_ratio: {aspect_ratio}, cfg_scale: {cfg_scale}, use_context: {use_conversation_context}, enhanced_prompt: '{enhanced_prompt}'"
         )
 
         # Add more detailed logging to debug the issue
         logger.debug(f"Image generation parameters:")
         logger.debug(f"user_prompt: '{user_prompt}'")
-        logger.debug(f"subject: '{subject}'")
         logger.debug(f"use_conversation_context: {use_conversation_context}")
         logger.debug(f"Number of messages: {len(messages) if messages else 0}")
 
@@ -644,13 +439,10 @@ class ImageGenerationTool(BaseTool):
         config = ChatConfig.from_environment()
         return self.generate_image_from_prompt(
             user_prompt,
-            subject,
-            style,
-            mood,
-            details,
             aspect_ratio,
             cfg_scale,
             use_conversation_context,
+            enhanced_prompt,
             config,
             messages,
         )

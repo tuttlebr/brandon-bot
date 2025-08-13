@@ -15,16 +15,16 @@ from typing import Dict
 # Tool LLM type configurations - matching actual tool names from tool classes
 TOOL_LLM_TYPES = {
     "conversation_context": "llm",
-    "extract_web_content": "intelligent",
+    "extract_web_content": "llm",
     "get_weather": "fast",
     "tavily_news_search": "intelligent",
     "tavily_internet_search": "intelligent",
     "retrieval_search": "intelligent",
     "pdf_assistant": "intelligent",
-    "text_assistant": "intelligent",
+    "text_assistant": "llm",
     "generate_image": "fast",
     "analyze_image": "vlm",
-    "generalist_conversation": "llm",
+    "generalist_conversation": "intelligent",
     "tool_selection": "intelligent",
 }
 
@@ -90,10 +90,7 @@ Track vision, goals, concept evolution, and style consistency.""",
     "conversation_context_document_analysis": """Analyze document content in conversation context.
 
 Summarize key points, structure, and connections to user queries.""",
-    "generalist_conversation": """You are a helpful AI assistant engaged in general conversation.
-
-Provide thoughtful, informative responses for discussions, explanations, creative writing, and advice.
-Draw from your knowledge to answer questions thoroughly and engagingly.""",
+    "generalist_conversation": "detailed thinking on",
 }
 
 
@@ -132,7 +129,7 @@ def get_tool_system_prompt(tool_name: str, default_prompt: str) -> str:
 
     # Otherwise, use default with global prefix if configured
     if GLOBAL_TOOL_PROMPT_PREFIX:
-        return f"{GLOBAL_TOOL_PROMPT_PREFIX}\n\n{default_prompt}"
+        return f"{GLOBAL_TOOL_PROMPT_PREFIX} - {default_prompt}"
 
     return default_prompt
 
