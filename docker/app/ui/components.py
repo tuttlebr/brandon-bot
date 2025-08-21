@@ -22,7 +22,9 @@ class ChatHistoryComponent:
         self.config = config
         self.file_storage = FileStorageService()
 
-    def display_chat_history(self, messages: list, messages_per_page: int = 25):
+    def display_chat_history(
+        self, messages: list, messages_per_page: int = 25
+    ):
         """
         Display the chat history with pagination
 
@@ -96,11 +98,15 @@ class ChatHistoryComponent:
                                 logging.warning(
                                     f"Image not found in storage: {image_id}"
                                 )
-                                st.info("🖼️ Image not available (may have been removed)")
+                                st.info(
+                                    "🖼️ Image not available (may have been removed)"
+                                )
 
                         except Exception as e:
-                            logging.error(f"Error displaying image {image_id}: {e}")
-                            st.info("🖼️ Image could not be displayed")
+                            logging.error(
+                                "Error displaying image %s: %s", image_id, e
+                            )
+                            st.error(f"Error displaying image: {e}")
                     else:
                         # No image ID available
                         logging.warning("Image message without image_id")
@@ -127,13 +133,17 @@ class ChatHistoryComponent:
                         "processing", False
                     )  # Don't show during active processing
                 ):
-                    self.display_context_expander(st.session_state.last_tool_context)
+                    self.display_context_expander(
+                        st.session_state.last_tool_context
+                    )
 
         # Display pagination controls if needed
         if total_pages > 1:
             self._display_pagination_controls(current_page, total_pages)
 
-    def _display_pagination_controls(self, current_page: int, total_pages: int):
+    def _display_pagination_controls(
+        self, current_page: int, total_pages: int
+    ):
         """
         Display pagination controls
 

@@ -43,7 +43,9 @@ def handle_pdf_upload(uploaded_file) -> Optional[Dict[str, Any]]:
         file_controller = FileController(config)
 
         with st.spinner(f"Extracting text from {filename}..."):
-            success, pdf_data = file_controller.process_pdf_upload(uploaded_file)
+            success, pdf_data = file_controller.process_pdf_upload(
+                uploaded_file
+            )
 
         if not success:
             error_msg = pdf_data.get('error', 'Failed to extract PDF text')

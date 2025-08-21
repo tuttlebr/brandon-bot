@@ -28,7 +28,10 @@ BASE64_PREFIX_PATTERN = r"^data:image/.+;base64,"
 ALLOWED_MODES = ["base"]
 
 # HTTP constants
-HTTP_HEADERS = {"Accept": "application/json", "Content-Type": "application/json"}
+HTTP_HEADERS = {
+    "Accept": "application/json",
+    "Content-Type": "application/json",
+}
 
 
 class ImageProcessingError(Exception):
@@ -130,7 +133,9 @@ def generate_image(
         # Raise HTTP errors
         response.raise_for_status()
         if return_bytes_io:
-            return base64_to_pil_image(response.json()["artifacts"][0]["base64"])
+            return base64_to_pil_image(
+                response.json()["artifacts"][0]["base64"]
+            )
         else:
             return response.json()["artifacts"][0]["base64"]
 
@@ -140,7 +145,9 @@ def generate_image(
         # raise
     except Exception as e:
         logger.error(f"Error generating image: {str(e)}")
-        raise ImageProcessingError(f"Failed to generate image: {str(e)}") from e
+        raise ImageProcessingError(
+            f"Failed to generate image: {str(e)}"
+        ) from e
 
 
 def base64_to_pil_image(base64_str: str) -> Optional[Image.Image]:

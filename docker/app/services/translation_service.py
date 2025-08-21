@@ -92,7 +92,9 @@ class TranslationService:
                     {"role": "user", "content": text},
                 ]
 
-            logger.debug(f"Translating text to {target_language} using {model_name}")
+            logger.debug(
+                f"Translating text to {target_language} using {model_name}"
+            )
 
             response = client.chat.completions.create(
                 model=model_name,
@@ -143,7 +145,9 @@ class TranslationService:
             or "translating" not in msg.get("content", "").lower()
         ]
 
-        return [{"role": "system", "content": system_prompt}] + filtered_messages
+        return [
+            {"role": "system", "content": system_prompt}
+        ] + filtered_messages
 
     def get_supported_languages(self) -> List[str]:
         """Get list of supported languages"""

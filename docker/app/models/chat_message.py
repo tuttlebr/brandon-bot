@@ -6,7 +6,9 @@ class ChatMessage:
     """Class to handle chat message operations"""
 
     def __init__(
-        self, role: str, content: Union[str, List[Dict[str, Any]], Dict[str, Any]]
+        self,
+        role: str,
+        content: Union[str, List[Dict[str, Any]], Dict[str, Any]],
     ):
         """
         Initialize a chat message
@@ -45,7 +47,10 @@ class ChatMessage:
         Returns:
             True if the message contains an image, False otherwise
         """
-        return isinstance(self.content, dict) and self.content.get("type") == "image"
+        return (
+            isinstance(self.content, dict)
+            and self.content.get("type") == "image"
+        )
 
     def get_image_data(self) -> tuple[str, str, str]:
         """

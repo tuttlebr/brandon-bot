@@ -28,7 +28,9 @@ class UserPreferences(BaseModel):
     message_limit: int = Field(
         default=100, ge=1, le=1000, description="Messages per session limit"
     )
-    auto_save: bool = Field(default=True, description="Auto-save conversations")
+    auto_save: bool = Field(
+        default=True, description="Auto-save conversations"
+    )
 
 
 class User(BaseModel):
@@ -40,8 +42,12 @@ class User(BaseModel):
     """
 
     user_id: str = Field(..., description="Unique user identifier")
-    session_id: Optional[str] = Field(None, description="Current session identifier")
-    role: UserRole = Field(default=UserRole.USER, description="User role in the system")
+    session_id: Optional[str] = Field(
+        None, description="Current session identifier"
+    )
+    role: UserRole = Field(
+        default=UserRole.USER, description="User role in the system"
+    )
     preferences: UserPreferences = Field(
         default_factory=UserPreferences, description="User preferences"
     )
@@ -51,8 +57,12 @@ class User(BaseModel):
     last_active: datetime = Field(
         default_factory=datetime.now, description="Last activity timestamp"
     )
-    message_count: int = Field(default=0, ge=0, description="Total messages sent")
-    session_count: int = Field(default=0, ge=0, description="Total sessions created")
+    message_count: int = Field(
+        default=0, ge=0, description="Total messages sent"
+    )
+    session_count: int = Field(
+        default=0, ge=0, description="Total sessions created"
+    )
 
     def update_activity(self) -> None:
         """Update last activity timestamp"""

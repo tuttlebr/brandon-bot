@@ -29,8 +29,12 @@ class CurrentWeather(BaseModel):
         None, description="Current relative humidity in %"
     )
     wind_speed: float = Field(description="Current wind speed in km/h")
-    weather_code: Optional[int] = Field(None, description="Weather condition code")
-    is_day: Optional[bool] = Field(None, description="Whether it's day or night")
+    weather_code: Optional[int] = Field(
+        None, description="Weather condition code"
+    )
+    is_day: Optional[bool] = Field(
+        None, description="Whether it's day or night"
+    )
     precipitation_probability: Optional[float] = Field(
         None, description="Current precipitation probability in %"
     )
@@ -39,7 +43,9 @@ class CurrentWeather(BaseModel):
 class HourlyWeather(BaseModel):
     """Hourly weather forecast"""
 
-    time: List[str] = Field(default_factory=list, description="Hourly timestamps")
+    time: List[str] = Field(
+        default_factory=list, description="Hourly timestamps"
+    )
     temperature: List[float] = Field(
         default_factory=list, description="Hourly temperatures in Fahrenheit"
     )
@@ -56,7 +62,8 @@ class HourlyWeather(BaseModel):
         default_factory=list, description="Hourly whether it's day or night"
     )
     precipitation_probability: List[float] = Field(
-        default_factory=list, description="Hourly precipitation probability in %"
+        default_factory=list,
+        description="Hourly precipitation probability in %",
     )
 
 
@@ -68,7 +75,9 @@ class WeatherResponse(BaseToolResponse):
     longitude: float = Field(description="Longitude coordinate")
     timezone: str = Field(description="Timezone")
     current: CurrentWeather = Field(description="Current weather conditions")
-    hourly: Optional[HourlyWeather] = Field(None, description="Hourly weather forecast")
+    hourly: Optional[HourlyWeather] = Field(
+        None, description="Hourly weather forecast"
+    )
     source: str = Field(description="Source of the weather data")
 
 
@@ -104,7 +113,9 @@ class WeatherAPIClient:
         }
 
         try:
-            response = requests.get(self.geocoding_url, params=params, timeout=5)
+            response = requests.get(
+                self.geocoding_url, params=params, timeout=5
+            )
             response.raise_for_status()
             data = response.json()
 
@@ -127,7 +138,9 @@ class WeatherAPIClient:
             city_only = self._extract_city_only(location)
             if city_only != location:
                 params["name"] = city_only
-                response = requests.get(self.geocoding_url, params=params, timeout=5)
+                response = requests.get(
+                    self.geocoding_url, params=params, timeout=5
+                )
                 response.raise_for_status()
                 data = response.json()
 
@@ -184,7 +197,9 @@ class WeatherAPIClient:
             params["forecast_days"] = 2
 
         try:
-            response = requests.get(self.weather_url, params=params, timeout=10)
+            response = requests.get(
+                self.weather_url, params=params, timeout=10
+            )
             response.raise_for_status()
             return response.json()
         except requests.RequestException as e:
@@ -283,7 +298,9 @@ class WeatherController(ToolController):
             wind_speed=hourly.get("wind_speed_10m", []),
             weather_code=hourly.get("weather_code", []),
             is_day=is_day_bools,
-            precipitation_probability=hourly.get("precipitation_probability", []),
+            precipitation_probability=hourly.get(
+                "precipitation_probability", []
+            ),
         )
 
 

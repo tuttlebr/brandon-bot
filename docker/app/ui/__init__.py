@@ -1,5 +1,10 @@
 from .components import ChatHistoryComponent
-from .view_helpers import MessageHelper, ProgressHelper, ViewHelperFactory, view_factory
+from .view_helpers import (
+    MessageHelper,
+    ProgressHelper,
+    ViewHelperFactory,
+    view_factory,
+)
 from .view_interfaces import (
     IApplicationInterface,
     IChatDisplayInterface,

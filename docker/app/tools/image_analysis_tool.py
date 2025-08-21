@@ -9,7 +9,12 @@ import logging
 from typing import Any, AsyncGenerator, Dict, Type
 
 from pydantic import Field
-from tools.base import BaseTool, BaseToolResponse, ExecutionMode, StreamingToolResponse
+from tools.base import (
+    BaseTool,
+    BaseToolResponse,
+    ExecutionMode,
+    StreamingToolResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +134,9 @@ class ImageAnalysisTool(BaseTool):
 
             # Get image data from session state
             image_base64 = st.session_state.current_image_base64
-            filename = getattr(st.session_state, "current_image_filename", "Unknown")
+            filename = getattr(
+                st.session_state, "current_image_filename", "Unknown"
+            )
 
         logger.info(f"Analyzing image: {filename}")
         logger.debug(f"Image base64 length: {len(image_base64)}")
@@ -205,7 +212,9 @@ class ImageAnalysisTool(BaseTool):
 
             # Get image data from session state
             image_base64 = st.session_state.current_image_base64
-            filename = getattr(st.session_state, "current_image_filename", "Unknown")
+            filename = getattr(
+                st.session_state, "current_image_filename", "Unknown"
+            )
 
         logger.info(f"Analyzing image: {filename}")
         logger.debug(f"Image base64 length: {len(image_base64)}")
@@ -278,7 +287,8 @@ class ImageAnalysisTool(BaseTool):
 
             # Use VLM endpoint and model
             client = OpenAI(
-                api_key=config_obj.vlm_api_key, base_url=config_obj.vlm_endpoint
+                api_key=config_obj.vlm_api_key,
+                base_url=config_obj.vlm_endpoint,
             )
 
             model_name = config_obj.vlm_model_name
@@ -321,7 +331,9 @@ class ImageAnalysisTool(BaseTool):
                 if chunk.choices and chunk.choices[0].delta.content:
                     chunk_content = chunk.choices[0].delta.content
                     # Filter think tags from the chunk
-                    filtered_content = think_filter.process_chunk(chunk_content)
+                    filtered_content = think_filter.process_chunk(
+                        chunk_content
+                    )
                     if filtered_content:
                         collected_response += filtered_content
 
@@ -366,7 +378,8 @@ class ImageAnalysisTool(BaseTool):
 
             # Use async VLM client
             client = AsyncOpenAI(
-                api_key=config_obj.vlm_api_key, base_url=config_obj.vlm_endpoint
+                api_key=config_obj.vlm_api_key,
+                base_url=config_obj.vlm_endpoint,
             )
 
             model_name = config_obj.vlm_model_name
@@ -408,7 +421,9 @@ class ImageAnalysisTool(BaseTool):
                 if chunk.choices and chunk.choices[0].delta.content:
                     chunk_content = chunk.choices[0].delta.content
                     # Filter think tags from the chunk
-                    filtered_content = think_filter.process_chunk(chunk_content)
+                    filtered_content = think_filter.process_chunk(
+                        chunk_content
+                    )
                     if filtered_content:
                         yield filtered_content
 
@@ -479,7 +494,10 @@ class ImageAnalysisTool(BaseTool):
             target_height = max(target_height, 32)
 
             # Check if resizing is needed
-            if original_width != target_width or original_height != target_height:
+            if (
+                original_width != target_width
+                or original_height != target_height
+            ):
                 # Resize image
                 resized_img = img.resize(
                     (target_width, target_height), Image.Resampling.LANCZOS
@@ -502,7 +520,9 @@ class ImageAnalysisTool(BaseTool):
                 rgb_img.paste(
                     resized_img,
                     mask=(
-                        resized_img.split()[-1] if resized_img.mode == 'RGBA' else None
+                        resized_img.split()[-1]
+                        if resized_img.mode == 'RGBA'
+                        else None
                     ),
                 )
                 resized_img = rgb_img
@@ -519,7 +539,9 @@ class ImageAnalysisTool(BaseTool):
             return processed_base64
 
         except Exception as e:
-            logger.error(f"Failed to preprocess image for VLM, using original: {e}")
+            logger.error(
+                f"Failed to preprocess image for VLM, using original: {e}"
+            )
             # Return original if preprocessing fails
             return image_base64
 

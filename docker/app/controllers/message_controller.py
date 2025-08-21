@@ -12,7 +12,10 @@ class MessageController:
     """Controller for handling message processing and validation"""
 
     def __init__(
-        self, config_obj: ChatConfig, chat_service: ChatService, session_controller=None
+        self,
+        config_obj: ChatConfig,
+        chat_service: ChatService,
+        session_controller=None,
     ):
         """
         Initialize the message controller
@@ -27,7 +30,8 @@ class MessageController:
         self.session_controller = session_controller
         # Compile pattern once for performance
         self._toolcall_pattern = re.compile(
-            r'<TOOLCALL(?:[-"\s])*\[.*?\]</TOOLCALL>', re.DOTALL | re.IGNORECASE
+            r'<TOOLCALL(?:[-"\s])*\[.*?\]</TOOLCALL>',
+            re.DOTALL | re.IGNORECASE,
         )
 
     def validate_prompt(self, prompt: str) -> tuple[bool, str]:
@@ -167,8 +171,10 @@ class MessageController:
             # Fallback to direct access with safety check
             if not hasattr(st.session_state, "messages"):
                 st.session_state.messages = []
-            st.session_state.messages.append({"role": role, "content": content})
-        logging.debug(f"Added {role} message to chat history")
+            st.session_state.messages.append(
+                {"role": role, "content": content}
+            )
+        logging.debug("Added %s message to chat history", role)
         return True
 
     def update_chat_history(self, text: str, role: str):
@@ -182,7 +188,9 @@ class MessageController:
         # Clean up message format before saving using session controller if available
         if hasattr(self, 'session_controller') and self.session_controller:
             messages = self.session_controller.get_messages()
-            cleaned_messages = self.chat_service.drop_verbose_messages_context(messages)
+            cleaned_messages = self.chat_service.drop_verbose_messages_context(
+                messages
+            )
             self.session_controller.set_messages(cleaned_messages)
         else:
             # Fallback to direct access

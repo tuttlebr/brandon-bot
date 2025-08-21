@@ -66,7 +66,9 @@ class PDFIngestionService:
             Dict containing pdf_id, total_pages, char_count, chunk_count.
         """
         logger.info(
-            "Starting ingestion for PDF '%s' (session %s)", filename, session_id
+            "Starting ingestion for PDF '%s' (session %s)",
+            filename,
+            session_id,
         )
 
         # 1. Validate PDF data structure
@@ -78,7 +80,9 @@ class PDFIngestionService:
             raise RuntimeError("PDF appears empty - no pages found")
 
         total_chars = sum(len(p.get("text", "")) for p in pages)
-        logger.info("Processing %s chars across %s pages", total_chars, len(pages))
+        logger.info(
+            "Processing %s chars across %s pages", total_chars, len(pages)
+        )
 
         # 2. Generate content-based pdf_id if possible
         if pdf_content:
@@ -87,7 +91,9 @@ class PDFIngestionService:
         else:
             # Fallback to UUID if no content provided
             pdf_id = f"pdf_{uuid.uuid4().hex[:12]}"
-            logger.warning(f"No PDF content provided, using random ID: {pdf_id}")
+            logger.warning(
+                f"No PDF content provided, using random ID: {pdf_id}"
+            )
 
         # 3. Check if PDF already exists and handle based on configuration
         pdf_exists = False
@@ -96,16 +102,22 @@ class PDFIngestionService:
             if existing_info:
                 if check_existing:
                     # Configuration says to re-upload existing PDFs
-                    logger.info(f"PDF already exists: {pdf_id} - will replace it")
+                    logger.info(
+                        f"PDF already exists: {pdf_id} - will replace it"
+                    )
                     pdf_exists = True
                     # Delete existing chunks from Milvus before re-ingesting
                     try:
-                        deleted = self.chunking_service.delete_pdf_chunks(pdf_id)
+                        deleted = self.chunking_service.delete_pdf_chunks(
+                            pdf_id
+                        )
                         logger.info(
                             f"Deleted {deleted} existing chunks for PDF {pdf_id}"
                         )
                     except Exception as e:
-                        logger.warning(f"Failed to delete existing chunks: {e}")
+                        logger.warning(
+                            f"Failed to delete existing chunks: {e}"
+                        )
                 else:
                     # Configuration says to skip existing PDFs
                     logger.info(
@@ -114,8 +126,12 @@ class PDFIngestionService:
                     # Return existing PDF information without re-processing
                     return {
                         "pdf_id": pdf_id,
-                        "total_pages": existing_info.get("total_pages", len(pages)),
-                        "char_count": existing_info.get("char_count", total_chars),
+                        "total_pages": existing_info.get(
+                            "total_pages", len(pages)
+                        ),
+                        "char_count": existing_info.get(
+                            "char_count", total_chars
+                        ),
                         "chunk_count": existing_info.get("chunk_count", 0),
                         "replaced_existing": False,
                         "skipped_existing": True,
@@ -145,7 +161,9 @@ class PDFIngestionService:
         if not success:
             raise RuntimeError("Failed to upload PDF chunks to Milvus")
 
-        logger.info("PDF '%s' ingestion completed (pdf_id=%s)", filename, pdf_id)
+        logger.info(
+            "PDF '%s' ingestion completed (pdf_id=%s)", filename, pdf_id
+        )
         return {
             "pdf_id": pdf_id,
             "total_pages": len(pages),
@@ -178,14 +196,18 @@ class PDFIngestionService:
                     consistency_level="Strong",
                 )
 
-                logger.info(f"Successfully created collection '{collection_name}'")
+                logger.info(
+                    f"Successfully created collection '{collection_name}'"
+                )
             else:
                 logger.debug(f"Collection '{collection_name}' already exists")
 
             # Ensure collection is loaded
             try:
                 milvus_client.load_collection(collection_name=collection_name)
-                logger.debug(f"Collection '{collection_name}' loaded successfully")
+                logger.debug(
+                    f"Collection '{collection_name}' loaded successfully"
+                )
             except Exception as e:
                 logger.debug(
                     f"Collection '{collection_name}' may already be loaded: {e}"

@@ -38,7 +38,9 @@ def initialize_app():
         llm_client_service.initialize(config_obj)
         logger.info("LLM client service initialized at startup")
     except Exception as e:
-        logger.error(f"Failed to initialize LLM client service at startup: {e}")
+        logger.error(
+            f"Failed to initialize LLM client service at startup: {e}"
+        )
         # Don't raise - let the app continue and try again later
 
     # Suppress Streamlit warnings if configured

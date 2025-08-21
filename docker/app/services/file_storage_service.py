@@ -52,10 +52,16 @@ class FileStorageService:
             self.pdfs_dir = self.storage_path / "pdfs"
             self.metadata_dir = self.storage_path / "metadata"
 
-            for dir_path in [self.images_dir, self.pdfs_dir, self.metadata_dir]:
+            for dir_path in [
+                self.images_dir,
+                self.pdfs_dir,
+                self.metadata_dir,
+            ]:
                 dir_path.mkdir(parents=True, exist_ok=True)
 
-            logger.info(f"Storage directories initialized at {self.storage_path}")
+            logger.info(
+                f"Storage directories initialized at {self.storage_path}"
+            )
         except Exception as e:
             logger.error(f"Failed to create storage directories: {e}")
             raise FileProcessingError(f"Storage initialization failed: {e}")
@@ -481,7 +487,9 @@ class FileStorageService:
                         total_size += metadata.get("size_bytes", 0)
 
                 except (json.JSONDecodeError, IOError) as e:
-                    logger.debug(f"Error reading metadata file {metadata_file}: {e}")
+                    logger.debug(
+                        f"Error reading metadata file {metadata_file}: {e}"
+                    )
                     continue
 
             # Check limits

@@ -159,7 +159,9 @@ class WebDataExtractor:
                     response.raise_for_status()
 
                     # Check content type
-                    content_type = response.headers.get("content-type", "").lower()
+                    content_type = response.headers.get(
+                        "content-type", ""
+                    ).lower()
                     if (
                         "text/html" not in content_type
                         and "application/xhtml" not in content_type
@@ -176,7 +178,9 @@ class WebDataExtractor:
 
             # Parse HTML in thread pool to avoid blocking
             loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(None, self._parse_html, html_text)
+            result = await loop.run_in_executor(
+                None, self._parse_html, html_text
+            )
 
             elapsed_time = time.time() - start_time
             logger.info(

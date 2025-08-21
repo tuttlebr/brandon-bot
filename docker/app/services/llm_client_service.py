@@ -108,7 +108,8 @@ class LLMClientService:
                 )
             elif llm_type == "llm":
                 client = OpenAI(
-                    api_key=self._config.llm_api_key, base_url=self._config.llm_endpoint
+                    api_key=self._config.llm_api_key,
+                    base_url=self._config.llm_endpoint,
                 )
             elif llm_type == "intelligent":
                 client = OpenAI(
@@ -117,7 +118,8 @@ class LLMClientService:
                 )
             elif llm_type == "vlm":
                 client = OpenAI(
-                    api_key=self._config.vlm_api_key, base_url=self._config.vlm_endpoint
+                    api_key=self._config.vlm_api_key,
+                    base_url=self._config.vlm_endpoint,
                 )
             else:
                 raise ValueError(f"Invalid LLM type: {llm_type}")

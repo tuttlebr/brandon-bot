@@ -52,12 +52,24 @@ class ChatCompletionRequest(BaseModel):
     messages: List[ChatMessage] = Field(
         ..., description="List of conversation messages"
     )
-    model: Optional[str] = Field(None, description="Model to use for completion")
-    temperature: Optional[float] = Field(0.0, description="Sampling temperature")
-    top_p: Optional[float] = Field(0.95, description="Top-p sampling parameter")
-    max_tokens: Optional[int] = Field(None, description="Maximum tokens to generate")
-    stream: Optional[bool] = Field(False, description="Whether to stream the response")
-    tools: Optional[List[Dict[str, Any]]] = Field(None, description="Available tools")
+    model: Optional[str] = Field(
+        None, description="Model to use for completion"
+    )
+    temperature: Optional[float] = Field(
+        0.0, description="Sampling temperature"
+    )
+    top_p: Optional[float] = Field(
+        0.95, description="Top-p sampling parameter"
+    )
+    max_tokens: Optional[int] = Field(
+        None, description="Maximum tokens to generate"
+    )
+    stream: Optional[bool] = Field(
+        False, description="Whether to stream the response"
+    )
+    tools: Optional[List[Dict[str, Any]]] = Field(
+        None, description="Available tools"
+    )
     tool_choice: Optional[Union[str, Dict[str, Any]]] = Field(
         "auto", description="Tool choice strategy"
     )
@@ -81,8 +93,12 @@ class ChatCompletionResponse(BaseModel):
     object: str = Field("chat.completion", description="Object type")
     created: int = Field(..., description="Creation timestamp")
     model: str = Field(..., description="Model used")
-    choices: List[ChatCompletionChoice] = Field(..., description="Generated choices")
-    usage: Optional[Dict[str, Any]] = Field(None, description="Token usage information")
+    choices: List[ChatCompletionChoice] = Field(
+        ..., description="Generated choices"
+    )
+    usage: Optional[Dict[str, Any]] = Field(
+        None, description="Token usage information"
+    )
 
 
 class StreamingChatCompletionResponse(BaseModel):
@@ -126,10 +142,14 @@ class APIChatbotService:
                 self.config_obj, self.chat_service, self.session_controller
             )
             self.file_controller = FileController(
-                self.config_obj, self.message_controller, self.session_controller
+                self.config_obj,
+                self.message_controller,
+                self.session_controller,
             )
             self.image_controller = ImageController(
-                self.config_obj, self.message_controller, self.session_controller
+                self.config_obj,
+                self.message_controller,
+                self.session_controller,
             )
             self.response_controller = ResponseController(
                 self.config_obj,
@@ -163,7 +183,9 @@ class APIChatbotService:
     ) -> List[ChatMessage]:
         """Convert dictionary messages to Pydantic format"""
         return [
-            ChatMessage(role=msg["role"], content=msg["content"], name=msg.get("name"))
+            ChatMessage(
+                role=msg["role"], content=msg["content"], name=msg.get("name")
+            )
             for msg in messages
         ]
 
@@ -192,7 +214,9 @@ class APIChatbotService:
 
             # Validate messages
             if not messages:
-                raise HTTPException(status_code=400, detail="No messages provided")
+                raise HTTPException(
+                    status_code=400, detail="No messages provided"
+                )
 
             # Get the user's message (last message from user)
             user_message = ""
@@ -211,18 +235,26 @@ class APIChatbotService:
                     break
 
             if not user_message:
-                raise HTTPException(status_code=400, detail="No user message found")
+                raise HTTPException(
+                    status_code=400, detail="No user message found"
+                )
 
             # Validate the prompt
             if not self.message_controller.validate_prompt(user_message):
-                raise HTTPException(status_code=400, detail="Invalid input detected")
+                raise HTTPException(
+                    status_code=400, detail="Invalid input detected"
+                )
 
             # Add user message to chat history
-            self.message_controller.safe_add_message_to_history("user", user_message)
+            self.message_controller.safe_add_message_to_history(
+                "user", user_message
+            )
 
             # Prepare messages for processing
-            prepared_messages = self.message_controller.prepare_messages_for_processing(
-                messages
+            prepared_messages = (
+                self.message_controller.prepare_messages_for_processing(
+                    messages
+                )
             )
 
             # Determine model to use
@@ -295,7 +327,9 @@ class APIChatbotService:
                 choices=[
                     ChatCompletionChoice(
                         index=0,
-                        message=ChatMessage(role="assistant", content=full_response),
+                        message=ChatMessage(
+                            role="assistant", content=full_response
+                        ),
                         finish_reason="stop",
                     )
                 ],
@@ -311,11 +345,15 @@ class APIChatbotService:
         except Exception as e:
             logger.error("Error generating non-streaming response: %s", e)
             raise HTTPException(
-                status_code=500, detail=f"Failed to generate response: {str(e)}"
+                status_code=500,
+                detail=f"Failed to generate response: {str(e)}",
             )
 
     async def _generate_response_async(
-        self, prepared_messages: List[Dict[str, Any]], model_name: str, model_type: str
+        self,
+        prepared_messages: List[Dict[str, Any]],
+        model_name: str,
+        model_type: str,
     ) -> str:
         """Generate response asynchronously (API-specific)"""
 
@@ -363,7 +401,11 @@ class APIChatbotService:
                     created=created_time,
                     model=model_name,
                     choices=[
-                        {"index": 0, "delta": {"content": chunk}, "finish_reason": None}
+                        {
+                            "index": 0,
+                            "delta": {"content": chunk},
+                            "finish_reason": None,
+                        }
                     ],
                 )
 
@@ -432,7 +474,9 @@ async def root():
     return {
         "message": "BrandonBot API",
         "version": "1.0.0",
-        "endpoints": {"/agent": "POST - Chat completion endpoint (OpenAI compatible)"},
+        "endpoints": {
+            "/agent": "POST - Chat completion endpoint (OpenAI compatible)"
+        },
     }
 
 
@@ -454,7 +498,9 @@ async def chat_completion(request: ChatCompletionRequest):
 
 
 @app.post("/agent/{session_id}")
-async def chat_completion_with_session(session_id: str, request: ChatCompletionRequest):
+async def chat_completion_with_session(
+    session_id: str, request: ChatCompletionRequest
+):
     """
     Chat completion endpoint with session ID
 

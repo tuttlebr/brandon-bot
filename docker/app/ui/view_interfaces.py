@@ -92,7 +92,9 @@ class ViewInterfaceRegistry:
     def get_default_interface(self) -> IApplicationInterface:
         """Get default interface"""
         if self._default_interface is None:
-            self._default_interface = ViewInterfaceFactory.get_default_interface()
+            self._default_interface = (
+                ViewInterfaceFactory.get_default_interface()
+            )
         return self._default_interface
 
 

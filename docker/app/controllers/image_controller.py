@@ -59,7 +59,7 @@ class ImageController:
 
         except Exception as e:
             error_msg = f"❌ **Image Processing Error:** An unexpected error occurred while processing your image. Please try again."
-            logging.error(f"Unexpected image processing error: {e}")
+            logging.error("Unexpected image processing error: %s", e)
             self._display_error_message(error_msg)
             return False
         finally:
@@ -77,7 +77,9 @@ class ImageController:
             Tuple of (success: bool, result: dict)
         """
         logging.info(
-            f"Starting to process image file: {uploaded_file.name}, type: {uploaded_file.type}"
+            "Starting to process image file: %s, type: %s",
+            uploaded_file.name,
+            uploaded_file.type,
         )
 
         # Create temporary file with configured suffix
@@ -90,7 +92,7 @@ class ImageController:
         try:
             # Check file size limits
             file_size = os.path.getsize(temp_file_path)
-            logging.debug(f"Original file size: {file_size / 1024:.2f} KB")
+            logging.debug("Original file size: %.2f KB", file_size / 1024)
 
             if file_size > config.file_processing.MAX_IMAGE_SIZE:
                 return (
@@ -106,19 +108,28 @@ class ImageController:
                 max_dimension = 1024
 
                 logging.debug(
-                    f"Original image dimensions: {original_width}x{original_height}"
+                    "Original image dimensions: %sx%s",
+                    original_width,
+                    original_height,
                 )
 
                 # Check if resizing is needed
-                if original_width > max_dimension or original_height > max_dimension:
+                if (
+                    original_width > max_dimension
+                    or original_height > max_dimension
+                ):
                     # Calculate scale factor to fit longest side within max_dimension
-                    scale = max_dimension / max(original_width, original_height)
+                    scale = max_dimension / max(
+                        original_width, original_height
+                    )
 
                     # Calculate new dimensions
                     new_width = int(original_width * scale)
                     new_height = int(original_height * scale)
 
-                    logging.debug(f"Image needs resizing. Scale factor: {scale:.3f}")
+                    logging.debug(
+                        "Image needs resizing. Scale factor: %.3f", scale
+                    )
 
                     # Resize using high-quality Lanczos resampling
                     resized_img = img.resize(
@@ -126,7 +137,12 @@ class ImageController:
                     )
 
                     logging.info(
-                        f"Resized uploaded image '{uploaded_file.name}' from {original_width}x{original_height} to {new_width}x{new_height}"
+                        "Resized uploaded image '%s' from %sx%s to %sx%s",
+                        uploaded_file.name,
+                        original_width,
+                        original_height,
+                        new_width,
+                        new_height,
                     )
 
                     # Save resized image to bytes
@@ -138,18 +154,25 @@ class ImageController:
                     if img_format not in ['JPEG', 'PNG', 'GIF', 'BMP']:
                         img_format = 'PNG'
 
-                    logging.debug(f"Saving resized image as format: {img_format}")
+                    logging.debug(
+                        "Saving resized image as format: %s", img_format
+                    )
 
-                    resized_img.save(img_buffer, format=img_format, optimize=True)
+                    resized_img.save(
+                        img_buffer, format=img_format, optimize=True
+                    )
                     img_buffer.seek(0)  # Reset buffer position to beginning
                     image_bytes = img_buffer.getvalue()
 
                     logging.debug(
-                        f"Resized image size: {len(image_bytes) / 1024:.2f} KB"
+                        "Resized image size: %.2f KB", len(image_bytes) / 1024
                     )
                 else:
                     logging.debug(
-                        f"Uploaded image '{uploaded_file.name}' already within size limit ({original_width}x{original_height})"
+                        "Uploaded image '%s' already within size limit (%sx%s)",
+                        uploaded_file.name,
+                        original_width,
+                        original_height,
                     )
                     # Read original image bytes
                     with open(temp_file_path, "rb") as image_file:
@@ -166,18 +189,26 @@ class ImageController:
                 verify_img = PILImage.open(IOByteIO(image_bytes))
                 verify_width, verify_height = verify_img.size
                 logging.debug(
-                    f"Final image dimensions after processing: {verify_width}x{verify_height}"
+                    "Final image dimensions after processing: %sx%s",
+                    verify_width,
+                    verify_height,
                 )
 
                 # Update file size after potential resizing
                 file_size = len(image_bytes)
 
                 logging.info(
-                    f"Processed image '{uploaded_file.name}': {file_size / 1024:.2f} KB, {verify_width}x{verify_height}"
+                    "Processed image '%s': %.2f KB, %sx%s",
+                    uploaded_file.name,
+                    file_size / 1024,
+                    verify_width,
+                    verify_height,
                 )
 
             # Get file type from uploaded file
-            file_type = uploaded_file.type if uploaded_file.type else "image/png"
+            file_type = (
+                uploaded_file.type if uploaded_file.type else "image/png"
+            )
 
             return (
                 True,
@@ -191,14 +222,14 @@ class ImageController:
 
         except Exception as e:
             error_msg = f"Failed to process image file: {str(e)}"
-            logging.error(f"Image processing error: {e}", exc_info=True)
+            logging.error("Image processing error: %s", e, exc_info=True)
             return False, {"error": error_msg}
 
         finally:
             # Clean up temporary file
             try:
                 os.unlink(temp_file_path)
-                logging.debug(f"Cleaned up temporary file: {temp_file_path}")
+                logging.debug("Cleaned up temporary file: %s", temp_file_path)
             except OSError:
                 pass
 
@@ -220,31 +251,43 @@ class ImageController:
                 )
 
                 # Get the stored image data to retrieve the file path
-                stored_image_data = self.session_controller.get_latest_uploaded_image()
+                stored_image_data = (
+                    self.session_controller.get_latest_uploaded_image()
+                )
                 if stored_image_data and "file_path" in stored_image_data:
                     # Add the file path to the image_data dict
                     image_data["file_object"] = stored_image_data["file_path"]
                     logging.info(
-                        f"Added file path to image_data: {stored_image_data['file_path']}"
+                        "Added file path to image_data: %s",
+                        stored_image_data['file_path'],
                     )
                 else:
-                    logging.warning("Could not retrieve file path for stored image")
+                    logging.warning(
+                        "Could not retrieve file path for stored image"
+                    )
 
                 # Store the image data in session state for easy access
-                st.session_state.current_image_base64 = image_data["image_data"]
+                st.session_state.current_image_base64 = image_data[
+                    "image_data"
+                ]
                 st.session_state.current_image_filename = filename
                 st.session_state.current_image_id = image_id
 
                 logging.debug(
-                    f"Stored image in session state - filename: {filename}, data length: {len(image_data['image_data'])}"
+                    "Stored image in session state - filename: %s, data length: %s",
+                    filename,
+                    len(image_data['image_data']),
                 )
 
                 # Verify the size of what we stored in session state
                 import base64 as b64
 
-                stored_bytes = b64.b64decode(st.session_state.current_image_base64)
+                stored_bytes = b64.b64decode(
+                    st.session_state.current_image_base64
+                )
                 logging.debug(
-                    f"Session state image size: {len(stored_bytes) / 1024:.2f} KB"
+                    "Session state image size: %.2f KB",
+                    len(stored_bytes) / 1024,
                 )
 
                 # Add user notification message (without base64 data)
@@ -254,7 +297,9 @@ class ImageController:
                 )
 
                 # Display the user message
-                with st.chat_message("user", avatar=self.config_obj.user_avatar):
+                with st.chat_message(
+                    "user", avatar=self.config_obj.user_avatar
+                ):
                     st.markdown(user_message)
 
                 # Add assistant response
@@ -272,13 +317,17 @@ class ImageController:
                 # Mark file as processed
                 self.mark_file_as_processed(filename)
 
-                logging.info(f"Successfully processed and stored image: {filename}")
+                logging.info(
+                    "Successfully processed and stored image: %s", filename
+                )
 
             else:
-                logging.error("Session controller not available for image storage")
+                logging.error(
+                    "Session controller not available for image storage"
+                )
 
         except Exception as e:
-            logging.error(f"Error handling successful image processing: {e}")
+            logging.error("Error handling successful image processing: %s", e)
             raise
 
     def _handle_processing_error(self, error_result: dict):
@@ -298,10 +347,14 @@ class ImageController:
         Args:
             error_msg: Error message to display
         """
-        with st.chat_message("assistant", avatar=self.config_obj.assistant_avatar):
+        with st.chat_message(
+            "assistant", avatar=self.config_obj.assistant_avatar
+        ):
             st.error(error_msg)
 
-        self.message_controller.safe_add_message_to_history("assistant", error_msg)
+        self.message_controller.safe_add_message_to_history(
+            "assistant", error_msg
+        )
 
     def is_new_upload(self, uploaded_file) -> bool:
         """
@@ -316,10 +369,12 @@ class ImageController:
         # Check if we're currently processing this file
         if (
             hasattr(st.session_state, "currently_processing_image")
-            and st.session_state.currently_processing_image == uploaded_file.name
+            and st.session_state.currently_processing_image
+            == uploaded_file.name
         ):
             logging.info(
-                f"Image '{uploaded_file.name}' is already being processed, skipping duplicate processing"
+                "Image '%s' is already being processed, skipping duplicate processing",
+                uploaded_file.name,
             )
             return False
 
@@ -337,14 +392,16 @@ class ImageController:
             filename: Name of the file being processed
         """
         st.session_state.currently_processing_image = filename
-        logging.info(f"Marked image '{filename}' as currently being processed")
+        logging.info(
+            "Marked image '%s' as currently being processed", filename
+        )
 
     def clear_processing_file(self):
         """Clear the currently processing file marker"""
         if hasattr(st.session_state, "currently_processing_image"):
             filename = st.session_state.currently_processing_image
             st.session_state.currently_processing_image = None
-            logging.info(f"Cleared processing marker for image '{filename}'")
+            logging.info("Cleared processing marker for image '%s'", filename)
 
     def mark_file_as_processed(self, filename: str):
         """
@@ -354,7 +411,7 @@ class ImageController:
             filename: Name of the processed file
         """
         st.session_state.last_uploaded_image = filename
-        logging.info(f"Marked image '{filename}' as successfully processed")
+        logging.info("Marked image '%s' as successfully processed", filename)
 
     def get_supported_file_types(self) -> list:
         """

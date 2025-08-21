@@ -101,7 +101,9 @@ class TavilyTool(BaseTool):
             List of high-scoring search results with extracted content added
         """
         # Filter results with score >= 0.6
-        high_scoring_results = [result for result in results if result.score >= 0.6]
+        high_scoring_results = [
+            result for result in results if result.score >= 0.6
+        ]
 
         if not high_scoring_results:
             logger.info(
@@ -150,11 +152,15 @@ class TavilyTool(BaseTool):
                                 # Collect content from the async generator
                                 async def collect_content():
                                     collected = ""
-                                    async for chunk in extract_result.content_generator:
+                                    async for (
+                                        chunk
+                                    ) in extract_result.content_generator:
                                         collected += chunk
                                     return collected
 
-                                content = loop.run_until_complete(collect_content())
+                                content = loop.run_until_complete(
+                                    collect_content()
+                                )
                             except Exception as e:
                                 logger.error(
                                     f"Failed to collect streaming content from fallback result {extract_result.url}: {e}"
@@ -199,7 +205,10 @@ class TavilyTool(BaseTool):
                 # Handle both WebExtractResponse and StreamingExtractResponse
                 content = None
                 if extract_result.success:
-                    if hasattr(extract_result, 'content') and extract_result.content:
+                    if (
+                        hasattr(extract_result, 'content')
+                        and extract_result.content
+                    ):
                         # Regular WebExtractResponse
                         content = extract_result.content
                     elif (
@@ -220,11 +229,15 @@ class TavilyTool(BaseTool):
                             # Collect content from the async generator
                             async def collect_content():
                                 collected = ""
-                                async for chunk in extract_result.content_generator:
+                                async for (
+                                    chunk
+                                ) in extract_result.content_generator:
                                     collected += chunk
                                 return collected
 
-                            content = loop.run_until_complete(collect_content())
+                            content = loop.run_until_complete(
+                                collect_content()
+                            )
                         except Exception as e:
                             logger.error(
                                 f"Failed to collect streaming content from {extract_result.url}: {e}"
@@ -274,7 +287,9 @@ class TavilyTool(BaseTool):
             # Clean up content text to remove formatting artifacts
             clean_content = self._clean_content(result.content)
             # Format as: 1. [title](url): content
-            entry = f"{i}. [{result.title}]({result.url}): {clean_content}\n___"
+            entry = (
+                f"{i}. [{result.title}]({result.url}): {clean_content}\n___"
+            )
 
             # Add extracted content if available
             if result.extracted_content:
@@ -419,7 +434,9 @@ class TavilyTool(BaseTool):
             raise requests.RequestException(f"Tavily API HTTP error: {str(e)}")
         except requests.exceptions.RequestException as e:
             logger.error("Request exception during Tavily API call: %s", e)
-            raise requests.RequestException(f"Tavily API request failed: {str(e)}")
+            raise requests.RequestException(
+                f"Tavily API request failed: {str(e)}"
+            )
         except Exception as e:
             logger.error("Unexpected error during Tavily search: %s", e)
             raise
@@ -436,7 +453,9 @@ class TavilyTool(BaseTool):
             TavilyResponse: The search results in a validated Pydantic model
         """
         if "query" not in params:
-            raise ValueError("'query' key is required in parameters dictionary")
+            raise ValueError(
+                "'query' key is required in parameters dictionary"
+            )
 
         query = params["query"]
         logger.debug("run_with_dict method called with query: '%s'", query)

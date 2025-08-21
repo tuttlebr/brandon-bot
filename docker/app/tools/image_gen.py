@@ -44,9 +44,13 @@ def get_dimensions_from_aspect_ratio(aspect_ratio: str) -> Tuple[int, int]:
 class ImageGenerationResponse(BaseToolResponse):
     """Response from image generation tool"""
 
-    image_data: Optional[str] = Field(None, description="Base64 encoded image data")
+    image_data: Optional[str] = Field(
+        None, description="Base64 encoded image data"
+    )
     original_prompt: str = Field(description="Original user prompt")
-    enhanced_prompt: str = Field(description="Enhanced prompt used for generation")
+    enhanced_prompt: str = Field(
+        description="Enhanced prompt used for generation"
+    )
     direct_response: bool = Field(
         False, description="Whether this is a direct response"
     )
@@ -63,7 +67,9 @@ class ImageGenerationTool(BaseTool):
         self.name = "generate_image"
         self.description = "Generate images or visualizations from text descriptions. Use when user requests creating, generating, making, or drawing images or other visuals. OK to use for graphs, charts or signs with text."
         self.supported_contexts = ['image_generation']
-        self.execution_mode = ExecutionMode.SYNC  # Image generation is synchronous
+        self.execution_mode = (
+            ExecutionMode.SYNC
+        )  # Image generation is synchronous
         self.timeout = 120.0  # Image generation can take longer
 
     def _initialize_mvc(self):
@@ -190,7 +196,9 @@ class ImageGenerationTool(BaseTool):
             # Use the tool registry to execute conversation context tool
             from tools.registry import execute_tool
 
-            context_response = execute_tool("conversation_context", context_params)
+            context_response = execute_tool(
+                "conversation_context", context_params
+            )
             summary = None
             if context_response and context_response.success:
                 summary = context_response.analysis
@@ -306,7 +314,9 @@ class ImageGenerationTool(BaseTool):
         # Use the provided enhanced prompt, or fall back to user_prompt if not provided
         if enhanced_prompt is None:
             enhanced_prompt = user_prompt
-            logger.info(f"No enhanced prompt provided, using original: '{user_prompt}'")
+            logger.info(
+                f"No enhanced prompt provided, using original: '{user_prompt}'"
+            )
         else:
             logger.info(f"Using provided enhanced prompt: '{enhanced_prompt}'")
 
@@ -354,7 +364,9 @@ class ImageGenerationTool(BaseTool):
                     result_dict["used_conversation_context"] = True
                     summary = conversation_context.get("summary", "")
                     result_dict["context_summary"] = (
-                        summary[:200] + "..." if len(summary) > 200 else summary
+                        summary[:200] + "..."
+                        if len(summary) > 200
+                        else summary
                     )
                 else:
                     result_dict["used_conversation_context"] = False
@@ -367,7 +379,9 @@ class ImageGenerationTool(BaseTool):
                     original_prompt=user_prompt,
                     enhanced_prompt=enhanced_prompt,
                     direct_response=True,
-                    result=json.dumps(result_dict),  # Result field excludes image_data
+                    result=json.dumps(
+                        result_dict
+                    ),  # Result field excludes image_data
                 )
             except Exception as e:
                 logger.error(f"Error converting image to base64: {e}")
@@ -412,7 +426,9 @@ class ImageGenerationTool(BaseTool):
             ImageGenerationResponse: The image generation result
         """
         if "user_prompt" not in params:
-            raise ValueError("'user_prompt' key is required in parameters dictionary")
+            raise ValueError(
+                "'user_prompt' key is required in parameters dictionary"
+            )
         if "enhanced_prompt" not in params:
             raise ValueError(
                 "'enhanced_prompt' key is required in parameters dictionary"

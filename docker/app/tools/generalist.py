@@ -69,7 +69,9 @@ class GeneralistController(ToolController):
                 system_prompt, query, messages
             )
 
-            logger.debug(f"Generating conversational response using {model_name}")
+            logger.debug(
+                f"Generating conversational response using {model_name}"
+            )
 
             # Generate response
             response = client.chat.completions.create(
@@ -98,7 +100,9 @@ class GeneralistController(ToolController):
 
         try:
             # Create streaming generator
-            content_generator = self._generate_streaming_response(query, messages)
+            content_generator = self._generate_streaming_response(
+                query, messages
+            )
 
             return {
                 "query": query,
@@ -108,7 +112,9 @@ class GeneralistController(ToolController):
             }
 
         except Exception as e:
-            logger.error(f"Error setting up streaming generalist response: {e}")
+            logger.error(
+                f"Error setting up streaming generalist response: {e}"
+            )
             raise
 
     async def _generate_streaming_response(
@@ -124,7 +130,9 @@ class GeneralistController(ToolController):
             # Get configured system prompt if available
             from tools.tool_llm_config import get_tool_system_prompt
 
-            system_prompt = get_tool_system_prompt("generalist_conversation", None)
+            system_prompt = get_tool_system_prompt(
+                "generalist_conversation", None
+            )
 
             # Build conversation messages
             final_messages = self._build_conversation_messages(
@@ -151,7 +159,9 @@ class GeneralistController(ToolController):
                 if chunk.choices and chunk.choices[0].delta.content:
                     chunk_content = chunk.choices[0].delta.content
                     # Filter think tags from the chunk
-                    filtered_content = think_filter.process_chunk(chunk_content)
+                    filtered_content = think_filter.process_chunk(
+                        chunk_content
+                    )
                     if filtered_content:
                         yield filtered_content
 
@@ -183,7 +193,10 @@ class GeneralistController(ToolController):
         return system_prompt
 
     def _build_conversation_messages(
-        self, system_prompt: str, query: str, messages: Optional[List[Dict[str, Any]]]
+        self,
+        system_prompt: str,
+        query: str,
+        messages: Optional[List[Dict[str, Any]]],
     ) -> List[Dict[str, str]]:
         """Build the conversation messages for the LLM"""
 
@@ -201,7 +214,10 @@ class GeneralistController(ToolController):
                         cleaned_content = strip_think_tags(content)
                         if cleaned_content.strip():
                             conversation_messages.append(
-                                {"role": msg["role"], "content": cleaned_content}
+                                {
+                                    "role": msg["role"],
+                                    "content": cleaned_content,
+                                }
                             )
 
             # Include last 10 messages for context
@@ -277,7 +293,11 @@ class GeneralistTool(BaseTool):
         super().__init__()
         self.name = "generalist_conversation"
         self.description = "Handle general conversation without external tools. Use for explanations, discussions, advice, creative writing, and casual chat."
-        self.supported_contexts = ['general_conversation', 'discussion', 'explanation']
+        self.supported_contexts = [
+            'general_conversation',
+            'discussion',
+            'explanation',
+        ]
         self.execution_mode = ExecutionMode.AUTO  # Support both sync and async
         self.timeout = 30.0
 

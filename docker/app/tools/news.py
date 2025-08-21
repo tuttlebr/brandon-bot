@@ -104,7 +104,9 @@ class NewsTool(BaseTool):
             List of high-scoring search results with extracted content added
         """
         # Filter results with score >= 0.4
-        high_scoring_results = [result for result in results if result.score >= 0.15]
+        high_scoring_results = [
+            result for result in results if result.score >= 0.15
+        ]
 
         if not high_scoring_results:
             logger.warning(
@@ -153,11 +155,15 @@ class NewsTool(BaseTool):
                                 # Collect content from the async generator
                                 async def collect_content():
                                     collected = ""
-                                    async for chunk in extract_result.content_generator:
+                                    async for (
+                                        chunk
+                                    ) in extract_result.content_generator:
                                         collected += chunk
                                     return collected
 
-                                content = loop.run_until_complete(collect_content())
+                                content = loop.run_until_complete(
+                                    collect_content()
+                                )
                             except Exception as e:
                                 logger.error(
                                     "Failed to collect streaming content from fallback result %s: %s",
@@ -185,7 +191,8 @@ class NewsTool(BaseTool):
             return fallback_results
 
         logger.info(
-            "Extracting content for %d high-scoring results", len(high_scoring_results)
+            "Extracting content for %d high-scoring results",
+            len(high_scoring_results),
         )
 
         # Import extract tool
@@ -206,7 +213,10 @@ class NewsTool(BaseTool):
                 # Handle both WebExtractResponse and StreamingExtractResponse
                 content = None
                 if extract_result.success:
-                    if hasattr(extract_result, "content") and extract_result.content:
+                    if (
+                        hasattr(extract_result, "content")
+                        and extract_result.content
+                    ):
                         # Regular WebExtractResponse
                         content = extract_result.content
                     elif (
@@ -227,11 +237,15 @@ class NewsTool(BaseTool):
                             # Collect content from the async generator
                             async def collect_content():
                                 collected = ""
-                                async for chunk in extract_result.content_generator:
+                                async for (
+                                    chunk
+                                ) in extract_result.content_generator:
                                     collected += chunk
                                 return collected
 
-                            content = loop.run_until_complete(collect_content())
+                            content = loop.run_until_complete(
+                                collect_content()
+                            )
                         except Exception as e:
                             logger.error(
                                 "Failed to collect streaming content from %s: %s",
@@ -243,7 +257,8 @@ class NewsTool(BaseTool):
                 if content:
                     url_to_content[extract_result.url] = content
                     logger.debug(
-                        "Successfully extracted content from %s", extract_result.url
+                        "Successfully extracted content from %s",
+                        extract_result.url,
                     )
                 else:
                     logger.warning(
@@ -286,7 +301,9 @@ class NewsTool(BaseTool):
             # Clean up content text to remove formatting artifacts
             clean_content = self._clean_content(result.content)
             # Format as: 1. [title](url): content
-            entry = f"{i}. [{result.title}]({result.url}): {clean_content}\n___"
+            entry = (
+                f"{i}. [{result.title}]({result.url}): {clean_content}\n___"
+            )
 
             # Add extracted content if available
             if result.extracted_content:
@@ -402,7 +419,8 @@ class NewsTool(BaseTool):
 
         try:
             logger.debug(
-                "Making API request to Tavily news search for query: '%s'", query
+                "Making API request to Tavily news search for query: '%s'",
+                query,
             )
 
             # Make the API request
@@ -413,7 +431,8 @@ class NewsTool(BaseTool):
             response.raise_for_status()
 
             logger.debug(
-                "Tavily news API request successful (HTTP %d)", response.status_code
+                "Tavily news API request successful (HTTP %d)",
+                response.status_code,
             )
 
             # Parse the JSON response and validate with Pydantic
@@ -450,7 +469,9 @@ class NewsTool(BaseTool):
             raise requests.RequestException(f"Tavily API HTTP error: {str(e)}")
         except requests.exceptions.RequestException as e:
             logger.error("Request exception during Tavily API call: %s", e)
-            raise requests.RequestException(f"Tavily API request failed: {str(e)}")
+            raise requests.RequestException(
+                f"Tavily API request failed: {str(e)}"
+            )
         except Exception as e:
             logger.error("Unexpected error during Tavily search: %s", e)
             raise
@@ -467,7 +488,9 @@ class NewsTool(BaseTool):
             TavilyResponse: The search results in a validated Pydantic model
         """
         if "query" not in params:
-            raise ValueError("'query' key is required in parameters dictionary")
+            raise ValueError(
+                "'query' key is required in parameters dictionary"
+            )
 
         query = params["query"]
         logger.debug("run_with_dict method called with query: '%s'", query)

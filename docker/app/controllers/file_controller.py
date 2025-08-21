@@ -12,11 +12,15 @@ from utils.config import config
 
 class FileController:
     """
-    Handles file upload requests and extracts text content using external services
+    Handles file upload requests and extracts text content using
+    external services
     """
 
     def __init__(
-        self, chat_config: ChatConfig, message_controller=None, session_controller=None
+        self,
+        chat_config: ChatConfig,
+        message_controller=None,
+        session_controller=None,
     ):
         self.config = chat_config
         self.message_controller = message_controller
@@ -100,7 +104,7 @@ class FileController:
                 return False, result
 
         except Exception as e:
-            logging.error(f"Unexpected PDF processing error: {e}")
+            logging.error("Unexpected PDF processing error: %s", e)
             return False, {"error": str(e)}
         finally:
             # Always clear the processing marker when done
@@ -146,7 +150,9 @@ class FileController:
 
                 # Use resilient request
                 response = self._make_resilient_request(
-                    nvingest_endpoint, files, base_timeout=config.get_api_timeout("pdf")
+                    nvingest_endpoint,
+                    files,
+                    base_timeout=config.get_api_timeout("pdf"),
                 )
 
             # Parse JSON response
@@ -160,12 +166,16 @@ class FileController:
 
             pages = pdf_data.get("pages", [])
             if not pages:
-                return False, {"error": "No content could be extracted from the PDF"}
+                return False, {
+                    "error": "No content could be extracted from the PDF"
+                }
 
             # Calculate total text length
             total_chars = sum(len(page.get("text", "")) for page in pages)
             logging.info(
-                f"Successfully extracted {len(pages)} pages ({total_chars:,} characters) from PDF"
+                "Successfully extracted %d pages (%d characters) from PDF",
+                len(pages),
+                total_chars,
             )
 
             return True, pdf_data
@@ -175,15 +185,17 @@ class FileController:
                 "error": "PDF processing timed out. The file may be too large or complex. Please try a smaller file."
             }
         except requests.exceptions.RequestException as e:
-            logging.error(f"Request error during PDF processing: {e}")
+            logging.error("Request error during PDF processing: %s", e)
             return False, {
                 "error": "Failed to connect to PDF processing server. Please try again later."
             }
         except json.JSONDecodeError as e:
-            logging.error(f"JSON decode error: {e}")
-            return False, {"error": "Invalid response from PDF processing server"}
+            logging.error("JSON decode error: %s", e)
+            return False, {
+                "error": "Invalid response from PDF processing server"
+            }
         except Exception as e:
-            logging.error(f"Unexpected error processing PDF: {e}")
+            logging.error("Unexpected error processing PDF: %s", e)
             return False, {"error": f"PDF processing failed: {str(e)}"}
         finally:
             # Clean up temporary file

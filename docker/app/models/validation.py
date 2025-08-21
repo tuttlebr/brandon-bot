@@ -18,7 +18,10 @@ class ValidationError(Exception):
     """Custom validation error"""
 
     def __init__(
-        self, message: str, field: Optional[str] = None, code: Optional[str] = None
+        self,
+        message: str,
+        field: Optional[str] = None,
+        code: Optional[str] = None,
     ):
         self.message = message
         self.field = field
@@ -35,7 +38,10 @@ class ValidationResult:
         self.warnings: List[str] = []
 
     def add_error(
-        self, message: str, field: Optional[str] = None, code: Optional[str] = None
+        self,
+        message: str,
+        field: Optional[str] = None,
+        code: Optional[str] = None,
     ) -> None:
         """Add a validation error"""
         self.errors.append(ValidationError(message, field, code))
@@ -100,7 +106,9 @@ class UserValidator(ModelValidator):
             result.add_error("User ID is required", "user_id", "REQUIRED")
         elif len(user.user_id) < 3:
             result.add_error(
-                "User ID must be at least 3 characters", "user_id", "MIN_LENGTH"
+                "User ID must be at least 3 characters",
+                "user_id",
+                "MIN_LENGTH",
             )
 
         # Validate preferences
@@ -158,7 +166,9 @@ class SessionValidator(ModelValidator):
 
         # Validate session ID
         if not session.session_id:
-            result.add_error("Session ID is required", "session_id", "REQUIRED")
+            result.add_error(
+                "Session ID is required", "session_id", "REQUIRED"
+            )
 
         # Validate user ID
         if not session.user_id:
@@ -169,13 +179,17 @@ class SessionValidator(ModelValidator):
             file_result = self._validate_file_info(file_info)
             for error in file_result.errors:
                 result.add_error(
-                    f"File {i}: {error.message}", f"uploaded_files[{i}]", error.code
+                    f"File {i}: {error.message}",
+                    f"uploaded_files[{i}]",
+                    error.code,
                 )
 
         # Business rule validations
         if session.message_count < 0:
             result.add_error(
-                "Message count cannot be negative", "message_count", "INVALID_VALUE"
+                "Message count cannot be negative",
+                "message_count",
+                "INVALID_VALUE",
             )
 
         # Validate timestamps
@@ -201,7 +215,9 @@ class SessionValidator(ModelValidator):
         result = ValidationResult()
 
         if not self.validate_filename(file_info.filename):
-            result.add_error("Invalid filename format", "filename", "INVALID_FORMAT")
+            result.add_error(
+                "Invalid filename format", "filename", "INVALID_FORMAT"
+            )
 
         if not self.validate_file_size(file_info.size_bytes):
             result.add_error(
@@ -284,8 +300,10 @@ class ValidationService:
         session_result = self.validate_session(session)
 
         # Then validate cross-model consistency
-        consistency_result = self.cross_validator.validate_user_session_consistency(
-            user, session
+        consistency_result = (
+            self.cross_validator.validate_user_session_consistency(
+                user, session
+            )
         )
 
         # Combine results

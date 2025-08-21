@@ -78,7 +78,9 @@ class Session(BaseModel):
     intelligent_llm_model_name: str = Field(
         default="", description="Intelligent LLM model being used"
     )
-    vlm_model_name: str = Field(default="", description="Vision LLM model being used")
+    vlm_model_name: str = Field(
+        default="", description="Vision LLM model being used"
+    )
 
     def update_timestamp(self) -> None:
         """Update the session's last update timestamp"""
@@ -141,7 +143,9 @@ class Session(BaseModel):
         Returns:
             List of FileInfo objects of the specified type
         """
-        return [f for f in self.uploaded_files if f.file_type == file_type.lower()]
+        return [
+            f for f in self.uploaded_files if f.file_type == file_type.lower()
+        ]
 
     def set_processing_status(self, status: ProcessingStatus) -> None:
         """
@@ -252,6 +256,8 @@ class Session(BaseModel):
             context_data=state_data.get("context_data", {}),
             llm_model_name=state_data.get("llm_model_name", ""),
             fast_llm_model_name=state_data.get("fast_llm_model_name", ""),
-            intelligent_llm_model_name=state_data.get("intelligent_llm_model_name", ""),
+            intelligent_llm_model_name=state_data.get(
+                "intelligent_llm_model_name", ""
+            ),
             vlm_model_name=state_data.get("vlm_model_name", ""),
         )

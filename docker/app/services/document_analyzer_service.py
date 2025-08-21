@@ -52,8 +52,12 @@ class DocumentAnalyzerService:
         """
         try:
             # Check if the document is too large for direct processing
-            estimated_tokens = len(document_text) // 4  # Rough token estimation
-            max_tokens = 126000  # Conservative limit to stay well under model limits
+            estimated_tokens = (
+                len(document_text) // 4
+            )  # Rough token estimation
+            max_tokens = (
+                126000  # Conservative limit to stay well under model limits
+            )
 
             if estimated_tokens > max_tokens:
                 logger.warning(
@@ -71,7 +75,9 @@ class DocumentAnalyzerService:
 
             base_prompt = get_tool_system_prompt("document_analysis", "")
             # Interpolate document type into the prompt
-            system_prompt = base_prompt.replace("a document", f"a {document_type}")
+            system_prompt = base_prompt.replace(
+                "a document", f"a {document_type}"
+            )
 
             if filename:
                 user_message = f"Based on the document '{filename}', please answer this question: {instructions}\n\nDocument:\n{document_text}"
@@ -148,7 +154,9 @@ class DocumentAnalyzerService:
 
             base_prompt = get_tool_system_prompt("document_analysis", "")
             # Interpolate document type into the prompt
-            system_prompt = base_prompt.replace("a document", f"a {document_type}")
+            system_prompt = base_prompt.replace(
+                "a document", f"a {document_type}"
+            )
 
             if filename:
                 user_message = f"Based on the document '{filename}', please answer this question: {instructions}\n\nDocument:\n{document_text}"
@@ -181,7 +189,9 @@ class DocumentAnalyzerService:
                 if chunk.choices and chunk.choices[0].delta.content:
                     chunk_content = chunk.choices[0].delta.content
                     # Filter think tags from the chunk
-                    filtered_content = think_filter.process_chunk(chunk_content)
+                    filtered_content = think_filter.process_chunk(
+                        chunk_content
+                    )
                     if filtered_content:
                         collected_result += filtered_content
 
@@ -233,9 +243,7 @@ class DocumentAnalyzerService:
             # Process all chunks concurrently
             async def process_chunk_async(i: int, chunk: str):
                 try:
-                    chunk_instructions = (
-                        f"{instructions} (Processing section {i+1} of {len(chunks)})"
-                    )
+                    chunk_instructions = f"{instructions} (Processing section {i+1} of {len(chunks)})"
                     chunk_result = await self._analyze_single_chunk(
                         chunk, chunk_instructions, document_type, filename
                     )
@@ -249,7 +257,10 @@ class DocumentAnalyzerService:
 
             # Run all chunk processing tasks concurrently
             chunk_results_raw = await asyncio.gather(
-                *[process_chunk_async(i, chunk) for i, chunk in enumerate(chunks)],
+                *[
+                    process_chunk_async(i, chunk)
+                    for i, chunk in enumerate(chunks)
+                ],
                 return_exceptions=True,
             )
 
@@ -257,7 +268,9 @@ class DocumentAnalyzerService:
             chunk_results = []
             for i, result in enumerate(chunk_results_raw):
                 if isinstance(result, Exception):
-                    logger.error(f"Chunk {i+1} failed with exception: {result}")
+                    logger.error(
+                        f"Chunk {i+1} failed with exception: {result}"
+                    )
                     chunk_results.append(
                         f"Section {i+1} processing failed due to error: {str(result)}"
                     )
@@ -281,7 +294,10 @@ class DocumentAnalyzerService:
                 )
 
                 return await self._analyze_single_chunk(
-                    combined_text, synthesis_instructions, "analysis results", filename
+                    combined_text,
+                    synthesis_instructions,
+                    "analysis results",
+                    filename,
                 )
             else:
                 return {"success": True, "result": chunk_results[0]}
@@ -318,7 +334,9 @@ class DocumentAnalyzerService:
 
             base_prompt = get_tool_system_prompt("document_analysis", "")
             # Interpolate document type into the prompt
-            system_prompt = base_prompt.replace("a document", f"a {document_type}")
+            system_prompt = base_prompt.replace(
+                "a document", f"a {document_type}"
+            )
 
             if filename:
                 user_message = f"Based on the document '{filename}', please answer this question: {instructions}\n\nDocument:\n{chunk_text}"
@@ -382,13 +400,17 @@ class DocumentAnalyzerService:
 
         try:
             if doc_size == "small":
-                return await self._analyze_small_document(pages, instructions, filename)
+                return await self._analyze_small_document(
+                    pages, instructions, filename
+                )
             elif doc_size == "medium":
                 return await self._analyze_medium_document(
                     pages, instructions, filename
                 )
             else:  # large
-                return await self._analyze_large_document(pages, instructions, filename)
+                return await self._analyze_large_document(
+                    pages, instructions, filename
+                )
         except Exception as e:
             logger.error(f"Error in PDF analysis: {e}")
             return {"success": False, "error": str(e)}
@@ -399,7 +421,9 @@ class DocumentAnalyzerService:
         """Analyze small documents in a single pass"""
 
         full_text = DocumentProcessor.format_pages_for_analysis(pages)
-        return await self.analyze_document(full_text, instructions, "PDF", filename)
+        return await self.analyze_document(
+            full_text, instructions, "PDF", filename
+        )
 
     async def _analyze_medium_document(
         self, pages: List[Dict[str, Any]], instructions: str, filename: str
@@ -410,7 +434,9 @@ class DocumentAnalyzerService:
         batch_size = max(3, len(pages) // 3)
 
         # Create async function for processing each batch
-        async def process_batch_async(i: int, batch_pages: List[Dict[str, Any]]):
+        async def process_batch_async(
+            i: int, batch_pages: List[Dict[str, Any]]
+        ):
             # Determine actual page numbers for this batch
             if batch_pages:
                 start_page_num = batch_pages[0].get('page', i + 1)
@@ -421,7 +447,9 @@ class DocumentAnalyzerService:
                 start_page_num = i + 1
                 end_page_num = min(i + batch_size, len(pages))
 
-            batch_text = DocumentProcessor.format_pages_for_analysis(batch_pages)
+            batch_text = DocumentProcessor.format_pages_for_analysis(
+                batch_pages
+            )
 
             batch_instruction = (
                 f"Analyze pages {start_page_num}-{end_page_num} of '{filename}' for this question: {instructions}. "
@@ -442,12 +470,16 @@ class DocumentAnalyzerService:
 
         # Create all batches
         batches = [
-            (i, pages[i : i + batch_size]) for i in range(0, len(pages), batch_size)
+            (i, pages[i : i + batch_size])
+            for i in range(0, len(pages), batch_size)
         ]
 
         # Run all batch processing tasks concurrently
         batch_results_raw = await asyncio.gather(
-            *[process_batch_async(i, batch_pages) for i, batch_pages in batches],
+            *[
+                process_batch_async(i, batch_pages)
+                for i, batch_pages in batches
+            ],
             return_exceptions=True,
         )
 
@@ -478,7 +510,9 @@ class DocumentAnalyzerService:
         batch_size = max(20, len(pages) // 10)
 
         # Create async function for processing each large batch
-        async def process_large_batch_async(i: int, batch_pages: List[Dict[str, Any]]):
+        async def process_large_batch_async(
+            i: int, batch_pages: List[Dict[str, Any]]
+        ):
             # Determine actual page numbers for this batch
             batch_end = min(i + batch_size, len(pages))
             if batch_pages:
@@ -488,7 +522,9 @@ class DocumentAnalyzerService:
                 start_page_num = i + 1
                 end_page_num = batch_end
 
-            batch_text = DocumentProcessor.format_pages_for_analysis(batch_pages)
+            batch_text = DocumentProcessor.format_pages_for_analysis(
+                batch_pages
+            )
 
             batch_instruction = (
                 f"You are analyzing a chunk of a larger document. This chunk covers pages {start_page_num}-{end_page_num} of '{filename}'. "
@@ -511,7 +547,8 @@ class DocumentAnalyzerService:
 
         # Create all large batches
         large_batches = [
-            (i, pages[i : i + batch_size]) for i in range(0, len(pages), batch_size)
+            (i, pages[i : i + batch_size])
+            for i in range(0, len(pages), batch_size)
         ]
 
         # Run all large batch processing tasks concurrently
@@ -537,12 +574,18 @@ class DocumentAnalyzerService:
         )
 
     async def _synthesize_batch_results(
-        self, batch_results: List[Dict[str, str]], instructions: str, filename: str
+        self,
+        batch_results: List[Dict[str, str]],
+        instructions: str,
+        filename: str,
     ) -> Dict[str, any]:
         """Synthesize results from multiple batch analyses with hierarchical summarization"""
 
         if not batch_results:
-            return {"success": False, "error": "No batch results to synthesize"}
+            return {
+                "success": False,
+                "error": "No batch results to synthesize",
+            }
 
         # If there are many results, create intermediate summaries first
         if len(batch_results) > 1:
@@ -565,7 +608,10 @@ class DocumentAnalyzerService:
                     f"Focus only on the key points related to the user's query: {instructions}"
                 )
                 return await self.analyze_document(
-                    chunk_findings, synthesis_instruction, "analysis results", None
+                    chunk_findings,
+                    synthesis_instruction,
+                    "analysis results",
+                    None,
                 )
 
             # Create chunks and tasks

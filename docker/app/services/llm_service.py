@@ -106,7 +106,9 @@ class LLMService:
                     if isinstance(content, dict):
                         # Try to get text content from dict
                         current_user_message = (
-                            content.get("text", "") if "text" in content else ""
+                            content.get("text", "")
+                            if "text" in content
+                            else ""
                         )
                     elif content is None:
                         current_user_message = ""
@@ -124,7 +126,9 @@ class LLMService:
             # PDF context is now automatically injected by ChatService
 
             # Filter messages to ensure LLM compatibility
-            windowed_messages = self._filter_messages_for_llm(windowed_messages)
+            windowed_messages = self._filter_messages_for_llm(
+                windowed_messages
+            )
 
             # Get tool definitions
             tools = get_all_tool_definitions()
@@ -173,7 +177,8 @@ class LLMService:
                         "content": prompt_manager.get_context_prompt(
                             "pdf_active", filename=pdf_info['filename']
                         ).replace(
-                            f"{pdf_info['filename']}", f"'{pdf_info['filename']}'"
+                            f"{pdf_info['filename']}",
+                            f"'{pdf_info['filename']}'",
                         ),
                     }
                     # Insert at the beginning after any existing system messages
@@ -185,7 +190,9 @@ class LLMService:
                             insert_idx = i
                             break
                         insert_idx = i + 1
-                    windowed_messages_with_guidance.insert(insert_idx, pdf_guidance)
+                    windowed_messages_with_guidance.insert(
+                        insert_idx, pdf_guidance
+                    )
 
             # Force PDF assistant tool when a PDF is active
             tool_choice = "auto"
@@ -222,7 +229,9 @@ class LLMService:
 
             # First, get non-streaming response to check for tool calls
             tool_selection_model_type = get_tool_llm_type("tool_selection")
-            tool_selection_model = self._get_model_for_type(tool_selection_model_type)
+            tool_selection_model = self._get_model_for_type(
+                tool_selection_model_type
+            )
             response = self.streaming_service.sync_completion(
                 windowed_messages_with_guidance,
                 tool_selection_model,
@@ -242,12 +251,14 @@ class LLMService:
                 pdf_id
                 and pdf_info
                 and not any(
-                    tc.get("name") == "pdf_assistant" for tc in (tool_calls or [])
+                    tc.get("name") == "pdf_assistant"
+                    for tc in (tool_calls or [])
                 )
             ):
                 # Only force if pdf_assistant was available in the tools list
                 pdf_tool_available = any(
-                    t.get("function", {}).get("name") == "pdf_assistant" for t in tools
+                    t.get("function", {}).get("name") == "pdf_assistant"
+                    for t in tools
                 )
                 if pdf_tool_available:
                     logger.warning(
@@ -300,11 +311,14 @@ class LLMService:
     ) -> AsyncGenerator[str, None]:
         """Handle tool calls and generate streaming response"""
         # Determine execution strategy
-        strategy = self.tool_execution_service.determine_execution_strategy(tool_calls)
+        strategy = self.tool_execution_service.determine_execution_strategy(
+            tool_calls
+        )
 
         # Get current user message
         current_user_message = next(
-            (msg for msg in reversed(messages) if msg.get("role") == "user"), None
+            (msg for msg in reversed(messages) if msg.get("role") == "user"),
+            None,
         )
 
         # Execute tools
@@ -436,7 +450,8 @@ class LLMService:
                             f"Direct response tool '{tool_name}' content too long. Truncating for message history."
                         )
                         content = (
-                            content[:max_tool_content_chars] + "\n\n[Content truncated]"
+                            content[:max_tool_content_chars]
+                            + "\n\n[Content truncated]"
                         )
 
                     extended_messages.append(
@@ -472,7 +487,8 @@ class LLMService:
         # Check if all tool responses are direct responses
         # If so, skip LLM synthesis since direct response tools provide their own final output
         all_direct_responses = all(
-            response.get("role") == "direct_response" for response in tool_responses
+            response.get("role") == "direct_response"
+            for response in tool_responses
         )
 
         if all_direct_responses:
@@ -523,10 +539,14 @@ class LLMService:
             return messages
 
         # Keep system and tool messages (important context)
-        system_messages = [msg for msg in messages if msg.get("role") == "system"]
+        system_messages = [
+            msg for msg in messages if msg.get("role") == "system"
+        ]
         tool_messages = [msg for msg in messages if msg.get("role") == "tool"]
         conversation_messages = [
-            msg for msg in messages if msg.get("role") not in ["system", "tool"]
+            msg
+            for msg in messages
+            if msg.get("role") not in ["system", "tool"]
         ]
 
         # CRITICAL FIX: Only apply sliding window for very long conversations
@@ -639,8 +659,12 @@ class LLMService:
             Tuple of (truncated messages, was_truncated flag)
         """
         # Always keep system messages and the latest user message
-        system_messages = [msg for msg in messages if msg.get("role") == "system"]
-        non_system_messages = [msg for msg in messages if msg.get("role") != "system"]
+        system_messages = [
+            msg for msg in messages if msg.get("role") == "system"
+        ]
+        non_system_messages = [
+            msg for msg in messages if msg.get("role") != "system"
+        ]
 
         if not non_system_messages:
             return messages, False

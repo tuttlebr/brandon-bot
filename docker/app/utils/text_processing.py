@@ -42,7 +42,9 @@ def sanitize_python_input(text: str) -> str:
         return ""
 
     # Remove or escape potentially dangerous characters
-    text = re.sub(r"[^\x20-\x7E\n\t]", "", text)  # Only printable ASCII + newlines/tabs
+    text = re.sub(
+        r"[^\x20-\x7E\n\t]", "", text
+    )  # Only printable ASCII + newlines/tabs
 
     # Normalize whitespace
     text = re.sub(r"\r\n", "\n", text)  # Normalize line endings

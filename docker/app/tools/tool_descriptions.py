@@ -114,7 +114,12 @@ TOOL_DEFINITIONS = {
             "today",
             "now",
         ],
-        "anti_trigger_words": ["thanks", "what is", "explain", "tell me about"],
+        "anti_trigger_words": [
+            "thanks",
+            "what is",
+            "explain",
+            "tell me about",
+        ],
         "requires_specific_query": True,
         "example_uses": [
             "What's happening in tech today?",
@@ -237,7 +242,13 @@ TOOL_DEFINITIONS = {
     },
     "tavily_news_search": {
         "description": "Search specifically for news articles and breaking events. Use when user explicitly asks for news, headlines, or current events.",
-        "trigger_words": ["news", "headlines", "breaking", "events", "happening"],
+        "trigger_words": [
+            "news",
+            "headlines",
+            "breaking",
+            "events",
+            "happening",
+        ],
         "is_specialized_search": True,
         "example_uses": [
             "What's in the news today?",
@@ -307,7 +318,8 @@ class ToolDescriptionEnhancer:
         # Check for required elements
         if tool_info.get("requires_action_verb", False):
             has_action_verb = any(
-                word in message_lower for word in tool_info.get("trigger_words", [])
+                word in message_lower
+                for word in tool_info.get("trigger_words", [])
             )
             if not has_action_verb:
                 return False
@@ -330,7 +342,14 @@ class ToolDescriptionEnhancer:
 
         if tool_info.get("requires_url", False):
             # Check for URL patterns
-            url_patterns = ["http://", "https://", "www.", ".com", ".org", ".net"]
+            url_patterns = [
+                "http://",
+                "https://",
+                "www.",
+                ".com",
+                ".org",
+                ".net",
+            ]
             has_url = any(pattern in user_message for pattern in url_patterns)
             if not has_url:
                 return False
@@ -468,7 +487,16 @@ def extract_actual_request(message: str) -> Optional[str]:
     message_lower = message.lower()
 
     # Common patterns that separate acknowledgment from new request
-    separators = ["now", "next", "also", "and", "but", "can you", "could you", "please"]
+    separators = [
+        "now",
+        "next",
+        "also",
+        "and",
+        "but",
+        "can you",
+        "could you",
+        "please",
+    ]
 
     for separator in separators:
         if separator in message_lower:

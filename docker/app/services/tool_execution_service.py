@@ -160,7 +160,11 @@ class ToolExecutionService:
 
         # Apply tool-specific modifications
         modified_args = await self._apply_tool_modifications(
-            tool_name, tool_args, current_user_message, messages, is_multi_tool_call
+            tool_name,
+            tool_args,
+            current_user_message,
+            messages,
+            is_multi_tool_call,
         )
 
         logger.info(
@@ -190,18 +194,25 @@ class ToolExecutionService:
                 # Execute the async controller method directly
                 raw_data = await tool._controller.process_async(modified_args)
                 # Format the response using the view
-                result = tool._view.format_response(raw_data, tool.get_response_type())
+                result = tool._view.format_response(
+                    raw_data, tool.get_response_type()
+                )
             except Exception as e:
                 logger.error(
-                    f"Error executing async tool {tool_name}: {e}", exc_info=True
+                    f"Error executing async tool {tool_name}: {e}",
+                    exc_info=True,
                 )
                 if hasattr(tool, '_view'):
-                    result = tool._view.format_error(e, tool.get_response_type())
+                    result = tool._view.format_error(
+                        e, tool.get_response_type()
+                    )
                 else:
                     raise
         else:
             # Execute sync tools in thread pool with context preservation
-            logger.info("Tool '%s' is sync, executing in thread pool", tool_name)
+            logger.info(
+                "Tool '%s' is sync, executing in thread pool", tool_name
+            )
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(
                 self.executor,
@@ -244,7 +255,9 @@ class ToolExecutionService:
         else:
             return {
                 "role": "tool",
-                "content": result.json() if hasattr(result, "json") else str(result),
+                "content": (
+                    result.json() if hasattr(result, "json") else str(result)
+                ),
                 "tool_name": tool_name,
             }
 
@@ -260,7 +273,11 @@ class ToolExecutionService:
         modified_args = tool_args.copy()
 
         # Add conversation context for specific tools
-        context_tools = ["conversation_context", "text_assistant", "generate_image"]
+        context_tools = [
+            "conversation_context",
+            "text_assistant",
+            "generate_image",
+        ]
         if tool_name in context_tools and messages:
             # Special handling for image generation in multi-tool scenarios
             if tool_name == "generate_image" and is_multi_tool_call:
@@ -324,12 +341,18 @@ class ToolExecutionService:
 
                     # Try to get from session controller as fallback
                     try:
-                        from controllers.session_controller import SessionController
+                        from controllers.session_controller import (
+                            SessionController,
+                        )
 
                         session_controller = SessionController(self.config)
-                        latest_image = session_controller.get_latest_uploaded_image()
+                        latest_image = (
+                            session_controller.get_latest_uploaded_image()
+                        )
                         if latest_image and latest_image.get('image_data'):
-                            modified_args["image_base64"] = latest_image['image_data']
+                            modified_args["image_base64"] = latest_image[
+                                'image_data'
+                            ]
                             modified_args["filename"] = latest_image.get(
                                 'filename', 'Unknown'
                             )
@@ -341,10 +364,14 @@ class ToolExecutionService:
                                 "No image found in session controller either"
                             )
                     except Exception as e:
-                        logger.error("Error accessing session controller: %s", e)
+                        logger.error(
+                            "Error accessing session controller: %s", e
+                        )
 
             except Exception as e:
-                logger.error("Error accessing session state for image data: %s", e)
+                logger.error(
+                    "Error accessing session state for image data: %s", e
+                )
 
         return modified_args
 
@@ -355,7 +382,9 @@ class ToolExecutionService:
         # With automatic PDF injection, we no longer need special PDF tool restrictions
         return tool_calls
 
-    def determine_execution_strategy(self, tool_calls: List[Dict[str, Any]]) -> str:
+    def determine_execution_strategy(
+        self, tool_calls: List[Dict[str, Any]]
+    ) -> str:
         """
         Determine the best execution strategy for the given tools
 

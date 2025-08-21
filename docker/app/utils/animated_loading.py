@@ -137,7 +137,9 @@ def get_galaxy_animation_html(
         for i in range(ring["dots"]):
             angle_offset = (360 / ring["dots"]) * i
             # Add some spiral offset for galaxy arms
-            spiral_offset = (ring["radius"] - 25) * 1.5  # More spiral for outer rings
+            spiral_offset = (
+                ring["radius"] - 25
+            ) * 1.5  # More spiral for outer rings
             total_angle = angle_offset + spiral_offset
 
             delay = (animation_duration * ring["speed"] / ring["dots"]) * i

@@ -18,7 +18,9 @@ logger = logging.getLogger(__name__)
 class ResponseParsingService:
     """Service for parsing LLM responses and extracting tool calls"""
 
-    def parse_response(self, response: Any) -> Tuple[str, List[Dict[str, Any]]]:
+    def parse_response(
+        self, response: Any
+    ) -> Tuple[str, List[Dict[str, Any]]]:
         """
         Parse LLM response to extract content and tool calls
 
@@ -106,7 +108,9 @@ class ResponseParsingService:
         return tool_calls
 
     def _normalize_tool_calls(
-        self, openai_calls: List[Dict[str, Any]], custom_calls: List[Dict[str, Any]]
+        self,
+        openai_calls: List[Dict[str, Any]],
+        custom_calls: List[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
         """Normalize tool calls to a consistent format"""
         normalized = []
@@ -148,6 +152,8 @@ class ResponseParsingService:
 
         cleaned = content
         for pattern in patterns:
-            cleaned = re.sub(pattern, '', cleaned, flags=re.DOTALL | re.IGNORECASE)
+            cleaned = re.sub(
+                pattern, '', cleaned, flags=re.DOTALL | re.IGNORECASE
+            )
 
         return cleaned.strip()

@@ -38,7 +38,9 @@ class AssistantResponse(BaseToolResponse):
     """Response from the assistant tool"""
 
     original_text: str = Field(description="The original input text")
-    task_type: AssistantTaskType = Field(description="The type of task performed")
+    task_type: AssistantTaskType = Field(
+        description="The type of task performed"
+    )
     result: str = Field(description="The processed result")
     improvements: Optional[List[str]] = Field(
         None, description="List of improvements made (for proofreading)"
@@ -128,9 +130,13 @@ class AssistantController(ToolController):
                 logger.info(
                     f"Found PDF data: {pdf_data.get('filename')} with {len(pdf_data.get('pages', []))} pages"
                 )
-                pdf_text = PDFDataExtractor.extract_text_from_pdf_data(pdf_data)
+                pdf_text = PDFDataExtractor.extract_text_from_pdf_data(
+                    pdf_data
+                )
                 if pdf_text:
-                    logger.info(f"Extracted {len(pdf_text)} characters of PDF text")
+                    logger.info(
+                        f"Extracted {len(pdf_text)} characters of PDF text"
+                    )
                     # Replace generic references with actual content
                     text_lower = text.lower()
                     if (
@@ -146,7 +152,9 @@ class AssistantController(ToolController):
                         # Append as additional context
                         return f"{text}\n\n--- Additional Context ---\n\n{pdf_text}"
                 else:
-                    logger.warning("PDF data found but no text could be extracted")
+                    logger.warning(
+                        "PDF data found but no text could be extracted"
+                    )
             else:
                 logger.debug("No PDF data found in messages")
 
@@ -162,7 +170,9 @@ class AssistantController(ToolController):
         """Handle translation tasks"""
 
         if not target_language:
-            raise ValueError("target_language is required for translation tasks")
+            raise ValueError(
+                "target_language is required for translation tasks"
+            )
 
         result = self.translator.translate_text(
             text, target_language, source_language, messages
@@ -273,7 +283,10 @@ class AssistantController(ToolController):
                 # Save previous page
                 if current_page is not None and current_text:
                     pages.append(
-                        {"page": current_page, "text": "\n".join(current_text).strip()}
+                        {
+                            "page": current_page,
+                            "text": "\n".join(current_text).strip(),
+                        }
                     )
 
                 # Start new page
@@ -319,14 +332,18 @@ class AssistantController(ToolController):
 
             if main_pdf_files:
                 # Sort by modification time to get most recent main PDF
-                main_pdf_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+                main_pdf_files.sort(
+                    key=lambda x: x.stat().st_mtime, reverse=True
+                )
                 latest_pdf_file = main_pdf_files[0]
                 pdf_id = latest_pdf_file.stem  # e.g., 'pdf_5990e3a1ea80'
             else:
                 # No standalone PDF files found – fall back to using batch filename to derive base ID
                 batch_files = [f for f in pdf_files if "_batch_" in f.stem]
                 if not batch_files:
-                    logger.warning("No PDF or batch files found in storage directory")
+                    logger.warning(
+                        "No PDF or batch files found in storage directory"
+                    )
                     return context_pages
 
                 # Use the most recent batch file to derive the base PDF ID
@@ -364,7 +381,9 @@ class AssistantController(ToolController):
                 return all_pages
             else:
                 logger.warning(f"No batches found for PDF {pdf_id}")
-                logger.warning(f"Available files: {[f.name for f in pdf_files]}")
+                logger.warning(
+                    f"Available files: {[f.name for f in pdf_files]}"
+                )
 
         except Exception as e:
             logger.error(f"Error loading complete document for analysis: {e}")
@@ -426,7 +445,11 @@ class AssistantTool(BaseTool):
         super().__init__()
         self.name = "text_assistant"
         self.description = "Process text with specific operations: summarize, translate, proofread, rewrite, analyze documents, or develop code. Use when user provides text AND requests processing."
-        self.supported_contexts = ['translation', 'text_processing', 'code_generation']
+        self.supported_contexts = [
+            'translation',
+            'text_processing',
+            'code_generation',
+        ]
 
     def _initialize_mvc(self):
         """Initialize MVC components"""

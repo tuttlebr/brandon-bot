@@ -132,7 +132,9 @@ class ToolRegistry:
             dependencies: Optional dependencies
             lazy_load: If True, create instance only when needed
         """
-        self._factory.register_tool_class(name, tool_class, config, dependencies)
+        self._factory.register_tool_class(
+            name, tool_class, config, dependencies
+        )
 
         if not lazy_load:
             # Create instance immediately
@@ -243,7 +245,9 @@ class ToolRegistry:
         for name in all_tool_names:
             # Check if tool is enabled in configuration
             if not config.tools.is_tool_enabled(name):
-                logger.debug(f"Tool '{name}' is disabled in configuration, skipping")
+                logger.debug(
+                    f"Tool '{name}' is disabled in configuration, skipping"
+                )
                 continue
 
             tool = self.get_tool(name)
@@ -253,11 +257,17 @@ class ToolRegistry:
 
                     # Override description with enhanced version if configured
                     if config.tools.USE_ENHANCED_DESCRIPTIONS:
-                        from tools.tool_descriptions import get_tool_description
+                        from tools.tool_descriptions import (
+                            get_tool_description,
+                        )
 
                         enhanced_desc = get_tool_description(name)
-                        if enhanced_desc and not enhanced_desc.startswith("Tool '"):
-                            definition["function"]["description"] = enhanced_desc
+                        if enhanced_desc and not enhanced_desc.startswith(
+                            "Tool '"
+                        ):
+                            definition["function"][
+                                "description"
+                            ] = enhanced_desc
                             logger.debug(
                                 f"Using enhanced description for tool '{name}'"
                             )
@@ -265,7 +275,9 @@ class ToolRegistry:
                     definitions.append(definition)
                     logger.debug(f"Added tool definition for '{name}'")
                 except Exception as e:
-                    logger.error(f"Error getting definition for tool {name}: {e}")
+                    logger.error(
+                        f"Error getting definition for tool {name}: {e}"
+                    )
 
         logger.info(
             f"Returning {len(definitions)} tool definitions (out of {len(all_tool_names)} registered)"
@@ -323,7 +335,9 @@ def register_tool_class(
     lazy_load: bool = True,
 ) -> None:
     """Register a tool class with the global registry"""
-    _registry.register_tool_class(name, tool_class, config, dependencies, lazy_load)
+    _registry.register_tool_class(
+        name, tool_class, config, dependencies, lazy_load
+    )
 
 
 def get_tool(name: str) -> Optional[BaseTool]:

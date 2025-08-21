@@ -17,7 +17,7 @@ repos:
     rev: 25.1.0
     hooks:
       - id: black
-        args: ["--skip-string-normalization", "--line-length=88"]
+        args: ["--skip-string-normalization", "--line-length=79"]
         additional_dependencies: ["click==8.0.4"]
   - repo: https://github.com/pycqa/isort
     rev: 5.12.0
@@ -30,7 +30,7 @@ repos:
             "--trailing-comma",
             "--force-grid-wrap=0",
             "--use-parenthese",
-            "--line-width=88",
+            "--line-width=79",
             "--ws",
             "--skip=third_party",
           ]

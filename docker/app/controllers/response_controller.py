@@ -69,7 +69,9 @@ class ResponseController:
             self._handle_response_error(e)
             return lambda: None  # Return no-op function on error
 
-    def _generate_response_chunks(self, prepared_messages: List[Dict[str, Any]]):
+    def _generate_response_chunks(
+        self, prepared_messages: List[Dict[str, Any]]
+    ):
         """
         Generate response chunks from LLM service using simplified streaming
 
@@ -83,7 +85,9 @@ class ResponseController:
         model_name = self.session_controller.get_model_name(model_type)
 
         logging.info(
-            f"Generating LLM response with simplified streaming (model_type: {model_type}, model: {model_name})"
+            "Generating LLM response with simplified streaming (model_type: %s, model: %s)",
+            model_type,
+            model_name,
         )
 
         # Initialize response tracking
@@ -91,7 +95,9 @@ class ResponseController:
         full_response = ""
 
         # Create the chat message container for streaming
-        with st.chat_message("assistant", avatar=self.config_obj.assistant_avatar):
+        with st.chat_message(
+            "assistant", avatar=self.config_obj.assistant_avatar
+        ):
             message_placeholder = st.empty()
 
             # Display loading animation inside the chat message
@@ -119,10 +125,8 @@ class ResponseController:
                 )
 
             except Exception as e:
-                logging.error(f"Error in streaming: {e}")
-                error_message = (
-                    "I apologize, but I encountered an error generating the response."
-                )
+                logging.error("Error in streaming: %s", e)
+                error_message = "I apologize, but I encountered an error generating the response."
                 message_placeholder.markdown(error_message)
                 full_response = error_message
 
@@ -143,9 +147,7 @@ class ResponseController:
                     message_placeholder.empty()
                     self._display_image_generation_response(image_response)
                     self._handle_tool_context()
-                    full_response = (
-                        ""  # No text response to add to history for image generation
-                    )
+                    full_response = ""  # No text response to add to history for image generation
                 else:
                     # Handle tool context for text response
                     self._handle_tool_context()
@@ -212,7 +214,7 @@ class ResponseController:
                 message_placeholder.markdown(display_text)
 
         except Exception as e:
-            logging.error(f"Streaming error: {e}")
+            logging.error("Streaming error: %s", e)
             raise
 
         return full_response
@@ -227,7 +229,9 @@ class ResponseController:
 
         # Add response to chat history if there's text content
         if full_response and full_response.strip():
-            self.message_controller.update_chat_history(full_response, "assistant")
+            self.message_controller.update_chat_history(
+                full_response, "assistant"
+            )
 
         # Clear processing flag
         self.session_controller.set_processing_state(False)
@@ -260,7 +264,9 @@ class ResponseController:
                     if tool_result and hasattr(tool_result, 'success'):
                         response_data = {
                             "success": tool_result.success,
-                            "image_data": getattr(tool_result, 'image_data', None),
+                            "image_data": getattr(
+                                tool_result, 'image_data', None
+                            ),
                             "original_prompt": getattr(
                                 tool_result, 'original_prompt', ''
                             ),
@@ -272,20 +278,26 @@ class ResponseController:
                             ),
                         }
 
-                        if response_data["success"] and response_data["image_data"]:
+                        if (
+                            response_data["success"]
+                            and response_data["image_data"]
+                        ):
                             return response_data
                         elif not response_data["success"]:
                             return response_data
 
                 except Exception as e:
                     logging.error(
-                        f"Error extracting image generation tool response: {e}"
+                        "Error extracting image generation tool response: %s",
+                        e,
                     )
                     continue
 
         return {}
 
-    def _display_image_generation_response(self, image_response: Dict[str, Any]):
+    def _display_image_generation_response(
+        self, image_response: Dict[str, Any]
+    ):
         """
         Display image generation response from tool calls
 
@@ -304,12 +316,18 @@ class ResponseController:
                 self._display_image_generation_error(image_response)
 
         except Exception as e:
-            logging.error(f"Error displaying image generation response: {e}")
-            error_msg = "I encountered an error while displaying the generated image."
+            logging.error("Error displaying image generation response: %s", e)
+            error_msg = (
+                "I encountered an error while displaying the generated image."
+            )
             st.markdown(error_msg)
-            self.message_controller.safe_add_message_to_history("assistant", error_msg)
+            self.message_controller.safe_add_message_to_history(
+                "assistant", error_msg
+            )
 
-    def _display_successful_image_generation(self, image_response: Dict[str, Any]):
+    def _display_successful_image_generation(
+        self, image_response: Dict[str, Any]
+    ):
         """
         Display successful image generation
 
@@ -319,7 +337,9 @@ class ResponseController:
         from utils.image import base64_to_pil_image
 
         image_data = image_response["image_data"]
-        enhanced_prompt = image_response.get("enhanced_prompt", "Generated image")
+        enhanced_prompt = image_response.get(
+            "enhanced_prompt", "Generated image"
+        )
         original_prompt = image_response.get("original_prompt", "")
 
         # Convert base64 to PIL Image for display
@@ -327,7 +347,11 @@ class ResponseController:
 
         if generated_image:
             # Display the generated image
-            st.image(generated_image, caption=enhanced_prompt, use_container_width=True)
+            st.image(
+                generated_image,
+                caption=enhanced_prompt,
+                use_container_width=True,
+            )
 
             # Store image in session state
             image_id = self.session_controller.store_generated_image(
@@ -336,11 +360,15 @@ class ResponseController:
 
             # Store the generated image in session state for easy access by other tools
             st.session_state.current_image_base64 = image_data
-            st.session_state.current_image_filename = f"generated_{image_id}.png"
+            st.session_state.current_image_filename = (
+                f"generated_{image_id}.png"
+            )
             st.session_state.current_image_id = image_id
 
             logging.info(
-                f"Stored generated image in session state - image_id: {image_id}, data length: {len(image_data)}"
+                "Stored generated image in session state - image_id: %s, data length: %s",
+                image_id,
+                len(image_data),
             )
 
             # Create history message
@@ -363,13 +391,16 @@ class ResponseController:
             )
 
             logging.debug(
-                f"Successfully displayed generated image with prompt: {enhanced_prompt}"
+                "Successfully displayed generated image with prompt: %s",
+                enhanced_prompt,
             )
         else:
             error_msg = "Generated image but failed to display it properly."
             logging.error("Failed to convert base64 to PIL image")
             st.markdown(error_msg)
-            self.message_controller.safe_add_message_to_history("assistant", error_msg)
+            self.message_controller.safe_add_message_to_history(
+                "assistant", error_msg
+            )
 
     def _display_image_generation_error(self, image_response: Dict[str, Any]):
         """
@@ -378,7 +409,9 @@ class ResponseController:
         Args:
             image_response: Image response data with error
         """
-        error_message = image_response.get("error_message", "Failed to generate image.")
+        error_message = image_response.get(
+            "error_message", "Failed to generate image."
+        )
         st.markdown(f"**Image Generation Error:** {error_message}")
         self.message_controller.safe_add_message_to_history(
             "assistant", f"Image generation failed: {error_message}"
@@ -428,7 +461,7 @@ class ResponseController:
                             tool_contexts.append(context)
 
                     except Exception as e:
-                        logging.error(f"Error extracting tool context: {e}")
+                        logging.error("Error extracting tool context: %s", e)
                         continue
 
         # Also check recent tool messages in chat history (e.g., injected PDF search results)
@@ -464,22 +497,29 @@ class ResponseController:
 
                     except Exception as e:
                         logging.error(
-                            f"Error extracting tool context from chat history: {e}"
+                            "Error extracting tool context from chat history: %s",
+                            e,
                         )
                         continue
 
         if tool_contexts:
-            combined_context = config.tool_context.CONTEXT_SEPARATOR.join(tool_contexts)
+            combined_context = config.tool_context.CONTEXT_SEPARATOR.join(
+                tool_contexts
+            )
             # Count actual tool responses (not chunks within responses)
             tool_count = len(tool_contexts)
             logging.info(
-                f"Extracted tool context from {tool_count} tool response{'s' if tool_count != 1 else ''}"
+                "Extracted tool context from %s tool response%s",
+                tool_count,
+                "s" if tool_count != 1 else "",
             )
             return combined_context
 
         return ""
 
-    def _extract_context_from_tool_response(self, tool_response: Dict[str, Any]) -> str:
+    def _extract_context_from_tool_response(
+        self, tool_response: Dict[str, Any]
+    ) -> str:
         """
         Extract context from a single tool response
 
@@ -515,7 +555,10 @@ class ResponseController:
             Formatted context string
         """
         # Skip image generation data using centralized keywords
-        if any(key in tool_data for key in config.image_generation.DETECTION_KEYWORDS):
+        if any(
+            key in tool_data
+            for key in config.image_generation.DETECTION_KEYWORDS
+        ):
             return ""
 
         # Check for formatted_results first (preferred format)
@@ -558,7 +601,9 @@ class ResponseController:
             result = tool_data.get("result", "")
             processing_notes = tool_data.get("processing_notes", "")
 
-            context_parts = [f"**PDF {operation.title()} Results from:** {filename}"]
+            context_parts = [
+                f"**PDF {operation.title()} Results from:** {filename}"
+            ]
 
             if processing_notes:
                 context_parts.append(f"**{processing_notes}**")
@@ -571,21 +616,31 @@ class ResponseController:
             return "\n\n".join(context_parts)
 
         # Handle web extraction results
-        if "url" in tool_data and "content" in tool_data and "success" in tool_data:
+        if (
+            "url" in tool_data
+            and "content" in tool_data
+            and "success" in tool_data
+        ):
             url = tool_data.get("url", "Unknown URL")
             content = tool_data.get("content", "")
             success = tool_data.get("success", False)
 
             if success and content.strip():
                 # Show extracted content with URL context
-                content_preview = content[: config.tool_context.PREVIEW_TEXT_LENGTH]
+                content_preview = content[
+                    : config.tool_context.PREVIEW_TEXT_LENGTH
+                ]
                 if len(content) > config.tool_context.PREVIEW_TEXT_LENGTH:
-                    content_preview += config.tool_context.CONTEXT_TRUNCATION_SUFFIX
+                    content_preview += (
+                        config.tool_context.CONTEXT_TRUNCATION_SUFFIX
+                    )
 
                 return f"**Web Content Extracted from:** {url}\n\n{content_preview}"
             elif not success:
                 error_msg = tool_data.get("error_message", "Extraction failed")
-                return f"**Web Extraction Failed:** {url}\n\nError: {error_msg}"
+                return (
+                    f"**Web Extraction Failed:** {url}\n\nError: {error_msg}"
+                )
             else:
                 return f"**Web Extraction:** {url} (No content extracted)"
 
@@ -632,18 +687,22 @@ class ResponseController:
                 if page_text:
                     # Truncate long text but show meaningful preview
                     preview_text = page_text[:preview_length] + (
-                        truncation_suffix if len(page_text) > preview_length else ""
+                        truncation_suffix
+                        if len(page_text) > preview_length
+                        else ""
                     )
-                    context_parts.append(f"**Page {page_num}:**\n{preview_text}")
+                    context_parts.append(
+                        f"**Page {page_num}:**\n{preview_text}"
+                    )
 
             if len(content) > max_pages:
-                context_parts.append(f"... and {len(content) - max_pages} more pages")
+                context_parts.append(
+                    f"... and {len(content) - max_pages} more pages"
+                )
 
             return "\n\n".join(context_parts)
         else:
-            return (
-                f"**PDF Query Result:** {tool_data.get('message', 'No content found')}"
-            )
+            return f"**PDF Query Result:** {tool_data.get('message', 'No content found')}"
 
     def _get_ui_elements_from_llm_service(self) -> List[Dict[str, Any]]:
         """
@@ -657,7 +716,10 @@ class ResponseController:
         return []
 
     def _display_response_with_ui_elements(
-        self, full_response: str, ui_elements: List[Dict[str, Any]], message_placeholder
+        self,
+        full_response: str,
+        ui_elements: List[Dict[str, Any]],
+        message_placeholder,
     ):
         """
         Display the synthesized response with embedded UI elements
@@ -679,7 +741,9 @@ class ResponseController:
                 image_data = element["data"]
                 if image_data["success"] and image_data["image_data"]:
                     # Convert base64 to PIL Image
-                    generated_image = base64_to_pil_image(image_data["image_data"])
+                    generated_image = base64_to_pil_image(
+                        image_data["image_data"]
+                    )
                     if generated_image:
                         # Display the image below the text
                         st.image(
@@ -689,21 +753,27 @@ class ResponseController:
                         )
 
                         # Store image in session state
-                        image_id = self.session_controller.store_generated_image(
-                            image_data["image_data"],
-                            image_data["enhanced_prompt"],
-                            image_data["original_prompt"],
+                        image_id = (
+                            self.session_controller.store_generated_image(
+                                image_data["image_data"],
+                                image_data["enhanced_prompt"],
+                                image_data["original_prompt"],
+                            )
                         )
 
                         # Store the generated image in session state for easy access by other tools
-                        st.session_state.current_image_base64 = image_data["image_data"]
+                        st.session_state.current_image_base64 = image_data[
+                            "image_data"
+                        ]
                         st.session_state.current_image_filename = (
                             f"generated_{image_id}.png"
                         )
                         st.session_state.current_image_id = image_id
 
                         logging.info(
-                            f"Stored generated image in session state - image_id: {image_id}, data length: {len(image_data['image_data'])}"
+                            "Stored generated image in session state - image_id: %s, data length: %s",
+                            image_id,
+                            len(image_data['image_data']),
                         )
 
                         # Create history message for the image

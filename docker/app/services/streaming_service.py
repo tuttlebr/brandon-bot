@@ -69,7 +69,9 @@ class StreamingService:
         """
         client = self.get_client(model_type, async_client=True)
 
-        logger.debug("Streaming with model_type: %s, model: %s", model_type, model)
+        logger.debug(
+            "Streaming with model_type: %s, model: %s", model_type, model
+        )
 
         try:
             # Prepare API parameters

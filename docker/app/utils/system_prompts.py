@@ -126,7 +126,9 @@ Remember:
     # ==========================================
 
     @classmethod
-    def get_tool_prompt(cls, tool_name: str, context: Optional[Dict] = None) -> str:
+    def get_tool_prompt(
+        cls, tool_name: str, context: Optional[Dict] = None
+    ) -> str:
         """
         Get the system prompt for a specific tool's LLM operations.
         These prompts ensure each tool maintains consistent behavior.
@@ -339,11 +341,15 @@ class PromptManager:
         """Get the main system prompt for tool selection"""
         return self.prompts.get_main_system_prompt(tools_list)
 
-    def get_tool_prompt(self, tool_name: str, context: Optional[Dict] = None) -> str:
+    def get_tool_prompt(
+        self, tool_name: str, context: Optional[Dict] = None
+    ) -> str:
         """Get prompt for a specific tool"""
         cache_key = f"tool_{tool_name}_{str(context)}"
         if cache_key not in self._cache:
-            self._cache[cache_key] = self.prompts.get_tool_prompt(tool_name, context)
+            self._cache[cache_key] = self.prompts.get_tool_prompt(
+                tool_name, context
+            )
         return self._cache[cache_key]
 
     def get_context_prompt(self, context: str, **kwargs) -> str:

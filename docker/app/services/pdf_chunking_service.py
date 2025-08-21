@@ -31,7 +31,8 @@ class PDFChunkingService:
 
         # Initialize embedding client
         self.embedding_client = OpenAI(
-            base_url=config.env.EMBEDDING_ENDPOINT, api_key=config.env.EMBEDDING_API_KEY
+            base_url=config.env.EMBEDDING_ENDPOINT,
+            api_key=config.env.EMBEDDING_API_KEY,
         )
         self.embedding_model = config.env.EMBEDDING_MODEL
 
@@ -66,11 +67,15 @@ class PDFChunkingService:
                 )
                 logger.info(f"Created collection: {self.collection_name}")
             else:
-                logger.info(f"Collection '{self.collection_name}' already exists")
+                logger.info(
+                    f"Collection '{self.collection_name}' already exists"
+                )
 
             # Try to load collection
             try:
-                self.milvus_client.load_collection(collection_name=self.collection_name)
+                self.milvus_client.load_collection(
+                    collection_name=self.collection_name
+                )
                 logger.info(f"Loaded collection: {self.collection_name}")
             except Exception as e:
                 logger.warning(
@@ -175,7 +180,9 @@ class PDFChunkingService:
                 )
 
                 # Log details about chunks being uploaded
-                total_text_size = sum(len(chunk['text']) for chunk in data_to_insert)
+                total_text_size = sum(
+                    len(chunk['text']) for chunk in data_to_insert
+                )
                 logger.info(
                     f"📊 Chunk details: Total text size: {total_text_size:,} chars, Average chunk size: {total_text_size // len(data_to_insert):,} chars"
                 )
@@ -190,12 +197,16 @@ class PDFChunkingService:
                 )
 
                 # Log individual chunk info for debugging
-                for i, chunk in enumerate(data_to_insert[:3]):  # Log first 3 chunks
+                for i, chunk in enumerate(
+                    data_to_insert[:3]
+                ):  # Log first 3 chunks
                     logger.debug(
                         f"  Chunk {i}: ID={chunk['id']}, Text preview: {chunk['text'][:100]}..."
                     )
                 if len(data_to_insert) > 3:
-                    logger.debug(f"  ... and {len(data_to_insert) - 3} more chunks")
+                    logger.debug(
+                        f"  ... and {len(data_to_insert) - 3} more chunks"
+                    )
 
                 # Try to load collection after first insert
                 try:
@@ -214,7 +225,9 @@ class PDFChunkingService:
                 if hasattr(st, 'session_state'):
                     st.session_state.pdf_milvus_upload_complete = True
                     st.session_state.pdf_milvus_upload_filename = filename
-                    st.session_state.pdf_milvus_upload_chunks = len(data_to_insert)
+                    st.session_state.pdf_milvus_upload_chunks = len(
+                        data_to_insert
+                    )
 
                 return True
             except Exception as e:
@@ -283,7 +296,9 @@ class PDFChunkingService:
 
             # Move with overlap
             start = (
-                end - self.chunk_overlap if end - self.chunk_overlap > start else end
+                end - self.chunk_overlap
+                if end - self.chunk_overlap > start
+                else end
             )
 
         return chunks
@@ -381,7 +396,9 @@ class PDFChunkingService:
                 self.milvus_client.delete(
                     collection_name=self.collection_name, ids=ids_to_delete
                 )
-                logger.info(f"Deleted {len(ids_to_delete)} chunks for PDF: {pdf_id}")
+                logger.info(
+                    f"Deleted {len(ids_to_delete)} chunks for PDF: {pdf_id}"
+                )
                 return len(ids_to_delete)
 
             return 0
@@ -391,7 +408,9 @@ class PDFChunkingService:
             return 0
 
     # Compatibility methods to match original interface
-    def chunk_pdf_document(self, pdf_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def chunk_pdf_document(
+        self, pdf_data: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         """Create chunks from PDF document (compatibility method)"""
         filename = pdf_data.get('filename', 'Unknown')
         pdf_id = pdf_data.get('pdf_id')
@@ -411,7 +430,9 @@ class PDFChunkingService:
 
         return chunks
 
-    def store_chunks_with_embeddings(self, chunks: List[Dict[str, Any]]) -> bool:
+    def store_chunks_with_embeddings(
+        self, chunks: List[Dict[str, Any]]
+    ) -> bool:
         """Store chunks with embeddings (compatibility method)"""
         if not chunks or not self.milvus_client:
             return False
@@ -458,7 +479,9 @@ class PDFChunkingService:
 
         if data_to_insert:
             try:
-                logger.info(f"📊 Uploading {len(data_to_insert)} embeddings to Milvus")
+                logger.info(
+                    f"📊 Uploading {len(data_to_insert)} embeddings to Milvus"
+                )
 
                 # Insert all at once
                 self.milvus_client.insert(
@@ -486,7 +509,9 @@ class PDFChunkingService:
                 if hasattr(st, 'session_state'):
                     st.session_state.pdf_milvus_upload_complete = True
                     st.session_state.pdf_milvus_upload_filename = filename
-                    st.session_state.pdf_milvus_upload_chunks = len(data_to_insert)
+                    st.session_state.pdf_milvus_upload_chunks = len(
+                        data_to_insert
+                    )
 
                 return True
             except Exception as e:

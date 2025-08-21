@@ -42,9 +42,15 @@ class ConversationContextResponse(BaseToolResponse):
     """Response from conversation context analysis"""
 
     analysis: str = Field(description="The context analysis result")
-    user_intent: Optional[str] = Field(None, description="Identified user intent")
-    conversation_type: Optional[str] = Field(None, description="Type of conversation")
-    key_topics: Optional[List[str]] = Field(None, description="Key topics identified")
+    user_intent: Optional[str] = Field(
+        None, description="Identified user intent"
+    )
+    conversation_type: Optional[str] = Field(
+        None, description="Type of conversation"
+    )
+    key_topics: Optional[List[str]] = Field(
+        None, description="Key topics identified"
+    )
     has_document: bool = Field(
         default=False, description="Whether a document is being discussed"
     )
@@ -56,7 +62,9 @@ class ConversationContextResponse(BaseToolResponse):
         description="Flag indicating this response should be returned directly to user",
     )
     success: bool = Field(default=True, description="Success status")
-    error_message: Optional[str] = Field(None, description="Error message if failed")
+    error_message: Optional[str] = Field(
+        None, description="Error message if failed"
+    )
 
     @property
     def result(self) -> str:
@@ -67,9 +75,15 @@ class ConversationContextResponse(BaseToolResponse):
 class StreamingConversationContextResponse(StreamingToolResponse):
     """Streaming response from conversation context analysis"""
 
-    user_intent: Optional[str] = Field(None, description="Identified user intent")
-    conversation_type: Optional[str] = Field(None, description="Type of conversation")
-    key_topics: Optional[List[str]] = Field(None, description="Key topics identified")
+    user_intent: Optional[str] = Field(
+        None, description="Identified user intent"
+    )
+    conversation_type: Optional[str] = Field(
+        None, description="Type of conversation"
+    )
+    key_topics: Optional[List[str]] = Field(
+        None, description="Key topics identified"
+    )
     has_document: bool = Field(
         default=False, description="Whether a document is being discussed"
     )
@@ -91,9 +105,13 @@ class ConversationContextController(ToolController):
     def process(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Process the conversation context analysis request"""
         if "query" not in params:
-            raise ValueError("'query' key is required in parameters dictionary")
+            raise ValueError(
+                "'query' key is required in parameters dictionary"
+            )
         if "max_messages" not in params:
-            raise ValueError("'max_messages' key is required in parameters dictionary")
+            raise ValueError(
+                "'max_messages' key is required in parameters dictionary"
+            )
 
         # Validate context type
         try:
@@ -134,9 +152,13 @@ class ConversationContextController(ToolController):
     async def process_async(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Process the conversation context analysis request asynchronously"""
         if "query" not in params:
-            raise ValueError("'query' key is required in parameters dictionary")
+            raise ValueError(
+                "'query' key is required in parameters dictionary"
+            )
         if "max_messages" not in params:
-            raise ValueError("'max_messages' key is required in parameters dictionary")
+            raise ValueError(
+                "'max_messages' key is required in parameters dictionary"
+            )
 
         # Validate context type
         try:
@@ -274,7 +296,9 @@ class ConversationContextController(ToolController):
             # Try to identify user intent
             user_intent = self._extract_user_intent(result, messages)
 
-            logger.info(f"Successfully generated {context_type} context analysis")
+            logger.info(
+                f"Successfully generated {context_type} context analysis"
+            )
 
             return {
                 "analysis": result,
@@ -358,7 +382,9 @@ class ConversationContextController(ToolController):
             client = llm_client_service.get_async_client(self.llm_type)
             model_name = llm_client_service.get_model_name(self.llm_type)
 
-            logger.info(f"Analyzing {context_type.value} context with streaming")
+            logger.info(
+                f"Analyzing {context_type.value} context with streaming"
+            )
 
             # Get system prompt for the specific context type
             system_prompt = self._get_system_prompt(context_type, focus_query)
@@ -414,7 +440,9 @@ class ConversationContextController(ToolController):
                 if chunk.choices and chunk.choices[0].delta.content:
                     chunk_content = chunk.choices[0].delta.content
                     # Filter think tags from the chunk
-                    filtered_content = think_filter.process_chunk(chunk_content)
+                    filtered_content = think_filter.process_chunk(
+                        chunk_content
+                    )
                     if filtered_content:
                         yield filtered_content
 
@@ -424,7 +452,9 @@ class ConversationContextController(ToolController):
                 yield final_content
 
         except Exception as e:
-            logger.error(f"Error in streaming conversation context analysis: {e}")
+            logger.error(
+                f"Error in streaming conversation context analysis: {e}"
+            )
             yield f"Error analyzing context: {str(e)}"
 
     def _get_system_prompt(
@@ -455,7 +485,9 @@ class ConversationContextController(ToolController):
 
         return prompt
 
-    def _format_messages_for_analysis(self, messages: List[Dict[str, Any]]) -> str:
+    def _format_messages_for_analysis(
+        self, messages: List[Dict[str, Any]]
+    ) -> str:
         """Format messages for LLM analysis"""
         formatted = []
 
@@ -493,12 +525,17 @@ class ConversationContextController(ToolController):
         content = strip_think_tags(content)
         # Remove tool call instructions
         content = re.sub(
-            r"<TOOLCALL.*?</TOOLCALL>", "", content, flags=re.DOTALL | re.IGNORECASE
+            r"<TOOLCALL.*?</TOOLCALL>",
+            "",
+            content,
+            flags=re.DOTALL | re.IGNORECASE,
         )
 
         return content.strip()
 
-    def _extract_key_topics(self, result: str, context_type: ContextType) -> List[str]:
+    def _extract_key_topics(
+        self, result: str, context_type: ContextType
+    ) -> List[str]:
         """Extract key topics from the analysis result"""
         topics = []
 
@@ -507,8 +544,12 @@ class ConversationContextController(ToolController):
             import re
 
             # Look for bullet points or numbered lists
-            list_items = re.findall(r"(?:[-*•]\s*|^\d+\.\s*)(.+)", result, re.MULTILINE)
-            topics.extend([item.strip() for item in list_items if item.strip()])
+            list_items = re.findall(
+                r"(?:[-*•]\s*|^\d+\.\s*)(.+)", result, re.MULTILINE
+            )
+            topics.extend(
+                [item.strip() for item in list_items if item.strip()]
+            )
 
             # If no list found, try to extract topics from sentences
             if not topics:
@@ -525,11 +566,15 @@ class ConversationContextController(ToolController):
             topics.extend(quoted)
 
             # Extract capitalized phrases that might be topics
-            capitalized = re.findall(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b", result)
+            capitalized = re.findall(
+                r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b", result
+            )
             topics.extend(capitalized[:3])  # Limit to avoid noise
 
         # Clean and deduplicate
-        topics = [t.strip() for t in topics if t.strip() and len(t.strip()) > 3]
+        topics = [
+            t.strip() for t in topics if t.strip() and len(t.strip()) > 3
+        ]
         return list(dict.fromkeys(topics))[:5]  # Remove duplicates, limit to 5
 
     def _extract_user_intent(
@@ -559,7 +604,8 @@ class ConversationContextController(ToolController):
                 ):
                     return "problem_solving"
                 elif any(
-                    word in content.lower() for word in ["find", "search", "look for"]
+                    word in content.lower()
+                    for word in ["find", "search", "look for"]
                 ):
                     return "information_search"
                 break
@@ -578,7 +624,9 @@ class ConversationContextController(ToolController):
         # Fallback to scanning messages for PDF data
         return self._get_pdf_content_from_messages(messages)
 
-    def _get_pdf_content_from_pdf_data(self, pdf_data: Dict[str, Any]) -> Optional[str]:
+    def _get_pdf_content_from_pdf_data(
+        self, pdf_data: Dict[str, Any]
+    ) -> Optional[str]:
         """
         Extract PDF content from explicitly passed PDF data
 
@@ -669,7 +717,10 @@ class ConversationContextView(ToolView):
             error_code = "TIMEOUT_ERROR"
 
         return ConversationContextResponse(
-            analysis="", success=False, error_message=str(error), error_code=error_code
+            analysis="",
+            success=False,
+            error_message=str(error),
+            error_code=error_code,
         )
 
 
@@ -746,4 +797,6 @@ def get_conversation_context_tool_definition() -> Dict[str, Any]:
     if tool:
         return tool.get_definition()
     else:
-        raise RuntimeError("Failed to get conversation context tool definition")
+        raise RuntimeError(
+            "Failed to get conversation context tool definition"
+        )

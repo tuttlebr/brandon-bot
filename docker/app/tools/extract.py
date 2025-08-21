@@ -98,7 +98,9 @@ class WebExtractController(ToolController):
 
             # If no specific request, return raw content
             if not request:
-                formatted_content = f"# {title}\n\n{content}" if title else content
+                formatted_content = (
+                    f"# {title}\n\n{content}" if title else content
+                )
                 return {
                     "url": url,
                     "content": formatted_content,
@@ -107,7 +109,9 @@ class WebExtractController(ToolController):
                 }
 
             # Process with LLM using streaming internally for faster latency
-            processed_content = self._extract_with_llm(url, content, request, title)
+            processed_content = self._extract_with_llm(
+                url, content, request, title
+            )
 
             return {
                 "url": url,
@@ -327,7 +331,8 @@ class WebExtractController(ToolController):
             # Get appropriate client based on tool's llm_type
             if self.llm_type == "fast":
                 client = OpenAI(
-                    api_key=config_obj.fast_api_key, base_url=config_obj.fast_endpoint
+                    api_key=config_obj.fast_api_key,
+                    base_url=config_obj.fast_endpoint,
                 )
                 model_name = config_obj.fast_model_name
             else:  # default
@@ -379,7 +384,9 @@ Instructions:
                 if chunk.choices and chunk.choices[0].delta.content:
                     chunk_content = chunk.choices[0].delta.content
                     # Filter think tags from the chunk
-                    filtered_content = think_filter.process_chunk(chunk_content)
+                    filtered_content = think_filter.process_chunk(
+                        chunk_content
+                    )
                     if filtered_content:
                         collected_response += filtered_content
 
@@ -394,7 +401,9 @@ Instructions:
             logger.error(f"Error extracting content with LLM: {e}")
             raise
 
-    async def _extract_with_llm_async(self, html_content: str, url: str) -> str:
+    async def _extract_with_llm_async(
+        self, html_content: str, url: str
+    ) -> str:
         """Extract content from HTML using LLM asynchronously"""
         try:
             client = llm_client_service.get_async_client(self.llm_type)
@@ -406,7 +415,8 @@ Instructions:
 
             if len(html_content) > 200000:
                 html_content = (
-                    html_content[:200000] + "\n[Content truncated due to length]"
+                    html_content[:200000]
+                    + "\n[Content truncated due to length]"
                 )
                 logger.info(
                     f"Truncated HTML content to 200k characters for LLM processing"
@@ -514,7 +524,9 @@ Instructions:
                 if chunk.choices and chunk.choices[0].delta.content:
                     chunk_content = chunk.choices[0].delta.content
                     # Filter think tags from the chunk
-                    filtered_content = think_filter.process_chunk(chunk_content)
+                    filtered_content = think_filter.process_chunk(
+                        chunk_content
+                    )
                     if filtered_content:
                         yield filtered_content
 

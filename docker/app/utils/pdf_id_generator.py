@@ -13,7 +13,9 @@ from typing import BinaryIO, Union
 logger = logging.getLogger(__name__)
 
 
-def generate_pdf_id(pdf_content: Union[bytes, BinaryIO], filename: str = None) -> str:
+def generate_pdf_id(
+    pdf_content: Union[bytes, BinaryIO], filename: str = None
+) -> str:
     """
     Generate a unique PDF ID based on file content.
 
@@ -34,7 +36,9 @@ def generate_pdf_id(pdf_content: Union[bytes, BinaryIO], filename: str = None) -
         if hasattr(pdf_content, 'read'):
             # It's a file-like object (e.g., UploadedFile from Streamlit)
             # Read the content and reset position
-            current_pos = pdf_content.tell() if hasattr(pdf_content, 'tell') else 0
+            current_pos = (
+                pdf_content.tell() if hasattr(pdf_content, 'tell') else 0
+            )
             pdf_content.seek(0)
             content_bytes = pdf_content.read()
             pdf_content.seek(current_pos)  # Reset to original position
@@ -48,7 +52,9 @@ def generate_pdf_id(pdf_content: Union[bytes, BinaryIO], filename: str = None) -
         # Use first 16 characters for ID (sufficient uniqueness)
         pdf_id = f"pdf_{content_hash[:16]}"
 
-        logger.debug(f"Generated PDF ID {pdf_id} for {filename or 'unknown file'}")
+        logger.debug(
+            f"Generated PDF ID {pdf_id} for {filename or 'unknown file'}"
+        )
         return pdf_id
 
     except Exception as e:
@@ -61,7 +67,9 @@ def generate_pdf_id(pdf_content: Union[bytes, BinaryIO], filename: str = None) -
             # Last resort: timestamp-based ID
             import time
 
-            timestamp_hash = hashlib.md5(str(time.time()).encode()).hexdigest()[:16]
+            timestamp_hash = hashlib.md5(
+                str(time.time()).encode()
+            ).hexdigest()[:16]
             return f"pdf_{timestamp_hash}"
 
 

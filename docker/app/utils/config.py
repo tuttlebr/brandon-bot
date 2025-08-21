@@ -63,7 +63,9 @@ class FileProcessingConfig:
     )
 
     # PDF Summarization settings
-    PDF_SUMMARIZATION_THRESHOLD: int = 10  # Number of pages to trigger summarization
+    PDF_SUMMARIZATION_THRESHOLD: int = (
+        10  # Number of pages to trigger summarization
+    )
     PDF_SUMMARIZATION_BATCH_SIZE: int = (
         10  # Pages per batch for summarization (increased from 5)
     )
@@ -94,11 +96,15 @@ class FileProcessingConfig:
     PDF_CHUNK_OVERLAP: int = 0  # Overlap between chunks
     PDF_MIN_CHUNK_SIZE: int = 500  # Minimum chunk size
     PDF_MAX_CHUNKS_PER_QUERY: int = 10  # Maximum chunks to retrieve per query
-    PDF_SIMILARITY_THRESHOLD: float = 3.0  # L2 distance threshold for similarity
+    PDF_SIMILARITY_THRESHOLD: float = (
+        3.0  # L2 distance threshold for similarity
+    )
 
     # PDF Upload behavior
     PDF_REUPLOAD_EXISTING: bool = field(
-        default_factory=lambda: os.getenv("PDF_REUPLOAD_EXISTING", "true").lower()
+        default_factory=lambda: os.getenv(
+            "PDF_REUPLOAD_EXISTING", "true"
+        ).lower()
         == "true"
     )  # Whether to re-upload existing PDFs (True=delete & re-upload, False=skip existing)
     # Set PDF_REUPLOAD_EXISTING=false to skip re-uploading existing PDFs and use existing chunks
@@ -134,14 +140,18 @@ class LLMConfig:
         default_factory=lambda: int(os.getenv("MAX_CONTEXT_TOKENS", "116000"))
     )  # Maximum context length for LLM (tokens)
     MAX_TOOL_RESPONSE_TOKENS: int = field(
-        default_factory=lambda: int(os.getenv("MAX_TOOL_RESPONSE_TOKENS", "16000"))
+        default_factory=lambda: int(
+            os.getenv("MAX_TOOL_RESPONSE_TOKENS", "16000")
+        )
     )  # Maximum tokens for individual tool responses
 
     # Conversation context injection
     AUTO_INJECT_CONVERSATION_CONTEXT: bool = (
         True  # Automatically inject conversation context
     )
-    MIN_TURNS_FOR_CONTEXT_INJECTION: int = 1  # Minimum turns before injecting context
+    MIN_TURNS_FOR_CONTEXT_INJECTION: int = (
+        1  # Minimum turns before injecting context
+    )
 
 
 @dataclass
@@ -177,9 +187,13 @@ class SystemConfig:
     """System-level configuration"""
 
     # Logging configuration
-    LOG_LEVEL: str = field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
+    LOG_LEVEL: str = field(
+        default_factory=lambda: os.getenv("LOG_LEVEL", "INFO")
+    )
     SUPPRESS_STREAMLIT_WARNINGS: bool = field(
-        default_factory=lambda: os.getenv("SUPPRESS_STREAMLIT_WARNINGS", "true").lower()
+        default_factory=lambda: os.getenv(
+            "SUPPRESS_STREAMLIT_WARNINGS", "true"
+        ).lower()
         == "true"
     )
 
@@ -228,7 +242,10 @@ class ToolConfig:
             if env_value is not None:
                 self.ENABLED_TOOLS[tool_name] = env_value.lower() == "true"
                 logging.info(
-                    f"Tool '{tool_name}' enabled: {self.ENABLED_TOOLS[tool_name]} (from {env_var})"
+                    "Tool '%s' enabled: %s (from %s)",
+                    tool_name,
+                    self.ENABLED_TOOLS[tool_name],
+                    env_var,
                 )
 
         # Load from external config file if provided
@@ -248,19 +265,28 @@ class ToolConfig:
                 elif config_file.endswith(('.yaml', '.yml')):
                     config_data = yaml.safe_load(f)
                 else:
-                    logging.warning(f"Unsupported config file format: {config_file}")
+                    logging.warning(
+                        "Unsupported config file format: %s", config_file
+                    )
                     return
 
                 # Update enabled tools from file
                 if "enabled_tools" in config_data:
-                    for tool_name, enabled in config_data["enabled_tools"].items():
+                    for tool_name, enabled in config_data[
+                        "enabled_tools"
+                    ].items():
                         self.ENABLED_TOOLS[tool_name] = bool(enabled)
                         logging.info(
-                            f"Tool '{tool_name}' enabled: {enabled} (from {config_file})"
+                            "Tool '%s' enabled: %s (from %s)",
+                            tool_name,
+                            enabled,
+                            config_file,
                         )
 
         except Exception as e:
-            logging.error(f"Failed to load tool config from {config_file}: {e}")
+            logging.error(
+                "Failed to load tool config from %s: %s", config_file, e
+            )
 
     def is_tool_enabled(self, tool_name: str) -> bool:
         """Check if a tool is enabled"""
@@ -268,12 +294,14 @@ class ToolConfig:
 
     def get_enabled_tools(self) -> List[str]:
         """Get list of all enabled tools"""
-        return [name for name, enabled in self.ENABLED_TOOLS.items() if enabled]
+        return [
+            name for name, enabled in self.ENABLED_TOOLS.items() if enabled
+        ]
 
     def set_tool_enabled(self, tool_name: str, enabled: bool):
         """Enable or disable a tool at runtime"""
         self.ENABLED_TOOLS[tool_name] = enabled
-        logging.info(f"Tool '{tool_name}' dynamically set to: {enabled}")
+        logging.info("Tool '%s' dynamically set to: %s", tool_name, enabled)
 
 
 @dataclass
@@ -281,8 +309,12 @@ class EnvironmentConfig:
     """Environment variable configuration with defaults"""
 
     # Bot configuration
-    BOT_TITLE: str = field(default_factory=lambda: os.getenv("BOT_TITLE", "Nano"))
-    META_USER: str = field(default_factory=lambda: os.getenv("META_USER", "Human"))
+    BOT_TITLE: str = field(
+        default_factory=lambda: os.getenv("BOT_TITLE", "Nano")
+    )
+    META_USER: str = field(
+        default_factory=lambda: os.getenv("META_USER", "Human")
+    )
 
     # Model endpoints and names
     FAST_LLM_MODEL_NAME: Optional[str] = field(
@@ -365,7 +397,9 @@ class EnvironmentConfig:
     PARTITION_NAME: str = field(
         default_factory=lambda: os.getenv("PARTITION_NAME", "milvus")
     )
-    DEFAULT_DB: str = field(default_factory=lambda: os.getenv("DEFAULT_DB", "milvus"))
+    DEFAULT_DB: str = field(
+        default_factory=lambda: os.getenv("DEFAULT_DB", "milvus")
+    )
 
     # Reranker configuration
     RERANKER_ENDPOINT: Optional[str] = field(
@@ -454,7 +488,8 @@ class AppConfig:
         missing_vars = self.env.validate_required_env_vars()
         if missing_vars:
             logging.warning(
-                f"Missing required environment variables: {', '.join(missing_vars)}"
+                "Missing required environment variables: %s",
+                ", ".join(missing_vars),
             )
 
     def get_llm_parameters(self) -> Dict[str, Any]:
@@ -500,16 +535,24 @@ class AppConfig:
         missing_vars = self.env.validate_required_env_vars()
         if missing_vars:
             raise ValueError(
-                f"Missing required environment variables: {', '.join(missing_vars)}"
+                "Missing required environment variables: %s",
+                ", ".join(missing_vars),
             )
 
         # Additional validation for specific endpoints
-        if self.env.NVINGEST_ENDPOINT and not self.env.NVINGEST_ENDPOINT.startswith(
-            ('http://', 'https://')
+        if (
+            self.env.NVINGEST_ENDPOINT
+            and not self.env.NVINGEST_ENDPOINT.startswith(
+                ('http://', 'https://')
+            )
         ):
-            raise ValueError("NVINGEST_ENDPOINT must be a valid HTTP/HTTPS URL")
+            raise ValueError(
+                "NVINGEST_ENDPOINT must be a valid HTTP/HTTPS URL"
+            )
 
-        logging.info("Environment configuration validation completed successfully")
+        logging.info(
+            "Environment configuration validation completed successfully"
+        )
 
 
 # Global configuration instance

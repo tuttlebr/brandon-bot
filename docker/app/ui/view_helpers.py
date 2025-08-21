@@ -19,7 +19,10 @@ class UIMessage:
     """Represents a UI message with metadata"""
 
     def __init__(
-        self, content: str, message_type: str = "info", title: Optional[str] = None
+        self,
+        content: str,
+        message_type: str = "info",
+        title: Optional[str] = None,
     ):
         self.content = content
         self.message_type = message_type  # info, success, warning, error
@@ -40,7 +43,9 @@ class IViewInterface(ABC):
         """Display a message to the user"""
 
     @abstractmethod
-    def show_loading(self, message: str = "Loading...") -> Any:  # dead: disable
+    def show_loading(
+        self, message: str = "Loading..."
+    ) -> Any:  # dead: disable
         """Show loading indicator"""
 
 
@@ -69,7 +74,9 @@ class StreamlitViewInterface(IViewInterface):
         else:  # info or default
             st.info(message.content)
 
-    def show_loading(self, message: str = "Loading...") -> Any:  # dead: disable
+    def show_loading(
+        self, message: str = "Loading..."
+    ) -> Any:  # dead: disable
         """Show loading indicator using Streamlit spinner"""
         return st.spinner(message)
 

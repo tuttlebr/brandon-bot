@@ -63,7 +63,9 @@ class TextProcessorService:
         try:
             # Check if the text is too large for direct processing
             estimated_tokens = len(text) // 4  # Rough token estimation
-            max_tokens = 32000  # Conservative limit to stay well under model limits
+            max_tokens = (
+                32000  # Conservative limit to stay well under model limits
+            )
 
             if estimated_tokens > max_tokens:
                 logger.warning(
@@ -94,7 +96,9 @@ class TextProcessorService:
 
             # Log message details
             num_messages = len(final_messages)
-            total_chars = sum(len(msg.get("content", "")) for msg in final_messages)
+            total_chars = sum(
+                len(msg.get("content", "")) for msg in final_messages
+            )
             logger.info(
                 f"📤 Sending to LLM endpoint: {num_messages} messages, ~{total_chars} total chars"
             )
@@ -118,7 +122,9 @@ class TextProcessorService:
                     timeout=60.0,  # 60 second timeout
                 )
             except asyncio.TimeoutError:
-                logger.error("LLM request timed out after 60 seconds for %s", task_type)
+                logger.error(
+                    "LLM request timed out after 60 seconds for %s", task_type
+                )
                 return {
                     "success": False,
                     "error": "Request timed out - the document might be too large or the service is slow",
@@ -134,7 +140,9 @@ class TextProcessorService:
                 "success": True,
                 "result": result,
                 "task_type": task_type,
-                "processing_notes": self._get_processing_notes(task_type, text, result),
+                "processing_notes": self._get_processing_notes(
+                    task_type, text, result
+                ),
             }
 
         except Exception as e:
@@ -165,7 +173,9 @@ class TextProcessorService:
         try:
             # Check if the text is too large for direct processing
             estimated_tokens = len(text) // 4  # Rough token estimation
-            max_tokens = 100000  # Conservative limit to stay well under model limits
+            max_tokens = (
+                100000  # Conservative limit to stay well under model limits
+            )
 
             if estimated_tokens > max_tokens:
                 logger.warning(
@@ -196,7 +206,9 @@ class TextProcessorService:
 
             # Log message details for streaming
             num_messages = len(final_messages)
-            total_chars = sum(len(msg.get("content", "")) for msg in final_messages)
+            total_chars = sum(
+                len(msg.get("content", "")) for msg in final_messages
+            )
             logger.info(
                 f"📤 Sending to LLM endpoint (streaming): {num_messages} messages, ~{total_chars} total chars"
             )
@@ -206,7 +218,9 @@ class TextProcessorService:
                 f"   System prompt preview: {final_messages[0]['content'][:100]}..."
             )
 
-            logger.info("🔄 Making streaming LLM API call to %s...", model_name)
+            logger.info(
+                "🔄 Making streaming LLM API call to %s...", model_name
+            )
 
             response = await client.chat.completions.create(
                 model=model_name,
@@ -224,7 +238,9 @@ class TextProcessorService:
                 if chunk.choices and chunk.choices[0].delta.content:
                     chunk_content = chunk.choices[0].delta.content
                     # Filter think tags from the chunk
-                    filtered_content = think_filter.process_chunk(chunk_content)
+                    filtered_content = think_filter.process_chunk(
+                        chunk_content
+                    )
                     if filtered_content:
                         collected_result += filtered_content
 
@@ -301,7 +317,10 @@ class TextProcessorService:
 
             # Run all chunk processing tasks concurrently
             chunk_results = await asyncio.gather(
-                *[process_chunk_async(i, chunk) for i, chunk in enumerate(chunks)],
+                *[
+                    process_chunk_async(i, chunk)
+                    for i, chunk in enumerate(chunks)
+                ],
                 return_exceptions=True,
             )
 
@@ -309,7 +328,9 @@ class TextProcessorService:
             processed_results = []
             for i, result in enumerate(chunk_results):
                 if isinstance(result, Exception):
-                    logger.error("Chunk %d failed with exception: %s", i + 1, result)
+                    logger.error(
+                        "Chunk %d failed with exception: %s", i + 1, result
+                    )
                     processed_results.append(
                         f"Section {i+1} processing failed due to error: {str(result)}"
                     )
@@ -326,7 +347,9 @@ class TextProcessorService:
 
             # Combine chunk results based on task type
             if task_type == TextTaskType.SUMMARIZE:
-                return await self._combine_summaries(chunk_results, instructions)
+                return await self._combine_summaries(
+                    chunk_results, instructions
+                )
             elif task_type == TextTaskType.TRANSLATE:
                 return await self._combine_translations(chunk_results)
             else:
@@ -408,7 +431,10 @@ class TextProcessorService:
             )
 
             return await self._process_single_chunk(
-                TextTaskType.SUMMARIZE, combined_text, synthesis_instructions, None
+                TextTaskType.SUMMARIZE,
+                combined_text,
+                synthesis_instructions,
+                None,
             )
         except Exception as e:
             logger.error("Error combining summaries: %s", e)
@@ -418,7 +444,9 @@ class TextProcessorService:
                 "task_type": TextTaskType.SUMMARIZE,
             }
 
-    async def _combine_translations(self, chunk_results: List[str]) -> Dict[str, any]:
+    async def _combine_translations(
+        self, chunk_results: List[str]
+    ) -> Dict[str, any]:
         """Combine multiple translations into a final translation"""
         try:
             # For translations, just concatenate the results
@@ -494,7 +522,8 @@ class TextProcessorService:
             for msg in messages
             if msg.get("role") != "system"
             or not any(
-                task.value in msg.get("content", "").lower() for task in TextTaskType
+                task.value in msg.get("content", "").lower()
+                for task in TextTaskType
             )
         ]
 
@@ -507,10 +536,15 @@ class TextProcessorService:
 
                 return [
                     {"role": "system", "content": system_prompt},
-                    {"role": "system", "content": f"Additional context:\n\n{context}"},
+                    {
+                        "role": "system",
+                        "content": f"Additional context:\n\n{context}",
+                    },
                 ] + filtered_messages
 
-        return [{"role": "system", "content": system_prompt}] + filtered_messages
+        return [
+            {"role": "system", "content": system_prompt}
+        ] + filtered_messages
 
     def _get_processing_notes(
         self, task_type: TextTaskType, original: str, result: str

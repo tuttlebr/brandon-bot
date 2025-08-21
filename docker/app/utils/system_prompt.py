@@ -72,7 +72,9 @@ class SystemPromptManager:
         if self._last_cache_time is None:
             return True
 
-        time_since_cache = (datetime.now() - self._last_cache_time).total_seconds()
+        time_since_cache = (
+            datetime.now() - self._last_cache_time
+        ).total_seconds()
         if time_since_cache > self._cache_ttl_seconds:
             return True
 
@@ -146,7 +148,7 @@ class SystemPromptManager:
                     initialize_all_tools()
                     tools_text = get_tools_list_text()
                 except Exception as init_e:
-                    logging.error(f"Failed to initialize tools: {init_e}")
+                    logging.error("Failed to initialize tools: %s", init_e)
 
             # If we still have no tools, return fallback
             if not tools_text.strip():
@@ -157,11 +159,9 @@ class SystemPromptManager:
 
             return tools_text
         except Exception as e:
-            logging.warning(f"Could not auto-generate tools list: {e}")
+            logging.warning("Could not auto-generate tools list: %s", e)
             # Fallback to manual list
-            return (
-                "- tools: External services which help you answer customer questions."
-            )
+            return "- tools: External services which help you answer customer questions."
 
     def get_available_contexts(self) -> List[str]:
         """
@@ -175,7 +175,7 @@ class SystemPromptManager:
 
             return get_all_supported_contexts()
         except Exception as e:
-            logging.warning(f"Could not get available contexts: {e}")
+            logging.warning("Could not get available contexts: %s", e)
             return []
 
 

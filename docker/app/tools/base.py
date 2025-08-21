@@ -59,7 +59,8 @@ class StreamingToolResponse(BaseToolResponse):
         None, description="Async generator that yields content chunks"
     )
     is_streaming: bool = Field(
-        default=True, description="Flag indicating this is a streaming response"
+        default=True,
+        description="Flag indicating this is a streaming response",
     )
 
     class Config:
@@ -155,7 +156,9 @@ class BaseTool(ABC):
 
             # Controller: Process business logic
             if self._controller is None:
-                raise RuntimeError(f"Controller not initialized for {self.name}")
+                raise RuntimeError(
+                    f"Controller not initialized for {self.name}"
+                )
 
             # Determine execution mode
             if self.execution_mode == ExecutionMode.ASYNC or (
@@ -172,7 +175,9 @@ class BaseTool(ABC):
             if self._view is None:
                 raise RuntimeError(f"View not initialized for {self.name}")
 
-            return self._view.format_response(raw_data, self.get_response_type())
+            return self._view.format_response(
+                raw_data, self.get_response_type()
+            )
 
         except ValidationError as e:
             logger.error(f"Validation error in {self.name}: {e}")
@@ -215,17 +220,27 @@ class BaseTool(ABC):
                     self._execute_controller_async(params), loop
                 )
                 result = future.result(timeout=self.timeout)
-                logger.info(f"Async execution of {self.name} completed successfully")
+                logger.info(
+                    f"Async execution of {self.name} completed successfully"
+                )
                 return result
             else:
                 # If no loop is running, use run_until_complete
                 logger.info(f"Executing {self.name} async in new loop")
-                return loop.run_until_complete(self._execute_controller_async(params))
+                return loop.run_until_complete(
+                    self._execute_controller_async(params)
+                )
         except asyncio.TimeoutError:
-            logger.error(f"Timeout executing {self.name} after {self.timeout}s")
-            raise TimeoutError(f"Execution timed out after {self.timeout} seconds")
+            logger.error(
+                f"Timeout executing {self.name} after {self.timeout}s"
+            )
+            raise TimeoutError(
+                f"Execution timed out after {self.timeout} seconds"
+            )
 
-    async def _execute_controller_async(self, params: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_controller_async(
+        self, params: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Execute controller asynchronously"""
         if hasattr(self._controller, 'process_async'):
             return await self._controller.process_async(params)
@@ -278,7 +293,9 @@ class BaseTool(ABC):
         # Check required parameters
         missing = [param for param in required if param not in params]
         if missing:
-            raise ValidationError(f"Missing required parameters: {', '.join(missing)}")
+            raise ValidationError(
+                f"Missing required parameters: {', '.join(missing)}"
+            )
 
         # Basic type validation
         for param_name, param_value in params.items():
@@ -288,19 +305,33 @@ class BaseTool(ABC):
 
                 # Type checking
                 if param_type == "string" and not isinstance(param_value, str):
-                    raise ValidationError(f"Parameter '{param_name}' must be a string")
-                elif param_type == "integer" and not isinstance(param_value, int):
+                    raise ValidationError(
+                        f"Parameter '{param_name}' must be a string"
+                    )
+                elif param_type == "integer" and not isinstance(
+                    param_value, int
+                ):
                     raise ValidationError(
                         f"Parameter '{param_name}' must be an integer"
                     )
                 elif param_type == "number" and not isinstance(
                     param_value, (int, float)
                 ):
-                    raise ValidationError(f"Parameter '{param_name}' must be a number")
-                elif param_type == "boolean" and not isinstance(param_value, bool):
-                    raise ValidationError(f"Parameter '{param_name}' must be a boolean")
-                elif param_type == "array" and not isinstance(param_value, list):
-                    raise ValidationError(f"Parameter '{param_name}' must be an array")
+                    raise ValidationError(
+                        f"Parameter '{param_name}' must be a number"
+                    )
+                elif param_type == "boolean" and not isinstance(
+                    param_value, bool
+                ):
+                    raise ValidationError(
+                        f"Parameter '{param_name}' must be a boolean"
+                    )
+                elif param_type == "array" and not isinstance(
+                    param_value, list
+                ):
+                    raise ValidationError(
+                        f"Parameter '{param_name}' must be an array"
+                    )
 
                 # Enum validation
                 if "enum" in expected and param_value not in expected["enum"]:
@@ -315,12 +346,16 @@ class BaseTool(ABC):
         response_type = self.get_response_type()
         try:
             return response_type(
-                success=False, error_message=error_message, error_code=error_code
+                success=False,
+                error_message=error_message,
+                error_code=error_code,
             )
         except Exception:
             # Fallback to base response
             return BaseToolResponse(
-                success=False, error_message=error_message, error_code=error_code
+                success=False,
+                error_message=error_message,
+                error_code=error_code,
             )
 
     @abstractmethod

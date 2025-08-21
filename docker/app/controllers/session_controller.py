@@ -73,7 +73,9 @@ class SessionController:
                 vlm_model_name=self.config_obj.vlm_model_name,
             )
 
-            user = User(user_id=user_id, session_id=session_id, role=UserRole.USER)
+            user = User(
+                user_id=user_id, session_id=session_id, role=UserRole.USER
+            )
 
             # Validate models
             validation_result = validation_service.validate_user_session_pair(
@@ -115,7 +117,7 @@ class SessionController:
             self._current_session = session
             self._current_user = user
 
-            logging.info(f"Initialized new session: {session_id}")
+            logging.info("Initialized new session: %s", session_id)
 
             return session
 
@@ -125,10 +127,15 @@ class SessionController:
 
     def _get_or_create_session_id(self) -> str:
         """Get existing session ID or create new one"""
-        if hasattr(st.session_state, 'session_id') and st.session_state.session_id:
+        if (
+            hasattr(st.session_state, 'session_id')
+            and st.session_state.session_id
+        ):
             return st.session_state.session_id
 
-        return f"session_{int(time.time() * 1000)}_{random.randint(1000, 9999)}"
+        return (
+            f"session_{int(time.time() * 1000)}_{random.randint(1000, 9999)}"
+        )
 
     def _get_or_create_user_id(self) -> str:
         """Get existing user ID or create new one"""
@@ -164,29 +171,49 @@ class SessionController:
                 session_data = {
                     'session_id': getattr(st.session_state, 'session_id', ''),
                     'user_id': getattr(st.session_state, 'user_id', ''),
-                    'status': getattr(st.session_state, 'status', SessionStatus.ACTIVE),
-                    'processing_status': getattr(
-                        st.session_state, 'processing_status', ProcessingStatus.IDLE
+                    'status': getattr(
+                        st.session_state, 'status', SessionStatus.ACTIVE
                     ),
-                    'message_count': getattr(st.session_state, 'message_count', 0),
-                    'uploaded_files': getattr(st.session_state, 'uploaded_files', []),
-                    'context_data': getattr(st.session_state, 'context_data', {}),
-                    'llm_model_name': getattr(st.session_state, 'llm_model_name', ''),
+                    'processing_status': getattr(
+                        st.session_state,
+                        'processing_status',
+                        ProcessingStatus.IDLE,
+                    ),
+                    'message_count': getattr(
+                        st.session_state, 'message_count', 0
+                    ),
+                    'uploaded_files': getattr(
+                        st.session_state, 'uploaded_files', []
+                    ),
+                    'context_data': getattr(
+                        st.session_state, 'context_data', {}
+                    ),
+                    'llm_model_name': getattr(
+                        st.session_state, 'llm_model_name', ''
+                    ),
                     'fast_llm_model_name': getattr(
                         st.session_state, 'fast_llm_model_name', ''
                     ),
                     'intelligent_llm_model_name': getattr(
                         st.session_state, 'intelligent_llm_model_name', ''
                     ),
-                    'vlm_model_name': getattr(st.session_state, 'vlm_model_name', ''),
-                    'created_at': getattr(st.session_state, 'created_at', time.time()),
-                    'updated_at': getattr(st.session_state, 'updated_at', time.time()),
+                    'vlm_model_name': getattr(
+                        st.session_state, 'vlm_model_name', ''
+                    ),
+                    'created_at': getattr(
+                        st.session_state, 'created_at', time.time()
+                    ),
+                    'updated_at': getattr(
+                        st.session_state, 'updated_at', time.time()
+                    ),
                 }
 
                 try:
-                    self._current_session = Session.from_streamlit_state(session_data)
+                    self._current_session = Session.from_streamlit_state(
+                        session_data
+                    )
                 except Exception as e:
-                    logging.error(f"Error loading session from state: {e}")
+                    logging.error("Error loading session from state: %s", e)
                     # Fallback to creating new session
                     return self.initialize_session_state()
             else:
@@ -212,15 +239,21 @@ class SessionController:
                 ),
                 'session_id': getattr(st.session_state, 'session_id', ''),
                 'role': getattr(st.session_state, 'user_role', UserRole.USER),
-                'preferences': getattr(st.session_state, 'user_preferences', {}),
-                'message_count': getattr(st.session_state, 'user_message_count', 0),
-                'session_count': getattr(st.session_state, 'user_session_count', 0),
+                'preferences': getattr(
+                    st.session_state, 'user_preferences', {}
+                ),
+                'message_count': getattr(
+                    st.session_state, 'user_message_count', 0
+                ),
+                'session_count': getattr(
+                    st.session_state, 'user_session_count', 0
+                ),
             }
 
             try:
                 self._current_user = User.from_session_state(user_data)
             except Exception as e:
-                logging.error(f"Error loading user from state: {e}")
+                logging.error("Error loading user from state: %s", e)
                 # Create default user
                 self._current_user = User(user_id=user_data['user_id'])
 
@@ -250,7 +283,11 @@ class SessionController:
         Args:
             processing: Whether app is processing
         """
-        status = ProcessingStatus.PROCESSING if processing else ProcessingStatus.IDLE
+        status = (
+            ProcessingStatus.PROCESSING
+            if processing
+            else ProcessingStatus.IDLE
+        )
         self.set_processing_status(status)
 
     def is_processing(self) -> bool:
@@ -284,13 +321,15 @@ class SessionController:
         file_size = getattr(file_data, 'size', 0) if file_data else 0
 
         # Add file to session
-        file_info = session.add_uploaded_file(filename, file_id, file_type, file_size)
+        file_info = session.add_uploaded_file(
+            filename, file_id, file_type, file_size
+        )
 
         # Update cache and session state
         self._current_session = session
         self._store_session_state(session, self.get_current_user())
 
-        logging.info(f"Added uploaded file: {filename} ({file_type})")
+        logging.info("Added uploaded file: %s (%s)", filename, file_type)
         return file_info
 
     def mark_file_processed(self, file_id: str) -> bool:
@@ -310,7 +349,7 @@ class SessionController:
             # Update cache and session state
             self._current_session = session
             self._store_session_state(session, self.get_current_user())
-            logging.info(f"Marked file as processed: {file_id}")
+            logging.info("Marked file as processed: %s", file_id)
 
         return success
 
@@ -384,7 +423,7 @@ class SessionController:
 
         if session.session_id:
             self.file_storage.cleanup_session(session.session_id)
-            logging.info(f"Cleaned up session: {session.session_id}")
+            logging.info("Cleaned up session: %s", session.session_id)
 
         # Clear cached models
         self._current_session = None
@@ -442,7 +481,10 @@ class SessionController:
             st.session_state.stored_images = []
         st.session_state.stored_images.append(image_id)
 
-        if len(st.session_state.stored_images) > config.session.MAX_IMAGES_IN_SESSION:
+        if (
+            len(st.session_state.stored_images)
+            > config.session.MAX_IMAGES_IN_SESSION
+        ):
             st.session_state.stored_images = st.session_state.stored_images[
                 -config.session.MAX_IMAGES_IN_SESSION :
             ]
@@ -470,7 +512,7 @@ class SessionController:
 
         model_name = model_mapping.get(model_type)
         if not model_name:
-            logging.error(f"No {model_type} model name found")
+            logging.error("No %s model name found", model_type)
             # Fallback to config
             fallback_mapping = {
                 "fast": self.config_obj.fast_llm_model_name,
@@ -501,7 +543,9 @@ class SessionController:
                 system_prompt = get_system_prompt()
                 st.session_state.system_prompt = system_prompt
 
-            st.session_state.messages = [{"role": "system", "content": system_prompt}]
+            st.session_state.messages = [
+                {"role": "system", "content": system_prompt}
+            ]
 
         return getattr(st.session_state, "messages", [])
 
@@ -546,13 +590,18 @@ class SessionController:
         """
         session = self.get_current_session()
 
-        pdf_id = self.file_storage.store_pdf(filename, pdf_data, session.session_id)
+        pdf_id = self.file_storage.store_pdf(
+            filename, pdf_data, session.session_id
+        )
 
         if 'stored_pdfs' not in st.session_state:
             st.session_state.stored_pdfs = []
         st.session_state.stored_pdfs.append(pdf_id)
 
-        if len(st.session_state.stored_pdfs) > config.session.MAX_PDFS_IN_SESSION:
+        if (
+            len(st.session_state.stored_pdfs)
+            > config.session.MAX_PDFS_IN_SESSION
+        ):
             removed = st.session_state.stored_pdfs[
                 : -config.session.MAX_PDFS_IN_SESSION
             ]
@@ -561,9 +610,9 @@ class SessionController:
             ]
 
             for pdf_id in removed:
-                logging.info(f"Removing old PDF: {pdf_id}")
+                logging.info("Removing old PDF: %s", pdf_id)
 
-        logging.info(f"Stored PDF document '{filename}' with ID '{pdf_id}'")
+        logging.info("Stored PDF document '%s' with ID '%s'", filename, pdf_id)
         return pdf_id
 
     def get_latest_pdf_document(self) -> Optional[Dict[str, Any]]:
@@ -599,7 +648,9 @@ class SessionController:
         """Clear all PDF documents from session"""
         if hasattr(st.session_state, 'stored_pdfs'):
             st.session_state.stored_pdfs = []
-            logging.info("Cleared all PDF document references from session state")
+            logging.info(
+                "Cleared all PDF document references from session state"
+            )
 
     def has_pdf_documents(self) -> bool:
         """Check if there are any PDF documents in session
@@ -635,7 +686,10 @@ class SessionController:
             st.session_state.stored_images = []
         st.session_state.stored_images.append(image_id)
 
-        if len(st.session_state.stored_images) > config.session.MAX_IMAGES_IN_SESSION:
+        if (
+            len(st.session_state.stored_images)
+            > config.session.MAX_IMAGES_IN_SESSION
+        ):
             removed = st.session_state.stored_images[
                 : -config.session.MAX_IMAGES_IN_SESSION
             ]
@@ -644,9 +698,11 @@ class SessionController:
             ]
 
             for image_id in removed:
-                logging.info(f"Removing old image: {image_id}")
+                logging.info("Removing old image: %s", image_id)
 
-        logging.info(f"Stored uploaded image '{filename}' with ID '{image_id}'")
+        logging.info(
+            "Stored uploaded image '%s' with ID '%s'", filename, image_id
+        )
         return image_id
 
     def get_latest_uploaded_image(self) -> Optional[Dict[str, Any]]:
@@ -668,7 +724,9 @@ class SessionController:
         """Clear all uploaded images from session"""
         if hasattr(st.session_state, 'stored_images'):
             st.session_state.stored_images = []
-            logging.info("Cleared all uploaded image references from session state")
+            logging.info(
+                "Cleared all uploaded image references from session state"
+            )
 
     def has_uploaded_images(self) -> bool:
         """

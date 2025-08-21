@@ -44,7 +44,9 @@ class ConversationContextService:
 
         # Always inject context if we have more than just system messages
         conversation_messages = [
-            msg for msg in messages if msg.get("role") not in ["system", "tool"]
+            msg
+            for msg in messages
+            if msg.get("role") not in ["system", "tool"]
         ]
 
         # Calculate number of turns (2 messages = 1 turn)
@@ -75,16 +77,22 @@ class ConversationContextService:
 
         # Check if context has already been injected (avoid duplicates)
         for msg in messages:
-            if msg.get("role") == "system" and "## Conversation Context" in msg.get(
+            if msg.get(
+                "role"
+            ) == "system" and "## Conversation Context" in msg.get(
                 "content", ""
             ):
-                logger.debug("Conversation context already present, skipping injection")
+                logger.debug(
+                    "Conversation context already present, skipping injection"
+                )
                 return messages
 
         logger.info("Injecting conversation context for LLM invocation")
 
         # Get the conversation context
-        context_summary = self._get_conversation_summary(messages, user_message)
+        context_summary = self._get_conversation_summary(
+            messages, user_message
+        )
 
         if not context_summary:
             logger.warning("Failed to generate conversation context")
@@ -135,7 +143,9 @@ class ConversationContextService:
 
             # Filter conversation messages (exclude system/tool messages)
             conversation_messages = [
-                msg for msg in messages if msg.get("role") not in ["system", "tool"]
+                msg
+                for msg in messages
+                if msg.get("role") not in ["system", "tool"]
             ]
 
             # Apply max turns limit (convert turns to messages: 1 turn = 2 messages)

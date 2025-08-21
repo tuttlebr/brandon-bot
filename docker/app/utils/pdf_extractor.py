@@ -55,7 +55,9 @@ class PDFDataExtractor:
                             ),
                         }
                     # Check for batch-processed PDF
-                    elif data.get("type") == "pdf_data" and data.get("batch_processed"):
+                    elif data.get("type") == "pdf_data" and data.get(
+                        "batch_processed"
+                    ):
                         logger.debug(
                             f"Found batch-processed PDF in system message: {data.get('filename')}"
                         )
@@ -76,7 +78,9 @@ class PDFDataExtractor:
                     "---BEGIN PDF CONTENT---" in content
                     and "---END PDF CONTENT---" in content
                 ):
-                    pdf_data = PDFDataExtractor._parse_pdf_context_message(content)
+                    pdf_data = PDFDataExtractor._parse_pdf_context_message(
+                        content
+                    )
                     if pdf_data:
                         logger.debug(
                             f"Found PDF data in context message: {pdf_data.get('filename')}"
@@ -122,12 +126,16 @@ class PDFDataExtractor:
                             pages.append(
                                 {
                                     "page": current_page,
-                                    "text": '\n'.join(current_page_text).strip(),
+                                    "text": '\n'.join(
+                                        current_page_text
+                                    ).strip(),
                                 }
                             )
                         # Start new page
                         try:
-                            current_page = int(line.replace("### Page ", "").strip())
+                            current_page = int(
+                                line.replace("### Page ", "").strip()
+                            )
                             current_page_text = []
                         except ValueError:
                             pass
@@ -172,7 +180,9 @@ class PDFDataExtractor:
         for page in pages_to_process:
             page_text = page.get("text", "")
             if page_text:
-                document_text.append(f"[Page {page.get('page', '?')}]\n{page_text}")
+                document_text.append(
+                    f"[Page {page.get('page', '?')}]\n{page_text}"
+                )
 
         if document_text:
             return "\n\n".join(document_text)

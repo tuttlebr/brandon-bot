@@ -123,7 +123,9 @@ class PDFQueryServiceV2:
         limit = top_k if top_k is not None else self.search_config.topk
 
         # Create query embedding
-        embedding_response = self.embedding_creator.create_formatted_query(query)
+        embedding_response = self.embedding_creator.create_formatted_query(
+            query
+        )
         logger.debug("Generated embedding for query")
 
         # Update search config to filter by pdf_id
@@ -152,7 +154,9 @@ class PDFQueryServiceV2:
                 pages = metadata.get("pages", [])
                 if pages:
                     page_range = (
-                        f"{pages[0]}-{pages[-1]}" if len(pages) > 1 else str(pages[0])
+                        f"{pages[0]}-{pages[-1]}"
+                        if len(pages) > 1
+                        else str(pages[0])
                     )
                 else:
                     page_range = "unknown"
@@ -175,7 +179,9 @@ class PDFQueryServiceV2:
                 continue
 
         logger.info(
-            "PDFQueryService: found %d matches for pdf_id '%s'", len(matches), pdf_id
+            "PDFQueryService: found %d matches for pdf_id '%s'",
+            len(matches),
+            pdf_id,
         )
 
         # Determine filename - use provided or try to extract from metadata
@@ -213,7 +219,9 @@ class PDFQueryServiceV2:
             "chunks": matches,
             "used": bool(matches),
             "formatted_context": self._format_context(matches),
-            "tool_response": self.format_as_tool_response(matches, pdf_filename),
+            "tool_response": self.format_as_tool_response(
+                matches, pdf_filename
+            ),
             "unique_chunks": unique_count,
         }
 
@@ -236,7 +244,13 @@ class PDFQueryServiceV2:
         # Reinitialize Milvus client with updated config if collection parameters changed
         if any(
             key
-            in ['collection_name', 'uri', 'db_name', 'vector_field', 'output_fields']
+            in [
+                'collection_name',
+                'uri',
+                'db_name',
+                'vector_field',
+                'output_fields',
+            ]
             for key in kwargs
         ):
             self.milvus = SimilaritySearch(
@@ -246,7 +260,9 @@ class PDFQueryServiceV2:
                 vector_field=self.search_config.vector_field,
                 output_fields=self.search_config.output_fields,
             )
-            logger.info("Reinitialized Milvus client with updated configuration")
+            logger.info(
+                "Reinitialized Milvus client with updated configuration"
+            )
 
     def get_search_config(self) -> PDFSearchConfig:
         """Get current search configuration."""

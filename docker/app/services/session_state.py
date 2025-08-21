@@ -46,11 +46,16 @@ def get_active_pdf_id() -> Optional[str]:
     try:
         import streamlit as st
 
-        if hasattr(st, 'session_state') and 'active_pdf_id' in st.session_state:
+        if (
+            hasattr(st, 'session_state')
+            and 'active_pdf_id' in st.session_state
+        ):
             pdf_id = st.session_state['active_pdf_id']
             import logging
 
-            logging.debug(f"Retrieved active PDF ID from session state: {pdf_id}")
+            logging.debug(
+                "Retrieved active PDF ID from session state: %s", pdf_id
+            )
             return pdf_id
     except ImportError:
         pass
@@ -60,7 +65,7 @@ def get_active_pdf_id() -> Optional[str]:
     if pdf_id:
         import logging
 
-        logging.debug(f"Retrieved active PDF ID from contextvars: {pdf_id}")
+        logging.debug("Retrieved active PDF ID from contextvars: %s", pdf_id)
     return pdf_id
 
 

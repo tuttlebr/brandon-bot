@@ -30,7 +30,9 @@ class PDFSummarizerServiceV2:
         # Use the LLM type configured for pdf_assistant tool
         llm_type = get_tool_llm_type("pdf_assistant")
         logger.info(f"PDFSummarizerServiceV2 using LLM type: {llm_type}")
-        self.text_processor = TextProcessorService(self.config, llm_type=llm_type)
+        self.text_processor = TextProcessorService(
+            self.config, llm_type=llm_type
+        )
         self.chunker = PDFChunkingService(self.config)
 
     # ------------------------------------------------------------
@@ -74,7 +76,9 @@ class PDFSummarizerServiceV2:
         self, pdf_data: Dict[str, Any], user_instruction: Optional[str] = None
     ) -> Dict[str, Any]:
         logger.info("🔍 Small PDF summarization strategy selected")
-        logger.info(f"   Character count: {pdf_data.get('char_count', 'unknown')}")
+        logger.info(
+            f"   Character count: {pdf_data.get('char_count', 'unknown')}"
+        )
         logger.info(f"   Page count: {len(pdf_data.get('pages', []))}")
 
         # Extract text from pages with error handling
@@ -83,7 +87,9 @@ class PDFSummarizerServiceV2:
             if isinstance(page, dict) and "text" in page:
                 page_texts.append(page["text"])
             else:
-                logger.warning(f"Page {i} missing text field. Page data: {page}")
+                logger.warning(
+                    f"Page {i} missing text field. Page data: {page}"
+                )
 
         if not page_texts:
             logger.error("No text found in any pages")
@@ -98,10 +104,13 @@ class PDFSummarizerServiceV2:
         )
 
         try:
-            logger.info("🚀 Sending text to TextProcessorService for summarization...")
+            logger.info(
+                "🚀 Sending text to TextProcessorService for summarization..."
+            )
             # Use user instruction or default
             instructions = (
-                user_instruction or "Provide a concise summary of the document."
+                user_instruction
+                or "Provide a concise summary of the document."
             )
             result = await self.text_processor.process_text(
                 TextTaskType.SUMMARIZE,
@@ -127,8 +136,12 @@ class PDFSummarizerServiceV2:
     async def _summarize_large(
         self, pdf_data: Dict[str, Any], user_instruction: Optional[str] = None
     ) -> Dict[str, Any]:
-        logger.info("🔍 Large PDF summarization strategy selected (map-reduce)")
-        logger.info(f"   Character count: {pdf_data.get('char_count', 'unknown')}")
+        logger.info(
+            "🔍 Large PDF summarization strategy selected (map-reduce)"
+        )
+        logger.info(
+            f"   Character count: {pdf_data.get('char_count', 'unknown')}"
+        )
         logger.info(f"   Page count: {len(pdf_data.get('pages', []))}")
 
         # Step 1: ensure chunks exist
@@ -163,11 +176,17 @@ class PDFSummarizerServiceV2:
                     return {
                         "result": f"[Error summarizing chunk {chunk_idx + 1}: {result.get('error')}]"
                     }
-                logger.info(f"   ✓ Chunk {chunk_idx + 1} summarized successfully")
+                logger.info(
+                    f"   ✓ Chunk {chunk_idx + 1} summarized successfully"
+                )
                 return result
             except Exception as e:
-                logger.error(f"Exception summarizing chunk {chunk_idx + 1}: {e}")
-                return {"result": f"[Error in chunk {chunk_idx + 1}: {str(e)}]"}
+                logger.error(
+                    f"Exception summarizing chunk {chunk_idx + 1}: {e}"
+                )
+                return {
+                    "result": f"[Error in chunk {chunk_idx + 1}: {str(e)}]"
+                }
 
         chunk_results = await asyncio.gather(
             *(summarize_chunk(i, c) for i, c in enumerate(chunks)),
@@ -192,7 +211,9 @@ class PDFSummarizerServiceV2:
                 batch_text = "\n\n".join(partial_summaries[i : i + 5])
                 combined_batches.append(batch_text)
 
-            logger.info(f"   Created {len(combined_batches)} batches for reduction")
+            logger.info(
+                f"   Created {len(combined_batches)} batches for reduction"
+            )
 
             # summarize each combined batch
             async def summarize_batch(batch_idx, batch_text):
@@ -208,7 +229,10 @@ class PDFSummarizerServiceV2:
                 return result["result"]
 
             partial_summaries = await asyncio.gather(
-                *(summarize_batch(i, b) for i, b in enumerate(combined_batches))
+                *(
+                    summarize_batch(i, b)
+                    for i, b in enumerate(combined_batches)
+                )
             )
             logger.info(
                 f"✅ REDUCE iteration {iteration} complete: {len(partial_summaries)} summaries remaining"

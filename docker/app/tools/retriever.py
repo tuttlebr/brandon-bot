@@ -133,7 +133,9 @@ class SimilaritySearch:
 
         try:
             reranker_response = self._call_reranker_service(
-                payload, config.env.RERANKER_ENDPOINT, config.env.RERANKER_API_KEY
+                payload,
+                config.env.RERANKER_ENDPOINT,
+                config.env.RERANKER_API_KEY,
             )
             combined_results = self._combine_results(
                 embedding_response, reranker_response
@@ -153,10 +155,14 @@ class SimilaritySearch:
                 if "logit" in r and r["logit"] is not None
             ]
             if not results_with_logits:
-                logging.warning("No results with valid logit scores after reranking")
+                logging.warning(
+                    "No results with valid logit scores after reranking"
+                )
                 return None
 
-            validated_results = self._remove_outliers(results_with_logits, key="logit")
+            validated_results = self._remove_outliers(
+                results_with_logits, key="logit"
+            )
             return [validated_results]
         except Exception as e:
             logging.error("Reranking failed: %s", str(e))
@@ -186,7 +192,7 @@ class SimilaritySearch:
             "Accept": "application/json",
         }
 
-        logging.debug(f"Payload: {payload}")
+        logging.debug("Payload: %s", payload)
         with requests.Session() as session:
             response = session.post(endpoint, headers=headers, json=payload)
             response.raise_for_status()
@@ -211,15 +217,21 @@ class SimilaritySearch:
 
             # Validate index and logit
             if index is None or logit is None:
-                logging.debug(f"Skipping ranking with missing index or logit: {rank}")
+                logging.debug(
+                    "Skipping ranking with missing index or logit: %s", rank
+                )
                 continue
 
             # Check if index is within bounds
             if index < 0 or index >= len(embedding_response[0]):
-                logging.debug(f"Skipping ranking with out-of-bounds index: {index}")
+                logging.debug(
+                    "Skipping ranking with out-of-bounds index: %s", index
+                )
                 continue
 
-            embedding_response[0][index].update({"logit": logit, "index": index})
+            embedding_response[0][index].update(
+                {"logit": logit, "index": index}
+            )
 
         rerankable_results = [
             result for result in embedding_response[0] if "logit" in result
@@ -251,20 +263,29 @@ class SimilaritySearch:
             return data
 
         # Debug logging
-        logging.debug(f"_remove_outliers called with {len(data)} items, key='{key}'")
+        logging.debug(
+            "_remove_outliers called with %s items, key='%s'", len(data), key
+        )
         if data and len(data) > 0:
-            logging.debug(f"First item type: {type(data[0])}")
-            logging.debug(f"First item: {data[0]}")
+            logging.debug("First item type: %s", type(data[0]))
+            logging.debug("First item: %s", data[0])
             if key and isinstance(data[0], dict):
-                logging.debug(f"First item has key '{key}': {key in data[0]}")
+                logging.debug(
+                    "First item has key '%s': %s", key, key in data[0]
+                )
                 if key in data[0]:
                     logging.info(
-                        f"Value for key '{key}': {data[0][key]} (type: {type(data[0][key])})"
+                        "Value for key '%s': %s (type: %s)",
+                        key,
+                        data[0][key],
+                        type(data[0][key]),
                     )
 
         try:
             # Extract scores if data is a list of dictionaries or Pymilvus Hit objects
-            if key is not None and (isinstance(data[0], dict) or hasattr(data[0], key)):
+            if key is not None and (
+                isinstance(data[0], dict) or hasattr(data[0], key)
+            ):
                 try:
                     # Extract values and validate they are numeric, keeping track of valid items
                     raw_scores = []
@@ -276,7 +297,9 @@ class SimilaritySearch:
                             if isinstance(item, dict):
                                 if key not in item:
                                     logging.error(
-                                        f"Key '{key}' not found in dict item: {item}"
+                                        "Key '%s' not found in dict item: %s",
+                                        key,
+                                        item,
                                     )
                                     continue
                                 value = item[key]
@@ -286,7 +309,9 @@ class SimilaritySearch:
                                     value = getattr(item, key)
                                 else:
                                     logging.error(
-                                        f"Attribute '{key}' not found in item: {type(item)}"
+                                        "Attribute '%s' not found in item: %s",
+                                        key,
+                                        type(item),
                                     )
                                     continue
 
@@ -294,12 +319,16 @@ class SimilaritySearch:
                             if value is None or (
                                 isinstance(value, float) and np.isnan(value)
                             ):
-                                logging.warning(f"Skipping non-numeric value: {value}")
+                                logging.warning(
+                                    "Skipping non-numeric value: %s", value
+                                )
                                 continue
 
                             if not isinstance(value, (int, float)):
                                 logging.debug(
-                                    f"Skipping non-numeric value of type {type(value)}: {value}"
+                                    "Skipping non-numeric value of type %s: %s",
+                                    type(value),
+                                    value,
                                 )
                                 continue
 
@@ -307,18 +336,22 @@ class SimilaritySearch:
                             valid_items.append(item)
 
                         except Exception as e:
-                            logging.warning(f"Error processing item: {e}")
+                            logging.warning("Error processing item: %s", e)
                             continue
 
                     if not raw_scores:
-                        logging.warning("No valid numeric values found in data")
+                        logging.warning(
+                            "No valid numeric values found in data"
+                        )
                         return data
 
                     scores = np.array(raw_scores, dtype=np.float64)
-                    original_data = valid_items  # Use only the items with valid scores
+                    original_data = (
+                        valid_items  # Use only the items with valid scores
+                    )
 
                 except Exception as e:
-                    logging.error(f"Error extracting scores from data: {e}")
+                    logging.error("Error extracting scores from data: %s", e)
                     return data
             else:
                 original_data = None
@@ -329,11 +362,15 @@ class SimilaritySearch:
                         if value is None or (
                             isinstance(value, float) and np.isnan(value)
                         ):
-                            logging.warning(f"Skipping non-numeric value: {value}")
+                            logging.warning(
+                                "Skipping non-numeric value: %s", value
+                            )
                             continue
                         if not isinstance(value, (int, float)):
                             logging.debug(
-                                f"Skipping non-numeric value of type {type(value)}: {value}"
+                                "Skipping non-numeric value of type %s: %s",
+                                type(value),
+                                value,
                             )
                             continue
                         cleaned_data.append(float(value))
@@ -344,7 +381,7 @@ class SimilaritySearch:
 
                     scores = np.array(cleaned_data, dtype=np.float64)
                 except Exception as e:
-                    logging.error(f"Error creating array from data: {e}")
+                    logging.error("Error creating array from data: %s", e)
                     return data
 
             # Verify we have a valid numeric array
@@ -395,7 +432,11 @@ class SimilaritySearch:
                 # Filter scores (keep values <= cutoff)
                 filtered_scores = scores[scores <= cutoff]
                 logging.info(
-                    f"Natural break filtering: kept {len(filtered_scores)}/{original_count} values, cutoff: {cutoff:.6f}, largest gap: {max_gap_size:.6f}"
+                    "Natural break filtering: kept %s/%s values, cutoff: %s, largest gap: %s",
+                    len(filtered_scores),
+                    original_count,
+                    cutoff,
+                    max_gap_size,
                 )
                 return filtered_scores.tolist()[:5]
             else:
@@ -411,16 +452,20 @@ class SimilaritySearch:
                         if value <= cutoff:
                             filtered_data.append(item)
                     except Exception as e:
-                        logging.warning(f"Error filtering item: {e}")
+                        logging.warning("Error filtering item: %s", e)
                         continue
 
                 logging.info(
-                    f"Natural break filtering: kept {len(filtered_data)}/{original_count} items, cutoff: {cutoff:.6f}, largest gap: {max_gap_size:.6f}"
+                    "Natural break filtering: kept %s/%s items, cutoff: %s, largest gap: %s",
+                    len(filtered_data),
+                    original_count,
+                    cutoff,
+                    max_gap_size,
                 )
                 return filtered_data
 
         except Exception as e:
-            logging.error(f"Error in remove_outliers: {str(e)}")
+            logging.error("Error in remove_outliers: %s", str(e))
             return data
 
     def format_results(self, results: Optional[List[Dict[str, Any]]]) -> str:
@@ -452,7 +497,8 @@ class SimilaritySearch:
         source = entity["source"].strip()
         creation_date = entity["creation_date"].strip()
         base_text = (
-            f"<small>{index}. [{title}]({source}), " f"_'{text}'_, {creation_date}"
+            f"<small>{index}. [{title}]({source}), "
+            f"_'{text}'_, {creation_date}"
         )
 
         return f"{base_text}</small>"
@@ -466,9 +512,13 @@ class SearchResult(BaseModel):
     source: str = Field(description="Source URL or location of the document")
     text: str = Field(description="Text content of the document")
     creation_date: str = Field(description="Creation date of the document")
-    distance: Optional[float] = Field(None, description="Vector similarity distance")
+    distance: Optional[float] = Field(
+        None, description="Vector similarity distance"
+    )
     logit: Optional[float] = Field(None, description="Reranker logit score")
-    index: Optional[int] = Field(None, description="Original index in search results")
+    index: Optional[int] = Field(
+        None, description="Original index in search results"
+    )
 
 
 class RetrievalResponse(BaseToolResponse):
@@ -479,7 +529,9 @@ class RetrievalResponse(BaseToolResponse):
         default_factory=list, description="List of search results"
     )
     total_results: int = Field(description="Total number of results found")
-    reranked: bool = Field(default=False, description="Whether results were reranked")
+    reranked: bool = Field(
+        default=False, description="Whether results were reranked"
+    )
     formatted_results: str = Field(
         default="", description="Formatted results for display"
     )
@@ -572,7 +624,9 @@ class RetrieverTool(BaseTool):
         try:
             # Create query embedding
             logger.debug("Creating query embedding")
-            query_embedding = self.embedding_creator.create_formatted_query(query)
+            query_embedding = self.embedding_creator.create_formatted_query(
+                query
+            )
 
             # Perform similarity search
             logger.debug("Performing vector similarity search")
@@ -597,7 +651,9 @@ class RetrieverTool(BaseTool):
                 )
 
             # Use reranked results if available, otherwise use original results
-            final_results = reranked_results if reranked_results else search_results
+            final_results = (
+                reranked_results if reranked_results else search_results
+            )
 
             # Convert to Pydantic models
             results = []
@@ -616,7 +672,9 @@ class RetrieverTool(BaseTool):
                 results.append(search_result)
 
             # Format results for display
-            formatted_results = self.similarity_search.format_results(final_results)
+            formatted_results = self.similarity_search.format_results(
+                final_results
+            )
 
             response = RetrievalResponse(
                 query=query,
@@ -647,14 +705,19 @@ class RetrieverTool(BaseTool):
             RetrievalResponse: The search results in a validated Pydantic model
         """
         if "query" not in params:
-            raise ValueError("'query' key is required in parameters dictionary")
+            raise ValueError(
+                "'query' key is required in parameters dictionary"
+            )
 
         query = params["query"]
         use_reranker = params.get("use_reranker", True)
         max_results = params.get("max_results", MAX_RESULTS)
 
         logger.debug(
-            f"run_with_dict method called with query: '{query}', use_reranker: {use_reranker}, max_results: {max_results}"
+            "run_with_dict method called with query: '%s', use_reranker: %s, max_results: %s",
+            query,
+            use_reranker,
+            max_results,
         )
         return self.search_documents(query, use_reranker, max_results)
 

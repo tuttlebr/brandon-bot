@@ -8,7 +8,10 @@ when executing code in threads or async contexts.
 import logging
 from typing import Any, Callable
 
-from streamlit.runtime.scriptrunner import add_script_run_ctx, get_script_run_ctx
+from streamlit.runtime.scriptrunner import (
+    add_script_run_ctx,
+    get_script_run_ctx,
+)
 
 logger = logging.getLogger(__name__)
 

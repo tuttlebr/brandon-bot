@@ -3,7 +3,11 @@ from typing import Any, Dict, List
 
 from models.chat_config import ChatConfig
 from models.chat_message import ChatMessage
-from utils.split_context import END_CONTEXT, START_CONTEXT, extract_context_regex
+from utils.split_context import (
+    END_CONTEXT,
+    START_CONTEXT,
+    extract_context_regex,
+)
 from utils.text_processing import strip_think_tags
 
 
@@ -61,7 +65,9 @@ class ChatService:
             else:
                 cleaned_messages.append(message)
 
-        logging.debug("Cleaned context and thinking tags from previous chat history")
+        logging.debug(
+            "Cleaned context and thinking tags from previous chat history"
+        )
         return cleaned_messages
 
     def prepare_messages_for_api(
@@ -144,7 +150,8 @@ class ChatService:
                     {
                         "role": message["role"],
                         "content": ChatMessage(
-                            message["role"], extract_context_regex(message["content"])
+                            message["role"],
+                            extract_context_regex(message["content"]),
                         ).get_display_content(),
                     }
                 )

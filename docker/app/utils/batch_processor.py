@@ -17,7 +17,9 @@ T = TypeVar('T')
 class BatchProcessor:
     """Generic batch processor for handling large datasets"""
 
-    def __init__(self, batch_size: int = 5, delay_between_batches: float = 0.3):
+    def __init__(
+        self, batch_size: int = 5, delay_between_batches: float = 0.3
+    ):
         """
         Initialize batch processor
 
@@ -52,7 +54,9 @@ class BatchProcessor:
             batch_end = min(i + self.batch_size, total_items)
             batch = items[i:batch_end]
 
-            logger.debug(f"Processing batch {i+1}-{batch_end} of {total_items}")
+            logger.debug(
+                f"Processing batch {i+1}-{batch_end} of {total_items}"
+            )
 
             try:
                 result = await process_func(batch, i, batch_end)

@@ -148,9 +148,7 @@ class PDFAssistantController(ToolController):
                     chunks_text = query_result['formatted_context']
                     result = f"\n{chunks_text}\n"
                 else:
-                    result = (
-                        "No relevant sections found in the document for your query."
-                    )
+                    result = "No relevant sections found in the document for your query."
 
                 return {
                     'operation': 'query',
@@ -164,7 +162,9 @@ class PDFAssistantController(ToolController):
             elif operation == 'info':
                 info = f"PDF: {filename}\n"
                 info += f"Pages: {pdf_data.get('total_pages', 'Unknown')}\n"
-                info += f"Characters: {pdf_data.get('char_count', 'Unknown')}\n"
+                info += (
+                    f"Characters: {pdf_data.get('char_count', 'Unknown')}\n"
+                )
                 info += f"PDF ID: {pdf_id}"
 
                 return {
@@ -176,7 +176,9 @@ class PDFAssistantController(ToolController):
 
             else:
                 # For now, extract and analyze operations just use query
-                return await self.process_async({**params, 'operation': 'query'})
+                return await self.process_async(
+                    {**params, 'operation': 'query'}
+                )
 
         except Exception as e:
             logger.error(f"Error in PDF operation {operation}: {e}")
@@ -275,7 +277,9 @@ class PDFAssistantTool(BaseTool):
             )
             self._initialize_mvc()
         except Exception as e:
-            logger.error(f"Error in PDFAssistantTool.__init__: {e}", exc_info=True)
+            logger.error(
+                f"Error in PDFAssistantTool.__init__: {e}", exc_info=True
+            )
             raise
 
     def get_dynamic_description(self) -> str:

@@ -35,7 +35,9 @@ class ExecutorPool:
             self._executor = concurrent.futures.ThreadPoolExecutor(
                 max_workers=max_workers, thread_name_prefix="shared_executor"
             )
-            logger.info(f"Created shared executor pool with {max_workers} workers")
+            logger.info(
+                f"Created shared executor pool with {max_workers} workers"
+            )
 
             # Register cleanup on exit
             atexit.register(self._cleanup)
