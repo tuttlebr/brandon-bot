@@ -15,7 +15,8 @@ class ChatMessage:
 
         Args:
             role: The role of the message sender (system, user, assistant)
-            content: The content of the message, which can be text or structured content
+            content: The content of the message, which can be text or
+                structured content
         """
         self.role = role
         self.content = content

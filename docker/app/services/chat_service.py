@@ -28,7 +28,8 @@ class ChatService:
         self, messages: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """
-        Clean up context information and thinking tags from all previous messages in chat history
+        Clean up context information and thinking tags from all previous
+        messages in chat history
 
         Args:
             messages: List of message dictionaries
@@ -40,7 +41,8 @@ class ChatService:
 
         for message in messages:
             if message["role"] != "system":  # Preserve system prompt as is
-                # Check if this is an image message - if so, skip context cleaning
+                # Check if this is an image message - if so, skip
+                # context cleaning
                 if (
                     isinstance(message["content"], dict)
                     and message["content"].get("type") == "image"
@@ -89,9 +91,11 @@ class ChatService:
         for msg in messages:
             chat_message = ChatMessage(msg["role"], msg["content"])
 
-            # For image messages, only include the text content, not the image data
+            # For image messages, only include the text content, not the
+            # image data
             if chat_message.is_image_message():
-                # Only include the text confirmation message, not the image data
+                # Only include the text confirmation message, not the
+                # image data
                 text_content = chat_message.get_display_content()
                 self.verbose_messages.append(
                     {"role": msg["role"], "content": text_content}
@@ -102,10 +106,13 @@ class ChatService:
                     {"role": msg["role"], "content": msg["content"]}
                 )
 
-        # PDF context is now handled by LLM service via pdf_assistant tool calls
-        # The tool response will be captured and displayed in the tool context expander
+        # PDF context is now handled by LLM service via pdf_assistant
+        # tool calls
+        # The tool response will be captured and displayed in the tool
+        # context expander
 
-        # Add any explicitly provided context to the last user message if provided
+        # Add any explicitly provided context to the last user message
+        # if provided
         if context and self.verbose_messages:
             # Find the last user message
             for i in range(len(self.verbose_messages) - 1, -1, -1):

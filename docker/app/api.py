@@ -1,9 +1,9 @@
 """
 RESTful API for the BrandonBot chatbot service
 
-This module provides a FastAPI-based REST API that exposes the chatbot functionality
-through a single /agent endpoint, accepting OpenAI-compatible chat completion requests
-and returning responses in the same format.
+This module provides a FastAPI-based REST API that exposes the chatbot
+functionality through a single /agent endpoint, accepting OpenAI-compatible
+chat completion requests and returning responses in the same format.
 """
 
 import logging
@@ -306,7 +306,7 @@ class APIChatbotService:
         """Handle non-streaming chat completion response"""
 
         try:
-            # Generate response directly using LLM service (API-specific approach)
+            # Generate response directly using LLM service (API-specific)
             full_response = await self._generate_response_async(
                 prepared_messages, model_name, model_type
             )
@@ -369,7 +369,10 @@ class APIChatbotService:
 
         except Exception as e:
             logger.error("Error in async response generation: %s", e)
-            return "I apologize, but I encountered an error generating the response. Please try again."
+            return (
+                "I apologize, but I encountered an error generating the "
+                "response. Please try again."
+            )
 
     async def _handle_streaming_response(
         self,
@@ -504,8 +507,8 @@ async def chat_completion_with_session(
     """
     Chat completion endpoint with session ID
 
-    Accepts OpenAI-compatible chat completion requests with a specific session ID
-    for conversation continuity.
+    Accepts OpenAI-compatible chat completion requests with a specific session
+    ID for conversation continuity.
     """
     return await api_service.process_chat_completion(request, session_id)
 

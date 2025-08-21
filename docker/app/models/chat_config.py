@@ -97,7 +97,8 @@ class ChatConfig:
 
     @classmethod
     def from_environment(cls) -> "ChatConfig":
-        """Create configuration from environment variables using centralized config"""
+        """Create configuration from environment variables using
+        centralized config"""
         st.set_page_config(
             page_title=config.env.BOT_TITLE,
             page_icon=config.ui.ASSISTANT_AVATAR_PATH,

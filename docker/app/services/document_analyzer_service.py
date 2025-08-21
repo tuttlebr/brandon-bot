@@ -61,7 +61,8 @@ class DocumentAnalyzerService:
 
             if estimated_tokens > max_tokens:
                 logger.warning(
-                    f"Document too large ({estimated_tokens} estimated tokens), processing in chunks"
+                    f"Document too large ({estimated_tokens} estimated "
+                    f"tokens), processing in chunks"
                 )
                 return await self._analyze_large_document_chunked(
                     document_text, instructions, document_type, filename
@@ -80,9 +81,17 @@ class DocumentAnalyzerService:
             )
 
             if filename:
-                user_message = f"Based on the document '{filename}', please answer this question: {instructions}\n\nDocument:\n{document_text}"
+                user_message = (
+                    f"Based on the document '{filename}', please answer "
+                    f"this question: {instructions}\n\nDocument:\n"
+                    f"{document_text}"
+                )
             else:
-                user_message = f"Please analyze the following document and answer this question: {instructions}\n\nDocument:\n{document_text}"
+                user_message = (
+                    f"Please analyze the following document and answer "
+                    f"this question: {instructions}\n\nDocument:\n"
+                    f"{document_text}"
+                )
 
             messages = [
                 {"role": "system", "content": system_prompt},
@@ -105,7 +114,11 @@ class DocumentAnalyzerService:
             return {
                 "success": True,
                 "result": result,
-                "processing_notes": f"Document analysis completed for query: {instructions[:100]}{'...' if len(instructions) > 100 else ''}",
+                "processing_notes": (
+                    f"Document analysis completed for query: "
+                    f"{instructions[:100]}"
+                    f"{'...' if len(instructions) > 100 else ''}"
+                ),
             }
 
         except Exception as e:
@@ -140,7 +153,8 @@ class DocumentAnalyzerService:
 
             if estimated_tokens > max_tokens:
                 logger.warning(
-                    f"Document too large ({estimated_tokens} estimated tokens), analyzing in chunks"
+                    f"Document too large ({estimated_tokens} estimated "
+                    f"tokens), analyzing in chunks"
                 )
                 return await self._analyze_large_document_chunked(
                     document_text, instructions, document_type, filename
@@ -159,9 +173,17 @@ class DocumentAnalyzerService:
             )
 
             if filename:
-                user_message = f"Based on the document '{filename}', please answer this question: {instructions}\n\nDocument:\n{document_text}"
+                user_message = (
+                    f"Based on the document '{filename}', please answer "
+                    f"this question: {instructions}\n\nDocument:\n"
+                    f"{document_text}"
+                )
             else:
-                user_message = f"Please analyze the following document and answer this question: {instructions}\n\nDocument:\n{document_text}"
+                user_message = (
+                    f"Please analyze the following document and answer "
+                    f"this question: {instructions}\n\nDocument:\n"
+                    f"{document_text}"
+                )
 
             messages = [
                 {"role": "system", "content": system_prompt},
@@ -203,7 +225,11 @@ class DocumentAnalyzerService:
             return {
                 "success": True,
                 "result": collected_result,
-                "processing_notes": f"Document analysis completed for query: {instructions[:100]}{'...' if len(instructions) > 100 else ''}",
+                "processing_notes": (
+                    f"Document analysis completed for query: "
+                    f"{instructions[:100]}"
+                    f"{'...' if len(instructions) > 100 else ''}"
+                ),
             }
 
         except Exception as e:
@@ -218,7 +244,8 @@ class DocumentAnalyzerService:
         filename: Optional[str] = None,
     ) -> Dict[str, any]:
         """
-        Analyze a large document by splitting it into chunks and processing hierarchically
+        Analyze a large document by splitting it into chunks and processing
+        hierarchically
 
         Args:
             document_text: The document text to analyze
@@ -243,17 +270,26 @@ class DocumentAnalyzerService:
             # Process all chunks concurrently
             async def process_chunk_async(i: int, chunk: str):
                 try:
-                    chunk_instructions = f"{instructions} (Processing section {i+1} of {len(chunks)})"
+                    chunk_instructions = (
+                        f"{instructions} "
+                        f"(Processing section {i+1} of {len(chunks)})"
+                    )
                     chunk_result = await self._analyze_single_chunk(
                         chunk, chunk_instructions, document_type, filename
                     )
                     if chunk_result["success"]:
                         return chunk_result["result"]
                     else:
-                        return f"Section {i+1} processing failed: {chunk_result.get('error', 'Unknown error')}"
+                        return (
+                            f"Section {i+1} processing failed: "
+                            f"{chunk_result.get('error', 'Unknown error')}"
+                        )
                 except Exception as e:
                     logger.error(f"Error processing chunk {i+1}: {e}")
-                    return f"Section {i+1} processing failed due to error: {str(e)}"
+                    return (
+                        f"Section {i+1} processing failed due to error: "
+                        f"{str(e)}"
+                    )
 
             # Run all chunk processing tasks concurrently
             chunk_results_raw = await asyncio.gather(

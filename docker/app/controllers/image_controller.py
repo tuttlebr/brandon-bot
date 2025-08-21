@@ -26,7 +26,8 @@ class ImageController:
 
         Args:
             config_obj: Application configuration
-            message_controller: Message controller for adding responses to history
+            message_controller: Message controller for adding responses to
+                history
             session_controller: Session controller for image storage
         """
         self.config_obj = config_obj
@@ -58,7 +59,10 @@ class ImageController:
                 return False
 
         except Exception as e:
-            error_msg = f"❌ **Image Processing Error:** An unexpected error occurred while processing your image. Please try again."
+            error_msg = (
+                f"❌ **Image Processing Error:** An unexpected error "
+                f"occurred while processing your image. Please try again."
+            )
             logging.error("Unexpected image processing error: %s", e)
             self._display_error_message(error_msg)
             return False
@@ -98,7 +102,10 @@ class ImageController:
                 return (
                     False,
                     {
-                        "error": f"Image file too large. Maximum size: {config.file_processing.MAX_IMAGE_SIZE // (1024*1024)}MB"
+                        "error": (
+                            f"Image file too large. Maximum size: "
+                            f"{config.file_processing.MAX_IMAGE_SIZE // (1024*1024)}MB"
+                        )
                     },
                 )
 
@@ -118,7 +125,8 @@ class ImageController:
                     original_width > max_dimension
                     or original_height > max_dimension
                 ):
-                    # Calculate scale factor to fit longest side within max_dimension
+                    # Calculate scale factor to fit longest side within
+                    # max_dimension
                     scale = max_dimension / max(
                         original_width, original_height
                     )
@@ -169,7 +177,8 @@ class ImageController:
                     )
                 else:
                     logging.debug(
-                        "Uploaded image '%s' already within size limit (%sx%s)",
+                        "Uploaded image '%s' already within size limit "
+                        "(%sx%s)",
                         uploaded_file.name,
                         original_width,
                         original_height,
@@ -274,7 +283,8 @@ class ImageController:
                 st.session_state.current_image_id = image_id
 
                 logging.debug(
-                    "Stored image in session state - filename: %s, data length: %s",
+                    "Stored image in session state - "
+                    "filename: %s, data length: %s",
                     filename,
                     len(image_data['image_data']),
                 )
@@ -303,7 +313,10 @@ class ImageController:
                     st.markdown(user_message)
 
                 # Add assistant response
-                assistant_message = f"I've received your image **{filename}**. What would you like to know about it?"
+                assistant_message = (
+                    f"I've received your image **{filename}**. "
+                    f"What would you like to know about it?"
+                )
                 self.message_controller.safe_add_message_to_history(
                     "assistant", assistant_message
                 )
@@ -337,7 +350,10 @@ class ImageController:
         Args:
             error_result: Error information dictionary
         """
-        error_msg = f"❌ **Image Processing Error:** {error_result.get('error', 'Unknown error')}"
+        error_msg = (
+            f"❌ **Image Processing Error:** "
+            f"{error_result.get('error', 'Unknown error')}"
+        )
         self._display_error_message(error_msg)
 
     def _display_error_message(self, error_msg: str):
@@ -373,7 +389,8 @@ class ImageController:
             == uploaded_file.name
         ):
             logging.info(
-                "Image '%s' is already being processed, skipping duplicate processing",
+                "Image '%s' is already being processed, "
+                "skipping duplicate processing",
                 uploaded_file.name,
             )
             return False

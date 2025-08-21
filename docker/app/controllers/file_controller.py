@@ -134,15 +134,22 @@ class FileController:
                 return (
                     False,
                     {
-                        "error": f"PDF file too large. Maximum size: {config.file_processing.MAX_PDF_SIZE // (1024*1024)}MB"
+                        "error": (
+                            f"PDF file too large. Maximum size: "
+                            f"{config.file_processing.MAX_PDF_SIZE // (1024*1024)}MB"
+                        )
                     },
                 )
 
-            # Make request to PDF processing server using configured endpoint and timeout
+            # Make request to PDF processing server using configured
+            # endpoint and timeout
             nvingest_endpoint = config.env.NVINGEST_ENDPOINT
             if not nvingest_endpoint:
                 return False, {
-                    "error": "PDF processing service not configured (NVINGEST_ENDPOINT not set)"
+                    "error": (
+                        "PDF processing service not configured "
+                        "(NVINGEST_ENDPOINT not set)"
+                    )
                 }
 
             with open(temp_file_path, "rb") as pdf_file:
@@ -161,7 +168,9 @@ class FileController:
             # Validate response structure
             if not isinstance(pdf_data, dict) or "pages" not in pdf_data:
                 return False, {
-                    "error": "Invalid response format from PDF processing server"
+                    "error": (
+                        "Invalid response format from PDF processing server"
+                    )
                 }
 
             pages = pdf_data.get("pages", [])
@@ -182,7 +191,10 @@ class FileController:
 
         except requests.exceptions.Timeout:
             return False, {
-                "error": "PDF processing timed out. The file may be too large or complex. Please try a smaller file."
+                "error": (
+                    "PDF processing timed out. The file may be too large "
+                    "or complex. Please try a smaller file."
+                )
             }
         except requests.exceptions.RequestException as e:
             logging.error("Request error during PDF processing: %s", e)

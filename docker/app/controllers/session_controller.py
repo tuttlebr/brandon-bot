@@ -69,7 +69,9 @@ class SessionController:
                 processing_status=ProcessingStatus.IDLE,
                 llm_model_name=self.config_obj.llm_model_name,
                 fast_llm_model_name=self.config_obj.fast_llm_model_name,
-                intelligent_llm_model_name=self.config_obj.intelligent_llm_model_name,
+                intelligent_llm_model_name=(
+                    self.config_obj.intelligent_llm_model_name
+                ),
                 vlm_model_name=self.config_obj.vlm_model_name,
             )
 
@@ -83,7 +85,8 @@ class SessionController:
             )
             if not validation_result.is_valid:
                 logging.warning(
-                    f"Session validation warnings: {validation_result.get_error_messages()}"
+                    f"Session validation warnings: "
+                    f"{validation_result.get_error_messages()}"
                 )
 
             # Store models in session state
@@ -93,7 +96,8 @@ class SessionController:
             if not hasattr(st.session_state, "current_page"):
                 st.session_state.current_page = config.ui.CURRENT_PAGE_DEFAULT
                 logging.info(
-                    f"Initialized current_page to {config.ui.CURRENT_PAGE_DEFAULT}"
+                    f"Initialized current_page to "
+                    f"{config.ui.CURRENT_PAGE_DEFAULT}"
                 )
 
             # Initialize system prompt with full tools list
@@ -102,7 +106,8 @@ class SessionController:
 
             if len(get_all_tool_definitions()) == 0:
                 logging.info(
-                    "No tools found when initializing session, attempting to initialize tools"
+                    "No tools found when initializing session, "
+                    "attempting to initialize tools"
                 )
                 from tools.initialize_tools import initialize_all_tools
 
@@ -110,7 +115,8 @@ class SessionController:
 
             st.session_state.system_prompt = get_system_prompt()
             logging.info(
-                f"Initialized system prompt with available tools ({len(st.session_state.system_prompt)} chars)"
+                f"Initialized system prompt with available tools "
+                f"({len(st.session_state.system_prompt)} chars)"
             )
 
             # Cache models
@@ -444,7 +450,8 @@ class SessionController:
             system_prompt = get_system_prompt()
             st.session_state.system_prompt = system_prompt
             logging.info(
-                "System prompt not found in session state, initialized with tools list"
+                "System prompt not found in session state, "
+                "initialized with tools list"
             )
 
         return system_prompt
@@ -537,7 +544,8 @@ class SessionController:
 
         # Initialize messages if not present
         if not hasattr(st.session_state, "messages"):
-            # Use system prompt from session state if available, otherwise get it
+            # Use system prompt from session state if available,
+            # otherwise get it
             system_prompt = getattr(st.session_state, 'system_prompt', None)
             if not system_prompt:
                 system_prompt = get_system_prompt()

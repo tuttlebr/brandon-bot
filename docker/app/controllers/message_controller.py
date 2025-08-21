@@ -23,7 +23,8 @@ class MessageController:
         Args:
             config_obj: Application configuration
             chat_service: Chat service for message operations
-            session_controller: Session controller for safe state management (optional)
+            session_controller: Session controller for safe state management
+                (optional)
         """
         self.config_obj = config_obj
         self.chat_service = chat_service
@@ -55,7 +56,8 @@ class MessageController:
 
     def contains_tool_call_instructions(self, content: str) -> bool:
         """
-        Check if content contains custom tool call instructions (optimized for speed)
+        Check if content contains custom tool call instructions
+        (optimized for speed)
 
         Args:
             content: The content to check
@@ -77,7 +79,8 @@ class MessageController:
         self, messages: List[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """
-        Clean existing chat history to remove any messages containing tool call instructions
+        Clean existing chat history to remove any messages containing
+        tool call instructions
 
         Args:
             messages: List of messages to clean
@@ -102,7 +105,8 @@ class MessageController:
             # Check if message contains tool call instructions
             if self.contains_tool_call_instructions(content):
                 logging.warning(
-                    f"Removing {message.get('role', 'unknown')} message with tool call instructions from chat history"
+                    f"Removing {message.get('role', 'unknown')} message "
+                    f"with tool call instructions from chat history"
                 )
                 continue
 
@@ -111,7 +115,8 @@ class MessageController:
 
         if len(cleaned_messages) != original_count:
             logging.info(
-                f"Cleaned chat history: {original_count} -> {len(cleaned_messages)} messages"
+                f"Cleaned chat history: {original_count} -> "
+                f"{len(cleaned_messages)} messages"
             )
 
         return cleaned_messages
@@ -122,7 +127,8 @@ class MessageController:
 
         Args:
             role: The role of the message sender
-            content: The content of the message (can be string, dict for images, etc.)
+            content: The content of the message (can be string, dict for
+                images, etc.)
 
         Returns:
             True if message was added, False if rejected
@@ -134,7 +140,8 @@ class MessageController:
 
             if not sanitized_content:
                 logging.warning(
-                    f"Attempted to add empty {role} message to chat history, skipping"
+                    f"Attempted to add empty {role} message to chat "
+                    f"history, skipping"
                 )
                 return False
 
@@ -143,28 +150,33 @@ class MessageController:
                 sanitized_content
             ):
                 logging.warning(
-                    f"Attempted to add {role} message with tool call instructions to chat history, skipping"
+                    f"Attempted to add {role} message with tool call "
+                    f"instructions to chat history, skipping"
                 )
                 return False
 
             # Strip think tags before adding to history
             content = strip_think_tags(sanitized_content).strip()
         elif isinstance(content, dict):
-            # Dict content (like image messages) - ensure it has meaningful data
+            # Dict content (like image messages) - ensure it has
+            # meaningful data
             if not content:
                 logging.warning(
-                    f"Attempted to add empty dict {role} message to chat history, skipping"
+                    f"Attempted to add empty dict {role} message to "
+                    f"chat history, skipping"
                 )
                 return False
         else:
             # Other content types - ensure they're truthy
             if not content:
                 logging.warning(
-                    f"Attempted to add empty {role} message to chat history, skipping"
+                    f"Attempted to add empty {role} message to chat "
+                    f"history, skipping"
                 )
                 return False
 
-        # Add the validated message to history using session controller if available
+        # Add the validated message to history using session controller
+        # if available
         if hasattr(self, 'session_controller') and self.session_controller:
             self.session_controller.add_message(role, content)
         else:
@@ -185,7 +197,8 @@ class MessageController:
             text: The response text
             role: The role of the message sender
         """
-        # Clean up message format before saving using session controller if available
+        # Clean up message format before saving using session controller
+        # if available
         if hasattr(self, 'session_controller') and self.session_controller:
             messages = self.session_controller.get_messages()
             cleaned_messages = self.chat_service.drop_verbose_messages_context(

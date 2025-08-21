@@ -46,8 +46,9 @@ class ResponseController:
         self, prepared_messages: List[Dict[str, Any]]
     ):
         """
-        Generate and display streaming response, returning cleanup function for later execution
-        This allows the spinner to close immediately after response is displayed
+        Generate and display streaming response, returning cleanup function
+        for later execution. This allows the spinner to close immediately
+        after response is displayed
 
         Args:
             prepared_messages: Prepared messages for API call
@@ -85,7 +86,8 @@ class ResponseController:
         model_name = self.session_controller.get_model_name(model_type)
 
         logging.info(
-            "Generating LLM response with simplified streaming (model_type: %s, model: %s)",
+            "Generating LLM response with simplified streaming "
+            "(model_type: %s, model: %s)",
             model_type,
             model_name,
         )
@@ -107,7 +109,7 @@ class ResponseController:
                         icon=None,  # No icon since we're inside chat message
                         dot_size=8,
                         dot_gap=8,
-                        animation_height=30,  # Smaller height for inline display
+                        animation_height=30,  # Smaller height
                     ),
                     height=40,  # Compact height for inline display
                 )
@@ -126,7 +128,10 @@ class ResponseController:
 
             except Exception as e:
                 logging.error("Error in streaming: %s", e)
-                error_message = "I apologize, but I encountered an error generating the response."
+                error_message = (
+                    "I apologize, but I encountered an error "
+                    "generating the response."
+                )
                 message_placeholder.markdown(error_message)
                 full_response = error_message
 
@@ -139,7 +144,8 @@ class ResponseController:
                     full_response, ui_elements, message_placeholder
                 )
             else:
-                # Check for single image generation response (backward compatibility)
+                # Check for single image generation response
+                # (backward compatibility)
                 image_response = self._check_for_image_generation_response()
 
                 if image_response:
@@ -147,7 +153,8 @@ class ResponseController:
                     message_placeholder.empty()
                     self._display_image_generation_response(image_response)
                     self._handle_tool_context()
-                    full_response = ""  # No text response to add to history for image generation
+                    # No text response to add to history for image gen
+                    full_response = ""
                 else:
                     # Handle tool context for text response
                     self._handle_tool_context()
@@ -220,7 +227,8 @@ class ResponseController:
         return full_response
 
     def _display_response(self):
-        """Handle post-streaming tasks like adding to chat history and cleanup"""
+        """Handle post-streaming tasks like adding to chat history
+        and cleanup"""
         # The streaming display is now handled in _generate_response_chunks
         # This method handles post-streaming tasks
 
@@ -358,7 +366,8 @@ class ResponseController:
                 image_data, enhanced_prompt, original_prompt
             )
 
-            # Store the generated image in session state for easy access by other tools
+            # Store the generated image in session state for easy
+            # access by other tools
             st.session_state.current_image_base64 = image_data
             st.session_state.current_image_filename = (
                 f"generated_{image_id}.png"
@@ -366,7 +375,8 @@ class ResponseController:
             st.session_state.current_image_id = image_id
 
             logging.info(
-                "Stored generated image in session state - image_id: %s, data length: %s",
+                "Stored generated image in session state - "
+                "image_id: %s, data length: %s",
                 image_id,
                 len(image_data),
             )
@@ -375,15 +385,19 @@ class ResponseController:
             history_message = {
                 "type": "image",
                 "image_id": image_id,
-                # "text": f"🎨 Generated image with prompt: **{enhanced_prompt}**",
+                # "text": (
+                #     f"🎨 Generated image with prompt: "
+                #     f"**{enhanced_prompt}**"
+                # ),
                 "enhanced_prompt": enhanced_prompt,
                 "original_prompt": original_prompt,
             }
 
             if enhanced_prompt != original_prompt and original_prompt:
-                history_message[
-                    "text"
-                ] += f"\n\n*Enhanced from original request: \"{original_prompt}\"*"
+                history_message["text"] += (
+                    f"\n\n*Enhanced from original request: "
+                    f'"{original_prompt}"*'
+                )
 
             # Add image metadata to chat history
             self.message_controller.safe_add_message_to_history(
@@ -434,7 +448,8 @@ class ResponseController:
 
     def _extract_tool_context_from_llm_responses(self) -> str:
         """
-        Extract context from the LLM service's last tool responses and recent tool messages in chat history
+        Extract context from the LLM service's last tool responses and
+        recent tool messages in chat history
 
         Returns:
             Formatted context string from tool responses, empty if none found
@@ -464,7 +479,8 @@ class ResponseController:
                         logging.error("Error extracting tool context: %s", e)
                         continue
 
-        # Also check recent tool messages in chat history (e.g., injected PDF search results)
+        # Also check recent tool messages in chat history
+        # (e.g., injected PDF search results)
         messages = self.session_controller.get_messages()
         # Look for tool messages after the last user message
         last_user_idx = -1
@@ -497,7 +513,8 @@ class ResponseController:
 
                     except Exception as e:
                         logging.error(
-                            "Error extracting tool context from chat history: %s",
+                            "Error extracting tool context from "
+                            "chat history: %s",
                             e,
                         )
                         continue
@@ -529,7 +546,8 @@ class ResponseController:
         Returns:
             Formatted context string or empty string
         """
-        # Since we now only process regular tool responses, not direct responses
+        # Since we now only process regular tool responses,
+        # not direct responses
         tool_content = tool_response.get("content", "")
 
         if isinstance(tool_content, str):
@@ -635,7 +653,10 @@ class ResponseController:
                         config.tool_context.CONTEXT_TRUNCATION_SUFFIX
                     )
 
-                return f"**Web Content Extracted from:** {url}\n\n{content_preview}"
+                return (
+                    f"**Web Content Extracted from:** {url}\n\n"
+                    f"{content_preview}"
+                )
             elif not success:
                 error_msg = tool_data.get("error_message", "Extraction failed")
                 return (
@@ -702,7 +723,10 @@ class ResponseController:
 
             return "\n\n".join(context_parts)
         else:
-            return f"**PDF Query Result:** {tool_data.get('message', 'No content found')}"
+            return (
+                f"**PDF Query Result:** "
+                f"{tool_data.get('message', 'No content found')}"
+            )
 
     def _get_ui_elements_from_llm_service(self) -> List[Dict[str, Any]]:
         """
@@ -761,7 +785,8 @@ class ResponseController:
                             )
                         )
 
-                        # Store the generated image in session state for easy access by other tools
+                        # Store the generated image in session state
+                        # for easy access by other tools
                         st.session_state.current_image_base64 = image_data[
                             "image_data"
                         ]
@@ -771,7 +796,8 @@ class ResponseController:
                         st.session_state.current_image_id = image_id
 
                         logging.info(
-                            "Stored generated image in session state - image_id: %s, data length: %s",
+                            "Stored generated image in session state - "
+                            "image_id: %s, data length: %s",
                             image_id,
                             len(image_data['image_data']),
                         )
@@ -780,7 +806,10 @@ class ResponseController:
                         history_message = {
                             "type": "image",
                             "image_id": image_id,
-                            # "text": f"Generated image with prompt: {image_data['enhanced_prompt']}",
+                            # "text": (
+                            #     f"Generated image with prompt: "
+                            #     f"{image_data['enhanced_prompt']}"
+                            # ),
                             "enhanced_prompt": image_data["enhanced_prompt"],
                             "original_prompt": image_data["original_prompt"],
                         }
@@ -803,7 +832,8 @@ class ResponseController:
         error_msg = f"Error generating response: ```json\n{error}\n```"
         logging.error(error_msg)
         self.message_controller.update_chat_history(
-            "I apologize, but I encountered an error while generating a response.",
+            "I apologize, but I encountered an error while "
+            "generating a response.",
             "assistant",
         )
         self.session_controller.set_processing_state(False)

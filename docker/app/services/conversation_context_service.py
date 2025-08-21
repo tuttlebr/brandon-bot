@@ -71,7 +71,8 @@ class ConversationContextService:
         # Check if we should inject context
         if not self.should_inject_context(messages):
             logger.debug(
-                "Conversation context injection not needed - insufficient messages"
+                "Conversation context injection not needed - insufficient "
+                "messages"
             )
             return messages
 
@@ -120,7 +121,8 @@ class ConversationContextService:
                 enhanced_messages.append(msg)
 
         logger.info(
-            f"Injected conversation context summary ({len(context_summary)} chars)"
+            f"Injected conversation context summary "
+            f"({len(context_summary)} chars)"
         )
         return enhanced_messages
 
@@ -148,7 +150,8 @@ class ConversationContextService:
                 if msg.get("role") not in ["system", "tool"]
             ]
 
-            # Apply max turns limit (convert turns to messages: 1 turn = 2 messages)
+            # Apply max turns limit (convert turns to messages: 1 turn = 2
+            # messages)
             max_messages = max_turns * 2
             if len(conversation_messages) > max_messages:
                 limited_messages = conversation_messages[-max_messages:]
@@ -160,8 +163,12 @@ class ConversationContextService:
                 "query": "conversation_summary",
                 "max_messages": len(limited_messages),
                 "messages": limited_messages,
-                "include_document_content": False,  # We handle documents separately
-                "but_why": "An integer from 1-5 where a larger number indicates confidence this is the right tool to help the user.",
+                "include_document_content": False,  # We handle documents
+                # separately
+                "but_why": (
+                    "An integer from 1-5 where a larger number indicates "
+                    "confidence this is the right tool to help the user."
+                ),
             }
 
             # Execute the context analysis using the tool registry
@@ -172,37 +179,37 @@ class ConversationContextService:
             if response and response.success:
                 return response.analysis
             else:
-                logger.error(
-                    f"Context analysis failed: {response.error_message if response else 'Unknown error'}"
-                )
+                logger.warning("Context analysis failed")
                 return None
 
         except Exception as e:
-            logger.error(f"Error generating conversation summary: {e}")
+            logger.error(f"Error generating conversation context: {e}")
             return None
 
     def _create_context_system_message(
         self, context_summary: str, total_messages: int
     ) -> Dict[str, str]:
         """
-        Create a system message containing conversation context
+        Create a system message with conversation context
 
         Args:
-            context_summary: The conversation summary
+            context_summary: Generated conversation summary
             total_messages: Total number of messages in conversation
 
         Returns:
-            System message with conversation context
+            System message with context
         """
-        content = f"""## Conversation Context
-You are continuing an ongoing conversation. Here's a summary of the discussion so far:
+        return {
+            "role": "system",
+            "content": f"""## Conversation Context
+
+You are continuing an ongoing conversation. Here's a summary of the
+discussion so far:
 
 {context_summary}
 
 Total messages in conversation: {total_messages}
-Context window: Last {config.llm.SLIDING_WINDOW_MAX_TURNS} turns
 
-Please maintain continuity with the previous discussion and refer to earlier topics when relevant.
----"""
-
-        return {"role": "system", "content": content}
+Please maintain continuity with the previous discussion and refer to
+earlier topics when relevant.""",
+        }

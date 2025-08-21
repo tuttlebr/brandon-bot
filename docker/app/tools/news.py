@@ -71,11 +71,19 @@ class NewsTool(BaseTool):
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "The search query for recent news, breaking news, or current events (only use for news-related topics)",
+                            "description": (
+                                "The search query for recent news, breaking "
+                                "news, or current events (only use for "
+                                "news-related topics)"
+                            ),
                         },
                         "but_why": {
                             "type": "integer",
-                            "description": "An integer from 1-5 where a larger number indicates confidence this is the right tool to help the user.",
+                            "description": (
+                                "An integer from 1-5 where a larger number "
+                                "indicates confidence this is the right tool "
+                                "to help the user."
+                            ),
                         },
                     },
                     "required": ["query", "but_why"],
@@ -128,7 +136,7 @@ class NewsTool(BaseTool):
 
                 # Update with extracted content if successful
                 for extract_result in extract_results:
-                    # Handle both WebExtractResponse and StreamingExtractResponse
+                    # Handle WebExtractResponse and StreamingExtractResponse
                     content = None
                     if extract_result.success:
                         if (
@@ -141,7 +149,7 @@ class NewsTool(BaseTool):
                             hasattr(extract_result, "content_generator")
                             and extract_result.content_generator
                         ):
-                            # StreamingExtractResponse - we need to collect the content
+                            # StreamingExtractResponse - collect the content
                             try:
                                 import asyncio
 
@@ -186,7 +194,6 @@ class NewsTool(BaseTool):
 
             except Exception as e:
                 logger.error("Error in fallback extraction: %s", e)
-                # Continue without extracted content - don't fail the entire search
 
             return fallback_results
 
@@ -223,7 +230,7 @@ class NewsTool(BaseTool):
                         hasattr(extract_result, "content_generator")
                         and extract_result.content_generator
                     ):
-                        # StreamingExtractResponse - we need to collect the content
+                        # StreamingExtractResponse - collect the content
                         try:
                             import asyncio
 
@@ -318,7 +325,8 @@ class NewsTool(BaseTool):
 
     def _clean_content(self, content: str) -> str:
         """
-        Clean content text by removing formatting artifacts and ensuring plain text display
+        Clean content text by removing formatting artifacts and ensuring
+        plain text display
 
         Args:
             content: Raw content string from search results

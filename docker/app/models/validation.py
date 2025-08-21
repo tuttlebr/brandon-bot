@@ -117,7 +117,8 @@ class UserValidator(ModelValidator):
         # Business rule validations
         if user.message_count > user.preferences.message_limit:
             result.add_error(
-                f"Message count ({user.message_count}) exceeds limit ({user.preferences.message_limit})",
+                f"Message count ({user.message_count}) exceeds limit "
+                f"({user.preferences.message_limit})",
                 "message_count",
                 "BUSINESS_RULE",
             )
@@ -264,7 +265,8 @@ class CrossModelValidator:
         # Validate message count consistency
         if user.message_count > session.message_count:
             result.add_warning(
-                "User message count exceeds session message count - possible data sync issue"
+                "User message count exceeds session message count - "
+                "possible data sync issue"
             )
 
         return result
