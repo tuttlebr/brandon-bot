@@ -191,11 +191,9 @@ class ImageController:
                 image_base64 = base64.b64encode(image_bytes).decode("utf-8")
 
                 # Verify the dimensions of the final image
-                from io import BytesIO as IOByteIO
-
                 from PIL import Image as PILImage
 
-                verify_img = PILImage.open(IOByteIO(image_bytes))
+                verify_img = PILImage.open(BytesIO(image_bytes))
                 verify_width, verify_height = verify_img.size
                 logging.debug(
                     "Final image dimensions after processing: %sx%s",

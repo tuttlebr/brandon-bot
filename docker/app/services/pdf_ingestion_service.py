@@ -10,8 +10,7 @@ Handles the ingestion of PDF documents into the system, including:
 
 import logging
 import uuid
-from io import BinaryIO
-from typing import Any, Dict
+from typing import Any, BinaryIO, Dict
 
 from models.chat_config import ChatConfig
 from services.file_storage_service import FileStorageService
@@ -50,7 +49,8 @@ class PDFIngestionService:
         metadata.
 
         Args:
-            pdf_data: Extracted PDF data from NVIngest containing pages with text.
+            pdf_data: Extracted PDF data from NVIngest containing pages with
+                text.
             filename: Original filename.
             session_id: User session identifier (for storage scoping).
             pdf_content: Optional PDF file content for content-based ID
@@ -108,7 +108,8 @@ class PDFIngestionService:
                             pdf_id
                         )
                         logger.info(
-                            f"Deleted {deleted} existing chunks for PDF {pdf_id}"
+                            f"Deleted {deleted} existing chunks for PDF "
+                            f"{pdf_id}"
                         )
                     except Exception as e:
                         logger.warning(
