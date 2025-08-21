@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 # Constants
 DEFAULT_PROMPT = "A simple coffee shop interior"
 DEFAULT_MODE = "base"
-DEFAULT_CFG_SCALE = 3.0
+DEFAULT_CFG_SCALE = 3.5
 DEFAULT_WIDTH = 512
 DEFAULT_HEIGHT = 512
 DEFAULT_SEED = 42

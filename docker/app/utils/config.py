@@ -122,7 +122,7 @@ class LLMConfig:
     """LLM service configuration"""
 
     # Default model parameters
-    DEFAULT_TEMPERATURE: float = 0.0
+    DEFAULT_TEMPERATURE: float = 0.6
     DEFAULT_TOP_P: float = 0.95
     DEFAULT_FREQUENCY_PENALTY: float = 0.0
     DEFAULT_PRESENCE_PENALTY: float = 0.0
@@ -141,7 +141,7 @@ class LLMConfig:
     AUTO_INJECT_CONVERSATION_CONTEXT: bool = (
         True  # Automatically inject conversation context
     )
-    MIN_TURNS_FOR_CONTEXT_INJECTION: int = 7  # Minimum turns before injecting context
+    MIN_TURNS_FOR_CONTEXT_INJECTION: int = 1  # Minimum turns before injecting context
 
 
 @dataclass

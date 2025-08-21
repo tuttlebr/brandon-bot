@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 # Aspect ratio mappings to dimensions
 ASPECT_RATIO_MAPPINGS = {
-    "square": (1024, 1024),  # 1:1 ratio
+    "square": (768, 768),  # 1:1 ratio
     "portrait": (768, 1024),  # 3:4 ratio (vertical)
     "landscape": (1024, 768),  # 4:3 ratio (horizontal)
 }

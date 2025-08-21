@@ -76,7 +76,7 @@ class ToolExecutionService:
         messages: Optional[List[Dict[str, Any]]] = None,
     ) -> List[Dict[str, Any]]:
         """Execute tools in parallel"""
-        logger.info(f"Executing {len(tool_calls)} tools in parallel")
+        logger.info("Executing %d tools in parallel", len(tool_calls))
 
         is_multi_tool = len(tool_calls) > 1
         tasks = []
@@ -92,7 +92,7 @@ class ToolExecutionService:
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 tool_name = tool_calls[i].get("name", "unknown")
-                logger.error(f"Tool {tool_name} failed: {result}")
+                logger.error("Tool %s failed: %s", tool_name, result)
                 responses.append(
                     {
                         "role": "tool",
@@ -113,7 +113,7 @@ class ToolExecutionService:
         messages: Optional[List[Dict[str, Any]]] = None,
     ) -> List[Dict[str, Any]]:
         """Execute tools sequentially"""
-        logger.info(f"Executing {len(tool_calls)} tools sequentially")
+        logger.info("Executing %d tools sequentially", len(tool_calls))
 
         is_multi_tool = len(tool_calls) > 1
         responses = []
@@ -131,7 +131,7 @@ class ToolExecutionService:
 
             except Exception as e:
                 tool_name = tool_call.get("name", "unknown")
-                logger.error(f"Tool {tool_name} failed: {e}")
+                logger.error("Tool %s failed: %s", tool_name, e)
                 responses.append(
                     {
                         "role": "tool",
@@ -201,7 +201,7 @@ class ToolExecutionService:
                     raise
         else:
             # Execute sync tools in thread pool with context preservation
-            logger.info(f"Tool '{tool_name}' is sync, executing in thread pool")
+            logger.info("Tool '%s' is sync, executing in thread pool", tool_name)
             loop = asyncio.get_event_loop()
             result = await loop.run_in_executor(
                 self.executor,
@@ -341,10 +341,10 @@ class ToolExecutionService:
                                 "No image found in session controller either"
                             )
                     except Exception as e:
-                        logger.error(f"Error accessing session controller: {e}")
+                        logger.error("Error accessing session controller: %s", e)
 
             except Exception as e:
-                logger.error(f"Error accessing session state for image data: {e}")
+                logger.error("Error accessing session state for image data: %s", e)
 
         return modified_args
 

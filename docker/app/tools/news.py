@@ -43,11 +43,14 @@ class NewsTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "tavily_news_search"
-        self.description = "Search specifically for news articles and breaking events. Use when user explicitly asks for news, headlines, or current events."
+        self.description = (
+            "Up-to-date news articles and breaking events. "
+            "Use when the user explicitly asks for news, headlines, "
+            "or current events."
+        )
 
     def _initialize_mvc(self):
-        """Initialize MVC components"""
-        # This tool doesn't need separate MVC components as it's simple
+        """Initialize MVC components (not needed for this tool)"""
         self._controller = None
         self._view = None
 
@@ -127,13 +130,13 @@ class NewsTool(BaseTool):
                     content = None
                     if extract_result.success:
                         if (
-                            hasattr(extract_result, 'content')
+                            hasattr(extract_result, "content")
                             and extract_result.content
                         ):
                             # Regular WebExtractResponse
                             content = extract_result.content
                         elif (
-                            hasattr(extract_result, 'content_generator')
+                            hasattr(extract_result, "content_generator")
                             and extract_result.content_generator
                         ):
                             # StreamingExtractResponse - we need to collect the content
@@ -157,28 +160,32 @@ class NewsTool(BaseTool):
                                 content = loop.run_until_complete(collect_content())
                             except Exception as e:
                                 logger.error(
-                                    f"Failed to collect streaming content from fallback result {extract_result.url}: {e}"
+                                    "Failed to collect streaming content from fallback result %s: %s",
+                                    extract_result.url,
+                                    e,
                                 )
                                 content = None
 
                     if content:
                         top_result.extracted_content = content
                         logger.debug(
-                            f"Successfully extracted content from fallback result: {extract_result.url}"
+                            "Successfully extracted content from fallback result: %s",
+                            extract_result.url,
                         )
                     else:
                         logger.warning(
-                            f"Failed to extract content from fallback result: {extract_result.url}"
+                            "Failed to extract content from fallback result: %s",
+                            extract_result.url,
                         )
 
             except Exception as e:
-                logger.error(f"Error in fallback extraction: {e}")
+                logger.error("Error in fallback extraction: %s", e)
                 # Continue without extracted content - don't fail the entire search
 
             return fallback_results
 
         logger.info(
-            f"Extracting content for {len(high_scoring_results)} high-scoring results"
+            "Extracting content for %d high-scoring results", len(high_scoring_results)
         )
 
         # Import extract tool
@@ -194,16 +201,16 @@ class NewsTool(BaseTool):
             # Create a mapping of URL to extracted content
             url_to_content = {}
             for extract_result in extract_results:
-                logger.debug(f"Extract result: {extract_result}")
+                logger.debug("Extract result: %s", extract_result)
 
                 # Handle both WebExtractResponse and StreamingExtractResponse
                 content = None
                 if extract_result.success:
-                    if hasattr(extract_result, 'content') and extract_result.content:
+                    if hasattr(extract_result, "content") and extract_result.content:
                         # Regular WebExtractResponse
                         content = extract_result.content
                     elif (
-                        hasattr(extract_result, 'content_generator')
+                        hasattr(extract_result, "content_generator")
                         and extract_result.content_generator
                     ):
                         # StreamingExtractResponse - we need to collect the content
@@ -227,18 +234,22 @@ class NewsTool(BaseTool):
                             content = loop.run_until_complete(collect_content())
                         except Exception as e:
                             logger.error(
-                                f"Failed to collect streaming content from {extract_result.url}: {e}"
+                                "Failed to collect streaming content from %s: %s",
+                                extract_result.url,
+                                e,
                             )
                             content = None
 
                 if content:
                     url_to_content[extract_result.url] = content
                     logger.debug(
-                        f"Successfully extracted content from {extract_result.url}"
+                        "Successfully extracted content from %s", extract_result.url
                     )
                 else:
                     logger.warning(
-                        f"Failed to extract content from {extract_result.url}: {extract_result.error_message}"
+                        "Failed to extract content from %s: %s",
+                        extract_result.url,
+                        extract_result.error_message,
                     )
 
             # Update only the high-scoring results with extracted content
@@ -247,11 +258,12 @@ class NewsTool(BaseTool):
                     result.extracted_content = url_to_content[result.url]
 
             logger.info(
-                f"Batch extraction completed. {len(url_to_content)} successful extractions"
+                "Batch extraction completed. %d successful extractions",
+                len(url_to_content),
             )
 
         except Exception as e:
-            logger.error(f"Error in batch extraction: {e}")
+            logger.error("Error in batch extraction: %s", e)
             # Continue without extracted content - don't fail the entire search
 
         return high_scoring_results
@@ -327,7 +339,8 @@ class NewsTool(BaseTool):
 
     def search_tavily(self, query: str, **kwargs) -> TavilyResponse:
         """
-        Search using Tavily API with batch content extraction for high-scoring results.
+        Search using Tavily API with batch content extraction for high-scoring
+        results.
 
         Args:
             query (str): The search query
@@ -340,7 +353,7 @@ class NewsTool(BaseTool):
             ValueError: If TAVILY_API_KEY environment variable is not set
             requests.RequestException: If the API request fails
         """
-        logger.info(f"Starting Tavily news search for query: '{query}'")
+        logger.info("Starting Tavily news search for query: '%s'", query)
 
         # Get API key from environment
         from utils.config import config
@@ -353,19 +366,32 @@ class NewsTool(BaseTool):
         logger.debug("API key found, preparing search parameters")
 
         # Default search parameters matching the shell script
-        # TODO: add more tavily API friendly domains to the include_domains list
         default_params = {
             "query": query,
-            "topic": "news",
+            # "topic": "news",
             "auto_parameters": True,
-            "include_raw_content": False,
-            "max_results": 10,
-            "include_images": False,
+            "include_domains": [
+                "semianalysis.com",
+                "seekingalpha.com",
+                "apnews.com",
+                "bbc.co.uk",
+                "espn.com",
+                "npr.org",
+                "reuters.com" "tomshardware.com",
+                "wallstreethorizon.com",
+                "finance.yahoo.com",
+                "marketwatch.com",
+                "cnbc.com",
+                "bloomberg.com",
+                "ft.com",
+                "wsj.com",
+                "nytimes.com",
+            ],
         }
 
         # Update with any provided kwargs
         search_params = {**default_params, **kwargs}
-        logger.debug(f"Search parameters: {search_params}")
+        logger.debug("Search parameters: %s", search_params)
 
         # API endpoint and headers
         url = "https://api.tavily.com/search"
@@ -376,15 +402,18 @@ class NewsTool(BaseTool):
 
         try:
             logger.debug(
-                f"Making API request to Tavily news search for query: '{query}'"
+                "Making API request to Tavily news search for query: '%s'", query
             )
 
             # Make the API request
-            response = requests.post(url, headers=headers, json=search_params)
-            response.raise_for_status()  # Raises an HTTPError for bad responses
+            response = requests.post(
+                url, headers=headers, json=search_params, timeout=30
+            )
+            # Raises an HTTPError for bad responses
+            response.raise_for_status()
 
             logger.debug(
-                f"Tavily news API request successful (HTTP {response.status_code})"
+                "Tavily news API request successful (HTTP %d)", response.status_code
             )
 
             # Parse the JSON response and validate with Pydantic
@@ -402,25 +431,28 @@ class NewsTool(BaseTool):
             )
 
             logger.info(
-                f"Search completed successfully. Found {len(tavily_response.results)} results in {tavily_response.response_time:.2f}s"
+                "Search completed successfully. Found %d results in %.2fs",
+                len(tavily_response.results),
+                tavily_response.response_time,
             )
             logger.debug(
-                f"Search results: {[result.title for result in tavily_response.results]}"
+                "Search results: %s",
+                [result.title for result in tavily_response.results],
             )
 
             return tavily_response
 
         except requests.exceptions.HTTPError as e:
-            logger.error(f"HTTP error during Tavily API request: {e}")
-            logger.error(f"Response status: {response.status_code}")
+            logger.error("HTTP error during Tavily API request: %s", e)
+            logger.error("Response status: %d", response.status_code)
             if hasattr(response, "text"):
-                logger.error(f"Response body: {response.text}")
+                logger.error("Response body: %s", response.text)
             raise requests.RequestException(f"Tavily API HTTP error: {str(e)}")
         except requests.exceptions.RequestException as e:
-            logger.error(f"Request exception during Tavily API call: {e}")
+            logger.error("Request exception during Tavily API call: %s", e)
             raise requests.RequestException(f"Tavily API request failed: {str(e)}")
         except Exception as e:
-            logger.error(f"Unexpected error during Tavily search: {e}")
+            logger.error("Unexpected error during Tavily search: %s", e)
             raise
 
     def run_with_dict(self, params: Dict[str, Any]) -> TavilyResponse:
@@ -438,7 +470,7 @@ class NewsTool(BaseTool):
             raise ValueError("'query' key is required in parameters dictionary")
 
         query = params["query"]
-        logger.debug(f"run_with_dict method called with query: '{query}'")
+        logger.debug("run_with_dict method called with query: '%s'", query)
         return self.search_tavily(query)
 
 

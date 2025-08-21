@@ -73,12 +73,7 @@ class GeneralistController(ToolController):
 
             # Generate response
             response = client.chat.completions.create(
-                model=model_name,
-                messages=final_messages,
-                temperature=0.6,
-                top_p=0.95,
-                presence_penalty=0.0,
-                frequency_penalty=0.0,
+                model=model_name, messages=final_messages, temperature=0.3
             )
 
             result = response.choices[0].message.content.strip()
@@ -144,10 +139,7 @@ class GeneralistController(ToolController):
             response = await client.chat.completions.create(
                 model=model_name,
                 messages=final_messages,
-                temperature=0.6,
-                top_p=0.95,
-                presence_penalty=0.0,
-                frequency_penalty=0.0,
+                temperature=0.3,
                 stream=True,
             )
 

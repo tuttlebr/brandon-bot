@@ -166,13 +166,14 @@ class LLMService:
                 pdf_info = get_active_pdf_info()
                 if pdf_info:
                     # Add a system message about the active PDF
+                    from utils.system_prompts import prompt_manager
+
                     pdf_guidance = {
                         "role": "system",
-                        "content": (
-                            f"A PDF document '{pdf_info['filename']}' is active. "
-                            f"For ANY PDF-related requests, use the 'pdf_assistant' tool immediately. "
-                            f"Do not provide commentary about the PDF or what you see. "
-                            f"Execute the tool with the user's exact request."
+                        "content": prompt_manager.get_context_prompt(
+                            "pdf_active", filename=pdf_info['filename']
+                        ).replace(
+                            f"{pdf_info['filename']}", f"'{pdf_info['filename']}'"
                         ),
                     }
                     # Insert at the beginning after any existing system messages

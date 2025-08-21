@@ -98,8 +98,8 @@ class TextProcessorService:
             logger.info(
                 f"📤 Sending to LLM endpoint: {num_messages} messages, ~{total_chars} total chars"
             )
-            logger.info(f"   Model: {model_name}")
-            logger.info(f"   Task: {task_type}")
+            logger.info("   Model: %s", model_name)
+            logger.info("   Task: %s", task_type)
             logger.debug(
                 f"   System prompt preview: {final_messages[0]['content'][:100]}..."
             )
@@ -108,30 +108,27 @@ class TextProcessorService:
             import asyncio
 
             try:
-                logger.info(f"🔄 Making LLM API call to {model_name}...")
+                logger.info("🔄 Making LLM API call to %s...", model_name)
                 response = await asyncio.wait_for(
                     client.chat.completions.create(
                         model=model_name,
                         messages=final_messages,
-                        temperature=0.6,
-                        top_p=0.95,
-                        presence_penalty=0.0,
-                        frequency_penalty=0.0,
+                        temperature=0.3,
                     ),
                     timeout=60.0,  # 60 second timeout
                 )
             except asyncio.TimeoutError:
-                logger.error(f"LLM request timed out after 60 seconds for {task_type}")
+                logger.error("LLM request timed out after 60 seconds for %s", task_type)
                 return {
                     "success": False,
                     "error": "Request timed out - the document might be too large or the service is slow",
                     "task_type": task_type,
                 }
 
-            logger.info(f"✅ LLM response received for {task_type}")
+            logger.info("✅ LLM response received for %s", task_type)
             result = response.choices[0].message.content.strip()
-            logger.info(f"   Response length: {len(result)} chars")
-            logger.info(f"   Response preview: {result[:100]}...")
+            logger.info("   Response length: %d chars", len(result))
+            logger.info("   Response preview: %s...", result[:100])
 
             return {
                 "success": True,
@@ -141,7 +138,7 @@ class TextProcessorService:
             }
 
         except Exception as e:
-            logger.error(f"Error processing text: {e}")
+            logger.error("Error processing text: %s", e)
             return {"success": False, "error": str(e), "task_type": task_type}
 
     async def process_text_streaming(
@@ -203,21 +200,18 @@ class TextProcessorService:
             logger.info(
                 f"📤 Sending to LLM endpoint (streaming): {num_messages} messages, ~{total_chars} total chars"
             )
-            logger.info(f"   Model: {model_name}")
-            logger.info(f"   Task: {task_type}")
+            logger.info("   Model: %s", model_name)
+            logger.info("   Task: %s", task_type)
             logger.debug(
                 f"   System prompt preview: {final_messages[0]['content'][:100]}..."
             )
 
-            logger.info(f"🔄 Making streaming LLM API call to {model_name}...")
+            logger.info("🔄 Making streaming LLM API call to %s...", model_name)
 
             response = await client.chat.completions.create(
                 model=model_name,
                 messages=final_messages,
-                temperature=0.6,
-                top_p=0.95,
-                presence_penalty=0.0,
-                frequency_penalty=0.0,
+                temperature=0.3,
                 stream=True,  # Enable streaming
             )
 
@@ -239,9 +233,9 @@ class TextProcessorService:
             if final_content:
                 collected_result += final_content
 
-            logger.info(f"✅ Streaming LLM response complete for {task_type}")
-            logger.info(f"   Response length: {len(collected_result)} chars")
-            logger.info(f"   Response preview: {collected_result[:100]}...")
+            logger.info("✅ Streaming LLM response complete for %s", task_type)
+            logger.info("   Response length: %d chars", len(collected_result))
+            logger.info("   Response preview: %s...", collected_result[:100])
 
             return {
                 "success": True,
@@ -253,7 +247,7 @@ class TextProcessorService:
             }
 
         except Exception as e:
-            logger.error(f"Error processing text with streaming: {e}")
+            logger.error("Error processing text with streaming: %s", e)
             return {"success": False, "error": str(e), "task_type": task_type}
 
     async def _process_large_text_chunked(
@@ -284,7 +278,7 @@ class TextProcessorService:
                 chunk = text[i : i + chunk_size]
                 chunks.append(chunk)
 
-            logger.info(f"Processing large text in {len(chunks)} chunks")
+            logger.info("Processing large text in %d chunks", len(chunks))
 
             # Process all chunks concurrently
             async def process_chunk_async(i: int, chunk: str):
@@ -302,7 +296,7 @@ class TextProcessorService:
                     else:
                         return f"Section {i+1} processing failed: {chunk_result.get('error', 'Unknown error')}"
                 except Exception as e:
-                    logger.error(f"Error processing chunk {i+1}: {e}")
+                    logger.error("Error processing chunk %d: %s", i + 1, e)
                     return f"Section {i+1} processing failed due to error: {str(e)}"
 
             # Run all chunk processing tasks concurrently
@@ -315,7 +309,7 @@ class TextProcessorService:
             processed_results = []
             for i, result in enumerate(chunk_results):
                 if isinstance(result, Exception):
-                    logger.error(f"Chunk {i+1} failed with exception: {result}")
+                    logger.error("Chunk %d failed with exception: %s", i + 1, result)
                     processed_results.append(
                         f"Section {i+1} processing failed due to error: {str(result)}"
                     )
@@ -341,7 +335,7 @@ class TextProcessorService:
                 )
 
         except Exception as e:
-            logger.error(f"Error in chunked text processing: {e}")
+            logger.error("Error in chunked text processing: %s", e)
             return {"success": False, "error": str(e), "task_type": task_type}
 
     async def _process_single_chunk(
@@ -398,7 +392,7 @@ class TextProcessorService:
             }
 
         except Exception as e:
-            logger.error(f"Error processing chunk: {e}")
+            logger.error("Error processing chunk: %s", e)
             return {"success": False, "error": str(e), "task_type": task_type}
 
     async def _combine_summaries(
@@ -417,7 +411,7 @@ class TextProcessorService:
                 TextTaskType.SUMMARIZE, combined_text, synthesis_instructions, None
             )
         except Exception as e:
-            logger.error(f"Error combining summaries: {e}")
+            logger.error("Error combining summaries: %s", e)
             return {
                 "success": False,
                 "error": str(e),
@@ -436,7 +430,7 @@ class TextProcessorService:
                 "processing_notes": "Translation completed in chunks and combined",
             }
         except Exception as e:
-            logger.error(f"Error combining translations: {e}")
+            logger.error("Error combining translations: %s", e)
             return {
                 "success": False,
                 "error": str(e),
@@ -462,7 +456,7 @@ class TextProcessorService:
                 task_type, combined_text, synthesis_instructions, None
             )
         except Exception as e:
-            logger.error(f"Error combining general results: {e}")
+            logger.error("Error combining general results: %s", e)
             return {"success": False, "error": str(e), "task_type": task_type}
 
     def _get_system_prompt(

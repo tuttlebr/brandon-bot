@@ -366,10 +366,7 @@ Instructions:
             response = client.chat.completions.create(
                 model=model_name,
                 messages=messages,
-                temperature=0.6,
-                top_p=0.95,
-                presence_penalty=0.0,
-                frequency_penalty=0.0,
+                temperature=0.3,
                 stream=True,  # Enable streaming for faster latency
             )
 
@@ -434,10 +431,7 @@ Instructions:
             response = await client.chat.completions.create(
                 model=model_name,
                 messages=messages,
-                temperature=0.6,
-                top_p=0.95,
-                presence_penalty=0.0,
-                frequency_penalty=0.0,
+                temperature=0.3,
                 max_tokens=65536,
             )
 
@@ -508,10 +502,7 @@ Instructions:
             response = await client.chat.completions.create(
                 model=model_name,
                 messages=messages,
-                temperature=0.6,
-                top_p=0.95,
-                presence_penalty=0.0,
-                frequency_penalty=0.0,
+                temperature=0.3,
                 stream=True,  # Enable streaming
             )
 

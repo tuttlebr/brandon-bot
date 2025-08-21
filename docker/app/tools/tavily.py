@@ -172,7 +172,7 @@ class TavilyTool(BaseTool):
                         )
 
             except Exception as e:
-                logger.error(f"Error in fallback extraction: {e}")
+                logger.error("Error in fallback extraction: %s", e)
                 # Continue without extracted content - don't fail the entire search
 
             return fallback_results
@@ -194,7 +194,7 @@ class TavilyTool(BaseTool):
             # Create a mapping of URL to extracted content
             url_to_content = {}
             for extract_result in extract_results:
-                logger.debug(f"Extract result: {extract_result}")
+                logger.debug("Extract result: %s", extract_result)
 
                 # Handle both WebExtractResponse and StreamingExtractResponse
                 content = None
@@ -251,7 +251,7 @@ class TavilyTool(BaseTool):
             )
 
         except Exception as e:
-            logger.error(f"Error in batch extraction: {e}")
+            logger.error("Error in batch extraction: %s", e)
             # Continue without extracted content - don't fail the entire search
 
         return high_scoring_results
@@ -339,7 +339,7 @@ class TavilyTool(BaseTool):
             ValueError: If TAVILY_API_KEY environment variable is not set
             requests.RequestException: If the API request fails
         """
-        logger.info(f"Starting Tavily search for query: '{query}'")
+        logger.info("Starting Tavily search for query: '%s'", query)
 
         # Get API key from environment
         from utils.config import config
@@ -368,7 +368,7 @@ class TavilyTool(BaseTool):
 
         # Update with any provided kwargs
         search_params = {**default_params, **kwargs}
-        logger.debug(f"Search parameters: {search_params}")
+        logger.debug("Search parameters: %s", search_params)
 
         # API endpoint and headers
         url = "https://api.tavily.com/search"
@@ -378,13 +378,15 @@ class TavilyTool(BaseTool):
         }
 
         try:
-            logger.debug(f"Making API request to Tavily for query: '{query}'")
+            logger.debug("Making API request to Tavily for query: '%s'", query)
 
             # Make the API request
             response = requests.post(url, headers=headers, json=search_params)
             response.raise_for_status()  # Raises an HTTPError for bad responses
 
-            logger.debug(f"Tavily API request successful (HTTP {response.status_code})")
+            logger.debug(
+                "Tavily API request successful (HTTP %d)", response.status_code
+            )
 
             # Parse the JSON response and validate with Pydantic
             response_data = response.json()
@@ -410,16 +412,16 @@ class TavilyTool(BaseTool):
             return tavily_response
 
         except requests.exceptions.HTTPError as e:
-            logger.error(f"HTTP error during Tavily API request: {e}")
-            logger.error(f"Response status: {response.status_code}")
+            logger.error("HTTP error during Tavily API request: %s", e)
+            logger.error("Response status: %d", response.status_code)
             if hasattr(response, "text"):
-                logger.error(f"Response body: {response.text}")
+                logger.error("Response body: %s", response.text)
             raise requests.RequestException(f"Tavily API HTTP error: {str(e)}")
         except requests.exceptions.RequestException as e:
-            logger.error(f"Request exception during Tavily API call: {e}")
+            logger.error("Request exception during Tavily API call: %s", e)
             raise requests.RequestException(f"Tavily API request failed: {str(e)}")
         except Exception as e:
-            logger.error(f"Unexpected error during Tavily search: {e}")
+            logger.error("Unexpected error during Tavily search: %s", e)
             raise
 
     def run_with_dict(self, params: Dict[str, Any]) -> TavilyResponse:
@@ -437,7 +439,7 @@ class TavilyTool(BaseTool):
             raise ValueError("'query' key is required in parameters dictionary")
 
         query = params["query"]
-        logger.debug(f"run_with_dict method called with query: '{query}'")
+        logger.debug("run_with_dict method called with query: '%s'", query)
         return self.search_tavily(query)
 
 

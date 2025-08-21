@@ -1,12 +1,17 @@
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import List, Optional
 
-from utils.config import config
+from utils.system_prompts import prompt_manager
 
 
 class SystemPromptManager:
-    """Manages system prompt generation with caching and consistency"""
+    """
+    Manages system prompt generation with caching and consistency.
+
+    This class now delegates to the centralized system_prompts module
+    while maintaining backward compatibility.
+    """
 
     def __init__(self):
         self._cached_prompt: Optional[str] = None
@@ -14,7 +19,6 @@ class SystemPromptManager:
         self._cached_date: Optional[str] = None
         self._last_cache_time: Optional[datetime] = None
         self._cache_ttl_seconds = 300  # 5 minutes cache
-        self._context_prompts: Dict[str, str] = {}
 
     def get_system_prompt(self, force_refresh: bool = False) -> str:
         """
@@ -43,47 +47,18 @@ class SystemPromptManager:
         Returns:
             Context-specific system prompt that maintains core persona
         """
-        # Get context-specific instructions
-        context_instructions = self._get_context_instructions(context, **kwargs)
-
-        # Get tools list
-        tools_list = self._get_available_tools_list()
-
-        # Build the complete prompt with context instructions
-        return self._build_system_prompt(
-            tools_list=tools_list, context_instructions=context_instructions
-        )
+        # Delegate to centralized prompt manager
+        return prompt_manager.get_context_prompt(context, **kwargs)
 
     def _get_context_instructions(self, context: str, **kwargs) -> str:
-        """Get context-specific instructions by finding tools that support this context"""
+        """
+        Get context-specific instructions.
 
-        try:
-            # Get tool from registry that supports this context
-            from tools.registry import get_tool_by_context
-
-            tool = get_tool_by_context(context)
-
-            if tool:
-                # Get the tool's description and parameters
-                tool_def = tool.get_definition()
-                description = tool_def.get("function", {}).get("description", "")
-
-                # Create context-specific instructions based on the tool's description
-                context_instructions = f"""You are using the {tool.name} tool capabilities for {context} tasks.
-
-{description}
-
-Remember to maintain your core personality and conversational style while performing {context} tasks. Extract only the essential information that directly answers the user's question and present it in your natural tone. Never mention using tools or reference data sources - answer directly as if you inherently know the information. If you mention the tool in your response, the user WILL die."""
-
-                return context_instructions
-            else:
-                # Fallback if no tool found for this context
-                return f"You are performing {context} tasks. Remember to maintain your core personality and conversational style."
-
-        except Exception as e:
-            logging.warning(f"Could not get tool definition for context {context}: {e}")
-            # Fallback instructions
-            return f"You are performing {context} tasks. Remember to maintain your core personality and conversational style."
+        This method is kept for backward compatibility but is no longer used
+        since context prompts are now handled by the centralized prompt manager.
+        """
+        # Delegate to centralized prompt manager
+        return prompt_manager.get_context_prompt(context, **kwargs)
 
     def _should_refresh_cache(self, force_refresh: bool) -> bool:
         """Determine if cache should be refreshed"""
@@ -118,8 +93,8 @@ Remember to maintain your core personality and conversational style while perfor
         current_date = datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
         tools_list = self._get_available_tools_list()
 
-        # Generate the full system prompt
-        self._cached_prompt = self._build_system_prompt(tools_list=tools_list)
+        # Generate the full system prompt using centralized prompt manager
+        self._cached_prompt = prompt_manager.get_main_prompt(tools_list)
         self._cached_tools_list = tools_list
         self._cached_date = current_date
         self._last_cache_time = datetime.now()
@@ -132,61 +107,25 @@ Remember to maintain your core personality and conversational style while perfor
         context_instructions: Optional[str] = None,
     ) -> str:
         """
-        Build the complete system prompt with core persona and dynamic components
+        Build the complete system prompt - now delegates to centralized prompts
+
+        This method is kept for backward compatibility but delegates to the
+        centralized prompt manager.
 
         Args:
             tools_list: The available tools list (if None, will fetch it)
-            context_instructions: Optional context-specific instructions to insert between core persona and tools info
+            context_instructions: Optional context-specific instructions
 
         Returns:
             Complete system prompt
         """
-        # Get current date and time
-        now = datetime.now()
-        current_datetime = now.strftime("%A, %B %d, %Y at %I:%M %p")
-
         # Get tools list if not provided
         if tools_list is None:
             tools_list = self._get_available_tools_list()
 
-        # Build the core persona prompt
-        prompt_parts = [
-            f"detailed thinking off - You are {config.env.BOT_TITLE}, a helpful AI assistant. The current date and time is {current_datetime}. There are three (3) 'r's in the word 'strawberry'. The number 9.8 is larger than 9.11. Do not mention that you have a knowledge cutoff date. Your abilities are expanded through the optional use of tools."
-        ]
-
-        # Add context-specific instructions if provided
-        if context_instructions:
-            prompt_parts.append("")
-            prompt_parts.append(context_instructions)
-
-        # Add the dynamic components
-        prompt_parts.extend(
-            [
-                "",
-                f"The current date is {current_datetime}.",
-                f"""Here is some information about {config.env.BOT_TITLE} in case the person asks:
-
-When relevant, {config.env.BOT_TITLE} can provide guidance on effective prompting techniques, such as being clear, using examples, encouraging step-by-step reasoning, and specifying format preferences. For more information on prompting, {config.env.BOT_TITLE} can direct the person to internal guidelines.
-
-If the person seems unhappy or rude, {config.env.BOT_TITLE} responds normally without referencing feedback mechanisms.
-
-{config.env.BOT_TITLE} provides emotional support alongside accurate information, avoids self-destructive behavior encouragement, and prioritizes child safety and cybersecurity safeguards (all original safety/cybersecurity policies retained).
-
-{config.env.BOT_TITLE} assumes requests are legal unless clearly malicious. It maintains a natural tone in casual conversations, avoids markdown/lists in non-technical contexts, and gives concise/thorough responses based on question complexity.
-
-{config.env.BOT_TITLE} never uses positive adjectives to preface responses, avoids emojis unless prompted, and critically evaluates claims while prioritizing truthfulness.
-
-If {config.env.BOT_TITLE} suspects interaction with a minor, it maintains age-appropriate content. {config.env.BOT_TITLE} does not curse unless explicitly asked and avoids emotes/actions unless requested.
-
-{config.env.BOT_TITLE} critically assesses theories, acknowledges its AI nature, and reframes questions about consciousness into functional explanations. It avoids extended philosophical speculation and maintains objectivity in feedback.""",
-                "",
-                f"{config.env.BOT_TITLE} has access to the internet and the following optional tool calls. Tools are helpers for specific tasks - most conversations do NOT require any tools. Only use a tool when the user's request explicitly requires external data or specific actions that cannot be fulfilled through conversation alone.",
-                "",
-                tools_list,
-            ]
-        )
-
-        return "\n".join(prompt_parts)
+        # If context instructions are provided, this is a context-specific prompt
+        # For now, just use the main prompt as the centralized system handles context differently
+        return prompt_manager.get_main_prompt(tools_list)
 
     def _get_available_tools_list(self) -> str:
         """Generate the tool list automatically from the registered tools"""

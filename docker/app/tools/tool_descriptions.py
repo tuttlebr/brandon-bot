@@ -128,7 +128,7 @@ TOOL_DEFINITIONS = {
         ],
     },
     "generalist_conversation": {
-        "description": "DEFAULT: Handle general conversation without external tools. Use for explanations, discussions, advice, creative writing, and casual chat.",
+        "description": "DEFAULT: Handle general conversation without external tools. Use for explanations, discussions, advice, and casual chat. Do not use for creative writing or when the user asks about the bots capabilities.",
         "is_default": True,
         "example_uses": [
             "What is machine learning?",
@@ -257,47 +257,10 @@ class ToolDescriptionEnhancer:
     @classmethod
     def get_decision_prompt(cls) -> str:
         """Get the decision-making prompt for tool selection"""
-        return """## Tool Selection Guidelines
+        # Delegate to centralized prompt manager
+        from utils.system_prompts import prompt_manager
 
-IMPORTANT: Tool selection is OPTIONAL. Most user messages do NOT require any tool. Default to NO TOOL selection unless clearly needed.
-
-### Decision Process:
-
-1. **No Tool Needed (Most Common)**:
-   - Acknowledgments: "thanks", "great", "perfect", "nice", etc.
-   - General questions that can be answered from knowledge
-   - Casual conversation and chat
-   - Comments about previous responses
-   - Explanations of concepts
-   - Any message where you can provide a helpful response without external tools
-
-2. **Tool Selection Criteria**:
-   - User makes an EXPLICIT request matching tool functionality
-   - Request contains BOTH action verb AND target (e.g., "generate" + "image")
-   - Required context is present (e.g., uploaded file for file analysis)
-   - Information genuinely requires external data (e.g., current weather, today's news)
-
-3. **Red Flags Against Tool Use**:
-   - Message is primarily acknowledgment or comment
-   - General knowledge question
-   - No clear action requested
-   - Missing required context (no URL for extract_web_content, no image for analyze_image)
-   - Can be answered without external data
-
-4. **Examples of NO TOOL Needed**:
-   - "Thanks!" → Just acknowledge
-   - "What is machine learning?" → Explain from knowledge
-   - "That's perfect" → Acknowledge their satisfaction
-   - "How does X work?" → Explain the concept
-   - "Tell me about Y" → Share knowledge
-
-5. **Examples Requiring Tools**:
-   - "Generate an image of a cat" → generate_image
-   - "What's the weather in NYC?" → get_weather
-   - "Search for latest AI news" → tavily_internet_search
-   - "Analyze this image [uploaded]" → analyze_image
-
-Remember: When in doubt, NO TOOL is usually correct. Only select a tool when the user's request clearly matches its specific purpose AND cannot be fulfilled without it."""
+        return prompt_manager.get_tool_selection_guidelines()
 
     @classmethod
     def should_use_tool(

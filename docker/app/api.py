@@ -142,7 +142,7 @@ class APIChatbotService:
             logger.info("API chatbot service initialized successfully")
 
         except Exception as e:
-            logger.error(f"Failed to initialize API chatbot service: {e}")
+            logger.error("Failed to initialize API chatbot service: %s", e)
             raise ConfigurationError(f"API service initialization failed: {e}")
 
     def _convert_messages_to_dict(
@@ -259,7 +259,7 @@ class APIChatbotService:
         except HTTPException:
             raise
         except Exception as e:
-            logger.error(f"Error processing chat completion: {e}")
+            logger.error("Error processing chat completion: %s", e)
             raise HTTPException(
                 status_code=500, detail=f"Internal server error: {str(e)}"
             )
@@ -309,7 +309,7 @@ class APIChatbotService:
             return response
 
         except Exception as e:
-            logger.error(f"Error generating non-streaming response: {e}")
+            logger.error("Error generating non-streaming response: %s", e)
             raise HTTPException(
                 status_code=500, detail=f"Failed to generate response: {str(e)}"
             )
@@ -330,7 +330,7 @@ class APIChatbotService:
             return full_response
 
         except Exception as e:
-            logger.error(f"Error in async response generation: {e}")
+            logger.error("Error in async response generation: %s", e)
             return "I apologize, but I encountered an error generating the response. Please try again."
 
     async def _handle_streaming_response(
@@ -419,10 +419,10 @@ async def startup_event():
         config.validate_environment()
         logger.info("Environment configuration validated successfully")
     except ConfigurationError as e:
-        logger.error(f"Configuration error: {e}")
+        logger.error("Configuration error: %s", e)
         raise
     except Exception as e:
-        logger.error(f"Unexpected validation error: {e}")
+        logger.error("Unexpected validation error: %s", e)
         raise
 
 

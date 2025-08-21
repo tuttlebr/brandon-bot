@@ -69,7 +69,7 @@ class StreamingService:
         """
         client = self.get_client(model_type, async_client=True)
 
-        logger.debug(f"Streaming with model_type: {model_type}, model: {model}")
+        logger.debug("Streaming with model_type: %s, model: %s", model_type, model)
 
         try:
             # Prepare API parameters
@@ -100,7 +100,7 @@ class StreamingService:
                     yield chunk.choices[0].delta.content
 
         except Exception as e:
-            logger.error(f"Streaming error: {e}")
+            logger.error("Streaming error: %s", e)
             raise StreamingError(f"Failed to stream response: {e}")
 
     def sync_completion(
@@ -155,5 +155,5 @@ class StreamingService:
             return client.chat.completions.create(**api_params)
 
         except Exception as e:
-            logger.error(f"Completion error: {e}")
+            logger.error("Completion error: %s", e)
             raise StreamingError(f"Failed to get completion: {e}")

@@ -53,7 +53,7 @@ class ResponseParsingService:
             return content, all_tool_calls
 
         except Exception as e:
-            logger.error(f"Error parsing response: {e}")
+            logger.error("Error parsing response: %s", e)
             raise LLMServiceError(f"Failed to parse LLM response: {e}")
 
     def _extract_openai_tool_calls(self, message: Any) -> List[Dict[str, Any]]:
@@ -72,7 +72,7 @@ class ResponseParsingService:
                     }
                 )
             except Exception as e:
-                logger.error(f"Error parsing OpenAI tool call: {e}")
+                logger.error("Error parsing OpenAI tool call: %s", e)
 
         return tool_calls
 
@@ -101,7 +101,7 @@ class ResponseParsingService:
                         ):
                             tool_calls.append(item)
             except json.JSONDecodeError as e:
-                logger.warning(f"Failed to parse custom tool call: {e}")
+                logger.warning("Failed to parse custom tool call: %s", e)
 
         return tool_calls
 
