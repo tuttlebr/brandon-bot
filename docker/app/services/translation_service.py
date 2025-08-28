@@ -123,7 +123,7 @@ class TranslationService:
         self, source_language: Optional[str], target_language: str
     ) -> str:
         """Get translation system prompt"""
-        from utils.system_prompt import get_context_system_prompt
+        from utils.system_prompts import get_context_system_prompt
 
         # Use the new context-aware system prompt
         return get_context_system_prompt(

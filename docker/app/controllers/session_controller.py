@@ -17,7 +17,7 @@ from models import (
 from services.file_storage_service import FileStorageService
 from ui.view_helpers import view_factory
 from utils.config import config
-from utils.system_prompt import get_system_prompt
+from utils.system_prompts import get_system_prompt
 
 
 class SessionController:

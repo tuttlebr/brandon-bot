@@ -2,7 +2,8 @@
 Tool LLM Configuration
 
 This module documents the LLM type configuration for each tool in the system.
-Tools can use "fast", "llm", "intelligent", or "vlm" models based on their requirements.
+Tools can use "fast", "llm", "intelligent", or "vlm" models based on their
+requirements.
 
 All tool-specific prompts are now managed centrally in utils/system_prompts.py
 """
@@ -11,22 +12,23 @@ from utils.system_prompts import prompt_manager
 
 # Tool LLM type configurations - matching actual tool names from tool classes
 TOOL_LLM_TYPES = {
-    "conversation_context": "llm",
+    "conversation_context": "intelligent",
     "extract_web_content": "llm",
-    "get_weather": "llm",
+    "get_weather": "fast",
     "tavily_news_search": "llm",
     "tavily_internet_search": "llm",
-    "retrieval_search": "intelligent",
-    "pdf_assistant": "intelligent",
-    "text_assistant": "llm",
+    "serpapi_internet_search": "llm",
+    "retrieval_search": "llm",
+    "pdf_assistant": "llm",
+    "text_assistant": "intelligent",
     "generate_image": "llm",
     "analyze_image": "vlm",
-    "generalist_conversation": "intelligent",
-    "tool_selection": "llm",
+    "generalist_conversation": "faintelligentst",
+    "tool_selection": "intelligent",
 }
 
 # Default LLM type if not specified
-DEFAULT_LLM_TYPE = "llm"
+DEFAULT_LLM_TYPE = "intelligent"
 
 
 def get_tool_llm_type(tool_name: str) -> str:
@@ -48,7 +50,7 @@ def get_tool_system_prompt(tool_name: str, default_prompt: str = None) -> str:
 
     Args:
         tool_name: Name of the tool
-        default_prompt: The default prompt to use if no override exists (deprecated)
+        default_prompt: (deprecated)
 
     Returns:
         The system prompt to use for this tool
@@ -61,7 +63,8 @@ def configure_tool_prompt(tool_name: str, system_prompt: str) -> None:
     """
     Configure a custom system prompt for a specific tool
 
-    DEPRECATED: Tool prompts should now be configured in utils/system_prompts.py
+    DEPRECATED: Tool prompts should now be configured in
+    utils/system_prompts.py
 
     Args:
         tool_name: Name of the tool to configure
@@ -70,7 +73,7 @@ def configure_tool_prompt(tool_name: str, system_prompt: str) -> None:
     import warnings
 
     warnings.warn(
-        "configure_tool_prompt is deprecated. Tool prompts should be configured in utils/system_prompts.py",
+        "configure_tool_prompt is deprecated. Config utils/system_prompts.py",
         DeprecationWarning,
         stacklevel=2,
     )

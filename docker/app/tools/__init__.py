@@ -48,7 +48,7 @@ from .retriever import (
     RetrieverTool,
     get_retrieval_tool_definition,
 )
-from .tavily import TavilyResponse, TavilyTool, get_tavily_tool_definition
+from .serpapi import SerpAPIResponse, SerpAPITool, get_serpapi_tool_definition
 from .weather import WeatherResponse, WeatherTool, get_weather_tool_definition
 
 __all__ = [
@@ -61,7 +61,7 @@ __all__ = [
     "ImageGenerationTool",
     "NewsTool",
     "RetrieverTool",
-    "TavilyTool",
+    "SerpAPITool",
     "WeatherTool",
     # Response classes
     "AssistantResponse",
@@ -72,7 +72,7 @@ __all__ = [
     "ImageGenerationResponse",
     "NewsResponse",
     "RetrievalResponse",
-    "TavilyResponse",
+    "SerpAPIResponse",
     "WeatherResponse",
     # Helper functions - only definitions
     "get_assistant_tool_definition",
@@ -83,7 +83,7 @@ __all__ = [
     "get_image_generation_tool_definition",
     "get_news_tool_definition",
     "get_retrieval_tool_definition",
-    "get_tavily_tool_definition",
+    "get_serpapi_tool_definition",
     "get_weather_tool_definition",
     # Registry functions
     "get_all_tool_definitions",

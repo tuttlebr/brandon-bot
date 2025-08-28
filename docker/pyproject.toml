@@ -20,7 +20,8 @@ dependencies = [
     "streamlit-authenticator==0.4.2",
     "aiohttp==3.12.14",
     "fastapi==0.104.1",
-    "uvicorn==0.24.0"
+    "uvicorn==0.24.0",
+    "serpapi==0.1.5",
 ]
 
 [project.optional-dependencies]
@@ -32,6 +33,7 @@ jupyterlab = [
     "seaborn==0.13.2",
     "theme-darcula==4.0.0",
     "pypdfium2==4.30.1",
+
 ]
 
 streamlit-docs = [

@@ -53,8 +53,8 @@ class FileProcessingConfig:
     PDF_TEMP_FILE_SUFFIX: str = ".pdf"
 
     # File size limits (in bytes)
-    MAX_PDF_SIZE: int = 16 * 1024 * 1024  # 16MB
-    MAX_IMAGE_SIZE: int = 10 * 1024 * 1024  # 10MB
+    MAX_PDF_SIZE: int = 100 * 1024 * 1024
+    MAX_IMAGE_SIZE: int = 20 * 1024 * 1024
 
     # Supported file types
     SUPPORTED_PDF_TYPES: List[str] = field(default_factory=lambda: ['pdf'])
@@ -213,14 +213,15 @@ class ToolConfig:
             "text_assistant": True,
             "conversation_context": True,
             "extract_web_content": True,
-            "tavily_internet_search": True,
+            "tavily_internet_search": False,
             "tavily_news_search": True,
             "retrieval_search": True,
-            "pdf_assistant": True,  # New unified PDF tool
+            "pdf_assistant": True,
             "analyze_image": True,
             "generate_image": True,
             "get_weather": True,
             "generalist_conversation": True,
+            "serpapi_internet_search": True,
         }
     )
 
@@ -372,6 +373,9 @@ class EnvironmentConfig:
     # Other API keys
     TAVILY_API_KEY: Optional[str] = field(
         default_factory=lambda: os.getenv("TAVILY_API_KEY")
+    )
+    SERPAPI_KEY: Optional[str] = field(
+        default_factory=lambda: os.getenv("SERPAPI_KEY")
     )
 
     # Embedding configuration

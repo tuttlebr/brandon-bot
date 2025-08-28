@@ -56,7 +56,7 @@ class ResponseParsingService:
 
         except Exception as e:
             logger.error("Error parsing response: %s", e)
-            raise LLMServiceError(f"Failed to parse LLM response: {e}")
+            raise LLMServiceError(f"Failed to parse LLM response: {e}") from e
 
     def _extract_openai_tool_calls(self, message: Any) -> List[Dict[str, Any]]:
         """Extract standard OpenAI format tool calls"""
@@ -66,15 +66,38 @@ class ResponseParsingService:
         tool_calls = []
         for tool_call in message.tool_calls:
             try:
+                # Log the raw arguments for debugging
+                raw_args = tool_call.function.arguments
+                logger.debug(
+                    "Parsing tool call '%s' with arguments: %s",
+                    tool_call.function.name,
+                    repr(raw_args),
+                )
+
+                # Parse the arguments
+                parsed_args = json.loads(raw_args)
+
                 tool_calls.append(
                     {
                         'name': tool_call.function.name,
-                        'arguments': json.loads(tool_call.function.arguments),
+                        'arguments': parsed_args,
                         'id': getattr(tool_call, 'id', None),
                     }
                 )
+            except json.JSONDecodeError as e:
+                logger.error(
+                    "JSON parsing error for tool call '%s': %s. "
+                    "Raw arguments: %s",
+                    tool_call.function.name,
+                    e,
+                    repr(tool_call.function.arguments),
+                )
             except Exception as e:
-                logger.error("Error parsing OpenAI tool call: %s", e)
+                logger.error(
+                    "Error parsing OpenAI tool call '%s': %s",
+                    tool_call.function.name,
+                    e,
+                )
 
         return tool_calls
 

@@ -2,11 +2,11 @@
 gatherUsageStats = false
 
 [client]
-showErrorDetails = true
+showErrorDetails = false
 
 [server]
 runOnSave = true
-maxUploadSize = 16
+maxUploadSize = 100
 enableCORS = false
 enableXsrfProtection = false
 maxMessageSize = 200

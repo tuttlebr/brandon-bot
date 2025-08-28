@@ -98,7 +98,12 @@ class BaseTool(ABC):
         self._name: str = ""
         self.description: str = ""
         # LLM type configuration - which LLM this tool should use
-        self.llm_type: Literal["fast", "llm", "intelligent", "vlm"] = "llm"
+        # Import here to avoid circular imports
+        from tools.tool_llm_config import DEFAULT_LLM_TYPE
+
+        self.llm_type: Literal["fast", "llm", "intelligent", "vlm"] = (
+            DEFAULT_LLM_TYPE
+        )
         # Contexts this tool supports (for system prompt context mapping)
         self.supported_contexts: List[str] = []
         # Execution mode

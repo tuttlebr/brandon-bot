@@ -38,7 +38,7 @@ def initialize_all_tools():
             PDFAssistantTool,
         )
         from tools.retriever import RetrieverTool
-        from tools.tavily import TavilyTool
+        from tools.serpapi import SerpAPITool
         from tools.weather import WeatherTool
 
         # Register tool classes with lazy loading (instances created on demand)
@@ -53,7 +53,7 @@ def initialize_all_tools():
             "pdf_assistant", PDFAssistantTool
         )  # Single PDF tool
         register_tool_class("retrieval_search", RetrieverTool)
-        register_tool_class("tavily_internet_search", TavilyTool)
+        register_tool_class("serpapi_internet_search", SerpAPITool)
         register_tool_class("get_weather", WeatherTool)
 
         # Note: The old PDF tools (retrieve_pdf_summary, process_pdf_text) are deprecated

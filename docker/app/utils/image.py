@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 DEFAULT_PROMPT = "A simple coffee shop interior"
 DEFAULT_MODE = "base"
 DEFAULT_CFG_SCALE = 3.5
-DEFAULT_WIDTH = 512
-DEFAULT_HEIGHT = 512
+DEFAULT_WIDTH = 1204
+DEFAULT_HEIGHT = 1204
 DEFAULT_SEED = 42
-DEFAULT_STEPS = 50
+DEFAULT_STEPS = 42
 
 BASE64_PREFIX_PATTERN = r"^data:image/.+;base64,"
 

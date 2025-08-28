@@ -103,35 +103,53 @@ class StreamingService:
 
         except Exception as e:
             logger.error("Streaming error: %s", e)
-            raise StreamingError(f"Failed to stream response: {e}")
+            raise StreamingError(f"Failed to stream response: {e}") from e
 
-    def sync_completion(
+    async def sync_completion(
         self,
         messages: List[Dict[str, Any]],
         model: str,
         model_type: str,
         tools: Optional[List[Dict[str, Any]]] = None,
         tool_choice: Optional[str] = "auto",
+        stream: Optional[bool] = None,
         **kwargs,
     ) -> Any:
         """
-        Get non-streaming completion from LLM
+        Get completion from LLM with optional streaming
+
+        This method can use streaming or non-streaming mode. When tools are
+        provided, it defaults to non-streaming to ensure proper tool call
+        parsing. Otherwise, it defaults to streaming for better performance.
 
         Args:
             messages: Conversation messages
             model: Model name
             model_type: Type of model to use
             tools: Optional tool definitions
-            tool_choice: How to handle tool selection ("auto", None, or "required")
+            tool_choice: How to handle tool selection ("auto", None, or
+                         "required")
+            stream: Force streaming on/off. If None, auto-decides based on
+                    whether tools are provided
             **kwargs: Additional parameters for the API
 
         Returns:
-            API response object
+            API response object with content and tool calls
         """
-        client = self.get_client(model_type, async_client=False)
+        client = self.get_client(model_type, async_client=True)
+
+        # Auto-decide streaming mode if not specified
+        if stream is None:
+            # Default to non-streaming when tools are involved
+            stream = tools is None
 
         logger.debug(
-            f"Sync completion with model_type: {model_type}, model: {model}, tool_choice: {tool_choice}"
+            "Completion - model_type: %s, model: %s, tool_choice: %s, "
+            "streaming: %s",
+            model_type,
+            model,
+            tool_choice,
+            stream,
         )
 
         try:
@@ -139,7 +157,7 @@ class StreamingService:
             api_params = {
                 "model": model,
                 "messages": messages,
-                "stream": False,
+                "stream": stream,
                 **config.get_llm_parameters(),
                 **kwargs,
             }
@@ -154,8 +172,158 @@ class StreamingService:
                 del api_params["frequency_penalty"]
                 del api_params["presence_penalty"]
 
-            return client.chat.completions.create(**api_params)
+            # Handle non-streaming mode
+            if not stream:
+                response = await client.chat.completions.create(**api_params)
+                return response
+
+            # Handle streaming mode
+            response_stream = await client.chat.completions.create(
+                **api_params
+            )
+
+            # Collect chunks to build complete response
+            collected_content = ""
+            collected_tool_calls = {}
+            finish_reason = None
+            response_id = None
+            response_model = model
+            created_time = None
+
+            async for chunk in response_stream:
+                # Collect response metadata from first chunk
+                if response_id is None and hasattr(chunk, 'id'):
+                    response_id = chunk.id
+                if created_time is None and hasattr(chunk, 'created'):
+                    created_time = chunk.created
+                if hasattr(chunk, 'model'):
+                    response_model = chunk.model
+
+                if chunk.choices:
+                    choice = chunk.choices[0]
+
+                    # Collect content
+                    if (
+                        hasattr(choice.delta, 'content')
+                        and choice.delta.content
+                    ):
+                        collected_content += choice.delta.content
+
+                    # Collect tool calls
+                    if (
+                        hasattr(choice.delta, 'tool_calls')
+                        and choice.delta.tool_calls
+                    ):
+                        for tool_call_delta in choice.delta.tool_calls:
+                            # Handle index - might be None for single calls
+                            idx = getattr(tool_call_delta, 'index', 0)
+                            if idx is None:
+                                idx = 0
+
+                            if idx not in collected_tool_calls:
+                                collected_tool_calls[idx] = {
+                                    'id': '',
+                                    'type': 'function',
+                                    'function': {'name': '', 'arguments': ''},
+                                }
+
+                            tc = collected_tool_calls[idx]
+
+                            # Update ID if provided
+                            if (
+                                hasattr(tool_call_delta, 'id')
+                                and tool_call_delta.id
+                            ):
+                                tc['id'] = tool_call_delta.id
+
+                            # Update function details
+                            if hasattr(tool_call_delta, 'function'):
+                                func = tool_call_delta.function
+
+                                # Update name if provided (only comes once)
+                                if (
+                                    hasattr(func, 'name')
+                                    and func.name is not None
+                                ):
+                                    tc['function']['name'] = func.name
+
+                                # Append arguments if provided
+                                if (
+                                    hasattr(func, 'arguments')
+                                    and func.arguments is not None
+                                ):
+                                    # Log each argument chunk for debugging
+                                    logger.debug(
+                                        "Tool call %d (%s) - appending "
+                                        "arguments chunk: %s (length: %d)",
+                                        idx,
+                                        tc['function']['name'] or 'unknown',
+                                        repr(func.arguments),
+                                        len(tc['function']['arguments']),
+                                    )
+                                    tc['function'][
+                                        'arguments'
+                                    ] += func.arguments
+
+                    # Get finish reason
+                    if (
+                        hasattr(choice, 'finish_reason')
+                        and choice.finish_reason
+                    ):
+                        finish_reason = choice.finish_reason
+
+            # Build response object that mimics the non-streaming
+            # response structure. This allows the parsing service
+            # to work without modification
+            from types import SimpleNamespace
+
+            # Convert collected tool calls to list
+            tool_calls_list = []
+            for idx in sorted(collected_tool_calls.keys()):
+                tc = collected_tool_calls[idx]
+                # Log the collected arguments for debugging
+                if tc['function']['arguments']:
+                    logger.debug(
+                        "Tool call %d (%s) arguments: %s",
+                        idx,
+                        tc['function']['name'],
+                        repr(tc['function']['arguments']),
+                    )
+                tool_call_obj = SimpleNamespace(
+                    id=tc['id'],
+                    type=tc['type'],
+                    function=SimpleNamespace(
+                        name=tc['function']['name'],
+                        arguments=tc['function']['arguments'],
+                    ),
+                )
+                tool_calls_list.append(tool_call_obj)
+
+            # Build message object
+            message = SimpleNamespace(
+                content=collected_content if collected_content else None,
+                tool_calls=tool_calls_list if tool_calls_list else None,
+            )
+
+            # Build choice object
+            choice = SimpleNamespace(
+                index=0, message=message, finish_reason=finish_reason
+            )
+
+            # Build response object
+            response = SimpleNamespace(
+                id=response_id,
+                object='chat.completion',
+                created=created_time,
+                model=response_model,
+                choices=[choice],
+            )
+
+            return response
 
         except Exception as e:
-            logger.error("Completion error: %s", e)
-            raise StreamingError(f"Failed to get completion: {e}")
+            mode = "streaming" if stream else "non-streaming"
+            logger.error("%s completion error: %s", mode.capitalize(), e)
+            raise StreamingError(
+                f"Failed to get {mode} completion: {e}"
+            ) from e

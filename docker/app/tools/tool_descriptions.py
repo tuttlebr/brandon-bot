@@ -102,7 +102,7 @@ TOOL_DEFINITIONS = {
             "Thanks for analyzing (acknowledgment - no tool needed)",
         ],
     },
-    "tavily_internet_search": {
+    "serpapi_internet_search": {
         "description": "Search the internet for current information and real-time data. Use for up-to-date facts, current events, or information that changes frequently.",
         "trigger_words": [
             "search",
@@ -123,8 +123,7 @@ TOOL_DEFINITIONS = {
         "requires_specific_query": True,
         "example_uses": [
             "What's happening in tech today?",
-            "Search for latest AI developments",
-            "Find current stock prices",
+            "How late is Domino's pizza open tonight?",
         ],
         "example_non_uses": [
             "What is Python? (general knowledge - no tool needed)",

@@ -117,7 +117,7 @@ class TextProcessorService:
                     client.chat.completions.create(
                         model=model_name,
                         messages=final_messages,
-                        temperature=0.3,
+                        temperature=0.6,
                     ),
                     timeout=60.0,  # 60 second timeout
                 )
@@ -225,7 +225,7 @@ class TextProcessorService:
             response = await client.chat.completions.create(
                 model=model_name,
                 messages=final_messages,
-                temperature=0.3,
+                temperature=0.6,
                 stream=True,  # Enable streaming
             )
 
@@ -492,7 +492,7 @@ class TextProcessorService:
     ) -> str:
         """Get the appropriate system prompt for text processing tasks"""
         from tools.tool_llm_config import get_tool_system_prompt
-        from utils.system_prompt import get_context_system_prompt
+        from utils.system_prompts import get_context_system_prompt
 
         # Check if there's a specific prompt for this text processing task
         specific_prompt_key = f"text_processing_{task_type.value}"

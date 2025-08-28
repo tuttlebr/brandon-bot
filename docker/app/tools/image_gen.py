@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 # Aspect ratio mappings to dimensions
 ASPECT_RATIO_MAPPINGS = {
-    "square": (768, 768),  # 1:1 ratio
+    "square": (1024, 1024),  # 1:1 ratio
     "portrait": (768, 1024),  # 3:4 ratio (vertical)
     "landscape": (1024, 768),  # 4:3 ratio (horizontal)
 }
@@ -103,13 +103,6 @@ class ImageGenerationTool(BaseTool):
                             "enum": ALLOWED_ASPECT_RATIOS,
                             "default": "square",
                         },
-                        "cfg_scale": {
-                            "type": "number",
-                            "description": "Guidance scale for how closely the image follows the text prompt. Higher values (3.5-4.5) give closer adherence to prompt but may reduce image quality. Lower values (1.5-3.0) allow more creative interpretation with potentially better image quality.",
-                            "minimum": 1.5,
-                            "maximum": 4.5,
-                            "default": 3.5,
-                        },
                         "use_conversation_context": {
                             "type": "boolean",
                             "description": "Whether to use conversation history to enhance the prompt. Useful for generating images related to ongoing discussions or stories.",
@@ -127,7 +120,6 @@ class ImageGenerationTool(BaseTool):
                     "required": [
                         "user_prompt",
                         "aspect_ratio",
-                        "cfg_scale",
                         "use_conversation_context",
                         "but_why",
                         "enhanced_prompt",
@@ -144,7 +136,6 @@ class ImageGenerationTool(BaseTool):
         """Execute the tool synchronously"""
         user_prompt = params.get("user_prompt")
         aspect_ratio = params.get("aspect_ratio", "square")
-        cfg_scale = params.get("cfg_scale", 3.5)
         use_conversation_context = params.get("use_conversation_context", True)
         enhanced_prompt = params.get("enhanced_prompt", user_prompt)
         messages = params.get("messages")
@@ -154,7 +145,7 @@ class ImageGenerationTool(BaseTool):
         return self.generate_image_from_prompt(
             user_prompt,
             aspect_ratio,
-            cfg_scale,
+            3.5,
             use_conversation_context,
             enhanced_prompt,
             config,
@@ -217,8 +208,8 @@ class ImageGenerationTool(BaseTool):
         self,
         enhanced_prompt: str,
         config: ChatConfig,
-        width: int = 512,
-        height: int = 512,
+        width: int = 1204,
+        height: int = 1204,
         cfg_scale: float = 3.5,
     ) -> Optional[Image.Image]:
         """

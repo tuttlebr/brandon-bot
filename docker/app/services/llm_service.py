@@ -232,12 +232,13 @@ class LLMService:
             tool_selection_model = self._get_model_for_type(
                 tool_selection_model_type
             )
-            response = self.streaming_service.sync_completion(
+            response = await self.streaming_service.sync_completion(
                 windowed_messages_with_guidance,
                 tool_selection_model,
                 tool_selection_model_type,
                 tools=tools,
                 tool_choice=tool_choice,
+                stream=False,  # Use non-streaming for tool selection
             )
 
             # Parse response for content and tool calls
