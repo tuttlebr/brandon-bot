@@ -63,8 +63,8 @@ class OrganicResult(BaseModel):
 class RelatedQuestion(BaseModel):
     """Related question from SerpAPI"""
 
-    snippet: str
-    more_results_link: Optional[str] = None
+    snippet: Optional[str] = None
+    more_results_link: Optional[str] = ""
 
 
 class RelatedSearch(BaseModel):
@@ -97,7 +97,7 @@ class SerpAPITool(BaseTool):
         super().__init__()
         self.name = "serpapi_internet_search"
         self.description = (
-            "Search the internet for current information using SerpAPI. "
+            "Search the internet for current information using Google. "
             "Query MUST be in the form of a question for best results. "
             "Returns search parameters and top 3 organic results "
             "with extracted webpage content (or snippet if extraction fails)."
@@ -146,8 +146,9 @@ class SerpAPITool(BaseTool):
                             "type": "string",
                             "description": (
                                 "location for the search "
-                                "MUST be in the form of a City, State, Country "
-                                "(e.g., 'New York, NY, United States')."
+                                "MUST be in the form of a City, State, "
+                                "Country (e.g., 'New York, NY, "
+                                "United States')."
                             ),
                             "default": "Saline, Michigan, United States",
                         },
