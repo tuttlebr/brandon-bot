@@ -328,7 +328,7 @@ class ResponseController:
             error_msg = (
                 "I encountered an error while displaying the generated image."
             )
-            st.markdown(error_msg)
+            st.markdown(error_msg, unsafe_allow_html=True)
             self.message_controller.safe_add_message_to_history(
                 "assistant", error_msg
             )
@@ -411,7 +411,7 @@ class ResponseController:
         else:
             error_msg = "Generated image but failed to display it properly."
             logging.error("Failed to convert base64 to PIL image")
-            st.markdown(error_msg)
+            st.markdown(error_msg, unsafe_allow_html=True)
             self.message_controller.safe_add_message_to_history(
                 "assistant", error_msg
             )
@@ -426,7 +426,10 @@ class ResponseController:
         error_message = image_response.get(
             "error_message", "Failed to generate image."
         )
-        st.markdown(f"**Image Generation Error:** {error_message}")
+        st.markdown(
+            f"**Image Generation Error:** {error_message}",
+            unsafe_allow_html=True,
+        )
         self.message_controller.safe_add_message_to_history(
             "assistant", f"Image generation failed: {error_message}"
         )
@@ -434,7 +437,10 @@ class ResponseController:
         # Show the enhanced prompt that was attempted
         enhanced_prompt = image_response.get("enhanced_prompt", "")
         if enhanced_prompt:
-            st.markdown(f"**Attempted prompt:** {enhanced_prompt}")
+            st.markdown(
+                f"**Attempted prompt:** {enhanced_prompt}",
+                unsafe_allow_html=True,
+            )
 
     def _handle_tool_context(self):
         """Extract and display tool context from LLM responses"""

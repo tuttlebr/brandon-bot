@@ -1,5 +1,6 @@
 import base64
 import logging
+import os
 import re
 from io import BytesIO
 from typing import Optional
@@ -20,7 +21,7 @@ DEFAULT_WIDTH = 1204
 DEFAULT_HEIGHT = 1204
 DEFAULT_SEED = 42
 DEFAULT_STEPS = 42
-
+IMAGE_API_KEY = os.getenv("IMAGE_API_KEY", "")
 BASE64_PREFIX_PATTERN = r"^data:image/.+;base64,"
 
 
@@ -31,6 +32,7 @@ ALLOWED_MODES = ["base"]
 HTTP_HEADERS = {
     "Accept": "application/json",
     "Content-Type": "application/json",
+    "Authorization": f"Bearer {IMAGE_API_KEY}",
 }
 
 

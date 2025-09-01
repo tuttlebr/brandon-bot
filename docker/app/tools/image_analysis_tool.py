@@ -319,7 +319,7 @@ class ImageAnalysisTool(BaseTool):
                 messages=messages,
                 temperature=1.0,
                 top_p=0.01,
-                stream=True,  # Enable streaming for faster first token
+                stream=True,
             )
 
             # Create think tag filter for streaming

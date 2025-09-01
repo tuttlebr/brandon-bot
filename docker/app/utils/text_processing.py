@@ -1,5 +1,9 @@
+import logging
 import re
-from typing import Optional
+import unicodedata
+from typing import Any, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 
 def strip_think_tags(text: Optional[str]) -> str:
@@ -41,19 +45,300 @@ def sanitize_python_input(text: str) -> str:
     if not text:
         return ""
 
-    # Remove or escape potentially dangerous characters
-    # text = re.sub(
-    #     r"[^\x20-\x7E\n\t]", "", text
-    # )  # Only printable ASCII + newlines/tabs
+    return (
+        unicodedata.normalize("NFKD", text)
+        .encode("ascii", "ignore")
+        .decode("utf-8")
+    )
 
-    # # Normalize whitespace
-    # text = re.sub(r"\r\n", "\n", text)  # Normalize line endings
-    # text = re.sub(r"\r", "\n", text)  # Convert carriage returns to newlines
 
-    # # Remove null bytes
-    # text = text.replace("\x00", "")
+def romanize_text(text: str) -> str:
+    """
+    Romanize/transliterate all non-ASCII characters to their closest
+    ASCII equivalent.
 
-    return text.strip()
+    This function uses Unicode normalization to convert accented
+    characters and other diacritical marks to their base ASCII forms.
+    For more complex transliteration (e.g., Chinese, Japanese, Arabic),
+    consider using the 'unidecode' library.
+
+    Args:
+        text: The input string to romanize
+
+    Returns:
+        A string with non-ASCII characters converted to their closest
+        ASCII equivalent. If an error occurs, returns the original
+        input string.
+    """
+    if not text:
+        return text
+
+    try:
+        # First, normalize the text to NFD (decomposed) form
+        # This separates base characters from combining characters
+        normalized = unicodedata.normalize('NFD', text)
+
+        # Build the result character by character
+        result = []
+        for char in normalized:
+            # Get the Unicode category
+            category = unicodedata.category(char)
+
+            # Skip combining marks (Mn = Mark, Nonspacing)
+            if category == 'Mn':
+                continue
+
+            # Try to get the ASCII representation
+            try:
+                # Try to encode as ASCII
+                ascii_char = char.encode('ascii').decode('ascii')
+                result.append(ascii_char)
+            except UnicodeEncodeError:
+                # For characters that can't be converted to ASCII,
+                # try to get their Unicode name and extract a
+                # reasonable replacement
+                try:
+                    name = unicodedata.name(char, None)
+                    if name:
+                        # Handle some common cases
+                        if 'LATIN' in name and 'LETTER' in name:
+                            # Extract the base letter from names like
+                            # "LATIN SMALL LETTER A WITH ACUTE"
+                            parts = name.split()
+                            if len(parts) >= 4:
+                                letter = parts[3]
+                                if len(letter) == 1 and letter.isalpha():
+                                    result.append(
+                                        letter.lower()
+                                        if 'SMALL' in name
+                                        else letter
+                                    )
+                                    continue
+
+                        # Handle quotation marks and apostrophes
+                        if 'QUOTATION MARK' in name:
+                            result.append('"')
+                            continue
+                        elif (
+                            'APOSTROPHE' in name
+                            or name == 'RIGHT SINGLE QUOTATION MARK'
+                        ):
+                            result.append("'")
+                            continue
+
+                        # Handle dashes and hyphens
+                        if 'DASH' in name or 'HYPHEN' in name:
+                            result.append('-')
+                            continue
+
+                        # Handle spaces
+                        if 'SPACE' in name:
+                            result.append(' ')
+                            continue
+
+                    # If we can't handle it, skip the character
+                    # (This is where unidecode would provide better
+                    # coverage)
+
+                except ValueError:
+                    # Character has no Unicode name, skip it
+                    pass
+
+        return ''.join(result)
+
+    except Exception as e:  # pylint: disable=broad-except
+        # We catch all exceptions to ensure we always return a string
+        logger.warning(
+            "Error in romanize_text: %s. Returning original input.", str(e)
+        )
+        return text
+
+
+class TextProcessor:
+    """
+    Context-aware text processor that applies different sanitization
+    strategies based on the use case.
+    """
+
+    @staticmethod
+    def for_filename(text: str, max_length: int = 255) -> str:
+        """
+        Process text to create safe filenames.
+
+        Args:
+            text: Input text to process
+            max_length: Maximum length for filename (default 255)
+
+        Returns:
+            Safe filename string
+        """
+        # Romanize to ASCII for maximum compatibility
+        safe = romanize_text(text)
+        # Replace unsafe filename characters
+        safe = re.sub(r'[<>:"/\\|?*]', '_', safe)
+        # Replace multiple spaces/underscores with single underscore
+        safe = re.sub(r'[\s_]+', '_', safe)
+        # Remove leading/trailing underscores and dots
+        safe = safe.strip('_.').strip()
+        # Ensure non-empty
+        if not safe:
+            safe = "unnamed"
+        # Truncate if needed
+        if len(safe) > max_length:
+            safe = safe[:max_length].rstrip('_')
+        return safe
+
+    @staticmethod
+    def for_search(text: str) -> str:
+        """
+        Normalize text for search operations while preserving original.
+        Returns lowercase, normalized text for better matching.
+
+        Args:
+            text: Input text to normalize
+
+        Returns:
+            Normalized search string
+        """
+        if not text:
+            return ""
+        # Normalize Unicode (NFKC for compatibility)
+        normalized = unicodedata.normalize('NFKC', text)
+        # Convert to lowercase for case-insensitive search
+        return normalized.lower().strip()
+
+    @staticmethod
+    def for_display(text: str, preserve_unicode: bool = True) -> str:
+        """
+        Clean text for display while preserving Unicode by default.
+
+        Args:
+            text: Input text to clean
+            preserve_unicode: Whether to preserve Unicode characters
+
+        Returns:
+            Cleaned display text
+        """
+        if not text:
+            return ""
+
+        # Don't normalize whitespace aggressively - preserve markdown
+        # formatting. Only clean up excessive blank lines (more than 2)
+        text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
+
+        # Clean up trailing whitespace on each line without breaking markdown
+        lines = text.split('\n')
+        cleaned_lines = [line.rstrip() for line in lines]
+        text = '\n'.join(cleaned_lines)
+
+        if not preserve_unicode:
+            # Only romanize if explicitly requested
+            text = romanize_text(text)
+
+        return text.strip()
+
+    @staticmethod
+    def for_code_identifier(text: str) -> str:
+        """
+        Convert text to valid Python/programming identifier.
+
+        Args:
+            text: Input text to convert
+
+        Returns:
+            Valid identifier string
+        """
+        # First romanize to get ASCII
+        ascii_text = romanize_text(text)
+        # Replace non-alphanumeric with underscores
+        identifier = re.sub(r'[^a-zA-Z0-9]', '_', ascii_text)
+        # Remove leading numbers
+        identifier = re.sub(r'^[0-9]+', '', identifier)
+        # Replace multiple underscores
+        identifier = re.sub(r'_+', '_', identifier)
+        # Remove leading/trailing underscores
+        identifier = identifier.strip('_')
+        # Ensure non-empty
+        if not identifier:
+            identifier = "var"
+        return identifier
+
+    @staticmethod
+    def for_api_key(text: str) -> str:
+        """
+        Sanitize text that might contain API keys or secrets.
+        Preserves exact formatting but strips dangerous characters.
+
+        Args:
+            text: Input text to sanitize
+
+        Returns:
+            Sanitized string safe for API usage
+        """
+        if not text:
+            return ""
+        # Remove control characters but preserve all printable chars
+        return ''.join(char for char in text if char.isprintable())
+
+    @staticmethod
+    def for_database_query(text: str) -> str:
+        """
+        Prepare text for database queries (basic SQL injection prevention).
+        Note: Always use parameterized queries in production!
+
+        Args:
+            text: Input text to sanitize
+
+        Returns:
+            Escaped text for database usage
+        """
+        if not text:
+            return ""
+        # Basic escaping - replace single quotes
+        # This is NOT sufficient for production - use parameterized queries!
+        return text.replace("'", "''")
+
+    @staticmethod
+    def get_processing_info(text: str) -> Dict[str, Any]:
+        """
+        Analyze text and return information about what processing
+        might be needed.
+
+        Args:
+            text: Input text to analyze
+
+        Returns:
+            Dictionary with processing recommendations
+        """
+        info = {
+            'has_unicode': any(ord(char) > 127 for char in text),
+            'has_special_chars': bool(re.search(r'[^a-zA-Z0-9\s]', text)),
+            'has_control_chars': any(not char.isprintable() for char in text),
+            'script_types': set(),
+            'needs_normalization': False,
+        }
+
+        # Detect script types
+        for char in text:
+            if ord(char) > 127:
+                name = unicodedata.name(char, '')
+                if 'CJK' in name:
+                    info['script_types'].add('CJK')
+                elif 'ARABIC' in name:
+                    info['script_types'].add('Arabic')
+                elif 'HEBREW' in name:
+                    info['script_types'].add('Hebrew')
+                elif 'CYRILLIC' in name:
+                    info['script_types'].add('Cyrillic')
+                elif 'DEVANAGARI' in name:
+                    info['script_types'].add('Devanagari')
+
+        # Check if normalization would change the text
+        normalized = unicodedata.normalize('NFC', text)
+        if normalized != text:
+            info['needs_normalization'] = True
+
+        return info
 
 
 class StreamingThinkTagFilter:
@@ -150,3 +435,50 @@ class StreamingThinkTagFilter:
         output = self.buffer
         self.buffer = ""
         return output
+
+
+# Usage Examples and Best Practices
+# ==================================
+#
+# 1. File Operations:
+#    filename = TextProcessor.for_filename("My Résumé 2024.pdf")
+#    # Result: "My_Resume_2024.pdf"
+#
+# 2. Search Operations:
+#    # Store original, search on normalized
+#    message = {
+#        'content': user_input,
+#        'search_content': TextProcessor.for_search(user_input)
+#    }
+#
+# 3. Display Operations:
+#    # Preserve Unicode by default
+#    display_text = TextProcessor.for_display(raw_text)
+#    # Force ASCII only when needed
+#    ascii_only = TextProcessor.for_display(raw_text, preserve_unicode=False)
+#
+# 4. Code Generation:
+#    var_name = TextProcessor.for_code_identifier("User's Name")
+#    # Result: "Users_Name"
+#
+# 5. API/Security:
+#    clean_key = TextProcessor.for_api_key(api_input)
+#    # Removes control characters but preserves the key
+#
+# 6. Text Analysis:
+#    info = TextProcessor.get_processing_info(text)
+#    if info['has_unicode'] and 'CJK' in info['script_types']:
+#        # Handle CJK text differently
+#
+# 7. Legacy Functions:
+#    # Use sparingly - only when you need forced ASCII conversion
+#    ascii_only = sanitize_python_input(text)
+#    # For more control over romanization
+#    romanized = romanize_text(text)
+#
+# Best Practices:
+# - Always preserve Unicode when possible
+# - Use context-specific processors
+# - Store both original and processed versions when needed
+# - Don't apply blanket sanitization to all text
+# - Consider user locale and preferences

@@ -1,13 +1,13 @@
 import json
 import logging
 import os
-import re
 import tempfile
 from typing import Tuple
 
 import requests
 from models.chat_config import ChatConfig
 from utils.config import config
+from utils.text_processing import TextProcessor
 
 
 class FileController:
@@ -41,27 +41,12 @@ class FileController:
         # Remove path components if any
         filename = os.path.basename(filename)
 
-        # Replace multiple spaces/underscores with single underscore
-        normalized = re.sub(r"[\s_]+", "_", filename)
+        # Use TextProcessor to create a safe filename
+        # This handles Unicode properly and creates ASCII-safe filenames
+        normalized = TextProcessor.for_filename(filename)
 
-        # Remove any non-alphanumeric characters except dots and underscores
-        normalized = re.sub(r"[^a-zA-Z0-9._-]", "", normalized)
-
-        # Replace multiple dots with single dot (except for extension)
-        parts = normalized.rsplit(".", 1)
-        if len(parts) == 2:
-            name, ext = parts
-            name = re.sub(r"\.+", ".", name)
-            normalized = f"{name}.{ext}"
-
-        # Convert to lowercase for consistency
+        # Convert to lowercase for consistency in tracking
         normalized = normalized.lower()
-
-        # Remove duplicate underscores
-        normalized = re.sub(r"_{2,}", "_", normalized)
-
-        # Final cleanup - remove leading/trailing whitespace
-        normalized = normalized.strip()
 
         return normalized
 

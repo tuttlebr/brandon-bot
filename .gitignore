@@ -276,3 +276,4 @@ kubernetes-deployment.yaml
 undeploy.sh
 examples/
 auth.yaml
+clean.py

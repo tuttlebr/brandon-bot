@@ -172,6 +172,7 @@ class ChatHistoryComponent:
         Args:
             context: Context information to display
         """
+
         if context:
             with st.expander(
                 "📋 View Tool Data Sources (for verification)", expanded=False

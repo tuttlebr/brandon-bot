@@ -308,7 +308,7 @@ class ImageController:
                 with st.chat_message(
                     "user", avatar=self.config_obj.user_avatar
                 ):
-                    st.markdown(user_message)
+                    st.markdown(user_message, unsafe_allow_html=True)
 
                 # Add assistant response
                 assistant_message = (
@@ -323,7 +323,7 @@ class ImageController:
                 with st.chat_message(
                     "assistant", avatar=self.config_obj.assistant_avatar
                 ):
-                    st.markdown(assistant_message)
+                    st.markdown(assistant_message, unsafe_allow_html=True)
 
                 # Mark file as processed
                 self.mark_file_as_processed(filename)

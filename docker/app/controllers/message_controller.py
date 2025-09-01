@@ -5,7 +5,7 @@ from typing import Any, Dict, List
 import streamlit as st
 from models.chat_config import ChatConfig
 from services import ChatService
-from utils.text_processing import sanitize_python_input, strip_think_tags
+from utils.text_processing import TextProcessor, strip_think_tags
 
 
 class MessageController:
@@ -121,7 +121,9 @@ class MessageController:
 
         return cleaned_messages
 
-    def safe_add_message_to_history(self, role: str, content: Any) -> bool:
+    def safe_add_message_to_history(
+        self, role: str, content: Any, skip_processing: bool = False
+    ) -> bool:
         """
         Enhanced safe message addition with Python validation
 
@@ -129,34 +131,58 @@ class MessageController:
             role: The role of the message sender
             content: The content of the message (can be string, dict for
                 images, etc.)
+            skip_processing: If True, skip content processing
+                (for already processed content)
 
         Returns:
             True if message was added, False if rejected
         """
         # Handle different content types
         if isinstance(content, str):
-            # Sanitize the content first
-            sanitized_content = sanitize_python_input(content)
+            if not skip_processing:
+                # Clean the content for display while preserving Unicode
+                cleaned_content = TextProcessor.for_display(content)
 
-            if not sanitized_content:
-                logging.warning(
-                    f"Attempted to add empty {role} message to chat "
-                    f"history, skipping"
-                )
-                return False
+                if not cleaned_content:
+                    logging.warning(
+                        f"Attempted to add empty {role} message to chat "
+                        f"history, skipping"
+                    )
+                    return False
 
-            # Check for tool call instructions (but allow tool responses)
-            if role != "tool" and self.contains_tool_call_instructions(
-                sanitized_content
-            ):
-                logging.warning(
-                    f"Attempted to add {role} message with tool call "
-                    f"instructions to chat history, skipping"
-                )
-                return False
+                # Check for tool call instructions (but allow tool responses)
+                if role != "tool" and self.contains_tool_call_instructions(
+                    cleaned_content
+                ):
+                    logging.warning(
+                        f"Attempted to add {role} message with tool call "
+                        f"instructions to chat history, skipping"
+                    )
+                    return False
 
-            # Strip think tags before adding to history
-            content = strip_think_tags(sanitized_content).strip()
+                # Process content only once when first adding
+                # For user messages, preserve the original markdown
+                # formatting. Only strip think tags and extract context
+                # for assistant messages
+                if role == "user":
+                    # For user messages, just use the cleaned content
+                    content = cleaned_content
+                    logging.debug("User message preserved: %s", repr(content))
+                else:
+                    # For assistant messages, strip think tags and
+                    # extract context
+                    from utils.split_context import extract_context_regex
+
+                    content = strip_think_tags(cleaned_content).strip()
+                    content = extract_context_regex(content).strip()
+            else:
+                # Content is already processed, just validate it's not empty
+                if not content:
+                    logging.warning(
+                        f"Attempted to add empty {role} message to chat "
+                        f"history, skipping"
+                    )
+                    return False
         elif isinstance(content, dict):
             # Dict content (like image messages) - ensure it has
             # meaningful data
@@ -197,24 +223,10 @@ class MessageController:
             text: The response text
             role: The role of the message sender
         """
-        # Clean up message format before saving using session controller
-        # if available
-        if hasattr(self, 'session_controller') and self.session_controller:
-            messages = self.session_controller.get_messages()
-            cleaned_messages = self.chat_service.drop_verbose_messages_context(
-                messages
-            )
-            self.session_controller.set_messages(cleaned_messages)
-        else:
-            # Fallback to direct access
-            if hasattr(st.session_state, "messages"):
-                st.session_state.messages = (
-                    self.chat_service.drop_verbose_messages_context(
-                        st.session_state.messages
-                    )
-                )
+        # For new messages, process the content once and store it
+        # Don't re-process existing messages in history
 
-        # Use the safe method to add the message
+        # Use the safe method to add the message (it will handle processing)
         self.safe_add_message_to_history(role, text)
 
     def prepare_messages_for_processing(

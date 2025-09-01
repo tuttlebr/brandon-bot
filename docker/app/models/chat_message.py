@@ -1,5 +1,4 @@
 from typing import Any, Dict, List, Union
-from utils.text_processing import strip_think_tags
 
 
 class ChatMessage:
@@ -38,8 +37,9 @@ class ChatMessage:
         else:
             raw_content = self.content
 
-        # Strip think tags before returning
-        return strip_think_tags(raw_content)
+        # Content should already be processed when stored in history
+        # Just return it as-is to avoid double processing
+        return raw_content
 
     def is_image_message(self) -> bool:
         """

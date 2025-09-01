@@ -135,7 +135,7 @@ class ProductionStreamlitChatApp:
 
             # Display user message with centralized configuration
             with st.chat_message("user", avatar=self.config_obj.user_avatar):
-                st.markdown(prompt)
+                st.markdown(prompt, unsafe_allow_html=True)
 
             # Clear previous context and tool responses using controllers
             self.session_controller.clear_tool_context()
@@ -379,7 +379,8 @@ class ProductionStreamlitChatApp:
                         > config.file_processing.PDF_SUMMARIZATION_THRESHOLD
                     ):
                         st.markdown(
-                            "💡 This is a large document. You can ask me to 'summarize the PDF' for a quick overview!"
+                            "💡 This is a large document. You can ask me to 'summarize the PDF' for a quick overview!",
+                            unsafe_allow_html=True,
                         )
 
                     if st.button(
@@ -390,8 +391,8 @@ class ProductionStreamlitChatApp:
                         st.rerun()
 
             # Image Upload Section
-            st.markdown("---")
-            st.markdown("### 📷 Image Upload")
+            st.markdown("---", unsafe_allow_html=True)
+            st.markdown("### 📷 Image Upload", unsafe_allow_html=True)
 
             # Check image processing status
             processing_status = getattr(
