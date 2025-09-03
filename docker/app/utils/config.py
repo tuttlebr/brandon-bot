@@ -130,8 +130,8 @@ class LLMConfig:
     # Default model parameters
     DEFAULT_TEMPERATURE: float = 0.6
     DEFAULT_TOP_P: float = 0.95
-    DEFAULT_FREQUENCY_PENALTY: float = 0.0
-    DEFAULT_PRESENCE_PENALTY: float = 0.0
+    DEFAULT_FREQUENCY_PENALTY: float = 0.5
+    DEFAULT_PRESENCE_PENALTY: float = 0.5
     DEFAULT_MAX_TOKENS: int = 65536
 
     # Context and token limits
