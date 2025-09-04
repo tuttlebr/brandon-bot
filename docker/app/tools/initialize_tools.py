@@ -28,6 +28,7 @@ def initialize_all_tools():
 
         # Import tool classes
         from tools.assistant import AssistantTool
+        from tools.context_generation import ContextGenerationTool
         from tools.conversation_context import ConversationContextTool
         from tools.extract import WebExtractTool
         from tools.generalist import GeneralistTool
@@ -43,6 +44,7 @@ def initialize_all_tools():
 
         # Register tool classes with lazy loading (instances created on demand)
         register_tool_class("text_assistant", AssistantTool)
+        register_tool_class("context_generation", ContextGenerationTool)
         register_tool_class("conversation_context", ConversationContextTool)
         register_tool_class("extract_web_content", WebExtractTool)
         register_tool_class("generalist_conversation", GeneralistTool)

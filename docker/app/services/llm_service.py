@@ -353,8 +353,9 @@ class LLMService:
 
         for response in tool_responses:
             if response.get("role") == "direct_response":
-                # Check if this is an image generation response
-                if response.get("tool_name") == "generate_image":
+                # Check if this is an image generation or context generation response
+                tool_name = response.get("tool_name")
+                if tool_name in ["generate_image", "context_generation"]:
                     tool_result = response.get("tool_result")
                     if (
                         tool_result
@@ -364,7 +365,7 @@ class LLMService:
                         ui_elements.append(
                             {
                                 "type": "image",
-                                "tool_name": "generate_image",
+                                "tool_name": tool_name,
                                 "data": {
                                     "success": tool_result.success,
                                     "image_data": getattr(
@@ -502,7 +503,7 @@ class LLMService:
                 if response.get("role") == "direct_response":
                     tool_name = response.get("tool_name", "")
                     # Skip image generation tools - they're handled separately by response controller
-                    if tool_name == "generate_image":
+                    if tool_name in ["generate_image", "context_generation"]:
                         continue
 
                     # Check if this is a streaming response

@@ -373,6 +373,65 @@ class ToolExecutionService:
                     "Error accessing session state for image data: %s", e
                 )
 
+        # Add image data for context_generation tool
+        if tool_name == "context_generation":
+            try:
+                import streamlit as st
+
+                if (
+                    hasattr(st.session_state, 'current_image_base64')
+                    and st.session_state.current_image_base64
+                ):
+                    modified_args["image_base64"] = (
+                        st.session_state.current_image_base64
+                    )
+                    modified_args["filename"] = getattr(
+                        st.session_state, 'current_image_filename', 'Unknown'
+                    )
+                    logger.info(
+                        f"Successfully added image data to context_generation arguments - filename: {modified_args['filename']}, data length: {len(modified_args['image_base64'])}"
+                    )
+                else:
+                    logger.warning(
+                        "No image data found in session state for context_generation tool"
+                    )
+
+                    # Try to get from session controller as fallback
+                    try:
+                        from controllers.session_controller import (
+                            SessionController,
+                        )
+
+                        session_controller = SessionController(self.config)
+                        latest_image = (
+                            session_controller.get_latest_uploaded_image()
+                        )
+                        if latest_image and latest_image.get('image_data'):
+                            modified_args["image_base64"] = latest_image[
+                                'image_data'
+                            ]
+                            modified_args["filename"] = latest_image.get(
+                                'filename', 'Unknown'
+                            )
+                            logger.info(
+                                f"Retrieved image from session controller for context_generation - filename: {modified_args['filename']}"
+                            )
+                        else:
+                            logger.warning(
+                                "No image found in session controller either for context_generation"
+                            )
+                    except Exception as e:
+                        logger.error(
+                            "Error accessing session controller for context_generation: %s",
+                            e,
+                        )
+
+            except Exception as e:
+                logger.error(
+                    "Error accessing session state for context_generation image data: %s",
+                    e,
+                )
+
         return modified_args
 
     def _apply_tool_restrictions(

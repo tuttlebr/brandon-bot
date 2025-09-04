@@ -219,6 +219,7 @@ class ToolConfig:
             "pdf_assistant": True,
             "analyze_image": True,
             "generate_image": True,
+            "context_generation": True,
             "get_weather": True,
             "generalist_conversation": True,
             "serpapi_internet_search": True,

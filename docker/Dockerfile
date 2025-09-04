@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7-labs
-FROM astral/uv:0.8.8-python3.13-bookworm-slim AS app
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS app
 ENV TZ=America/New_York
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
