@@ -9,6 +9,7 @@ A production-ready conversational AI application built with Streamlit, featuring
 - [Architecture](#architecture)
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
+- [REST API](#rest-api)
 - [Available Tools](#available-tools)
 - [MVC Implementation](#mvc-implementation)
 - [Services Layer](#services-layer)
@@ -17,7 +18,7 @@ A production-ready conversational AI application built with Streamlit, featuring
 
 ## Overview
 
-This application provides a sophisticated agentic chatbot interface powered by NVIDIA's language models, with a **production-grade MVC architecture** that ensures:
+This application provides a sophisticated agentic chatbot interface powered by NVIDIA's language models, available both as a web UI and a RESTful API, with a **production-grade MVC architecture** that ensures:
 
 - 🏗️ **Clean separation of concerns** between Models, Views, and Controllers
 - 🎯 **Framework abstraction** through view interfaces and helpers
@@ -51,48 +52,51 @@ The application includes **12 specialized tools** providing comprehensive AI cap
    - Multi-language translation
    - Code development assistance
 
-2. **Image Generation** (`generate_image`) - AI-powered image creation with:
+1. **Image Generation** (`generate_image`) - AI-powered image creation with:
    - Context-aware prompt enhancement
    - Multiple style presets (photorealistic, digital art, oil painting, etc.)
    - Aspect ratio control
    - Conversation context integration
 
-3. **Image Analysis** (`analyze_image`) - Vision-capable LLM for:
+1. **Image Analysis** (`analyze_image`) - Vision-capable LLM for:
    - Image description and understanding
    - Object identification
    - Visual question answering
    - Automatic image optimization for VLM processing
 
-4. **PDF Summary** (`retrieve_pdf_summary`) - Intelligent document summarization with:
+1. **PDF Summary** (`retrieve_pdf_summary`) - Intelligent document summarization with:
    - Recursive summarization for large documents
    - Query-aware processing
    - Batch processing for efficiency
 
-5. **PDF Text Processor** (`process_pdf_text`) - Advanced PDF analysis:
+1. **PDF Text Processor** (`process_pdf_text`) - Advanced PDF analysis:
    - Query-specific document analysis
    - Intelligent page selection
    - Context-aware responses
 
-6. **Web Search** (`tavily_internet_search`) - General web search integration
+1. **Web Search** (`serpapi_internet_search`) - General web search integration
 
-7. **News Search** (`tavily_news_search`) - Real-time news and current events
+1. **News Search** (`serpapi_news_search`) - Real-time news and current events
 
-8. **Weather** (`get_weather`) - Current weather information
+1. **Weather** (`get_weather`) - Current weather information
 
-9. **Web Extract** (`extract_web_content`) - Clean content extraction from URLs
+1. **Web Extract** (`extract_web_content`) - Clean content extraction from URLs
 
-10. **Retriever** (`retrieval_search`) - Vector-based semantic search for knowledge bases
+1. **Retriever** (`retrieval_search`) - Vector-based semantic search for knowledge bases
 
-11. **Conversation Context** (`conversation_context`) - Intelligent conversation analysis:
-    - Conversation summaries
-    - Topic extraction
-    - Task continuity tracking
-    - Document analysis context
+1. **Conversation Context** (`conversation_context`) - Intelligent conversation analysis:
+   - Conversation summaries
+   - Topic extraction
+   - Task continuity tracking
+   - Document analysis context
 
-12. **Generalist Conversation** (`generalist_conversation`) - General discussion and explanations
+1. **Generalist Conversation** (`generalist_conversation`) - General discussion and explanations
+
+1. **Context Generation** (`context_generation`) - Generate or modify images based on an existing image and text
 
 ### Production Features
 
+- **RESTful API**: OpenAI-compatible REST API endpoint for programmatic access
 - **Streaming Architecture**: Efficient real-time response streaming with progress indicators
 - **Smart Context Management**: Automatic injection of conversation and document context
 - **External File Storage**: Prevents memory exhaustion with disk-based file management
@@ -100,6 +104,8 @@ The application includes **12 specialized tools** providing comprehensive AI cap
 - **Session Isolation**: Secure, isolated user sessions with proper cleanup
 - **Error Recovery**: Comprehensive error handling with graceful degradation
 - **View Abstraction**: Framework-agnostic UI layer for easy testing and migration
+- **Flexible Tool Configuration**: Enable/disable tools dynamically via configuration
+- **Per-Model API Keys**: Support for different API keys per model type for better resource management
 
 ## Architecture
 
@@ -162,7 +168,8 @@ This application implements a **sophisticated MVC pattern** with service-oriente
 ./
 ├── docker/
 │   └── app/
-│       ├── main.py                      # Application entry point
+│       ├── main.py                      # Streamlit application entry point
+│       ├── api.py                       # FastAPI REST API server
 │       │
 │       ├── controllers/                 # 🎮 CONTROLLER LAYER
 │       │   ├── session_controller.py    # Session management
@@ -255,8 +262,9 @@ This application implements a **sophisticated MVC pattern** with service-oriente
    ```
 
 4. **Access the application**
-
-   Open your browser and navigate to `http://localhost:80`
+   - Streamlit UI: `http://localhost:80`
+   - REST API: `http://localhost:8000`
+   - API Documentation: `http://localhost:8000/docs`
 
 ## Configuration
 
@@ -288,25 +296,26 @@ BOT_TITLE=Streamlit Agentic Chatbot
 
 ### Per-Model API Keys (Optional)
 
-You can now specify different API keys for different models. If not specified, all models will use the global `NVIDIA_API_KEY`.
+The application now supports **individual API keys for each model type**, providing greater flexibility in resource management and usage tracking. If not specified, all models will fall back to using the global `NVIDIA_API_KEY`.
 
 ```bash
 # Individual model API keys (optional - defaults to NVIDIA_API_KEY if not set)
-FAST_LLM_API_KEY=your_fast_llm_api_key
-LLM_API_KEY=your_standard_llm_api_key
-INTELLIGENT_LLM_API_KEY=your_intelligent_llm_api_key
-VLM_API_KEY=your_vision_model_api_key
-EMBEDDING_API_KEY=your_embedding_api_key
-RERANKER_API_KEY=your_reranker_api_key
-IMAGE_API_KEY=your_image_generation_api_key
+FAST_LLM_API_KEY=your_fast_llm_api_key          # For quick operations (weather, search)
+LLM_API_KEY=your_standard_llm_api_key           # For general text processing
+INTELLIGENT_LLM_API_KEY=your_intelligent_key    # For complex reasoning & tool selection
+VLM_API_KEY=your_vision_model_api_key           # For image analysis
+EMBEDDING_API_KEY=your_embedding_api_key        # For vector embeddings
+RERANKER_API_KEY=your_reranker_api_key         # For search result reranking
+IMAGE_API_KEY=your_image_generation_api_key     # For image generation
 ```
 
-This allows you to:
+#### Benefits of Per-Model API Keys:
 
-- Use different API providers for different models
-- Apply different rate limits or quotas per model type
-- Track usage per model type with separate API keys
-- Maintain backward compatibility with a single NVIDIA_API_KEY
+- **Multi-Provider Support**: Use different API providers for different models (e.g., NVIDIA for LLMs, custom endpoint for embeddings)
+- **Resource Management**: Apply different rate limits or quotas per model type
+- **Cost Tracking**: Monitor usage and costs separately for each model type
+- **Fallback Support**: Automatically falls back to `NVIDIA_API_KEY` if individual keys aren't set
+- **Backward Compatibility**: Existing setups with just `NVIDIA_API_KEY` continue to work
 
 ### Optional Services
 
@@ -348,6 +357,147 @@ The application intelligently selects the appropriate LLM model based on the too
 
 - **Vision Model** (`VLM_MODEL_NAME`): Used for image analysis
   - Image understanding and description
+
+### Tool Configuration
+
+The application supports flexible tool configuration through environment variables or configuration files:
+
+```bash
+# Enable/disable specific tools via environment variables
+TOOL_ENABLE_TEXT_ASSISTANT=true
+TOOL_ENABLE_CONVERSATION_CONTEXT=true
+TOOL_ENABLE_SERPAPI_INTERNET_SEARCH=false
+TOOL_ENABLE_PDF_ASSISTANT=true
+
+# Use enhanced tool descriptions
+USE_ENHANCED_TOOL_DESCRIPTIONS=true
+
+# Or use a configuration file
+TOOL_CONFIG_FILE=/path/to/tool_config.json
+```
+
+Example tool configuration file (`tool_config.json`):
+
+```json
+{
+  "enabled_tools": {
+    "text_assistant": true,
+    "conversation_context": true,
+    "serpapi_internet_search": false,
+    "pdf_assistant": true,
+    "analyze_image": true,
+    "generate_image": true
+  }
+}
+```
+
+## REST API
+
+The application provides a RESTful API that is fully compatible with the OpenAI Chat Completions API format, making it easy to integrate with existing tools and libraries.
+
+### API Endpoints
+
+#### Chat Completion
+
+```
+POST /agent
+```
+
+Send chat completion requests in OpenAI format:
+
+```bash
+curl -X POST http://localhost:8000/agent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [
+      {"role": "user", "content": "What is the weather in San Francisco?"}
+    ],
+    "model": "fast",
+    "temperature": 0.7,
+    "stream": false
+  }'
+```
+
+#### Streaming Response
+
+```bash
+curl -X POST http://localhost:8000/agent \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [
+      {"role": "user", "content": "Write a story about a robot"}
+    ],
+    "stream": true
+  }'
+```
+
+#### With Session ID
+
+```
+POST /agent/{session_id}
+```
+
+Maintain conversation continuity with session IDs:
+
+```bash
+curl -X POST http://localhost:8000/agent/my-session-123 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [
+      {"role": "user", "content": "Continue our previous discussion"}
+    ]
+  }'
+```
+
+### API Features
+
+- **OpenAI Compatibility**: Works with any OpenAI-compatible client library
+- **Streaming Support**: Real-time streaming responses for better UX
+- **Session Management**: Maintain conversation context across requests
+- **Tool Integration**: Full access to all enabled tools via API
+- **Model Selection**: Specify which model to use (fast, standard, intelligent, vlm)
+
+### Running the API
+
+To run the API server alongside the Streamlit app:
+
+```bash
+# Using Docker Compose (recommended)
+docker compose up app api nginx -d
+
+# Or run directly
+python docker/app/api.py
+```
+
+The API will be available at `http://localhost:8000` with interactive documentation at `http://localhost:8000/docs`.
+
+### API Response Format
+
+Responses follow the OpenAI Chat Completion format:
+
+```json
+{
+  "id": "chatcmpl-123",
+  "object": "chat.completion",
+  "created": 1677652288,
+  "model": "meta/llama-3.1-70b-instruct",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "The weather in San Francisco is currently 65°F with partly cloudy skies."
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 12,
+    "completion_tokens": 18,
+    "total_tokens": 30
+  }
+}
+```
 
 ## MVC Implementation
 
@@ -670,11 +820,13 @@ The application is containerized for easy deployment:
 docker compose up -d
 
 # View logs
-docker compose logs -f app
+docker compose logs -f app api
 
-# Access the application
-# Main app: http://localhost:80
-# Documentation: http://localhost:8001
+# Access the services
+# Streamlit UI: http://localhost:80
+# REST API: http://localhost:8000
+# API Documentation: http://localhost:8000/docs
+# App Documentation: http://localhost:8001
 ```
 
 ### Environment Configuration

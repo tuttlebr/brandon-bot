@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional, Type
 import serpapi
 from pydantic import BaseModel, Field
 from tools.base import BaseTool, BaseToolResponse
+from utils.text_processing import clean_content, strip_think_tags
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -146,8 +147,8 @@ class SerpAPITool(BaseTool):
                             "type": "string",
                             "description": (
                                 "location for the search "
-                                "MUST be in the form of a City, State, "
-                                "Country (e.g., 'New York, NY, "
+                                "MUST be in the form of a 'City, State, "
+                                "Country' (e.g., 'New York, NY, "
                                 "United States')."
                             ),
                             "default": "Saline, Michigan, United States",
@@ -275,7 +276,7 @@ class SerpAPITool(BaseTool):
             # Fall back to snippets for all results
             for result in top_results:
                 if (
-                    not hasattr(result, 'extracted_content')
+                    not hasattr(result, "extracted_content")
                     or not result.extracted_content
                 ):
                     result.extracted_content = result.snippet
@@ -312,59 +313,22 @@ class SerpAPITool(BaseTool):
         formatted_entries = []
         for i, result in enumerate(results, 1):
             # Clean up snippet text to remove formatting artifacts
-            clean_snippet = self._clean_content(result.snippet)
+            clean_snippet = clean_content(result.snippet)
             # Format as: 1. [title](link): snippet
             entry = (
-                f"{i}. [{result.title}]({result.link}): {clean_snippet}\n\n___"
+                f"{i}. [{result.title}]({result.link}) - "
+                f"{result.source} ({result.date}): {clean_snippet}\n\n"
             )
 
             # Add extracted content if available
             if result.extracted_content:
-                entry += f"\n\n**Content:**\n{result.extracted_content}"
-
+                # Strip think tags from extracted content before display
+                cleaned_extract = strip_think_tags(result.extracted_content)
+                entry += f"\n\n**Extracted Content:**\n{cleaned_extract}"
+            entry += "\n\n___"
             formatted_entries.append(entry)
 
         return "\n".join(formatted_entries)
-
-    def _clean_content(self, content: str) -> str:
-        """
-        Clean content text by removing formatting artifacts and ensuring
-        plain text display
-
-        Args:
-            content: Raw content string from search results
-
-        Returns:
-            str: Cleaned content suitable for markdown display
-        """
-        if not content:
-            return ""
-
-        # Remove common markdown formatting artifacts
-        import re
-
-        # Remove markdown headers (# ## ###)
-        content = re.sub(r"^#+\s*", "", content, flags=re.MULTILINE)
-
-        # Remove markdown bold/italic formatting
-        # (**text**, *text*, __text__, _text_)
-        content = re.sub(r"\*{1,2}([^*]+)\*{1,2}", r"\1", content)
-        content = re.sub(r"_{1,2}([^_]+)_{1,2}", r"\1", content)
-
-        # Remove markdown links but keep the text [text](url) -> text
-        content = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", content)
-
-        # Remove HTML tags
-        content = re.sub(r"<[^>]+>", "", content)
-
-        # Remove excessive whitespace and normalize line breaks
-        content = re.sub(r"\s+", " ", content)
-        content = content.strip()
-
-        # Remove leading/trailing quotes that might be artifacts
-        content = content.strip("\"'")
-
-        return content
 
     def search_serpapi(
         self, query: str, location_requested: str, **kwargs

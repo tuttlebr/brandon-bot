@@ -50,7 +50,7 @@ def initialize_all_tools():
         register_tool_class("generalist_conversation", GeneralistTool)
         register_tool_class("analyze_image", ImageAnalysisTool)
         register_tool_class("generate_image", ImageGenerationTool)
-        register_tool_class("tavily_news_search", NewsTool)
+        register_tool_class("serpapi_news_search", NewsTool)
         register_tool_class(
             "pdf_assistant", PDFAssistantTool
         )  # Single PDF tool

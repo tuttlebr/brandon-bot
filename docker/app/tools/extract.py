@@ -22,7 +22,7 @@ from tools.base import (
     ToolController,
     ToolView,
 )
-from utils.text_processing import StreamingThinkTagFilter, strip_think_tags
+from utils.text_processing import StreamingThinkTagFilter, clean_content
 from utils.web_extractor import WebDataExtractor
 
 # Configure logger
@@ -371,7 +371,10 @@ Instructions:
             response = client.chat.completions.create(
                 model=model_name,
                 messages=messages,
-                temperature=0.6,
+                temperature=0.28,
+                top_p=0.95,
+                frequency_penalty=0.002,
+                presence_penalty=0.9,
                 stream=True,  # Enable streaming for faster latency
             )
 
@@ -427,7 +430,7 @@ Instructions:
 
             system_prompt = get_tool_system_prompt("extract_web_content", "")
 
-            user_message = f"Extract the main content from this webpage and convert it to markdown:\n\nURL: {url}\n\nHTML Content:\n{html_content}"
+            user_message = f"Extract the main content from this webpage and convert it to markdown. Be sure to escape any special characters as needed:\n\nURL: {url}\n\nHTML Content:\n{html_content}"
 
             messages = [
                 {"role": "system", "content": system_prompt},
@@ -441,14 +444,17 @@ Instructions:
             response = await client.chat.completions.create(
                 model=model_name,
                 messages=messages,
-                temperature=0.6,
+                temperature=0.28,
+                top_p=0.95,
+                frequency_penalty=0.002,
+                presence_penalty=0.9,
                 max_tokens=65536,
             )
 
             result = response.choices[0].message.content.strip()
 
             # Clean and validate the extracted content
-            cleaned_result = self._clean_extracted_content(result)
+            cleaned_result = clean_content(result)
 
             logger.info(
                 f"Successfully extracted {len(cleaned_result)} characters from URL (async)"
@@ -512,7 +518,10 @@ Instructions:
             response = await client.chat.completions.create(
                 model=model_name,
                 messages=messages,
-                temperature=0.6,
+                temperature=0.28,
+                top_p=0.95,
+                frequency_penalty=0.002,
+                presence_penalty=0.9,
                 stream=True,  # Enable streaming
             )
 
@@ -552,29 +561,6 @@ Instructions:
         ):
             collected_result += chunk
         return collected_result
-
-    def _clean_extracted_content(self, content: str) -> str:
-        """Clean up extracted content for better readability"""
-        if not content:
-            return ""
-
-        # Remove excessive newlines
-        content = re.sub(r"\n{3,}", "\n\n", content)
-
-        # Remove any remaining HTML tags that might have slipped through
-        content = re.sub(r"<[^>]+>", "", content)
-
-        # Remove excessive whitespace
-        content = re.sub(r" {2,}", " ", content)
-        content = content.strip()
-
-        # Strip think tags from extracted content
-        content = strip_think_tags(content)
-
-        # Add a header with the extraction notice
-        header = "## Web Content Extract\n\n"
-
-        return header + content
 
 
 class WebExtractView(ToolView):

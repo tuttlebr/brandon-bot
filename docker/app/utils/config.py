@@ -128,10 +128,10 @@ class LLMConfig:
     """LLM service configuration"""
 
     # Default model parameters
-    DEFAULT_TEMPERATURE: float = 0.6
+    DEFAULT_TEMPERATURE: float = 0.28
     DEFAULT_TOP_P: float = 0.95
-    DEFAULT_FREQUENCY_PENALTY: float = 0.5
-    DEFAULT_PRESENCE_PENALTY: float = 0.5
+    DEFAULT_FREQUENCY_PENALTY: float = 0.002
+    DEFAULT_PRESENCE_PENALTY: float = 0.9
     DEFAULT_MAX_TOKENS: int = 65536
 
     # Context and token limits
@@ -213,8 +213,8 @@ class ToolConfig:
             "text_assistant": True,
             "conversation_context": True,
             "extract_web_content": True,
-            "tavily_internet_search": False,
-            "tavily_news_search": True,
+            "serpapi_internet_search": False,
+            "serpapi_news_search": True,
             "retrieval_search": True,
             "pdf_assistant": True,
             "analyze_image": True,
@@ -372,9 +372,6 @@ class EnvironmentConfig:
     )
 
     # Other API keys
-    TAVILY_API_KEY: Optional[str] = field(
-        default_factory=lambda: os.getenv("TAVILY_API_KEY")
-    )
     SERPAPI_KEY: Optional[str] = field(
         default_factory=lambda: os.getenv("SERPAPI_KEY")
     )

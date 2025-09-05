@@ -204,8 +204,8 @@ TOOL_DEFINITIONS = {
             "What does this webpage say: [URL]",
         ],
         "example_non_uses": [
-            "Search for information about X (use tavily_internet_search)",
-            "Find me articles about Y (use tavily_internet_search)",
+            "Search for information about X (use serpapi_internet_search)",
+            "Find me articles about Y (use serpapi_internet_search)",
             "Thanks! (acknowledgment - no tool needed)",
         ],
     },
@@ -239,7 +239,7 @@ TOOL_DEFINITIONS = {
             "Search for information about Y in the PDF",
         ],
     },
-    "tavily_news_search": {
+    "serpapi_news_search": {
         "description": "Search specifically for news articles and breaking events. Use when user explicitly asks for news, headlines, or current events.",
         "trigger_words": [
             "news",

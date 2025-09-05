@@ -6,6 +6,46 @@ from typing import Any, Dict, Optional
 logger = logging.getLogger(__name__)
 
 
+def clean_content(content: str) -> str:
+    """
+    Clean content text by removing formatting artifacts and ensuring
+    plain text display
+
+    Args:
+        content: Raw content string from search results
+
+    Returns:
+        str: Cleaned content suitable for markdown display
+    """
+    if not content:
+        return ""
+
+    # # Remove common markdown formatting artifacts
+
+    # # Remove markdown headers (# ## ###)
+    # content = re.sub(r"^#+\s*", "", content, flags=re.MULTILINE)
+
+    # # Remove markdown bold/italic formatting
+    # # (**text**, *text*, __text__, _text_)
+    # content = re.sub(r"\*{1,2}([^*]+)\*{1,2}", r"\1", content)
+    # content = re.sub(r"_{1,2}([^_]+)_{1,2}", r"\1", content)
+
+    # # Remove markdown links but keep the text [text](url) -> text
+    # content = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", content)
+
+    # # Remove HTML tags
+    # content = re.sub(r"<[^>]+>", "", content)
+
+    # # Remove excessive whitespace and normalize line breaks
+    # content = re.sub(r"\s+", " ", content)
+
+    # # Remove leading/trailing quotes that might be artifacts
+    # content = content.strip("\"'")
+
+    content = content.strip()
+    return content
+
+
 def strip_think_tags(text: Optional[str]) -> str:
     """
     Remove <think>...</think> tags and their content from text.
@@ -76,7 +116,7 @@ def romanize_text(text: str) -> str:
     try:
         # First, normalize the text to NFD (decomposed) form
         # This separates base characters from combining characters
-        normalized = unicodedata.normalize('NFD', text)
+        normalized = unicodedata.normalize("NFD", text)
 
         # Build the result character by character
         result = []
@@ -85,13 +125,13 @@ def romanize_text(text: str) -> str:
             category = unicodedata.category(char)
 
             # Skip combining marks (Mn = Mark, Nonspacing)
-            if category == 'Mn':
+            if category == "Mn":
                 continue
 
             # Try to get the ASCII representation
             try:
                 # Try to encode as ASCII
-                ascii_char = char.encode('ascii').decode('ascii')
+                ascii_char = char.encode("ascii").decode("ascii")
                 result.append(ascii_char)
             except UnicodeEncodeError:
                 # For characters that can't be converted to ASCII,
@@ -101,7 +141,7 @@ def romanize_text(text: str) -> str:
                     name = unicodedata.name(char, None)
                     if name:
                         # Handle some common cases
-                        if 'LATIN' in name and 'LETTER' in name:
+                        if "LATIN" in name and "LETTER" in name:
                             # Extract the base letter from names like
                             # "LATIN SMALL LETTER A WITH ACUTE"
                             parts = name.split()
@@ -110,30 +150,30 @@ def romanize_text(text: str) -> str:
                                 if len(letter) == 1 and letter.isalpha():
                                     result.append(
                                         letter.lower()
-                                        if 'SMALL' in name
+                                        if "SMALL" in name
                                         else letter
                                     )
                                     continue
 
                         # Handle quotation marks and apostrophes
-                        if 'QUOTATION MARK' in name:
+                        if "QUOTATION MARK" in name:
                             result.append('"')
                             continue
                         elif (
-                            'APOSTROPHE' in name
-                            or name == 'RIGHT SINGLE QUOTATION MARK'
+                            "APOSTROPHE" in name
+                            or name == "RIGHT SINGLE QUOTATION MARK"
                         ):
                             result.append("'")
                             continue
 
                         # Handle dashes and hyphens
-                        if 'DASH' in name or 'HYPHEN' in name:
-                            result.append('-')
+                        if "DASH" in name or "HYPHEN" in name:
+                            result.append("-")
                             continue
 
                         # Handle spaces
-                        if 'SPACE' in name:
-                            result.append(' ')
+                        if "SPACE" in name:
+                            result.append(" ")
                             continue
 
                     # If we can't handle it, skip the character
@@ -144,7 +184,7 @@ def romanize_text(text: str) -> str:
                     # Character has no Unicode name, skip it
                     pass
 
-        return ''.join(result)
+        return "".join(result)
 
     except Exception as e:  # pylint: disable=broad-except
         # We catch all exceptions to ensure we always return a string
@@ -175,17 +215,17 @@ class TextProcessor:
         # Romanize to ASCII for maximum compatibility
         safe = romanize_text(text)
         # Replace unsafe filename characters
-        safe = re.sub(r'[<>:"/\\|?*]', '_', safe)
+        safe = re.sub(r'[<>:"/\\|?*]', "_", safe)
         # Replace multiple spaces/underscores with single underscore
-        safe = re.sub(r'[\s_]+', '_', safe)
+        safe = re.sub(r"[\s_]+", "_", safe)
         # Remove leading/trailing underscores and dots
-        safe = safe.strip('_.').strip()
+        safe = safe.strip("_.").strip()
         # Ensure non-empty
         if not safe:
             safe = "unnamed"
         # Truncate if needed
         if len(safe) > max_length:
-            safe = safe[:max_length].rstrip('_')
+            safe = safe[:max_length].rstrip("_")
         return safe
 
     @staticmethod
@@ -203,7 +243,7 @@ class TextProcessor:
         if not text:
             return ""
         # Normalize Unicode (NFKC for compatibility)
-        normalized = unicodedata.normalize('NFKC', text)
+        normalized = unicodedata.normalize("NFKC", text)
         # Convert to lowercase for case-insensitive search
         return normalized.lower().strip()
 
@@ -224,12 +264,12 @@ class TextProcessor:
 
         # Don't normalize whitespace aggressively - preserve markdown
         # formatting. Only clean up excessive blank lines (more than 2)
-        text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
+        text = re.sub(r"\n\s*\n\s*\n+", "\n\n", text)
 
         # Clean up trailing whitespace on each line without breaking markdown
-        lines = text.split('\n')
+        lines = text.split("\n")
         cleaned_lines = [line.rstrip() for line in lines]
-        text = '\n'.join(cleaned_lines)
+        text = "\n".join(cleaned_lines)
 
         if not preserve_unicode:
             # Only romanize if explicitly requested
@@ -251,13 +291,13 @@ class TextProcessor:
         # First romanize to get ASCII
         ascii_text = romanize_text(text)
         # Replace non-alphanumeric with underscores
-        identifier = re.sub(r'[^a-zA-Z0-9]', '_', ascii_text)
+        identifier = re.sub(r"[^a-zA-Z0-9]", "_", ascii_text)
         # Remove leading numbers
-        identifier = re.sub(r'^[0-9]+', '', identifier)
+        identifier = re.sub(r"^[0-9]+", "", identifier)
         # Replace multiple underscores
-        identifier = re.sub(r'_+', '_', identifier)
+        identifier = re.sub(r"_+", "_", identifier)
         # Remove leading/trailing underscores
-        identifier = identifier.strip('_')
+        identifier = identifier.strip("_")
         # Ensure non-empty
         if not identifier:
             identifier = "var"
@@ -278,7 +318,7 @@ class TextProcessor:
         if not text:
             return ""
         # Remove control characters but preserve all printable chars
-        return ''.join(char for char in text if char.isprintable())
+        return "".join(char for char in text if char.isprintable())
 
     @staticmethod
     def for_database_query(text: str) -> str:
@@ -311,32 +351,32 @@ class TextProcessor:
             Dictionary with processing recommendations
         """
         info = {
-            'has_unicode': any(ord(char) > 127 for char in text),
-            'has_special_chars': bool(re.search(r'[^a-zA-Z0-9\s]', text)),
-            'has_control_chars': any(not char.isprintable() for char in text),
-            'script_types': set(),
-            'needs_normalization': False,
+            "has_unicode": any(ord(char) > 127 for char in text),
+            "has_special_chars": bool(re.search(r"[^a-zA-Z0-9\s]", text)),
+            "has_control_chars": any(not char.isprintable() for char in text),
+            "script_types": set(),
+            "needs_normalization": False,
         }
 
         # Detect script types
         for char in text:
             if ord(char) > 127:
-                name = unicodedata.name(char, '')
-                if 'CJK' in name:
-                    info['script_types'].add('CJK')
-                elif 'ARABIC' in name:
-                    info['script_types'].add('Arabic')
-                elif 'HEBREW' in name:
-                    info['script_types'].add('Hebrew')
-                elif 'CYRILLIC' in name:
-                    info['script_types'].add('Cyrillic')
-                elif 'DEVANAGARI' in name:
-                    info['script_types'].add('Devanagari')
+                name = unicodedata.name(char, "")
+                if "CJK" in name:
+                    info["script_types"].add("CJK")
+                elif "ARABIC" in name:
+                    info["script_types"].add("Arabic")
+                elif "HEBREW" in name:
+                    info["script_types"].add("Hebrew")
+                elif "CYRILLIC" in name:
+                    info["script_types"].add("Cyrillic")
+                elif "DEVANAGARI" in name:
+                    info["script_types"].add("Devanagari")
 
         # Check if normalization would change the text
-        normalized = unicodedata.normalize('NFC', text)
+        normalized = unicodedata.normalize("NFC", text)
         if normalized != text:
-            info['needs_normalization'] = True
+            info["needs_normalization"] = True
 
         return info
 

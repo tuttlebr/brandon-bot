@@ -31,7 +31,7 @@ from .image_gen import (
     get_image_generation_tool_definition,
 )
 from .news import NewsTool
-from .news import TavilyResponse as NewsResponse
+from .news import SerpAPINewsResponse as NewsResponse
 from .news import get_news_tool_definition
 
 
