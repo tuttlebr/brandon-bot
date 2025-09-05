@@ -72,6 +72,32 @@ def strip_think_tags(text: Optional[str]) -> str:
     return cleaned_text.strip()
 
 
+def escape_markdown_dollars(text: Optional[str]) -> str:
+    """
+    Escape dollar signs in text for Streamlit markdown rendering.
+
+    Streamlit's markdown renderer interprets dollar signs as LaTeX math
+    delimiters. This function escapes standalone dollar signs while
+    preserving intended LaTeX math expressions that use the ${...} syntax.
+
+    Args:
+        text: The text to process
+
+    Returns:
+        Text with dollar signs properly escaped for Streamlit markdown
+    """
+    if not text:
+        return ""
+
+    # Escape all dollar signs first
+    escaped_text = text.replace("$", "\\$")
+
+    # But preserve LaTeX math expressions that use ${...} syntax
+    escaped_text = escaped_text.replace("\\${", "${")
+
+    return escaped_text
+
+
 def sanitize_python_input(text: str) -> str:
     """
     Sanitize user input to make it safer for Python processing.

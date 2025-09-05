@@ -6,7 +6,7 @@ from models.chat_message import ChatMessage
 from services.file_storage_service import FileStorageService
 from utils.image import base64_to_pil_image
 from utils.split_context import extract_context_regex
-from utils.text_processing import strip_think_tags
+from utils.text_processing import escape_markdown_dollars, strip_think_tags
 
 
 class ChatHistoryComponent:
@@ -115,11 +115,15 @@ class ChatHistoryComponent:
                     # Display the text content
                     content = chat_message.get_display_content()
                     if content:
-                        st.markdown(content, unsafe_allow_html=True)
+                        # Escape dollar signs for proper markdown rendering
+                        escaped_content = escape_markdown_dollars(content)
+                        st.markdown(escaped_content, unsafe_allow_html=True)
                 else:
                     # Regular text message
                     content = chat_message.get_display_content()
-                    st.markdown(content, unsafe_allow_html=True)
+                    # Escape dollar signs for proper markdown rendering
+                    escaped_content = escape_markdown_dollars(content)
+                    st.markdown(escaped_content, unsafe_allow_html=True)
 
                 # Display tool context if this is the last assistant message and context exists
                 if (
@@ -179,9 +183,7 @@ class ChatHistoryComponent:
             ):
                 # Strip think tags before displaying
                 cleaned_context = strip_think_tags(context)
-                st.markdown(
-                    extract_context_regex(cleaned_context)
-                    .replace("$", "\\$")
-                    .replace("\\${", "${"),
-                    unsafe_allow_html=True,
-                )
+                # Extract context and escape dollar signs
+                extracted_context = extract_context_regex(cleaned_context)
+                escaped_context = escape_markdown_dollars(extracted_context)
+                st.markdown(escaped_context, unsafe_allow_html=True)

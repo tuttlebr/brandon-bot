@@ -135,7 +135,10 @@ class ProductionStreamlitChatApp:
 
             # Display user message with centralized configuration
             with st.chat_message("user", avatar=self.config_obj.user_avatar):
-                st.markdown(prompt, unsafe_allow_html=True)
+                from utils.text_processing import escape_markdown_dollars
+
+                escaped_prompt = escape_markdown_dollars(prompt)
+                st.markdown(escaped_prompt, unsafe_allow_html=True)
 
             # Clear previous context and tool responses using controllers
             self.session_controller.clear_tool_context()

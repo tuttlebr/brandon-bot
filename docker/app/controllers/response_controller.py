@@ -209,7 +209,13 @@ class ResponseController:
                             # Clear the animation on first real content
                             message_placeholder.empty()
                             first_chunk_received = True
-                        message_placeholder.markdown(display_text)
+                        # Escape dollar signs for proper markdown rendering
+                        from utils.text_processing import (
+                            escape_markdown_dollars,
+                        )
+
+                        escaped_text = escape_markdown_dollars(display_text)
+                        message_placeholder.markdown(escaped_text)
 
                 # Small delay for visual effect
                 await asyncio.sleep(0.01)
@@ -218,7 +224,11 @@ class ResponseController:
             final_chunk = think_filter.flush()
             if final_chunk:
                 display_text += final_chunk
-                message_placeholder.markdown(display_text)
+                # Escape dollar signs for proper markdown rendering
+                from utils.text_processing import escape_markdown_dollars
+
+                escaped_text = escape_markdown_dollars(display_text)
+                message_placeholder.markdown(escaped_text)
 
         except Exception as e:
             logging.error("Streaming error: %s", e)
@@ -760,10 +770,12 @@ class ResponseController:
             message_placeholder: Streamlit placeholder for the message
         """
         from utils.image import base64_to_pil_image
+        from utils.text_processing import escape_markdown_dollars
 
         # First, display the full text response
         display_response = strip_think_tags(full_response)
-        message_placeholder.markdown(display_response)
+        escaped_response = escape_markdown_dollars(display_response)
+        message_placeholder.markdown(escaped_response)
 
         # Then display each UI element
         for element in ui_elements:
