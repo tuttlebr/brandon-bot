@@ -317,7 +317,7 @@ class SerpAPITool(BaseTool):
             # Format as: 1. [title](link): snippet
             entry = (
                 f"{i}. [{result.title}]({result.link}) - "
-                f"{result.source} ({result.date}): {clean_snippet}\n\n"
+                f"{result.link}: {clean_snippet}\n\n"
             )
 
             # Add extracted content if available
