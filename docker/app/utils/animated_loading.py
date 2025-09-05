@@ -5,6 +5,7 @@ This module provides a reusable animated loading indicator using pure CSS
 that continues animating even when Python execution is blocked.
 """
 
+import math
 from typing import Optional
 
 
@@ -110,195 +111,242 @@ def get_galaxy_animation_html(
     enable_3d_depth: bool = True,
 ) -> str:
     """
-    Generate HTML/CSS for a beautiful galaxy-like orbital animation with multiple rings and varied stars
+    Generate HTML/CSS for a network-like galaxy animation with connected
+    nodes and triangular shapes
 
     Args:
         center_dot_size: Size of the central star/black hole in pixels
         container_size: Size of the animation container in pixels
-        animation_duration: Duration of one complete galaxy rotation in seconds
-        enable_3d_depth: Whether to enable 3D depth effects (elliptical orbit, scaling, opacity)
+        animation_duration: Duration of one complete rotation in seconds
+        enable_3d_depth: Whether to enable 3D depth effects (future use)
 
     Returns:
         HTML string with embedded CSS for the galaxy animation
     """
-    # Define galaxy rings with different properties
-    galaxy_rings = [
-        {"radius": 60, "dots": 2, "size": 8, "speed": 1.0, "color": "#ffffff"},
-        {"radius": 65, "dots": 3, "size": 6, "speed": 0.8, "color": "#e3f2fd"},
-        {"radius": 70, "dots": 2, "size": 4, "speed": 0.6, "color": "#bbdefb"},
-        {"radius": 75, "dots": 1, "size": 3, "speed": 0.4, "color": "#90caf9"},
+    # Note: enable_3d_depth is kept for backward compatibility
+    # Define network nodes with triangles at specific positions
+    nodes_config = [
+        # Inner ring nodes
+        {"radius": 40, "angle": 0, "type": "triangle", "size": 12},
+        {"radius": 45, "angle": 60, "type": "dot", "size": 4},
+        {"radius": 40, "angle": 120, "type": "triangle", "size": 12},
+        {"radius": 45, "angle": 180, "type": "dot", "size": 4},
+        {"radius": 40, "angle": 240, "type": "triangle", "size": 12},
+        {"radius": 45, "angle": 300, "type": "dot", "size": 4},
+        # Outer ring nodes
+        {"radius": 65, "angle": 30, "type": "dot", "size": 5},
+        {"radius": 70, "angle": 90, "type": "triangle", "size": 14},
+        {"radius": 65, "angle": 150, "type": "dot", "size": 5},
+        {"radius": 70, "angle": 210, "type": "triangle", "size": 14},
+        {"radius": 65, "angle": 270, "type": "dot", "size": 5},
+        {"radius": 70, "angle": 330, "type": "triangle", "size": 14},
     ]
 
-    # Generate stars for all rings
-    all_stars_html = ""
-    star_id = 0
+    # Generate connection lines between nodes
+    connections = [
+        # Inner ring connections
+        (0, 1),
+        (1, 2),
+        (2, 3),
+        (3, 4),
+        (4, 5),
+        (5, 0),
+        # Outer ring connections
+        (6, 7),
+        (7, 8),
+        (8, 9),
+        (9, 10),
+        (10, 11),
+        (11, 6),
+        # Cross connections
+        (0, 7),
+        (2, 9),
+        (4, 11),
+        (1, 6),
+        (3, 8),
+        (5, 10),
+    ]
 
-    for ring in galaxy_rings:
-        for i in range(ring["dots"]):
-            angle_offset = (360 / ring["dots"]) * i
-            # Add some spiral offset for galaxy arms
-            spiral_offset = (
-                ring["radius"] - 25
-            ) * 1.5  # More spiral for outer rings
-            total_angle = angle_offset + spiral_offset
+    connections_html = ""
+    for i, (start_idx, end_idx) in enumerate(connections):
+        start = nodes_config[start_idx]
+        end = nodes_config[end_idx]
 
-            delay = (animation_duration * ring["speed"] / ring["dots"]) * i
-            individual_duration = animation_duration / ring["speed"]
+        # Calculate line position and angle
+        x1 = start["radius"] * math.cos(math.radians(start["angle"]))
+        y1 = start["radius"] * math.sin(math.radians(start["angle"]))
+        x2 = end["radius"] * math.cos(math.radians(end["angle"]))
+        y2 = end["radius"] * math.sin(math.radians(end["angle"]))
 
-            all_stars_html += f'''
-            <div class="galaxy-star galaxy-star-{star_id}" style="
-                width: {ring['size']}px;
-                height: {ring['size']}px;
-                margin-top: -{ring['size']//2}px;
-                margin-left: -{ring['size']//2}px;
-                background: radial-gradient(circle, {ring['color']} 0%, transparent 70%);
-                box-shadow: 0 0 2px {ring['color']}, 0 0 4px {ring['color']};
-                animation: galaxy-orbit-{star_id} {individual_duration}s linear infinite, twinkle {2 + (star_id % 3)}s ease-in-out infinite;
-                animation-delay: -{delay}s, -{(star_id * 0.3) % 2}s;
+        length = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+        angle = math.degrees(math.atan2(y2 - y1, x2 - x1))
+
+        # Calculate center position for line
+        center_x = (x1 + x2) / 2
+        center_y = (y1 + y2) / 2
+        connections_html += f'''
+        <div class="network-connection connection-{i}" style="
+            position: absolute;
+            width: {length}px;
+            height: 1px;
+            background: linear-gradient(90deg,
+                rgba(118, 185, 0, 0.15) 0%,
+                rgba(118, 185, 0, 0.4) 50%,
+                rgba(118, 185, 0, 0.15) 100%);
+            left: calc(50% + {center_x}px);
+            top: calc(50% + {center_y}px);
+            transform: translate(-50%, -50%) rotate({angle}deg);
+            transform-origin: center center;
+            opacity: 0.4;
+        "></div>'''
+
+    # Generate nodes HTML
+    nodes_html = ""
+    for i, node in enumerate(nodes_config):
+        x = node["radius"] * math.cos(math.radians(node["angle"]))
+        y = node["radius"] * math.sin(math.radians(node["angle"]))
+
+        if node["type"] == "triangle":
+            # Create triangular shape
+            nodes_html += f'''
+            <div class="network-node triangle-node node-{i}" style="
+                position: absolute;
+                width: 0;
+                height: 0;
+                border-left: {node['size']/2}px solid transparent;
+                border-right: {node['size']/2}px solid transparent;
+                border-bottom: {node['size']}px solid #76B900;
+                left: 50%;
+                top: 50%;
+                --base-x: {x}px;
+                --base-y: {y}px;
+                filter: drop-shadow(0 0 3px #76B900);
             "></div>'''
-            star_id += 1
+        else:
+            # Create circular dot
+            nodes_html += f'''
+            <div class="network-node dot-node node-{i}" style="
+                position: absolute;
+                width: {node['size']}px;
+                height: {node['size']}px;
+                background: radial-gradient(circle,
+                    rgba(255, 255, 255, 1) 0%,
+                    rgba(255, 255, 255, 0.6) 60%,
+                    transparent 100%);
+                border-radius: 50%;
+                left: 50%;
+                top: 50%;
+                --base-x: {x}px;
+                --base-y: {y}px;
+                box-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
+            "></div>'''
 
-    # Generate individual keyframes for each star
-    individual_keyframes = ""
-    star_id = 0
+    # Generate individual expansion keyframes for each node
+    expansion_keyframes = ""
+    for i, node in enumerate(nodes_config):
+        x = node["radius"] * math.cos(math.radians(node["angle"]))
+        y = node["radius"] * math.sin(math.radians(node["angle"]))
+        # Calculate expanded position (30% further from center)
+        x_expanded = x * 1.3
+        y_expanded = y * 1.3
+        size_offset = node['size'] / 2
 
-    for ring in galaxy_rings:
-        for i in range(ring["dots"]):
-            angle_offset = (360 / ring["dots"]) * i
-            spiral_offset = (ring["radius"] - 25) * 1.5
-            total_angle = angle_offset + spiral_offset
-
-            if enable_3d_depth:
-                individual_keyframes += f"""
-    @keyframes galaxy-orbit-{star_id} {{
+        expansion_keyframes += f"""
+    @keyframes node-expand-{i} {{
         0% {{
-            transform:
-                rotate({total_angle}deg)
-                translateX({ring['radius']}px)
-                scaleY(0.3)
-                scale(0.6)
-                rotate({-total_angle}deg);
-            opacity: 0.3;
-            z-index: 1;
-        }}
-        25% {{
-            transform:
-                rotate({total_angle + 90}deg)
-                translateX({ring['radius']}px)
-                scaleY(0.7)
-                scale(1.2)
-                rotate({-(total_angle + 90)}deg);
-            opacity: 1;
-            z-index: 3;
+            transform: translate(calc({x}px - {size_offset}px),
+                               calc({y}px - {size_offset}px));
         }}
         50% {{
-            transform:
-                rotate({total_angle + 180}deg)
-                translateX({ring['radius']}px)
-                scaleY(0.3)
-                scale(0.6)
-                rotate({-(total_angle + 180)}deg);
-            opacity: 0.3;
-            z-index: 1;
-        }}
-        75% {{
-            transform:
-                rotate({total_angle + 270}deg)
-                translateX({ring['radius']}px)
-                scaleY(0.7)
-                scale(1.2)
-                rotate({-(total_angle + 270)}deg);
-            opacity: 1;
-            z-index: 3;
+            transform: translate(calc({x_expanded}px - {size_offset}px),
+                               calc({y_expanded}px - {size_offset}px));
         }}
         100% {{
-            transform:
-                rotate({total_angle + 360}deg)
-                translateX({ring['radius']}px)
-                scaleY(0.3)
-                scale(0.6)
-                rotate({-(total_angle + 360)}deg);
-            opacity: 0.3;
-            z-index: 1;
+            transform: translate(calc({x}px - {size_offset}px),
+                               calc({y}px - {size_offset}px));
         }}
     }}
-                """
-            else:
-                individual_keyframes += f"""
-    @keyframes galaxy-orbit-{star_id} {{
-        0% {{
-            transform: rotate({total_angle}deg) translateX({ring['radius']}px) rotate({-total_angle}deg);
-        }}
-        100% {{
-            transform: rotate({total_angle + 360}deg) translateX({ring['radius']}px) rotate({-(total_angle + 360)}deg);
-        }}
-    }}
-                """
-            star_id += 1
-
-    # Base keyframes for galactic core and twinkle effects
-    base_keyframes = (
-        f"""
-    @keyframes twinkle {{
-        0%, 100% {{ opacity: 1; }}
-        50% {{ opacity: 0.6; }}
-    }}
-
-         @keyframes galactic-pulse {{
-         0%, 100% {{
-             box-shadow:
-                 0 0 15px #008471,
-                 0 0 30px #006b5c,
-                 0 0 45px #76B900,
-                 0 0 60px rgba(118, 185, 0, 0.3);
-         }}
-         50% {{
-             box-shadow:
-                 0 0 8px #008471,
-                 0 0 16px #006b5c,
-                 0 0 24px #76B900,
-                 0 0 35px rgba(118, 185, 0, 0.2);
-         }}
-     }}
-    """
-        if enable_3d_depth
-        else """
-    @keyframes twinkle {{
-        0%, 100% {{ opacity: 1; }}
-        50% {{ opacity: 0.6; }}
-    }}
-    """
-    )
-
-    all_keyframes = individual_keyframes + base_keyframes
-
-    center_glow = (
         """
-        background: radial-gradient(circle,
-            #00a085 0%,
-            #008471 25%,
-            #006b5c 45%,
-            #005947 65%,
-            #4a8c2a 80%,
-            #76B900 100%);
-        box-shadow:
-            0 0 15px #008471,
-            0 0 30px #006b5c,
-            0 0 45px #76B900,
-            0 0 60px rgba(118, 185, 0, 0.3);
-        animation: galactic-pulse 3s ease-in-out infinite;
-    """
-        if enable_3d_depth
-        else """background: radial-gradient(circle,
-        #00a085 0%,
-        #008471 25%,
-        #006b5c 45%,
-        #005947 65%,
-        #4a8c2a 80%,
-        #76B900 100%);"""
-    )
 
-    return f"""
+    # CSS Keyframes for animations
+    keyframes = """
+    @keyframes galaxy-rotate {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(-360deg); }
+    }
+
+    @-webkit-keyframes galaxy-rotate {
+        0% { -webkit-transform: rotate(0deg); }
+        100% { -webkit-transform: rotate(-360deg); }
+    }
+
+    @-moz-keyframes galaxy-rotate {
+        0% { -moz-transform: rotate(0deg); }
+        100% { -moz-transform: rotate(-360deg); }
+    }
+
+    @keyframes network-breathe {
+        0%, 100% {
+            transform: scale(1);
+        }
+        50% {
+            transform: scale(1.05);
+        }
+    }
+
+    @keyframes node-pulse {
+        0%, 100% {
+            opacity: 0.8;
+            transform: scale(1);
+        }
+        50% {
+            opacity: 1;
+            transform: scale(1.2);
+        }
+    }
+
+    @keyframes connection-pulse {
+        0%, 100% {
+            opacity: 0.2;
+            filter: blur(0px);
+        }
+        50% {
+            opacity: 0.5;
+            filter: blur(0.5px);
+        }
+    }
+
+    @keyframes triangle-glow {
+        0%, 100% {
+            filter: drop-shadow(0 0 3px #76B900)
+                    drop-shadow(0 0 6px #76B900);
+        }
+        50% {
+            filter: drop-shadow(0 0 6px #76B900)
+                    drop-shadow(0 0 12px #76B900);
+        }
+    }
+
+    @keyframes center-pulse {
+        0%, 100% {
+            box-shadow:
+                0 0 10px #008471,
+                0 0 20px #006b5c,
+                0 0 30px #76B900,
+                0 0 40px rgba(118, 185, 0, 0.3);
+        }
+        50% {
+            box-shadow:
+                0 0 5px #008471,
+                0 0 10px #006b5c,
+                0 0 15px #76B900,
+                0 0 20px rgba(118, 185, 0, 0.2);
+        }
+    }
+    """
+
+    # CSS for the galaxy network animation
+    css_styles = f"""
     <style>
     :root {{
         --center-dot-size: {center_dot_size}px;
@@ -306,7 +354,8 @@ def get_galaxy_animation_html(
         --container-size: {container_size}px;
     }}
 
-    {all_keyframes}
+    {keyframes}
+    {expansion_keyframes}
 
     .galaxy-container {{
         position: relative;
@@ -316,42 +365,98 @@ def get_galaxy_animation_html(
         justify-content: center;
         align-items: center;
         margin: 10px auto;
-        perspective: 300px;
         background: transparent;
-        border-radius: 50%;
-        overflow: visible;
+        overflow: hidden;
     }}
 
-    .galactic-core {{
+    /* Create a small mask in the center to hide any artifacts */
+    .galaxy-container::after {{
+        content: '';
         position: absolute;
-        width: var(--center-dot-size);
-        height: var(--center-dot-size);
-        {center_glow}
-        border-radius: 50%;
-        z-index: 10;
+        width: 10px;
+        height: 10px;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        background: radial-gradient(circle,
+            rgba(26, 26, 26, 1) 0%,
+            rgba(26, 26, 26, 0.8) 50%,
+            transparent 100%);
+        z-index: 20;
+        pointer-events: none;
     }}
 
-    .galaxy-arms {{
+    .network-container {{
         position: absolute;
         width: 100%;
         height: 100%;
-        top: 0;
-        left: 0;
+        animation: galaxy-rotate {animation_duration}s linear infinite,
+                   network-breathe 6s ease-in-out infinite;
+        -webkit-animation: galaxy-rotate {animation_duration}s linear infinite,
+                          network-breathe 6s ease-in-out infinite;
+        -moz-animation: galaxy-rotate {animation_duration}s linear infinite,
+                        network-breathe 6s ease-in-out infinite;
+        -o-animation: galaxy-rotate {animation_duration}s linear infinite,
+                      network-breathe 6s ease-in-out infinite;
     }}
 
-    .galaxy-star {{
-        position: absolute;
-        border-radius: 50%;
-        top: 50%;
-        left: 50%;
-        transform-origin: 0 0;
+    .network-connection {{
+        z-index: 1;
+        animation: connection-pulse 3s ease-in-out infinite;
     }}
+
+    .network-node {{
+        z-index: 5;
+    }}
+
+    /* Apply expansion animations to each node */
+    """
+
+    # Add individual node expansion animations with combined effects
+    for i, node in enumerate(nodes_config):
+        x = node["radius"] * math.cos(math.radians(node["angle"]))
+        y = node["radius"] * math.sin(math.radians(node["angle"]))
+        size_offset = node['size'] / 2
+        delay = (i * 0.2) % 1.2  # Stagger the animations
+
+        if node["type"] == "triangle":
+            css_styles += f"""
+    .node-{i} {{
+        transform: translate(calc({x}px - {size_offset}px),
+                           calc({y}px - {size_offset}px));
+        animation: node-expand-{i} 4s ease-in-out infinite {delay}s,
+                   triangle-glow 2s ease-in-out infinite {delay}s;
+    }}
+    """
+        else:
+            css_styles += f"""
+    .node-{i} {{
+        transform: translate(calc({x}px - {size_offset}px),
+                           calc({y}px - {size_offset}px));
+        animation: node-expand-{i} 4s ease-in-out infinite {delay}s,
+                   node-pulse 2.5s ease-in-out infinite {delay}s;
+    }}
+    """
+
+    css_styles += """
+    /* Connection animation delays */
+    .connection-1 { animation-delay: 0.1s; }
+    .connection-3 { animation-delay: 0.3s; }
+    .connection-5 { animation-delay: 0.5s; }
+    .connection-7 { animation-delay: 0.7s; }
+    .connection-9 { animation-delay: 0.9s; }
+    .connection-11 { animation-delay: 1.1s; }
+    .connection-13 { animation-delay: 1.3s; }
+    .connection-15 { animation-delay: 1.5s; }
     </style>
+    """
 
+    return f"""
+    {css_styles}
     <div class="galaxy-container">
-        <div class="galactic-core"></div>
-        <div class="galaxy-arms">
-            {all_stars_html}
+        <div class="network-container">
+            {connections_html}
+            {nodes_html}
         </div>
     </div>
     """
