@@ -12,15 +12,15 @@ from utils.system_prompts import prompt_manager
 
 # Tool LLM type configurations - matching actual tool names from tool classes
 TOOL_LLM_TYPES = {
-    "conversation_context": "llm",
-    "extract_web_content": "llm",
+    "conversation_context": "fast",
+    "extract_web_content": "fast",
     "get_weather": "fast",
     "serpapi_news_search": "llm",
     "serpapi_internet_search": "llm",
     "retrieval_search": "llm",
-    "pdf_assistant": "llm",
-    "text_assistant": "llm",
-    "generate_image": "llm",
+    "pdf_assistant": "fast",
+    "text_assistant": "fast",
+    "generate_image": "fast",
     "analyze_image": "vlm",
     "generalist_conversation": "llm",
     "tool_selection": "intelligent",

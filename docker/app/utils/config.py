@@ -128,7 +128,7 @@ class LLMConfig:
     """LLM service configuration"""
 
     # Default model parameters
-    DEFAULT_TEMPERATURE: float = 0.28
+    DEFAULT_TEMPERATURE: float = 1.0
     DEFAULT_TOP_P: float = 0.95
     DEFAULT_FREQUENCY_PENALTY: float = 0.002
     DEFAULT_PRESENCE_PENALTY: float = 0.9
@@ -213,7 +213,7 @@ class ToolConfig:
             "text_assistant": True,
             "conversation_context": True,
             "extract_web_content": True,
-            "serpapi_internet_search": False,
+            "serpapi_internet_search": True,
             "serpapi_news_search": True,
             "retrieval_search": True,
             "pdf_assistant": True,
@@ -222,7 +222,6 @@ class ToolConfig:
             "context_generation": True,
             "get_weather": True,
             "generalist_conversation": True,
-            "serpapi_internet_search": True,
         }
     )
 
@@ -506,7 +505,6 @@ class AppConfig:
             "top_p": self.llm.DEFAULT_TOP_P,
             "frequency_penalty": self.llm.DEFAULT_FREQUENCY_PENALTY,
             "presence_penalty": self.llm.DEFAULT_PRESENCE_PENALTY,
-            "max_tokens": self.llm.DEFAULT_MAX_TOKENS,
         }
 
     def get_api_timeout(self, endpoint_type: str = "default") -> int:

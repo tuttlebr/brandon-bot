@@ -87,7 +87,6 @@ class StreamingService:
                 api_params["tools"] = tools
                 api_params["tool_choice"] = "auto"
                 api_params["parallel_tool_calls"] = True
-                api_params["max_tokens"] = 200
                 del api_params["temperature"]
                 del api_params["top_p"]
                 del api_params["frequency_penalty"]
@@ -166,7 +165,6 @@ class StreamingService:
                 api_params["tools"] = tools
                 api_params["tool_choice"] = tool_choice
                 api_params["parallel_tool_calls"] = True
-                api_params["max_tokens"] = 200
                 del api_params["temperature"]
                 del api_params["top_p"]
                 del api_params["frequency_penalty"]

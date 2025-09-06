@@ -448,7 +448,6 @@ Instructions:
                 top_p=0.95,
                 frequency_penalty=0.002,
                 presence_penalty=0.9,
-                max_tokens=65536,
             )
 
             result = response.choices[0].message.content.strip()

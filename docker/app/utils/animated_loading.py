@@ -230,15 +230,15 @@ def get_galaxy_animation_html(
                 width: {node['size']}px;
                 height: {node['size']}px;
                 background: radial-gradient(circle,
-                    rgba(255, 255, 255, 1) 0%,
-                    rgba(255, 255, 255, 0.6) 60%,
+                    rgba(118, 185, 0, 1) 0%,
+                    rgba(118, 185, 0, 0.6) 60%,
                     transparent 100%);
                 border-radius: 50%;
                 left: 50%;
                 top: 50%;
                 --base-x: {x}px;
                 --base-y: {y}px;
-                box-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
+                box-shadow: 0 0 4px rgba(118, 185, 0, 0.8);
             "></div>'''
 
     # Generate individual expansion keyframes for each node
