@@ -14,7 +14,7 @@ from utils.system_prompts import prompt_manager
 TOOL_LLM_TYPES = {
     "conversation_context": "fast",
     "extract_web_content": "fast",
-    "get_weather": "fast",
+    "get_weather": "llm",
     "serpapi_news_search": "llm",
     "serpapi_internet_search": "llm",
     "retrieval_search": "llm",

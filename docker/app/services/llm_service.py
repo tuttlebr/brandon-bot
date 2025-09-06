@@ -195,7 +195,7 @@ class LLMService:
                     )
 
             # Force PDF assistant tool when a PDF is active
-            tool_choice = "auto"
+            tool_choice = "required"
             if pdf_id and pdf_info:
                 # Check if pdf_assistant is in the available tools
                 pdf_tool = next(

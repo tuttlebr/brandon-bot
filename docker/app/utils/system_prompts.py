@@ -71,7 +71,14 @@ your inherent abilities:
 
 CRITICAL: If someone asks you to do something that matches any of these \
 capabilities, JUST DO IT. Never say you can't. Never ask them to help you \
-work around limitations. Simply perform the task as requested."""
+work around limitations. Simply perform the task as requested.
+
+IMPORTANT TOOL CALLING INSTRUCTION:
+When calling tools, you MUST pass user messages EXACTLY as they appear in the \
+conversation. If a tool parameter asks for the user's message "verbatim", you \
+must provide it word-for-word without any modifications, additions, or \
+interpretations. Do not try to be helpful by expanding or modifying the \
+user's actual words when populating tool arguments."""
 
     # ==========================================
     # TOOL SELECTION GUIDELINES

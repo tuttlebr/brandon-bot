@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 class GeneralistResponse(BaseToolResponse):
     """Response from the generalist tool"""
 
-    query: str = Field(description="The original user query")
+    query: str = Field(description="The original user query, VERBATIM only.")
     response: str = Field(description="The conversational response")
     direct_response: bool = Field(
         default=True,
@@ -38,7 +38,7 @@ class GeneralistResponse(BaseToolResponse):
 class StreamingGeneralistResponse(StreamingToolResponse):
     """Streaming response from the generalist tool"""
 
-    query: str = Field(description="The original user query")
+    query: str = Field(description="The original user query, VERBATIM only.")
     direct_response: bool = Field(
         default=True,
         description="Flag indicating this response should be returned directly to user",
@@ -75,7 +75,7 @@ class GeneralistController(ToolController):
 
             # Generate response
             response = client.chat.completions.create(
-                model=model_name, messages=final_messages, temperature=0.6
+                model=model_name, messages=final_messages
             )
 
             result = response.choices[0].message.content.strip()
@@ -131,7 +131,8 @@ class GeneralistController(ToolController):
             from tools.tool_llm_config import get_tool_system_prompt
 
             system_prompt = get_tool_system_prompt(
-                "generalist_conversation", None
+                "generalist_conversation",
+                "you're a helpful assistant that can answer questions and help with tasks or just chat. This tool needs the user's message, verbatim.",
             )
 
             # Build conversation messages
@@ -147,7 +148,6 @@ class GeneralistController(ToolController):
             response = await client.chat.completions.create(
                 model=model_name,
                 messages=final_messages,
-                temperature=0.6,
                 stream=True,
             )
 
@@ -292,7 +292,12 @@ class GeneralistTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "generalist_conversation"
-        self.description = "Handle general conversation without external tools. Use for explanations, discussions, advice, creative writing, and casual chat."
+        self.description = (
+            "Handle general conversation without external tools. "
+            "CRITICAL: The 'query' parameter MUST contain the user's "
+            "EXACT message without ANY modifications. Use for explanations, "
+            "discussions, advice, creative writing, and casual chat."
+        )
         self.supported_contexts = [
             'general_conversation',
             'discussion',
@@ -318,11 +323,20 @@ class GeneralistTool(BaseTool):
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "The user's message or question exactly as they provided it",
+                            "description": (
+                                "The user's EXACT message, word-for-word. "
+                                "Do NOT modify, expand, or rephrase. "
+                                "If user says 'Hello!', pass 'Hello!' not "
+                                "'Hello! How can I help you today?'"
+                            ),
                         },
                         "but_why": {
                             "type": "integer",
-                            "description": "An integer from 1-5 where a larger number indicates confidence this is the right tool to help the user.",
+                            "description": (
+                                "An integer from 1-5 where a larger number "
+                                "indicates confidence this is the right tool "
+                                "to help the user."
+                            ),
                         },
                     },
                     "required": ["query", "but_why"],

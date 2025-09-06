@@ -98,10 +98,11 @@ class SerpAPITool(BaseTool):
         super().__init__()
         self.name = "serpapi_internet_search"
         self.description = (
-            "Search the internet for current information using Google. "
+            "Do not use this tool for weather or news.Search the internet for current information using Google. "
             "Query MUST be in the form of a question for best results. "
             "Returns search parameters and top 3 organic results "
             "with extracted webpage content (or snippet if extraction fails)."
+            "When helpful, provide links to the results in markdown format."
         )
 
     def _initialize_mvc(self):
