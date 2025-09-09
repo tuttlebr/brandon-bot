@@ -215,7 +215,7 @@ class ToolConfig:
             "extract_web_content": True,
             "serpapi_internet_search": True,
             "serpapi_news_search": True,
-            "retrieval_search": True,
+            "retrieval_search": False,
             "pdf_assistant": True,
             "analyze_image": True,
             "generate_image": True,

@@ -49,7 +49,7 @@ class ContextGenerationTool(BaseTool):
             "prompt. Use when user wants to edit/transform an existing "
             "image or create variations. Requires an uploaded image."
         )
-        self.supported_contexts = ['image_generation', 'image_editing']
+        self.supported_contexts = ["image_generation", "image_editing"]
         self.execution_mode = ExecutionMode.SYNC
         self.timeout = 120.0  # Context generation can take time
 
@@ -77,8 +77,7 @@ class ContextGenerationTool(BaseTool):
                         "prompt": {
                             "type": "string",
                             "description": (
-                                "Text prompt describing how to modify or "
-                                "contextualize the input image"
+                                "Verbatim, the user's original message requesting image generation"
                             ),
                         },
                         "aspect_ratio": {
@@ -89,12 +88,7 @@ class ContextGenerationTool(BaseTool):
                                 "aspect ratio as input, or specify 'square', "
                                 "'portrait', or 'landscape'"
                             ),
-                            "enum": [
-                                "match_input_image",
-                                "square",
-                                "portrait",
-                                "landscape",
-                            ],
+                            "enum": ["match_input_image"],
                             "default": "match_input_image",
                         },
                         "steps": {
@@ -104,8 +98,8 @@ class ContextGenerationTool(BaseTool):
                                 "quality but slower)"
                             ),
                             "default": 30,
-                            "minimum": 10,
-                            "maximum": 50,
+                            "minimum": 25,
+                            "maximum": 35,
                         },
                         "cfg_scale": {
                             "type": "number",
@@ -114,7 +108,7 @@ class ContextGenerationTool(BaseTool):
                                 "follow the prompt more closely"
                             ),
                             "default": 3.5,
-                            "minimum": 1.5,
+                            "minimum": 2.5,
                             "maximum": 4.5,
                         },
                         "seed": {
@@ -123,7 +117,7 @@ class ContextGenerationTool(BaseTool):
                                 "Random seed for reproducible results. "
                                 "Use 0 for random"
                             ),
-                            "default": 0,
+                            "default": 42,
                         },
                         "but_why": {
                             "type": "integer",
@@ -289,11 +283,11 @@ class ContextGenerationTool(BaseTool):
             if isinstance(response_body, dict):
                 # Try common response field names
                 field_names = [
-                    'image',
-                    'data',
-                    'result',
-                    'output',
-                    'artifacts',
+                    "image",
+                    "data",
+                    "result",
+                    "output",
+                    "artifacts",
                 ]
                 for field in field_names:
                     if field in response_body:
@@ -302,16 +296,16 @@ class ContextGenerationTool(BaseTool):
                         # Handle artifacts array structure
                         # (common in image generation APIs)
                         if (
-                            field == 'artifacts'
+                            field == "artifacts"
                             and isinstance(field_value, list)
                             and len(field_value) > 0
                         ):
                             artifact = field_value[0]
                             if (
                                 isinstance(artifact, dict)
-                                and 'base64' in artifact
+                                and "base64" in artifact
                             ):
-                                generated_image_data = artifact['base64']
+                                generated_image_data = artifact["base64"]
                                 logger.info(
                                     "Found image data in artifacts[0].base64"
                                 )
@@ -338,9 +332,9 @@ class ContextGenerationTool(BaseTool):
                     )
 
             # Clean up base64 data if needed
-            if generated_image_data.startswith('data:image'):
+            if generated_image_data.startswith("data:image"):
                 # Extract base64 part from data URL
-                generated_image_data = generated_image_data.split(',', 1)[1]
+                generated_image_data = generated_image_data.split(",", 1)[1]
 
             # Create successful response
             result_dict = {
