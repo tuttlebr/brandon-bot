@@ -24,7 +24,7 @@ TOOL_LLM_TYPES = {
     "analyze_image": "vlm",
     "generalist_conversation": "intelligent",
     "tool_selection": "intelligent",
-    "deep_researcher": "intelligent",
+    "deep_researcher": "llm",
 }
 
 

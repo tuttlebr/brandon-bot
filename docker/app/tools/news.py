@@ -10,16 +10,43 @@ from utils.text_processing import clean_content, strip_think_tags
 logger = logging.getLogger(__name__)
 
 
+class NewsSource(BaseModel):
+    """News source information from SerpAPI"""
+
+    name: str = Field(default="", description="Name of the source")
+    title: Optional[str] = Field(None, description="Title of the source")
+    icon: Optional[str] = Field(None, description="Link to the source icon")
+    authors: Optional[List[str]] = Field(None, description="List of authors")
+
+
+class NewsAuthor(BaseModel):
+    """News author information from SerpAPI"""
+
+    name: str = Field(default="", description="Name of the author")
+    thumbnail: Optional[str] = Field(None, description="Author's thumbnail")
+    handle: Optional[str] = Field(None, description="X/Twitter handle")
+
+
 class NewsResult(BaseModel):
     """Individual news result from SerpAPI"""
 
     position: int
     title: str
     link: str
-    source: str
+    source: NewsSource
+    author: Optional[NewsAuthor] = None
     thumbnail: Optional[str] = None
+    thumbnail_small: Optional[str] = Field(
+        None, description="Low-resolution thumbnail"
+    )
     snippet: str
     date: str
+    type: Optional[str] = Field(
+        None, description="Type of news (e.g., 'Opinion', 'Local coverage')"
+    )
+    video: Optional[bool] = Field(
+        None, description="True if the result is a video"
+    )
     extracted_content: Optional[str] = Field(
         None, description="Extracted content from URL"
     )
@@ -224,10 +251,31 @@ class NewsTool(BaseTool):
         for i, result in enumerate(results, 1):
             # Clean up snippet text to remove formatting artifacts
             clean_snippet = clean_content(result.snippet)
-            # Format as: 1. [title](link) - source (date): snippet
+
+            # Build metadata components
+            metadata_parts = [result.source.name]
+
+            # Add author if available
+            if result.author and result.author.name:
+                author_str = result.author.name
+                if result.author.handle:
+                    author_str += f" (@{result.author.handle})"
+                metadata_parts.append(f"by {author_str}")
+
+            # Add type if it's opinion or special coverage
+            if result.type:
+                metadata_parts.append(f"[{result.type}]")
+
+            # Add video indicator
+            if result.video:
+                metadata_parts.append("📹 Video")
+
+            metadata_parts.append(result.date)
+
+            # Format as: 1. [title](link) - metadata: snippet
             entry = (
                 f"{i}. [{result.title}]({result.link}) - "
-                f"{result.source} ({result.date}): {clean_snippet}\n\n"
+                f"{' | '.join(metadata_parts)}: {clean_snippet}\n\n"
             )
 
             # Add extracted content if available
@@ -272,8 +320,8 @@ class NewsTool(BaseTool):
         # Default search parameters for SerpAPI news search
         default_params = {
             "q": query,
-            "engine": "google_news_light",
-            "num": 5,  # Always set to 5 as per requirement
+            "engine": "google_news",
+            "num": 7,  # Always set to 7 as per requirement
             "hl": "en",
             "gl": "us",
         }
@@ -297,14 +345,43 @@ class NewsTool(BaseTool):
             # Convert news_results to NewsResult objects
             result_objects = []
             for news_item in news_results:
+                # Handle source field - it can be either a dict or string
+                source_data = news_item.get("source", {})
+                if isinstance(source_data, dict):
+                    source = NewsSource(
+                        name=source_data.get("name", ""),
+                        title=source_data.get("title"),
+                        icon=source_data.get("icon"),
+                        authors=source_data.get("authors"),
+                    )
+                else:
+                    # Fallback for string source (backward compatibility)
+                    source = NewsSource(
+                        name=str(source_data) if source_data else ""
+                    )
+
+                # Handle author field if present
+                author_data = news_item.get("author")
+                author = None
+                if author_data and isinstance(author_data, dict):
+                    author = NewsAuthor(
+                        name=author_data.get("name", ""),
+                        thumbnail=author_data.get("thumbnail"),
+                        handle=author_data.get("handle"),
+                    )
+
                 result = NewsResult(
                     position=news_item.get("position", 0),
                     title=news_item.get("title", ""),
                     link=news_item.get("link", ""),
-                    source=news_item.get("source", ""),
+                    source=source,
+                    author=author,
                     thumbnail=news_item.get("thumbnail"),
+                    thumbnail_small=news_item.get("thumbnail_small"),
                     snippet=news_item.get("snippet", ""),
                     date=news_item.get("date", ""),
+                    type=news_item.get("type"),
+                    video=news_item.get("video"),
                 )
                 result_objects.append(result)
 

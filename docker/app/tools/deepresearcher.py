@@ -118,6 +118,7 @@ class ResearchPhase(str, Enum):
     """Phases of deep research"""
 
     INITIAL_SEARCH = "initial_search"
+    FOLLOW_UP_SEARCH = "follow_up_search"
     DEEP_DIVE = "deep_dive"
     SYNTHESIS = "synthesis"
     QUALITY_CHECK = "quality_check"
@@ -260,7 +261,6 @@ class DeepResearchController(ToolController):
         iterations = []
         all_sources = []
         current_synthesis = ""
-        confidence_level = ConfidenceLevel.MEDIUM
         extracted_urls = set()  # Track URLs that have been extracted
 
         # Provide real-time updates during the search
@@ -283,9 +283,6 @@ class DeepResearchController(ToolController):
         # Continue iterations with progress updates
         iteration_count = 1
         while iteration_count < max_iterations:
-            # Update status for iteration start
-            yield f"\n> _Phase {iteration_count + 1}: Deep research iteration {iteration_count + 1}/{max_iterations}_\n\n"
-
             # Check if we need more research
             needs_more, next_phase = await self._assess_research_completeness(
                 current_synthesis=current_synthesis,
@@ -293,6 +290,14 @@ class DeepResearchController(ToolController):
                 target_depth=target_depth,
                 iteration_count=iteration_count,
             )
+
+            # Update status for iteration start
+            phase_description = (
+                "Deep research iteration"
+                if next_phase != ResearchPhase.FOLLOW_UP_SEARCH
+                else "Follow-up search iteration"
+            )
+            yield f"\n> _Phase {iteration_count + 1}: {phase_description} {iteration_count + 1}/{max_iterations}_\n\n"
 
             if not needs_more:
                 # Update status to show we're done with iterations
@@ -318,7 +323,12 @@ class DeepResearchController(ToolController):
             questions_to_research = follow_up_questions[:2]
             for i, question in enumerate(questions_to_research, 1):
                 # Update status for sub-question
-                yield f"> > > _Researching sub-question {i}/{len(questions_to_research)}..._\n\n"
+                action = (
+                    "Searching for new sources on"
+                    if next_phase == ResearchPhase.FOLLOW_UP_SEARCH
+                    else "Deep diving into"
+                )
+                yield f"> > > _{action} sub-question {i}/{len(questions_to_research)}..._\n\n"
 
                 iteration = await self._perform_research_iteration(
                     query=question,
@@ -419,7 +429,6 @@ class DeepResearchController(ToolController):
         iterations = []
         all_sources = []
         current_synthesis = ""
-        confidence_level = ConfidenceLevel.MEDIUM
         extracted_urls = set()  # Track URLs that have been extracted
 
         # Phase 1: Initial broad search
@@ -683,7 +692,10 @@ class DeepResearchController(ToolController):
         tools_used = []
         sources_found = []
         # Determine which tools to use based on phase
-        if phase == ResearchPhase.INITIAL_SEARCH:
+        if phase in [
+            ResearchPhase.INITIAL_SEARCH,
+            ResearchPhase.FOLLOW_UP_SEARCH,
+        ]:
             # Broad search using multiple tools
             logger.info("Starting web search via SerpAPI...")
             search_results = await self._execute_tool(
@@ -691,24 +703,30 @@ class DeepResearchController(ToolController):
                 {
                     "query": query,
                     "but_why": 5,
-                    "location_requested": "Saline, Michigan, United States",
+                    # "location_requested": "Saline, Michigan, United States",
                 },
             )
             tools_used.append("serpapi_internet_search")
             logger.info("Web search completed")
 
             if search_results and hasattr(search_results, "organic_results"):
-                logger.info(
-                    "Processing %d search results",
-                    len(search_results.organic_results[:3]),
+                # Determine how many results to process based on phase
+                max_results = (
+                    10 if phase == ResearchPhase.FOLLOW_UP_SEARCH else 5
                 )
-                for i, result in enumerate(
-                    search_results.organic_results[:3], 1
-                ):
+                results_to_process = search_results.organic_results[
+                    :max_results
+                ]
+                logger.info(
+                    "Processing %d search results (phase: %s)",
+                    len(results_to_process),
+                    phase.value,
+                )
+                for i, result in enumerate(results_to_process, 1):
                     logger.debug(
                         "Processing result %d/%d: %s",
                         i,
-                        min(3, len(search_results.organic_results)),
+                        len(results_to_process),
                         result.title[:80],
                     )
                     # Extract domain from URL
@@ -759,15 +777,19 @@ class DeepResearchController(ToolController):
             logger.info("News search completed")
 
             if news_results and hasattr(news_results, "news_results"):
+                # More news results for follow-up searches
+                max_news = 5 if phase == ResearchPhase.FOLLOW_UP_SEARCH else 3
+                news_to_process = news_results.news_results[:max_news]
                 logger.info(
-                    "Processing %d news results",
-                    len(news_results.news_results[:2]),
+                    "Processing %d news results (phase: %s)",
+                    len(news_to_process),
+                    phase.value,
                 )
-                for i, result in enumerate(news_results.news_results[:2], 1):
+                for i, result in enumerate(news_to_process, 1):
                     logger.debug(
                         "Processing news %d/%d: %s",
                         i,
-                        min(2, len(news_results.news_results)),
+                        len(news_to_process),
                         result.title[:80],
                     )
                     # Extract domain and date from news results
@@ -1013,14 +1035,14 @@ class DeepResearchController(ToolController):
         client = self.llm_client_service.get_async_client(self.llm_type)
 
         prompt = f"""Extract 3-5 key facts from the following content that \
-are relevant to the query while maintaining first principles: "{query}"
+are relevant to the query prioritizing the most recent information: "{query}"
 
 Content:
-{content[:16000]}
+{content}
 
 Return the facts as a JSON object with a "facts" key containing an array of strings.
 Example format: {{"facts": ["fact1", "fact2", "fact3"]}}
-Focus on specific, verifiable information while maintaining first principles."""
+Focus on specific, verifiable information."""
 
         # Guided JSON (xgrammar) is mandatory; any failure should raise.
         response = await client.chat.completions.create(
@@ -1079,7 +1101,7 @@ New sources found:
 {chr(10).join(source_summaries)}
 
 Create a coherent synthesis that:
-1. Integrates new information with previous findings
+1. Prioritizes the most recent information
 2. Highlights agreements and contradictions
 3. Identifies what we know with high confidence
 4. Notes any gaps or uncertainties
@@ -1088,7 +1110,7 @@ Create a coherent synthesis that:
 Each source has a citation ID that you should use when referencing information from that source.
 Example: "The research indicates that X is true [1], while another study suggests Y [2]."
 
-Keep the synthesis focused and factual while maintaining first principles."""
+Keep the synthesis focused and factual."""
 
         try:
             response = await client.chat.completions.create(
@@ -1132,10 +1154,11 @@ Evaluate:
 2. Are there significant knowledge gaps?
 3. Do we have diverse, credible sources?
 4. Is the confidence level sufficient (medium or high)?
+5. Would new searches help fill the gaps (follow_up_search) or should we extract more from existing sources (deep_dive)?
 
 Return a JSON object with:
 - needs_more_research: boolean
-- next_phase: "deep_dive" or "synthesis"
+- next_phase: "follow_up_search" (for new searches), "deep_dive" (for extracting from existing sources), or "synthesis" (if complete)
 - confidence: "low", "medium", or "high"
 - reasoning: string"""
 
@@ -1156,6 +1179,7 @@ Return a JSON object with:
         next_phase_str = result.get("next_phase", "deep_dive")
         valid_phases = [
             "initial_search",
+            "follow_up_search",
             "deep_dive",
             "synthesis",
             "quality_check",

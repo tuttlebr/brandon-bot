@@ -171,7 +171,7 @@ class SerpAPITool(BaseTool):
         return self.run_with_dict(params)
 
     def _extract_top_results(
-        self, results: List[OrganicResult], top_n: int = 3
+        self, results: List[OrganicResult], top_n: int = 1
     ) -> List[OrganicResult]:
         """
         Return top_n organic results with extracted content
