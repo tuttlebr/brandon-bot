@@ -377,11 +377,29 @@ class DeepResearchController(ToolController):
 
         yield final_synthesis
 
-        # Add references section
+        # Add references section (cited sources)
         references = self._generate_references(all_sources, citations_used)
         if references:
-            yield "\n\n> _References:_\n\n"
+            yield "\n\n> _References (Cited):_\n\n"
             for ref in references:
+                yield f"> >{ref}\n\n"
+
+        # Add all consulted sources if there are uncited ones
+        uncited_sources = [
+            s
+            for s in all_sources
+            if s.citation_id and s.citation_id not in citations_used
+        ]
+        if uncited_sources:
+            yield "\n\n> _Additional Sources Consulted:_\n\n"
+            # Sort by citation ID
+            uncited_sources.sort(
+                key=lambda x: (
+                    int(x.citation_id.strip("[]")) if x.citation_id else 999
+                )
+            )
+            for source in uncited_sources:
+                ref = self._format_single_reference(source)
                 yield f"> >{ref}\n\n"
 
         # Add limitations if any
@@ -599,11 +617,32 @@ class DeepResearchController(ToolController):
         )
 
         # Format the synthesis with research summary - clean and simple
+        # Separate cited and uncited sources
+        uncited_sources = [
+            s
+            for s in all_sources
+            if s.citation_id and s.citation_id not in citations_used
+        ]
+        uncited_sources.sort(
+            key=lambda x: (
+                int(x.citation_id.strip("[]")) if x.citation_id else 999
+            )
+        )
+
+        # Build additional sources section if needed
+        additional_sources_section = ""
+        if uncited_sources:
+            additional_refs = []
+            for source in uncited_sources:
+                additional_refs.append(self._format_single_reference(source))
+            additional_sources_section = f"\n\n### Additional Sources Consulted\n\n{chr(10).join(additional_refs)}"
+
         research_summary = f"""## Deep Research Complete
 
 **Research Statistics:**
 - Iterations performed: {len(iterations)}
 - Sources analyzed: {len(all_sources)}
+- Sources cited: {len(references)}
 - Research depth: {research_depth.upper()}
 - Confidence level: {confidence_level.value.upper()}
 
@@ -611,9 +650,9 @@ class DeepResearchController(ToolController):
 
 {final_synthesis}
 
-### References
+### References (Cited)
 
-{chr(10).join(references)}"""
+{chr(10).join(references)}{additional_sources_section}"""
 
         # Review the complete research summary for markdown formatting
         research_summary = await self._review_markdown_formatting(
@@ -648,7 +687,12 @@ class DeepResearchController(ToolController):
             # Broad search using multiple tools
             logger.info("Starting web search via SerpAPI...")
             search_results = await self._execute_tool(
-                "serpapi_internet_search", {"query": query, "but_why": 5}
+                "serpapi_internet_search",
+                {
+                    "query": query,
+                    "but_why": 5,
+                    "location_requested": "Saline, Michigan, United States",
+                },
             )
             tools_used.append("serpapi_internet_search")
             logger.info("Web search completed")
@@ -704,7 +748,12 @@ class DeepResearchController(ToolController):
             # Also try news search for current events
             logger.info("Attempting news search for recent information...")
             news_results = await self._execute_tool(
-                "serpapi_news_search", {"query": query, "but_why": 3}
+                "serpapi_news_search",
+                {
+                    "query": query,
+                    "but_why": 3,
+                    "location_requested": "Saline, Michigan, United States",
+                },
             )
             tools_used.append("serpapi_news_search")
             logger.info("News search completed")
@@ -786,7 +835,12 @@ class DeepResearchController(ToolController):
                     url[:100],
                 )
                 extract_result = await self._execute_tool(
-                    "extract_web_content", {"url": url, "but_why": 5}
+                    "extract_web_content",
+                    {
+                        "url": url,
+                        "but_why": 5,
+                        "location_requested": "Saline, Michigan, United States",
+                    },
                 )
                 tools_used.append("extract_web_content")
                 logger.info("Extraction completed for URL %d", i)
@@ -1240,9 +1294,12 @@ Create a comprehensive answer that:
 5. Provides specific examples and evidence
 6. Concludes with key takeaways
 7. IMPORTANT: Use inline citations [1], [2], etc. when referencing specific information
+8. CRITICAL: Cite as many sources as possible - aim to use ALL available sources in your synthesis
 
 Example of proper citation usage:
-"Recent studies show that X is effective [1], though some researchers argue Y [2]."
+"Recent studies show that X is effective [1], though some researchers argue Y [2]. Additional evidence from [3] supports this, while [4] provides context."
+
+Remember: Every source has valuable information. Try to cite ALL sources listed above.
 
 Also identify 3-5 key findings as bullet points and list which citations were actually used in your synthesis.
 
@@ -1305,7 +1362,7 @@ Focus on:
 1. Fixing escaped characters that shouldn't be escaped
 2. Ensuring proper line breaks and paragraph spacing
 3. Fixing any malformed lists or headers
-4. Ensuring citations like [1], [2] are properly formatted
+4. Ensuring citations like [1], [2] are properly formatted as superscript
 5. Removing any problematic markdown patterns
 6. Ensuring quotes and special characters display correctly
 
@@ -1365,6 +1422,27 @@ Text to review:
             references.append("".join(ref_parts))
 
         return references
+
+    def _format_single_reference(self, source: ResearchSource) -> str:
+        """Format a single source into a reference string"""
+        ref_parts = [source.citation_id if source.citation_id else "[?]"]
+
+        if source.author:
+            ref_parts.append(f" {source.author}.")
+        elif source.domain:
+            ref_parts.append(f" {source.domain}.")
+        else:
+            ref_parts.append(" Unknown source.")
+
+        if source.date:
+            ref_parts.append(f" ({source.date}).")
+
+        ref_parts.append(f" {source.title}.")
+
+        if source.url:
+            ref_parts.append(f" Retrieved from {source.url}")
+
+        return "".join(ref_parts)
 
     def _determine_research_depth(
         self, iterations: int, sources: int, confidence_level: ConfidenceLevel

@@ -15,11 +15,11 @@ class SearchMetadata(BaseModel):
 
     id: str
     status: str
-    json_endpoint: str
+    json_endpoint: Optional[str] = None
     created_at: str
     processed_at: str
-    google_light_url: str
-    raw_html_file: str
+    search_url: Optional[str] = None
+    raw_html_file: Optional[str] = None
     total_time_taken: float
 
 
@@ -86,9 +86,9 @@ class SerpAPIResponse(BaseToolResponse):
     related_questions: Optional[List[RelatedQuestion]] = None
     related_searches: Optional[List[RelatedSearch]] = None
     serpapi_pagination: Optional[Dict[str, Any]] = None
-    formatted_results: str = Field(
-        default="", description="Formatted results for display"
-    )
+    # formatted_results: Optional[str] = Field(
+    #     default="", description="Formatted results for display"
+    # )
 
 
 class SerpAPITool(BaseTool):
@@ -171,7 +171,7 @@ class SerpAPITool(BaseTool):
         return self.run_with_dict(params)
 
     def _extract_top_results(
-        self, results: List[OrganicResult], top_n: int = 1
+        self, results: List[OrganicResult], top_n: int = 3
     ) -> List[OrganicResult]:
         """
         Return top_n organic results with extracted content
@@ -292,7 +292,7 @@ class SerpAPITool(BaseTool):
         # Default search parameters for SerpAPI
         default_params = {
             "q": query,
-            "engine": "google_light",
+            "engine": "google",
             "location": location_requested,
             "google_domain": "google.com",
             "hl": "en",
@@ -322,9 +322,9 @@ class SerpAPITool(BaseTool):
             )
 
             # Format the results for display
-            serpapi_response.formatted_results = self.format_results(
-                serpapi_response.organic_results
-            )
+            # serpapi_response.formatted_results = self.format_results(
+            #     serpapi_response.organic_results
+            # )
 
             logger.info(
                 "Search completed successfully. "
