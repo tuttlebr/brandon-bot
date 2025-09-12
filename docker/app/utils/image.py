@@ -106,7 +106,7 @@ def generate_image(
         # Create a dictionary of parameters
         params = {
             "prompt": prompt,
-            "mode": mode,
+            # "mode": mode,
             "cfg_scale": cfg_scale,
             "width": width,
             "height": height,
@@ -117,13 +117,13 @@ def generate_image(
         }
 
         # Only add the image parameter if mode is not "base" and image_b64 is provided
-        if mode in ALLOWED_MODES and image_b64 is not None:
-            params["image"] = image_b64
-        elif mode == "redux" and image_b64 is not None:
-            params.pop("prompt")
-            params["image"] = image_b64
+        # if mode in ALLOWED_MODES and image_b64 is not None:
+        #     params["image"] = image_b64
+        # elif mode == "redux" and image_b64 is not None:
+        #     params.pop("prompt")
+        #     params["image"] = image_b64
 
-        logger.debug(f"Params: {params}")
+        logger.info(f"Params: {params}")
         # Create the request object using the Pydantic model
         request_data = ImageProcessingRequest(**params)
 

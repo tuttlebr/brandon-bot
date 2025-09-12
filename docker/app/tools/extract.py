@@ -627,7 +627,7 @@ class WebExtractTool(BaseTool):
         self.execution_mode = (
             ExecutionMode.AUTO
         )  # Changed to AUTO to support both sync and async
-        self.timeout = 60.0
+        self.timeout = 256.0
 
     def _initialize_mvc(self):
         """Initialize MVC components"""

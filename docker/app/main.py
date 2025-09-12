@@ -395,7 +395,7 @@ class ProductionStreamlitChatApp:
 
             # Image Upload Section
             st.markdown("---", unsafe_allow_html=True)
-            st.markdown("### 📷 Image Upload", unsafe_allow_html=True)
+            st.markdown("### Image Upload", unsafe_allow_html=True)
 
             # Check image processing status
             processing_status = getattr(

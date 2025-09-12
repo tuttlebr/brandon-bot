@@ -26,8 +26,8 @@ class UIConfig:
     BRAND_COLOR: str = "#76b900"
 
     # Asset paths
-    USER_AVATAR_PATH: str = "/app/assets/user.png"
-    ASSISTANT_AVATAR_PATH: str = "/app/assets/nvidia.png"
+    USER_AVATAR_PATH: str = "/app/assets/nvidia.png"
+    ASSISTANT_AVATAR_PATH: str = "/app/assets/user.png"
 
 
 @dataclass
@@ -128,7 +128,7 @@ class LLMConfig:
     """LLM service configuration"""
 
     # Default model parameters
-    DEFAULT_TEMPERATURE: float = 1.0
+    DEFAULT_TEMPERATURE: float = 0.25
     DEFAULT_TOP_P: float = 0.95
     DEFAULT_FREQUENCY_PENALTY: float = 0.002
     DEFAULT_PRESENCE_PENALTY: float = 0.9
@@ -215,13 +215,14 @@ class ToolConfig:
             "extract_web_content": True,
             "serpapi_internet_search": True,
             "serpapi_news_search": True,
-            "retrieval_search": False,
+            "retrieval_search": True,
             "pdf_assistant": True,
             "analyze_image": True,
             "generate_image": True,
             "context_generation": True,
             "get_weather": True,
             "generalist_conversation": True,
+            "deep_researcher": True,
         }
     )
 

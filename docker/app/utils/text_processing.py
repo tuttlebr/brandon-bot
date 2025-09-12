@@ -98,6 +98,65 @@ def escape_markdown_dollars(text: Optional[str]) -> str:
     return escaped_text
 
 
+def sanitize_markdown_for_streamlit(text: Optional[str]) -> str:
+    """
+    Sanitize markdown text for safe display in Streamlit.
+
+    This function prevents markdown rendering issues that can cause
+    corruption with certain characters, especially during streaming updates.
+
+    Args:
+        text: The markdown text to sanitize
+
+    Returns:
+        Sanitized markdown text safe for Streamlit display
+    """
+    if not text:
+        return ""
+
+    # First escape dollar signs
+    text = escape_markdown_dollars(text)
+
+    # Convert escaped newline sequences ("\\n") into actual newlines. This
+    # handles cases where upstream tools double-escape newlines, causing the
+    # literal characters "\n" to appear in the rendered Markdown instead of
+    # real line breaks. We replace *after* dollar-sign escaping to preserve any
+    # potential LaTeX constructs.
+    # text = text.replace("\\n", "\n")
+
+    # # Remove any null bytes or non-printable characters that might cause issues
+    # text = ''.join(char for char in text if char.isprintable() or char in '\n\r\t')
+
+    # # ------------------------------------------------------------------
+    # # Fix malformed quote / block-quote artifacts sometimes produced by
+    # # the LLM when JSON strings containing markdown are parsed.  These
+    # # show up as literal sequences like ">"">" which render as
+    # # distracting characters in Streamlit.  We remove stray quote marks
+    # # that directly bracket block-quote symbols (>) while preserving
+    # # legitimate quotes elsewhere.
+    # # ------------------------------------------------------------------
+    # # Pattern 1: quote(s) + > + optional quote(s)  -> keep a single '>'
+    # text = re.sub(r'"+\s*>\s*"*', '> ', text)
+
+    # # Pattern 2: > followed by quote(s) (e.g., '>"') -> '>'
+    # text = re.sub(r'>\s*"+', '>', text)
+
+    # # Collapse any lingering repeated '> ' sequences
+    # text = re.sub(r'(>\s*){2,}', '> ', text)
+
+    # # Remove any null bytes or non-printable characters that might cause issues
+    # text = ''.join(char for char in text if char.isprintable() or char in '\n\r\t')
+
+    # # Fix potential issues with repeated quote markers
+    # # Replace multiple consecutive > with a single >
+    # text = re.sub(r'>{2,}', '>', text)
+
+    # # Ensure quote blocks have proper spacing
+    # text = re.sub(r'^>', '> ', text, flags=re.MULTILINE)
+
+    return text
+
+
 def sanitize_python_input(text: str) -> str:
     """
     Sanitize user input to make it safer for Python processing.

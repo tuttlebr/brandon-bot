@@ -5,11 +5,14 @@ This tool generates contextually modified images based on an input image
 and text prompt.
 """
 
+import base64
+import io
 import logging
 import os
 from typing import Any, Dict, Optional, Type
 
 import requests
+from openai import OpenAI
 from pydantic import Field
 from tools.base import BaseTool, BaseToolResponse, ExecutionMode
 
@@ -47,7 +50,8 @@ class ContextGenerationTool(BaseTool):
         self.description = (
             "Generate or modify images based on an existing image and text "
             "prompt. Use when user wants to edit/transform an existing "
-            "image or create variations. Requires an uploaded image."
+            "image or create variations. Requires an uploaded image. "
+            "Supports OpenAI's image edit API when configured."
         )
         self.supported_contexts = ["image_generation", "image_editing"]
         self.execution_mode = ExecutionMode.SYNC
@@ -223,148 +227,219 @@ class ContextGenerationTool(BaseTool):
             )
 
         try:
-            # Prepare request
-            headers = {
-                "Authorization": f"Bearer {api_key}",
-                "Accept": "application/json",
-            }
+            # Check if using OpenAI API
+            if "api.openai.com" in endpoint:
+                logger.info("Using OpenAI API for image editing")
+                logger.info("Editing image with prompt: '%s'", prompt)
 
-            payload = {
-                "prompt": prompt,
-                "image": f"data:image/png;base64,{image_base64}",
-                "aspect_ratio": aspect_ratio,
-                "steps": steps,
-                "cfg_scale": cfg_scale,
-                "seed": seed,
-            }
+                # Initialize OpenAI client with the API key
+                client = OpenAI(api_key=api_key)
 
-            logger.info(
-                "Sending context generation request: prompt='%s', "
-                "aspect_ratio=%s, steps=%s, cfg_scale=%s, seed=%s",
-                prompt,
-                aspect_ratio,
-                steps,
-                cfg_scale,
-                seed,
-            )
-
-            # Make request
-            response = requests.post(
-                endpoint, headers=headers, json=payload, timeout=self.timeout
-            )
-            response.raise_for_status()
-
-            response_body = response.json()
-            logger.info("Context generation completed successfully")
-
-            # Log response structure for debugging
-            if isinstance(response_body, dict):
-                sample = str(response_body)[:200]
-                if len(str(response_body)) > 200:
-                    sample += "..."
-                logger.info(
-                    "API response structure - keys: %s, sample: %s",
-                    list(response_body.keys()),
-                    sample,
-                )
-            else:
-                sample = str(response_body)[:100]
-                if len(str(response_body)) > 100:
-                    sample += "..."
-                logger.info(
-                    "API response type: %s, sample: %s",
-                    type(response_body).__name__,
-                    sample,
+                # Convert base64 image to bytes for OpenAI API
+                image_bytes = base64.b64decode(image_base64)
+                image_file = io.BytesIO(image_bytes)
+                image_file.name = (
+                    "edit_image.png"  # OpenAI requires a filename
                 )
 
-            # Extract generated image from response
-            # Assuming the response contains base64 encoded image data
-            generated_image_data = None
-            if isinstance(response_body, dict):
-                # Try common response field names
-                field_names = [
-                    "image",
-                    "data",
-                    "result",
-                    "output",
-                    "artifacts",
-                ]
-                for field in field_names:
-                    if field in response_body:
-                        field_value = response_body[field]
+                # Use OpenAI's image edit API
+                response = client.images.edit(
+                    model="gpt-image-1",
+                    image=image_file,
+                    prompt=prompt,
+                    n=1,
+                    input_fidelity="high",
+                    quality="high",
+                )
 
-                        # Handle artifacts array structure
-                        # (common in image generation APIs)
-                        if (
-                            field == "artifacts"
-                            and isinstance(field_value, list)
-                            and len(field_value) > 0
-                        ):
-                            artifact = field_value[0]
-                            if (
-                                isinstance(artifact, dict)
-                                and "base64" in artifact
-                            ):
-                                generated_image_data = artifact["base64"]
-                                logger.info(
-                                    "Found image data in artifacts[0].base64"
-                                )
-                                break
-                        else:
-                            generated_image_data = field_value
-                            logger.info("Found image data in field: %s", field)
-                            break
+                # Get the base64 data from response
+                if response.data and len(response.data) > 0:
+                    generated_image_data = response.data[0].b64_json
+                    logger.info("Image edited successfully via OpenAI API")
 
-            if not generated_image_data:
-                # If response is a string, assume it's the image data
-                if isinstance(response_body, str):
-                    generated_image_data = response_body
-                    logger.info("Response is a string, using as image data")
+                    # Create successful response
+                    result_dict = {
+                        "success": True,
+                        "original_prompt": prompt,
+                        "enhanced_prompt": prompt,
+                        "input_image_used": True,
+                        "aspect_ratio": aspect_ratio,
+                        "steps": steps,
+                        "cfg_scale": cfg_scale,
+                        "seed": seed,
+                        "direct_response": True,
+                        "message": (
+                            f"Successfully edited image with prompt: {prompt}"
+                        ),
+                    }
+
+                    import json
+
+                    return ContextGenerationResponse(
+                        success=True,
+                        image_data=generated_image_data,
+                        original_prompt=prompt,
+                        enhanced_prompt=prompt,
+                        input_image_used=True,
+                        direct_response=True,
+                        result=json.dumps(result_dict),
+                    )
                 else:
-                    # Log available fields for debugging
-                    if isinstance(response_body, dict):
-                        available_fields = list(response_body.keys())
-                    else:
-                        available_fields = "N/A"
-                    raise ValueError(
-                        f"Could not find image data in response. "
-                        f"Available fields: {available_fields}"
+                    raise ValueError("No image data in OpenAI response")
+
+            else:
+                # Use existing custom API endpoint
+                # Prepare request
+                headers = {
+                    "Authorization": f"Bearer {api_key}",
+                    "Accept": "application/json",
+                }
+
+                payload = {
+                    "prompt": prompt,
+                    "image": f"data:image/png;base64,{image_base64}",
+                    "aspect_ratio": aspect_ratio,
+                    "steps": steps,
+                    "cfg_scale": cfg_scale,
+                    "seed": seed,
+                }
+
+                logger.info(
+                    "Sending context generation request: prompt='%s', "
+                    "aspect_ratio=%s, steps=%s, cfg_scale=%s, seed=%s",
+                    prompt,
+                    aspect_ratio,
+                    steps,
+                    cfg_scale,
+                    seed,
+                )
+
+                # Make request
+                response = requests.post(
+                    endpoint,
+                    headers=headers,
+                    json=payload,
+                    timeout=self.timeout,
+                )
+                response.raise_for_status()
+
+                response_body = response.json()
+                logger.info("Context generation completed successfully")
+
+                # Log response structure for debugging
+                if isinstance(response_body, dict):
+                    sample = str(response_body)[:200]
+                    if len(str(response_body)) > 200:
+                        sample += "..."
+                    logger.info(
+                        "API response structure - keys: %s, sample: %s",
+                        list(response_body.keys()),
+                        sample,
+                    )
+                else:
+                    sample = str(response_body)[:100]
+                    if len(str(response_body)) > 100:
+                        sample += "..."
+                    logger.info(
+                        "API response type: %s, sample: %s",
+                        type(response_body).__name__,
+                        sample,
                     )
 
-            # Clean up base64 data if needed
-            if generated_image_data.startswith("data:image"):
-                # Extract base64 part from data URL
-                generated_image_data = generated_image_data.split(",", 1)[1]
+                # Extract generated image from response
+                # Assuming the response contains base64 encoded image data
+                generated_image_data = None
+                if isinstance(response_body, dict):
+                    # Try common response field names
+                    field_names = [
+                        "image",
+                        "data",
+                        "result",
+                        "output",
+                        "artifacts",
+                    ]
+                    for field in field_names:
+                        if field in response_body:
+                            field_value = response_body[field]
 
-            # Create successful response
-            result_dict = {
-                "success": True,
-                "original_prompt": prompt,
-                "enhanced_prompt": prompt,
-                "input_image_used": True,
-                "aspect_ratio": aspect_ratio,
-                "steps": steps,
-                "cfg_scale": cfg_scale,
-                "seed": seed,
-                "direct_response": True,
-                "message": (
-                    f"Successfully generated image with prompt: {prompt}"
-                ),
-            }
+                            # Handle artifacts array structure
+                            # (common in image generation APIs)
+                            if (
+                                field == "artifacts"
+                                and isinstance(field_value, list)
+                                and len(field_value) > 0
+                            ):
+                                artifact = field_value[0]
+                                if (
+                                    isinstance(artifact, dict)
+                                    and "base64" in artifact
+                                ):
+                                    generated_image_data = artifact["base64"]
+                                    logger.info(
+                                        "Found image data in artifacts[0].base64"
+                                    )
+                                    break
+                            else:
+                                generated_image_data = field_value
+                                logger.info(
+                                    "Found image data in field: %s", field
+                                )
+                                break
 
-            import json
+                if not generated_image_data:
+                    # If response is a string, assume it's the image data
+                    if isinstance(response_body, str):
+                        generated_image_data = response_body
+                        logger.info(
+                            "Response is a string, using as image data"
+                        )
+                    else:
+                        # Log available fields for debugging
+                        if isinstance(response_body, dict):
+                            available_fields = list(response_body.keys())
+                        else:
+                            available_fields = "N/A"
+                        raise ValueError(
+                            f"Could not find image data in response. "
+                            f"Available fields: {available_fields}"
+                        )
 
-            # For consistency with image generation tool,
-            # use prompt as enhanced_prompt
-            return ContextGenerationResponse(
-                success=True,
-                image_data=generated_image_data,
-                original_prompt=prompt,
-                enhanced_prompt=prompt,  # For caption display
-                input_image_used=True,
-                direct_response=True,
-                result=json.dumps(result_dict),
-            )
+                # Clean up base64 data if needed
+                if generated_image_data.startswith("data:image"):
+                    # Extract base64 part from data URL
+                    generated_image_data = generated_image_data.split(",", 1)[
+                        1
+                    ]
+
+                # Create successful response
+                result_dict = {
+                    "success": True,
+                    "original_prompt": prompt,
+                    "enhanced_prompt": prompt,
+                    "input_image_used": True,
+                    "aspect_ratio": aspect_ratio,
+                    "steps": steps,
+                    "cfg_scale": cfg_scale,
+                    "seed": seed,
+                    "direct_response": True,
+                    "message": (
+                        f"Successfully generated image with prompt: {prompt}"
+                    ),
+                }
+
+                import json
+
+                # For consistency with image generation tool,
+                # use prompt as enhanced_prompt
+                return ContextGenerationResponse(
+                    success=True,
+                    image_data=generated_image_data,
+                    original_prompt=prompt,
+                    enhanced_prompt=prompt,  # For caption display
+                    input_image_used=True,
+                    direct_response=True,
+                    result=json.dumps(result_dict),
+                )
 
         except requests.exceptions.HTTPError as e:
             logger.error("HTTP error in context generation: %s", e)

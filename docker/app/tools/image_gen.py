@@ -2,6 +2,7 @@ import logging
 from typing import Any, Dict, List, Optional, Tuple, Type
 
 from models.chat_config import ChatConfig
+from openai import OpenAI
 from PIL import Image
 from pydantic import Field
 from tools.base import BaseTool, BaseToolResponse, ExecutionMode
@@ -39,6 +40,27 @@ def get_dimensions_from_aspect_ratio(aspect_ratio: str) -> Tuple[int, int]:
         )
 
     return ASPECT_RATIO_MAPPINGS[aspect_ratio]
+
+
+def get_openai_size_string(width: int, height: int) -> str:
+    """
+    Convert width and height to OpenAI's size format.
+    OpenAI DALL-E 3 supports: 1024x1024, 1024x1792, 1792x1024
+
+    Args:
+        width: Image width in pixels
+        height: Image height in pixels
+
+    Returns:
+        Size string compatible with OpenAI API
+    """
+    # Map to the closest supported OpenAI size
+    if width == height:
+        return "1024x1024"
+    elif height > width:
+        return "1024x1536"  # Portrait
+    else:
+        return "1536x1024"  # Landscape
 
 
 class ImageGenerationResponse(BaseToolResponse):
@@ -99,22 +121,40 @@ class ImageGenerationTool(BaseTool):
                         },
                         "aspect_ratio": {
                             "type": "string",
-                            "description": "Aspect ratio for the image. Choose based on the content: 'square' for balanced compositions, social media posts, or general purpose images; 'portrait' for vertical subjects like people, tall buildings, or phone wallpapers; 'landscape' for wide scenes, natural vistas, or desktop wallpapers.",
+                            "description": (
+                                "Aspect ratio for the image. Choose based on the content: "
+                                "'square' for balanced compositions, social media posts, or general "
+                                "purpose images; 'portrait' for vertical subjects like people, tall "
+                                "buildings, or phone wallpapers; 'landscape' for wide scenes, "
+                                "natural vistas, or desktop wallpapers."
+                            ),
                             "enum": ALLOWED_ASPECT_RATIOS,
                             "default": "square",
                         },
                         "use_conversation_context": {
                             "type": "boolean",
-                            "description": "Whether to use conversation history to enhance the prompt. Useful for generating images related to ongoing discussions or stories.",
+                            "description": (
+                                "Whether to use conversation history to enhance the prompt. "
+                                "Useful for generating images related to ongoing discussions or stories."
+                            ),
                             "default": True,
                         },
                         "but_why": {
                             "type": "integer",
-                            "description": "An integer from 1-5 where a larger number indicates confidence this is the right tool to help the user.",
+                            "description": (
+                                "An integer from 1-5 where a larger number indicates confidence "
+                                "this is the right tool to help the user."
+                            ),
                         },
                         "enhanced_prompt": {
                             "type": "string",
-                            "description": "The enhanced/rewritten prompt to use for image generation. If the original user prompt is already detailed and well-formed, you can use it as-is. Otherwise, enhance it with more specific details, artistic direction, and visual elements to improve the image generation result.",
+                            "description": (
+                                "The enhanced/rewritten prompt to use for image generation. "
+                                "If the original user prompt is already detailed and well-formed, "
+                                "you can use it as-is. Otherwise, enhance it with more specific "
+                                "details, artistic direction, and visual elements to improve the "
+                                "image generation result."
+                            ),
                         },
                     },
                     "required": [
@@ -195,13 +235,14 @@ class ImageGenerationTool(BaseTool):
                 summary = context_response.analysis
 
             logger.info(
-                f"Retrieved context - summary: {len(summary) if summary else 0} chars"
+                "Retrieved context - summary: %d chars",
+                len(summary) if summary else 0,
             )
 
             return {"summary": summary}
 
         except Exception as e:
-            logger.error(f"Error retrieving conversation context: {e}")
+            logger.error("Error retrieving conversation context: %s", e)
             return None
 
     def _generate_image_with_config(
@@ -230,28 +271,68 @@ class ImageGenerationTool(BaseTool):
             return None
 
         try:
-            logger.info(
-                f"Generating image with prompt: '{enhanced_prompt}', dimensions: {width}x{height}, cfg_scale: {cfg_scale}"
-            )
-            generated_image = generate_image(
-                invoke_url=config.image_endpoint,
-                prompt=enhanced_prompt,
-                mode="base",
-                width=width,
-                height=height,
-                cfg_scale=cfg_scale,
-                return_bytes_io=False,
-            )
+            # Check if using OpenAI API
+            if "api.openai.com" in config.image_endpoint:
+                logger.info("Using OpenAI API for image generation")
+                logger.info(
+                    "Generating image with prompt: '%s', dimensions: %dx%d",
+                    enhanced_prompt,
+                    width,
+                    height,
+                )
 
-            if generated_image:
-                logger.info("Image generated successfully")
-                return generated_image
+                # Initialize OpenAI client
+                client = OpenAI(api_key=config.image_api_key)
+
+                # Convert dimensions to OpenAI size format
+                size = get_openai_size_string(width, height)
+                logger.info("Using OpenAI size format: %s", size)
+
+                # Generate image using OpenAI API
+                response = client.images.generate(
+                    model="gpt-image-1",
+                    prompt=enhanced_prompt,
+                    n=1,
+                    size=size,
+                    moderation="low",
+                )
+
+                # Get the base64 data from response
+                if response.data and len(response.data) > 0:
+                    image_b64 = response.data[0].b64_json
+                    logger.info("Image generated successfully via OpenAI API")
+                    return image_b64  # Return base64 string directly
+                else:
+                    logger.error("No image data in OpenAI response")
+                    return None
+
             else:
-                logger.error("Image generation returned None")
-                return None
+                # Use existing custom API endpoint
+                logger.info(
+                    "Generating image with prompt: '%s', dimensions: %dx%d, cfg_scale: %.1f",
+                    enhanced_prompt,
+                    width,
+                    height,
+                    cfg_scale,
+                )
+                generated_image = generate_image(
+                    invoke_url=config.image_endpoint,
+                    prompt=enhanced_prompt,
+                    width=width,
+                    height=height,
+                    cfg_scale=cfg_scale,
+                    return_bytes_io=False,
+                )
+
+                if generated_image:
+                    logger.info("Image generated successfully")
+                    return generated_image
+                else:
+                    logger.error("Image generation returned None")
+                    return None
 
         except Exception as e:
-            logger.error(f"Error during image generation: {e}")
+            logger.error("Error during image generation: %s", e)
             return None
 
     def generate_image_from_prompt(
@@ -287,14 +368,18 @@ class ImageGenerationTool(BaseTool):
             width, height = get_dimensions_from_aspect_ratio(aspect_ratio)
         except ValueError as e:
             logger.warning(
-                f"Invalid aspect ratio '{aspect_ratio}', defaulting to 'square': {e}"
+                "Invalid aspect ratio '%s', defaulting to 'square': %s",
+                aspect_ratio,
+                e,
             )
             width, height = get_dimensions_from_aspect_ratio("square")
             aspect_ratio = "square"
 
         # Validate cfg_scale
         if not (1.5 <= cfg_scale <= 4.5):
-            logger.warning(f"Invalid cfg_scale {cfg_scale}, defaulting to 3.5")
+            logger.warning(
+                "Invalid cfg_scale %s, defaulting to 3.5", cfg_scale
+            )
             cfg_scale = 3.5
 
         # Get conversation context if requested and available
@@ -306,10 +391,13 @@ class ImageGenerationTool(BaseTool):
         if enhanced_prompt is None:
             enhanced_prompt = user_prompt
             logger.info(
-                f"No enhanced prompt provided, using original: '{user_prompt}'"
+                "No enhanced prompt provided, using original: '%s'",
+                user_prompt,
             )
         else:
-            logger.info(f"Using provided enhanced prompt: '{enhanced_prompt}'")
+            logger.info(
+                "Using provided enhanced prompt: '%s'", enhanced_prompt
+            )
 
         # Check if image endpoint is configured
         if not config.image_endpoint:
@@ -375,7 +463,7 @@ class ImageGenerationTool(BaseTool):
                     ),  # Result field excludes image_data
                 )
             except Exception as e:
-                logger.error(f"Error converting image to base64: {e}")
+                logger.error("Error converting image to base64: %s", e)
                 response_dict = {
                     "success": False,
                     "original_prompt": user_prompt,
@@ -433,14 +521,22 @@ class ImageGenerationTool(BaseTool):
         messages = params.get("messages", None)
 
         logger.debug(
-            f"run_with_dict called with user_prompt: '{user_prompt}', aspect_ratio: {aspect_ratio}, cfg_scale: {cfg_scale}, use_context: {use_conversation_context}, enhanced_prompt: '{enhanced_prompt}'"
+            "run_with_dict called with user_prompt: '%s', aspect_ratio: %s, "
+            "cfg_scale: %s, use_context: %s, enhanced_prompt: '%s'",
+            user_prompt,
+            aspect_ratio,
+            cfg_scale,
+            use_conversation_context,
+            enhanced_prompt,
         )
 
         # Add more detailed logging to debug the issue
-        logger.debug(f"Image generation parameters:")
-        logger.debug(f"user_prompt: '{user_prompt}'")
-        logger.debug(f"use_conversation_context: {use_conversation_context}")
-        logger.debug(f"Number of messages: {len(messages) if messages else 0}")
+        logger.debug("Image generation parameters:")
+        logger.debug("user_prompt: '%s'", user_prompt)
+        logger.debug("use_conversation_context: %s", use_conversation_context)
+        logger.debug(
+            "Number of messages: %d", len(messages) if messages else 0
+        )
 
         # Create config from environment
         config = ChatConfig.from_environment()

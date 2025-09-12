@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 from typing import Any, Dict, List
 
 import streamlit as st
@@ -12,7 +13,11 @@ from services import LLMService
 from ui import ChatHistoryComponent
 from utils.animated_loading import get_animated_loading_html
 from utils.config import config
-from utils.text_processing import StreamingThinkTagFilter, strip_think_tags
+from utils.text_processing import (
+    StreamingThinkTagFilter,
+    sanitize_markdown_for_streamlit,
+    strip_think_tags,
+)
 
 
 class ResponseController:
@@ -132,7 +137,9 @@ class ResponseController:
                     "I apologize, but I encountered an error "
                     "generating the response."
                 )
-                message_placeholder.markdown(error_message)
+                message_placeholder.markdown(
+                    error_message, unsafe_allow_html=True
+                )
                 full_response = error_message
 
             # After streaming is complete, check for UI elements (images, etc.)
@@ -189,6 +196,12 @@ class ResponseController:
         think_filter = StreamingThinkTagFilter()
         first_chunk_received = False
 
+        # Progress tracking
+        progress_bar = None
+        progress_container = None
+        progress_text = None
+        current_progress = 0.0
+
         try:
             # Stream response from LLM service with consistent model type
             async for chunk in self.llm_service.generate_streaming_response(
@@ -197,38 +210,83 @@ class ResponseController:
                 response_chunks.append(chunk)
                 full_response += chunk
 
+                # Check for progress markers
+                progress_match = re.search(
+                    r'<<<PROGRESS:([0-9.]+):(.+?)>>>', chunk
+                )
+                if progress_match:
+                    # Extract progress info
+                    progress_value = float(progress_match.group(1))
+                    progress_message = progress_match.group(2)
+
+                    # Initialize progress bar on first progress update
+                    if progress_bar is None and not first_chunk_received:
+                        # Clear the loading animation
+                        message_placeholder.empty()
+                        first_chunk_received = True
+
+                        # Create progress container
+                        progress_container = st.container()
+                        with progress_container:
+                            progress_text = st.empty()
+                            progress_bar = st.progress(0.0)
+
+                    # Update progress
+                    if progress_bar is not None:
+                        current_progress = progress_value
+                        progress_bar.progress(current_progress)
+                        progress_text.markdown(f"*{progress_message}*")
+
+                    # Remove progress marker from chunk before processing
+                    chunk = re.sub(r'<<<PROGRESS:[0-9.]+:.+?>>>', '', chunk)
+
                 # Process chunk through streaming filter
                 filtered_chunk = think_filter.process_chunk(chunk)
                 if filtered_chunk:
                     display_text += filtered_chunk
 
                     # Update UI with filtered response
-                    # The first update will replace the loading animation
+                    # Show content when we have actual text (not just progress)
                     if display_text.strip():
+                        # Clear progress bar when actual content starts
+                        if progress_container is not None:
+                            progress_container.empty()
+                            progress_container = None
+                            progress_bar = None
+                            progress_text = None
+
                         if not first_chunk_received:
-                            # Clear the animation on first real content
+                            # Clear animation if needed
                             message_placeholder.empty()
                             first_chunk_received = True
-                        # Escape dollar signs for proper markdown rendering
-                        from utils.text_processing import (
-                            escape_markdown_dollars,
+
+                        # Sanitize markdown for proper rendering
+                        sanitized_text = sanitize_markdown_for_streamlit(
+                            display_text
+                        )
+                        message_placeholder.markdown(
+                            sanitized_text, unsafe_allow_html=True
                         )
 
-                        escaped_text = escape_markdown_dollars(display_text)
-                        message_placeholder.markdown(escaped_text)
-
                 # Small delay for visual effect
-                await asyncio.sleep(0.01)
+                # await asyncio.sleep(0.01)
 
             # Process any remaining buffered content
             final_chunk = think_filter.flush()
             if final_chunk:
                 display_text += final_chunk
-                # Escape dollar signs for proper markdown rendering
-                from utils.text_processing import escape_markdown_dollars
 
-                escaped_text = escape_markdown_dollars(display_text)
-                message_placeholder.markdown(escaped_text)
+            # Clear any remaining progress bar
+            if progress_container is not None:
+                progress_container.empty()
+
+            # Display final content
+            if display_text.strip():
+                # Sanitize markdown for proper rendering
+                sanitized_text = sanitize_markdown_for_streamlit(display_text)
+                message_placeholder.markdown(
+                    sanitized_text, unsafe_allow_html=True
+                )
 
         except Exception as e:
             logging.error("Streaming error: %s", e)
@@ -770,12 +828,13 @@ class ResponseController:
             message_placeholder: Streamlit placeholder for the message
         """
         from utils.image import base64_to_pil_image
-        from utils.text_processing import escape_markdown_dollars
 
         # First, display the full text response
         display_response = strip_think_tags(full_response)
-        escaped_response = escape_markdown_dollars(display_response)
-        message_placeholder.markdown(escaped_response)
+        sanitized_response = sanitize_markdown_for_streamlit(display_response)
+        message_placeholder.markdown(
+            sanitized_response, unsafe_allow_html=True
+        )
 
         # Then display each UI element
         for element in ui_elements:

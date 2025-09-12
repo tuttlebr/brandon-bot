@@ -50,7 +50,7 @@ class ImageAnalysisTool(BaseTool):
         self.description = "Analyze uploaded images to describe content or answer visual questions. Use when user uploads an image AND asks about it."
         self.llm_type = "vlm"  # Use VLM model for image analysis
         self.execution_mode = ExecutionMode.AUTO  # Support both sync and async
-        self.timeout = 60.0  # Image analysis can take time
+        self.timeout = 256.0  # Image analysis can take time
 
     def _initialize_mvc(self):
         """Initialize MVC components"""

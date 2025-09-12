@@ -101,7 +101,7 @@ class SerpAPITool(BaseTool):
             "Do not use this tool for weather or news."
             "Search the internet for current information using Google. "
             "Query MUST be in the form of a question for best results. "
-            "Returns search parameters and top 1 organic results "
+            "Returns search parameters and top organic results "
             "with extracted webpage content (or snippet if extraction fails)."
             "When helpful, provide the results links in markdown format."
             "NEVER make up or guess URLs."
@@ -171,23 +171,23 @@ class SerpAPITool(BaseTool):
         return self.run_with_dict(params)
 
     def _extract_top_results(
-        self, results: List[OrganicResult]
+        self, results: List[OrganicResult], top_n: int = 1
     ) -> List[OrganicResult]:
         """
-        Return top 1 organic results with extracted content
+        Return top_n organic results with extracted content
 
         Args:
             results: List of organic search results
 
         Returns:
-            List containing top 1 results with extracted content
+            List containing top_n results with extracted content
         """
         if not results:
             logger.warning("No organic results found")
             return []
 
-        # Get top 1 results
-        top_results = results[:1]
+        # Get top_n results
+        top_results = results[:top_n]
         logger.info("Processing top %d organic results", len(top_results))
 
         # Initialize all results with snippet as extracted_content
@@ -196,128 +196,12 @@ class SerpAPITool(BaseTool):
             result.extracted_content = result.snippet
 
         # Try to extract content from URLs for all top results
-        try:
-            from tools.extract import execute_web_extract_batch
-
-            # Get URLs for all top results
-            urls = [result.link for result in top_results]
-            logger.debug(
-                "Attempting to extract content from %d URLs", len(urls)
-            )
-
-            try:
-                extract_results = execute_web_extract_batch(urls)
-            except Exception as e:
-                logger.error(
-                    "execute_web_extract_batch failed: %s. "
-                    "Using snippets for all results.",
-                    e,
-                )
-                # Already initialized with snippets, so just return
-                return top_results
-
-            # Create URL to extract result mapping
-            url_to_extract = {}
-            for extract_result in extract_results:
-                url_to_extract[extract_result.url] = extract_result
-
-            # Process each top result
-            for result in top_results:
-                try:
-                    extract_result = url_to_extract.get(result.link)
-
-                    if extract_result and extract_result.success:
-                        # Handle WebExtractResponse and
-                        # StreamingExtractResponse
-                        content = None
-                        if (
-                            hasattr(extract_result, "content")
-                            and extract_result.content
-                        ):
-                            content = extract_result.content
-                        elif (
-                            hasattr(extract_result, "content_generator")
-                            and extract_result.content_generator
-                        ):
-                            # Handle streaming response
-                            try:
-                                import asyncio
-
-                                try:
-                                    loop = asyncio.get_event_loop()
-                                except RuntimeError:
-                                    loop = asyncio.new_event_loop()
-                                    asyncio.set_event_loop(loop)
-
-                                async def collect_content():
-                                    collected = ""
-                                    async for (
-                                        chunk
-                                    ) in extract_result.content_generator:
-                                        collected += chunk
-                                    return collected
-
-                                content = loop.run_until_complete(
-                                    collect_content()
-                                )
-                            except Exception as e:
-                                logger.error(
-                                    "Failed to collect streaming content "
-                                    "for %s: %s. Using snippet instead.",
-                                    result.link,
-                                    e,
-                                )
-                                content = None
-
-                        if content:
-                            result.extracted_content = content
-                            logger.info(
-                                "Successfully extracted content from: %s",
-                                result.link,
-                            )
-                        else:
-                            logger.warning(
-                                "No content extracted for %s, keeping snippet",
-                                result.link,
-                            )
-                            # Already has snippet as extracted_content
-                    else:
-                        logger.warning(
-                            "Extraction failed or not successful for %s, "
-                            "keeping snippet",
-                            result.link,
-                        )
-                        # Already has snippet as extracted_content
-
-                except Exception as e:
-                    logger.error(
-                        "Error processing extraction result for %s: %s. "
-                        "Keeping snippet.",
-                        result.link,
-                        e,
-                    )
-                    # Already has snippet as extracted_content
-
-        except ImportError as e:
-            logger.error(
-                "Failed to import tools.extract module: %s. "
-                "Using snippets for all results.",
-                e,
-            )
-            # Already initialized with snippets, so just return
-        except Exception as e:
-            logger.error(
-                "Unexpected error during content extraction: %s. "
-                "Using snippets for all results.",
-                e,
-            )
-            # Already initialized with snippets, so just return
-
-        # Ensure all results have extracted_content (should already be set)
-        for result in top_results:
-            if not result.extracted_content:
-                result.extracted_content = result.snippet
-
+        # Skip web extraction for now to avoid deadlock issues
+        logger.info(
+            "Skipping web content extraction to avoid deadlock. "
+            "Using search snippets for all %d results.",
+            len(top_results),
+        )
         return top_results
 
     def _validate_query_format(self, query: str) -> str:
@@ -371,7 +255,7 @@ class SerpAPITool(BaseTool):
         self, query: str, location_requested: str, **kwargs
     ) -> SerpAPIResponse:
         """
-        Search using SerpAPI and return top 1 organic results with
+        Search using SerpAPI and return top_n organic results with
         extracted content from the webpages (falls back to snippet if
         extraction fails).
 
@@ -381,7 +265,7 @@ class SerpAPITool(BaseTool):
             **kwargs: Additional search parameters to override defaults
 
         Returns:
-            SerpAPIResponse: The search results with top 1 results
+            SerpAPIResponse: The search results with top_n results
                             including extracted content
 
         Raises:
@@ -432,7 +316,7 @@ class SerpAPITool(BaseTool):
             # Parse the JSON response and validate with Pydantic
             serpapi_response = SerpAPIResponse(**response_data)
 
-            # Extract content for top 1 results
+            # Extract content for top_n results
             serpapi_response.organic_results = self._extract_top_results(
                 serpapi_response.organic_results
             )

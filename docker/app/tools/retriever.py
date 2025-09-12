@@ -14,7 +14,7 @@ from utils.text_processing import strip_think_tags
 # Configure logger
 logger = logging.getLogger(__name__)
 
-MAX_RESULTS = 15
+MAX_RESULTS = 25
 
 
 @dataclass
@@ -25,7 +25,7 @@ class SearchConfig:
     uri: str
     db_name: str
     vector_field: str = "embedding"
-    radius: float = 2.0
+    radius: float = 1.6
     range_filter: float = 0.001
     topk: int = MAX_RESULTS
     output_fields: List[str] = None
@@ -438,7 +438,7 @@ class SimilaritySearch:
                     cutoff,
                     max_gap_size,
                 )
-                return filtered_scores.tolist()[:5]
+                return filtered_scores.tolist()
             else:
                 # Filter dictionaries or Hit objects
                 filtered_data = []
@@ -474,18 +474,38 @@ class SimilaritySearch:
             return ""
 
         formatted_entries = []
-        seen_texts = set()
+        seen_content = set()  # Track unique combinations of title + text
+        duplicate_count = 0
 
         i = 1
-        for result in results[0]:
-            text = result["entity"]["text"]
-            if text in seen_texts:
+        for idx, result in enumerate(results[0]):
+            entity = result["entity"]
+            # Create a unique key using both title and text to avoid false duplicates
+            content_key = (entity.get("title", ""), entity.get("text", ""))
+
+            if content_key in seen_content:
+                duplicate_count += 1
+                logger.debug(
+                    "Skipping duplicate result %d: title='%s', text='%s...'",
+                    idx,
+                    entity.get("title", "")[:50],
+                    entity.get("text", "")[:50],
+                )
                 continue
 
-            seen_texts.add(text)
-            entry = self._format_single_result(i, result["entity"])
+            seen_content.add(content_key)
+            entry = self._format_single_result(i, entity)
             formatted_entries.append(entry)
             i += 1
+
+        if duplicate_count > 0:
+            logger.info(
+                "Formatted %d unique results from %d total results (%d duplicates removed)",
+                len(formatted_entries),
+                len(results[0]),
+                duplicate_count,
+            )
+
         return "\n\n".join(formatted_entries)
 
     def _format_single_result(self, index: int, entity: Dict[str, Any]) -> str:
@@ -543,7 +563,7 @@ class RetrieverTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "retrieval_search"
-        self.description = "Search specialized knowledge base for mental health resources or NVIDIA technical documentation. Use ONLY for these specific domains."
+        self.description = "Search specialized knowledge base for NVIDIA technical documentation. For best results, pair with serpapi_internet_search."
 
     def _initialize_mvc(self):
         """Initialize MVC components"""
@@ -676,6 +696,8 @@ class RetrieverTool(BaseTool):
                 final_results
             )
 
+            # Note: 'results' contains ALL results (including duplicates)
+            # while 'formatted_results' shows only unique results for display
             response = RetrievalResponse(
                 query=query,
                 results=results,

@@ -14,17 +14,19 @@ from utils.system_prompts import prompt_manager
 TOOL_LLM_TYPES = {
     "conversation_context": "intelligent",
     "extract_web_content": "intelligent",
-    "get_weather": "intelligent",
+    "get_weather": "fast",
     "serpapi_news_search": "intelligent",
     "serpapi_internet_search": "intelligent",
     "retrieval_search": "intelligent",
     "pdf_assistant": "intelligent",
     "text_assistant": "intelligent",
-    "generate_image": "intelligent",
+    "generate_image": "fast",
     "analyze_image": "vlm",
     "generalist_conversation": "intelligent",
     "tool_selection": "intelligent",
+    "deep_researcher": "llm",
 }
+
 
 # Default LLM type if not specified
 DEFAULT_LLM_TYPE = "intelligent"
