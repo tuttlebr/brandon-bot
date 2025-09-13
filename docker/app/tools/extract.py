@@ -8,10 +8,7 @@ following the Model-View-Controller pattern.
 import logging
 import re
 from typing import Any, AsyncGenerator, Dict, List, Optional, Type
-from urllib.parse import urlparse
 
-import requests
-from bs4 import BeautifulSoup
 from pydantic import Field
 from services.llm_client_service import llm_client_service
 from tools.base import (
@@ -22,7 +19,7 @@ from tools.base import (
     ToolController,
     ToolView,
 )
-from utils.text_processing import StreamingThinkTagFilter, clean_content
+from utils.text_processing import StreamingThinkTagFilter
 from utils.web_extractor import WebDataExtractor
 
 # Configure logger
@@ -72,7 +69,8 @@ class WebExtractController(ToolController):
                 " (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
             ),
             "Accept": (
-                "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+                "text/html,application/xhtml+xml,application/xml;"
+                "q=0.9,image/webp,*/*;q=0.8"
             ),
             "Accept-Language": "en-US,en;q=0.5",
             "Accept-Encoding": "gzip, deflate",
@@ -142,7 +140,6 @@ class WebExtractController(ToolController):
         """Process the URL extraction request asynchronously with streaming"""
         url = params["url"]
         request = params.get("request", "")
-        stream = params.get("stream", True)  # Default to streaming
 
         try:
             # Extract content from URL
@@ -202,9 +199,8 @@ class WebExtractController(ToolController):
 
             content = result["content"]
             title = result.get("title", "")
-            raw_content = content  # Store raw content for reference
 
-            # If no specific request, create streaming response with raw content
+            # If no specific request, create streaming response
             if not request:
 
                 async def content_generator():
@@ -236,17 +232,18 @@ class WebExtractController(ToolController):
 
         except Exception as e:
             logger.error(f"Error processing URL {url}: {e}")
+            error_msg = str(e)
 
             # Return error with streaming response
             async def error_generator():
-                yield f"Failed to process {url}: {str(e)}"
+                yield f"Failed to process {url}: {error_msg}"
 
             return {
                 "url": url,
                 "content_generator": error_generator(),
                 "title": None,
                 "success": False,
-                "error_message": str(e),
+                "error_message": error_msg,
                 "is_streaming": True,
                 "direct_response": True,
             }
@@ -256,80 +253,6 @@ class WebExtractController(ToolController):
         url_pattern = r'https?://[^\s<>"{}|\\^`\[\]]+'
         urls = re.findall(url_pattern, text)
         return urls
-
-    def _validate_url(self, url: str) -> bool:
-        """Validate that the URL is properly formatted"""
-        try:
-            if not url.startswith(("http://", "https://")):
-                return False
-
-            parsed = urlparse(url)
-            if not parsed.netloc:
-                return False
-
-            return True
-        except Exception:
-            return False
-
-    def _check_user_provided_url(
-        self, url: str, messages: List[Dict[str, Any]]
-    ) -> bool:
-        """Check if the URL was provided by the user"""
-        if not messages:
-            return True
-
-        for message in reversed(messages):
-            if message.get("role") == "user":
-                content = str(message.get("content", ""))
-                if url in content:
-                    logger.info(f"Found URL '{url}' in user message")
-                    return True
-
-                urls_in_message = self._extract_urls_from_text(content)
-                if url in urls_in_message:
-                    logger.info(f"Found URL '{url}' in user message content")
-                    return True
-
-        logger.warning(f"URL '{url}' was not found in any user message")
-        return False
-
-    def _fetch_html_content(self, url: str) -> tuple[str, float]:
-        """Fetch HTML content from URL"""
-        import time
-
-        start_time = time.time()
-
-        try:
-            response = requests.get(
-                url, headers=self.headers, timeout=5, allow_redirects=True
-            )
-            response.raise_for_status()
-
-            content_type = response.headers.get("content-type", "").lower()
-            if (
-                "text/html" not in content_type
-                and "application/xhtml" not in content_type
-            ):
-                raise ValueError(
-                    "URL does not return HTML content. Content-Type:"
-                    f" {content_type}"
-                )
-
-            soup = BeautifulSoup(response.text, "html.parser")
-            for script in soup(["script", "style", "noscript", "iframe"]):
-                script.decompose()
-            body = str(soup.find("body"))
-
-            response_time = time.time() - start_time
-
-            return body, response_time
-
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Failed to fetch URL {url}: {e}")
-            raise
-        except Exception as e:
-            logger.error(f"Error fetching URL {url}: {e}")
-            raise
 
     def _extract_with_llm(
         self, url: str, content: str, request: str, title: str = ""
@@ -429,75 +352,6 @@ Instructions:
             logger.error(f"Error extracting content with LLM: {e}")
             raise
 
-    async def _extract_with_llm_async(
-        self, html_content: str, url: str
-    ) -> str:
-        """Extract content from HTML using LLM asynchronously"""
-        try:
-            client = llm_client_service.get_async_client(self.llm_type)
-            model_name = llm_client_service.get_model_name(self.llm_type)
-
-            logger.debug(
-                f"Using LLM type '{self.llm_type}' for async web extraction"
-                " (configured in tool_llm_config.py)"
-            )
-
-            if len(html_content) > 200000:
-                html_content = (
-                    html_content[:200000]
-                    + "\n[Content truncated due to length]"
-                )
-                logger.info(
-                    f"Truncated HTML content to 200k characters for LLM"
-                    f" processing"
-                )
-
-            # Get system prompt from centralized configuration
-            from tools.tool_llm_config import get_tool_system_prompt
-
-            system_prompt = get_tool_system_prompt("extract_web_content", "")
-
-            user_message = (
-                "Extract the main content from this webpage and convert it to"
-                " markdown. Be sure to escape any special characters as"
-                f" needed:\n\nURL: {url}\n\nHTML Content:\n{html_content}"
-            )
-
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_message},
-            ]
-
-            logger.info(
-                f"Extracting content from URL using {model_name} (async"
-                " non-streaming)"
-            )
-
-            response = await client.chat.completions.create(
-                model=model_name,
-                messages=messages,
-                temperature=0.28,
-                top_p=0.95,
-                frequency_penalty=0.002,
-                presence_penalty=0.9,
-            )
-
-            result = response.choices[0].message.content.strip()
-
-            # Clean and validate the extracted content
-            cleaned_result = clean_content(result)
-
-            logger.info(
-                f"Successfully extracted {len(cleaned_result)} characters from"
-                " URL (async)"
-            )
-
-            return cleaned_result
-
-        except Exception as e:
-            logger.error(f"Error extracting content with async LLM: {e}")
-            raise
-
     async def _extract_with_llm_streaming(
         self, url: str, content: str, request: str, title: str = ""
     ) -> AsyncGenerator[str, None]:
@@ -580,20 +434,6 @@ Instructions:
         except Exception as e:
             logger.error(f"Error in streaming extraction: {e}")
             yield f"Error processing content: {str(e)}"
-
-    async def _extract_with_llm_streaming_collected(
-        self, url: str, content: str, request: str, title: str = ""
-    ) -> str:
-        """
-        Process extraction using LLM with streaming but collect the full response.
-        This method is kept for compatibility.
-        """
-        collected_result = ""
-        async for chunk in self._extract_with_llm_streaming(
-            url, content, request, title
-        ):
-            collected_result += chunk
-        return collected_result
 
 
 class WebExtractView(ToolView):

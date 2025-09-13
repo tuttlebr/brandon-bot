@@ -397,7 +397,3 @@ class PDFAssistantTool(BaseTool):
 
 
 # Tool registration function
-def get_pdf_assistant_tool_definition() -> Dict[str, Any]:
-    """Get the PDF assistant tool definition for registration"""
-    tool = PDFAssistantTool()
-    return tool.get_definition()

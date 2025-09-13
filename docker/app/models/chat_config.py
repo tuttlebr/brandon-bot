@@ -73,16 +73,6 @@ class ChatConfig:
         return config.env.VLM_API_KEY
 
     @property
-    def embedding_api_key(self) -> str:
-        """API key for embedding model (falls back to NVIDIA_API_KEY)"""
-        return config.env.EMBEDDING_API_KEY
-
-    @property
-    def reranker_api_key(self) -> str:
-        """API key for reranker model (falls back to NVIDIA_API_KEY)"""
-        return config.env.RERANKER_API_KEY
-
-    @property
     def image_api_key(self) -> str:
         """API key for image generation (falls back to NVIDIA_API_KEY)"""
         return config.env.IMAGE_API_KEY

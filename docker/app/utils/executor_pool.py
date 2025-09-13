@@ -67,13 +67,3 @@ class ExecutorPool:
 
 # Global shared executor pool instance
 shared_executor_pool = ExecutorPool()
-
-
-def get_shared_executor() -> concurrent.futures.ThreadPoolExecutor:
-    """
-    Get the shared executor instance
-
-    Returns:
-        Shared ThreadPoolExecutor instance
-    """
-    return shared_executor_pool.executor

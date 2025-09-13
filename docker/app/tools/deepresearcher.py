@@ -36,25 +36,6 @@ class ConfidenceLevel(str, Enum):
     MEDIUM = "medium"
     HIGH = "high"
 
-    @classmethod
-    def from_float(cls, value: float) -> "ConfidenceLevel":
-        """Convert float confidence to categorical level"""
-        if value >= 0.8:
-            return cls.HIGH
-        elif value >= 0.6:
-            return cls.MEDIUM
-        else:
-            return cls.LOW
-
-    def to_float(self) -> float:
-        """Convert categorical level to float for backward compatibility"""
-        if self == ConfidenceLevel.HIGH:
-            return 0.85
-        elif self == ConfidenceLevel.MEDIUM:
-            return 0.7
-        else:
-            return 0.4
-
 
 FACTS_SCHEMA = {
     "type": "object",
@@ -121,7 +102,6 @@ class ResearchPhase(str, Enum):
     FOLLOW_UP_SEARCH = "follow_up_search"
     DEEP_DIVE = "deep_dive"
     SYNTHESIS = "synthesis"
-    QUALITY_CHECK = "quality_check"
 
 
 class ResearchSource(BaseModel):
@@ -209,7 +189,6 @@ class DeepResearchController(ToolController):
     """Controller handling deep research logic"""
 
     MAX_ITERATIONS = 5
-    MIN_CONFIDENCE_THRESHOLD = ConfidenceLevel.MEDIUM
 
     def __init__(self, config: ChatConfig, llm_type: str):
         self.config = config
@@ -1767,23 +1746,3 @@ class DeepResearcherTool(BaseTool):
     def get_response_type(self) -> Type[BaseToolResponse]:
         """Get the response type for this tool"""
         return DeepResearchResponse
-
-    def supports_streaming(self) -> bool:
-        """Indicate that this tool supports streaming responses"""
-        return True
-
-
-# Helper function for backward compatibility
-def get_deep_researcher_tool_definition() -> Dict[str, Any]:
-    """Get the OpenAI-compatible tool definition for deep researcher"""
-    from tools.registry import get_tool, register_tool_class
-
-    # Register the tool class if not already registered
-    register_tool_class("deep_researcher", DeepResearcherTool)
-
-    # Get the tool instance and return its definition
-    tool = get_tool("deep_researcher")
-    if tool:
-        return tool.get_definition()
-    else:
-        raise RuntimeError("Failed to get deep researcher tool definition")

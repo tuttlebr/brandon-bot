@@ -421,12 +421,6 @@ class PromptManager:
                 "customer questions."
             )
 
-    def clear_cache(self):
-        """Clear the prompt cache"""
-        self._cache.clear()
-        self._cached_prompt = None
-        self._cached_tools_list = None
-        self._cached_date = None
         self._last_cache_time = None
 
 

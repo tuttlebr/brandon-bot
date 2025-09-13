@@ -494,16 +494,3 @@ class ContextGenerationTool(BaseTool):
 
 
 # Helper function for backward compatibility
-def get_context_generation_tool_definition() -> Dict[str, Any]:
-    """Get the OpenAI-compatible tool definition"""
-    from tools.registry import get_tool, register_tool_class
-
-    # Register the tool class if not already registered
-    register_tool_class("context_generation", ContextGenerationTool)
-
-    # Get the tool instance and return its definition
-    tool = get_tool("context_generation")
-    if tool:
-        return tool.get_definition()
-    else:
-        raise RuntimeError("Failed to get context generation tool definition")

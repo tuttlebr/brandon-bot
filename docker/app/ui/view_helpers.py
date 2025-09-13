@@ -8,7 +8,7 @@ reducing coupling between controllers and Streamlit framework.
 import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, Optional
+from typing import Optional
 
 import streamlit as st
 
@@ -42,12 +42,6 @@ class IViewInterface(ABC):
     def show_message(self, message: UIMessage) -> None:  # dead: disable
         """Display a message to the user"""
 
-    @abstractmethod
-    def show_loading(
-        self, message: str = "Loading..."
-    ) -> Any:  # dead: disable
-        """Show loading indicator"""
-
 
 class StreamlitViewInterface(IViewInterface):
     """
@@ -73,12 +67,6 @@ class StreamlitViewInterface(IViewInterface):
             st.error(message.content)
         else:  # info or default
             st.info(message.content)
-
-    def show_loading(
-        self, message: str = "Loading..."
-    ) -> Any:  # dead: disable
-        """Show loading indicator using Streamlit spinner"""
-        return st.spinner(message)
 
 
 class MessageHelper:

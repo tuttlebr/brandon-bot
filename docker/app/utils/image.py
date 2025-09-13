@@ -25,9 +25,6 @@ IMAGE_API_KEY = os.getenv("IMAGE_API_KEY", "")
 BASE64_PREFIX_PATTERN = r"^data:image/.+;base64,"
 
 
-# Allowed modes for image generation
-ALLOWED_MODES = ["base"]
-
 # HTTP constants
 HTTP_HEADERS = {
     "Accept": "application/json",

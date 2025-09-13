@@ -5,75 +5,10 @@ This module provides a reusable batch processing framework for handling
 large documents and datasets efficiently.
 """
 
-import asyncio
 import logging
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
-
-T = TypeVar("T")
-
-
-class BatchProcessor:
-    """Generic batch processor for handling large datasets"""
-
-    def __init__(
-        self, batch_size: int = 5, delay_between_batches: float = 0.3
-    ):
-        """
-        Initialize batch processor
-
-        Args:
-            batch_size: Number of items to process in each batch
-            delay_between_batches: Delay in seconds between batch processing
-        """
-        self.batch_size = batch_size
-        self.delay_between_batches = delay_between_batches
-
-    async def process_in_batches(
-        self,
-        items: List[T],
-        process_func: Callable[[List[T], int, int], Any],
-        combine_func: Optional[Callable[[List[Any]], Any]] = None,
-    ) -> Any:
-        """
-        Process items in batches with optional result combination
-
-        Args:
-            items: List of items to process
-            process_func: Async function to process a batch (batch, start_idx, end_idx)
-            combine_func: Optional function to combine all batch results
-
-        Returns:
-            Combined results or list of batch results
-        """
-        results = []
-        total_items = len(items)
-
-        for i in range(0, total_items, self.batch_size):
-            batch_end = min(i + self.batch_size, total_items)
-            batch = items[i:batch_end]
-
-            logger.debug(
-                f"Processing batch {i+1}-{batch_end} of {total_items}"
-            )
-
-            try:
-                result = await process_func(batch, i, batch_end)
-                results.append(result)
-            except Exception as e:
-                logger.error(f"Error processing batch {i+1}-{batch_end}: {e}")
-                results.append(None)
-
-            # Add delay between batches (except for the last one)
-            if batch_end < total_items:
-                await asyncio.sleep(self.delay_between_batches)
-
-        # Combine results if function provided
-        if combine_func:
-            return combine_func(results)
-
-        return results
 
 
 class DocumentProcessor:

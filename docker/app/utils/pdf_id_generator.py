@@ -72,37 +72,6 @@ def generate_pdf_id(
             return f"pdf_{timestamp_hash}"
 
 
-def check_pdf_exists(pdf_id: str, milvus_client) -> bool:
-    """
-    Check if a PDF with given ID already exists in the database.
-
-    Args:
-        pdf_id: The PDF ID to check
-        milvus_client: Milvus client instance
-
-    Returns:
-        bool: True if PDF exists, False otherwise
-    """
-    try:
-        # Query for any chunks with this pdf_id
-        from pymilvus import Collection
-
-        collection = Collection("pdf_chunks")
-
-        # Search for one result with this pdf_id
-        expr = f'metadata like "%\\"pdf_id\\": \\"{pdf_id}\\"%"'
-        results = collection.query(expr=expr, output_fields=["id"], limit=1)
-
-        exists = len(results) > 0
-        logger.debug(f"PDF {pdf_id} exists: {exists}")
-        return exists
-
-    except Exception as e:
-        logger.warning(f"Error checking if PDF exists: {e}")
-        # If we can't check, assume it doesn't exist
-        return False
-
-
 def get_existing_pdf_info(pdf_id: str, file_storage_service) -> dict:
     """
     Retrieve information about an existing PDF.

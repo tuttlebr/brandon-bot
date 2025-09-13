@@ -89,17 +89,3 @@ def set_session_id(session_id: str | None):
 
     # Always set in contextvars too
     _session_id.set(session_id)
-
-
-def get_session_id() -> Optional[str]:
-    """Get the session ID"""
-    try:
-        import streamlit as st
-
-        if hasattr(st, "session_state") and "session_id" in st.session_state:
-            return st.session_state["session_id"]
-    except ImportError:
-        pass
-
-    # Fallback to contextvars
-    return _session_id.get()

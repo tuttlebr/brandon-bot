@@ -6,7 +6,7 @@ metadata, and decision logic to help the primary tool-calling LLM make better
 tool selection choices.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 # SINGLE SOURCE OF TRUTH for all tool descriptions and metadata
 TOOL_DEFINITIONS = {
@@ -299,126 +299,6 @@ TOOL_DEFINITIONS = {
 }
 
 
-class ToolDescriptionEnhancer:
-    """Enhances tool descriptions with context-aware guidance"""
-
-    # Use the single source of truth
-    ENHANCED_DESCRIPTIONS = TOOL_DEFINITIONS
-
-    @classmethod
-    def get_decision_prompt(cls) -> str:
-        """Get the decision-making prompt for tool selection"""
-        # Delegate to centralized prompt manager
-        from utils.system_prompts import prompt_manager
-
-        return prompt_manager.get_tool_selection_guidelines()
-
-    @classmethod
-    def should_use_tool(
-        cls,
-        user_message: str,
-        tool_name: str,
-        conversation_context: Optional[Dict] = None,
-    ) -> bool:
-        """
-        Determine if a tool should be used based on the user message and context
-
-        Args:
-            user_message: The user's message
-            tool_name: The tool being considered
-            conversation_context: Optional context about recent conversation
-
-        Returns:
-            True if tool should be used, False otherwise
-        """
-        if tool_name not in cls.ENHANCED_DESCRIPTIONS:
-            return True  # Unknown tool, let system decide
-
-        tool_info = cls.ENHANCED_DESCRIPTIONS[tool_name]
-        message_lower = user_message.lower()
-
-        # Check for anti-trigger words (strong signal NOT to use the tool)
-        if "anti_trigger_words" in tool_info:
-            for word in tool_info["anti_trigger_words"]:
-                if word in message_lower:
-                    # Check if it's the primary intent (not just part of a larger request)
-                    if (
-                        len(user_message.split()) < 5
-                    ):  # Short message, likely just acknowledgment
-                        return False
-
-        # Check for required context
-        if "context_requirement" in tool_info:
-            if (
-                not conversation_context
-                or tool_info["context_requirement"] not in conversation_context
-            ):
-                return False
-
-        # Check for required elements
-        if tool_info.get("requires_action_verb", False):
-            has_action_verb = any(
-                word in message_lower
-                for word in tool_info.get("trigger_words", [])
-            )
-            if not has_action_verb:
-                return False
-
-        if tool_info.get("requires_location", False):
-            # Simple check for location indicators
-            location_indicators = [
-                "in",
-                "at",
-                "near",
-                "weather",
-                "forecast",
-                "temperature",
-            ]
-            has_location = any(
-                indicator in message_lower for indicator in location_indicators
-            )
-            if not has_location:
-                return False
-
-        if tool_info.get("requires_url", False):
-            # Check for URL patterns
-            url_patterns = [
-                "http://",
-                "https://",
-                "www.",
-                ".com",
-                ".org",
-                ".net",
-            ]
-            has_url = any(pattern in user_message for pattern in url_patterns)
-            if not has_url:
-                return False
-
-        # Internal tools should never be used for user queries
-        if tool_info.get("is_internal", False):
-            return False
-
-        return True
-
-    @classmethod
-    def get_enhanced_tool_description(cls, tool_name: str) -> str:
-        """Get the enhanced description for a tool"""
-        if tool_name in cls.ENHANCED_DESCRIPTIONS:
-            return cls.ENHANCED_DESCRIPTIONS[tool_name]["description"]
-        return None
-
-    @classmethod
-    def get_tool_examples(cls, tool_name: str) -> Dict[str, List[str]]:
-        """Get examples of when to use and not use a tool"""
-        if tool_name in cls.ENHANCED_DESCRIPTIONS:
-            tool_info = cls.ENHANCED_DESCRIPTIONS[tool_name]
-            return {
-                "use": tool_info.get("example_uses", []),
-                "dont_use": tool_info.get("example_non_uses", []),
-            }
-        return {"use": [], "dont_use": []}
-
-
 def get_tool_description(tool_name: str) -> str:
     """
     Get the description for a specific tool from the single source of truth.
@@ -432,19 +312,6 @@ def get_tool_description(tool_name: str) -> str:
     if tool_name in TOOL_DEFINITIONS:
         return TOOL_DEFINITIONS[tool_name]["description"]
     return f"Tool '{tool_name}' - No description available"
-
-
-def get_tool_metadata(tool_name: str) -> Dict[str, Any]:
-    """
-    Get all metadata for a specific tool from the single source of truth.
-
-    Args:
-        tool_name: The name of the tool
-
-    Returns:
-        The tool metadata dictionary, or empty dict if not found
-    """
-    return TOOL_DEFINITIONS.get(tool_name, {})
 
 
 # Acknowledgment patterns that should NOT trigger tools

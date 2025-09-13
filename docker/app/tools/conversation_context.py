@@ -348,43 +348,6 @@ class ConversationContextController(ToolController):
             logger.error(f"Error analyzing conversation context: {e}")
             raise
 
-    async def _analyze_conversation_context_async(
-        self,
-        context_type: ContextType,
-        messages: List[Dict[str, Any]],
-        config: ChatConfig,
-        focus_query: Optional[str] = None,
-        pdf_data: Dict[str, Any] = None,
-    ) -> Dict[str, Any]:
-        """
-        Analyze conversation context using LLM with streaming (collects full response)
-
-        This method is kept for compatibility but collects the full response.
-        For true streaming, use _analyze_conversation_context_streaming.
-        """
-        collected_result = ""
-        async for chunk in self._analyze_conversation_context_streaming(
-            context_type, messages, config, focus_query, pdf_data
-        ):
-            collected_result += chunk
-
-        # Extract metadata after collecting full response
-        key_topics = self._extract_key_topics(collected_result, context_type)
-        user_intent = self._extract_user_intent(collected_result, messages)
-
-        return {
-            "analysis": collected_result,
-            "user_intent": user_intent,
-            "conversation_type": context_type.value,
-            "key_topics": key_topics,
-            "has_document": pdf_data is not None,
-            "document_info": (
-                pdf_data.get("info", "No additional document information")
-                if pdf_data
-                else "No additional document information"
-            ),
-        }
-
     async def _analyze_conversation_context_streaming(
         self,
         context_type: ContextType,

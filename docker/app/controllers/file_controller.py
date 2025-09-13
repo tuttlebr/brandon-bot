@@ -55,11 +55,6 @@ class FileController:
         normalized = self.normalize_filename(filename)
         self.processing_files.add(normalized)
 
-    def is_file_processing(self, filename: str) -> bool:
-        """Check if a file is currently being processed"""
-        normalized = self.normalize_filename(filename)
-        return normalized in self.processing_files
-
     def clear_processing_file(self):
         """Clear all processing markers"""
         self.processing_files.clear()

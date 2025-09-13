@@ -178,17 +178,6 @@ class APIChatbotService:
             for msg in messages
         ]
 
-    def _convert_dict_to_messages(
-        self, messages: List[Dict[str, Any]]
-    ) -> List[ChatMessage]:
-        """Convert dictionary messages to Pydantic format"""
-        return [
-            ChatMessage(
-                role=msg["role"], content=msg["content"], name=msg.get("name")
-            )
-            for msg in messages
-        ]
-
     async def process_chat_completion(
         self, request: ChatCompletionRequest, session_id: Optional[str] = None
     ) -> Union[ChatCompletionResponse, StreamingResponse]:
@@ -392,12 +381,9 @@ class APIChatbotService:
             created_time = int(time.time())
 
             # Stream the response using the LLM service
-            full_response = ""
             async for chunk in self.llm_service.generate_streaming_response(
                 prepared_messages, model_name, model_type
             ):
-                full_response += chunk
-
                 # Create streaming response chunk
                 response_chunk = StreamingChatCompletionResponse(
                     id=response_id,

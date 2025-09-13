@@ -121,13 +121,6 @@ def handle_pdf_upload(uploaded_file) -> Optional[Dict[str, Any]]:
         return None
 
 
-def clear_active_pdf():
-    """Clear the active PDF from session state"""
-    set_active_pdf_id(None)
-    if "active_pdf" in st.session_state:
-        del st.session_state["active_pdf"]
-
-
 def get_active_pdf_info() -> Optional[Dict[str, Any]]:
     """Get information about the currently active PDF"""
     return st.session_state.get("active_pdf")

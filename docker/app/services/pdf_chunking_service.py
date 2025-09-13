@@ -6,7 +6,6 @@ for efficient retrieval and query processing. Uses a simplified approach
 that's compatible with MilvusClient's auto-schema generation.
 """
 
-import hashlib
 import json
 import logging
 from typing import Any, Dict, List, Optional
@@ -95,14 +94,14 @@ class PDFChunkingService:
             db_name = config.env.DEFAULT_DB
 
             # Try simple connection first
-            test_client = MilvusClient(uri=uri)
+            MilvusClient(uri=uri)
 
             # Check if database exists by trying to use it
             try:
-                test_client = MilvusClient(uri=uri, db_name=db_name)
+                MilvusClient(uri=uri, db_name=db_name)
                 logger.info(f"Database '{db_name}' exists")
                 return True
-            except:
+            except Exception:
                 # Create database
                 logger.info(f"Creating database '{db_name}'...")
                 connections.connect(alias="default", uri=uri)
@@ -225,7 +224,7 @@ class PDFChunkingService:
                         f"📚 Milvus collection '{self.collection_name}' loaded"
                         " successfully"
                     )
-                except:
+                except Exception:
                     pass  # Ignore if already loaded
 
                 # Update session state to indicate Milvus upload complete
@@ -330,57 +329,6 @@ class PDFChunkingService:
             logger.error(f"Error creating embedding: {e}")
             return None
 
-    def _generate_pdf_id(self, filename: str) -> str:
-        """Generate unique ID for PDF"""
-        return hashlib.md5(filename.encode()).hexdigest()[:16]
-
-    def search_chunks(
-        self, query: str, pdf_id: str, limit: int = 5
-    ) -> List[Dict[str, Any]]:
-        """Search for relevant chunks"""
-        if not self.milvus_client:
-            return []
-
-        try:
-            # Create query embedding
-            query_embedding = self._create_embedding(query)
-            if not query_embedding:
-                return []
-
-            # Search
-            results = self.milvus_client.search(
-                collection_name=self.collection_name,
-                data=[query_embedding],
-                limit=limit * 2,  # Get more to filter
-                output_fields=["id", "text", "metadata"],
-            )
-
-            if not results or not results[0]:
-                return []
-
-            # Filter by pdf_id and format results
-            relevant_chunks = []
-            for hit in results[0]:
-                metadata = json.loads(hit["entity"].get("metadata", "{}"))
-                if metadata.get("pdf_id") == pdf_id:
-                    relevant_chunks.append(
-                        {
-                            "text": hit["entity"].get("text", ""),
-                            "pages": metadata.get("pages", []),
-                            "chunk_index": metadata.get("chunk_index", 0),
-                            "score": hit["distance"],
-                        }
-                    )
-
-                    if len(relevant_chunks) >= limit:
-                        break
-
-            return relevant_chunks
-
-        except Exception as e:
-            logger.error(f"Error searching chunks: {e}")
-            return []
-
     def delete_pdf_chunks(self, pdf_id: str) -> int:
         """Delete all chunks for a PDF
 
@@ -438,101 +386,6 @@ class PDFChunkingService:
             chunk["type"] = "sliding_window"
 
         return chunks
-
-    def store_chunks_with_embeddings(
-        self, chunks: List[Dict[str, Any]]
-    ) -> bool:
-        """Store chunks with embeddings (compatibility method)"""
-        if not chunks or not self.milvus_client:
-            return False
-
-        # Get PDF info from first chunk
-        pdf_id = chunks[0].get("pdf_id")
-        filename = chunks[0].get("filename", "Unknown")
-
-        logger.info(
-            f"📤 Starting Milvus upload for {filename}:"
-            f" {len(chunks)} pre-chunked segments"
-        )
-
-        # Prepare data for insertion
-        data_to_insert = []
-
-        for chunk in chunks:
-            # Create embedding
-            embedding = self._create_embedding(chunk["text"])
-            if not embedding:
-                continue
-
-            # Generate unique int64 ID
-            # Use hash of pdf_id and chunk_index to ensure uniqueness
-            id_str = f"{pdf_id}_{chunk['chunk_index']}"
-            chunk_id = abs(hash(id_str)) % (10**15)  # Ensure it fits in int64
-
-            # Prepare data in simplified format
-            chunk_data = {
-                "id": chunk_id,
-                "vector": embedding,
-                "text": chunk["text"][:60000],  # Limit text size
-                "metadata": json.dumps(
-                    {
-                        "pdf_id": pdf_id,
-                        "filename": filename,
-                        "chunk_index": chunk["chunk_index"],
-                        "pages": chunk["pages"],
-                        "total_chunks": chunk.get("total_chunks", len(chunks)),
-                    }
-                ),
-            }
-
-            data_to_insert.append(chunk_data)
-
-        if data_to_insert:
-            try:
-                logger.info(
-                    f"📊 Uploading {len(data_to_insert)} embeddings to Milvus"
-                )
-
-                # Insert all at once
-                self.milvus_client.insert(
-                    collection_name=self.collection_name, data=data_to_insert
-                )
-
-                logger.info(
-                    f"✅ Successfully stored {len(data_to_insert)} chunks for"
-                    f" {filename} in Milvus collection"
-                    f" '{self.collection_name}'"
-                )
-
-                # Try to load collection after first insert
-                try:
-                    self.milvus_client.load_collection(
-                        collection_name=self.collection_name
-                    )
-                    logger.info(
-                        f"📚 Milvus collection '{self.collection_name}' loaded"
-                        " successfully"
-                    )
-                except:
-                    pass  # Ignore if already loaded
-
-                # Update session state to indicate Milvus upload complete
-                import streamlit as st
-
-                if hasattr(st, "session_state"):
-                    st.session_state.pdf_milvus_upload_complete = True
-                    st.session_state.pdf_milvus_upload_filename = filename
-                    st.session_state.pdf_milvus_upload_chunks = len(
-                        data_to_insert
-                    )
-
-                return True
-            except Exception as e:
-                logger.error(f"❌ Failed to store chunks in Milvus: {e}")
-                return False
-        else:
-            logger.warning("⚠️ No chunks to store in Milvus")
-            return False
 
     def get_pdf_chunk_info(self, pdf_id: str) -> Dict[str, Any]:
         """Get information about chunks for a PDF"""

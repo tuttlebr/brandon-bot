@@ -294,17 +294,6 @@ class ToolConfig:
         """Check if a tool is enabled"""
         return self.ENABLED_TOOLS.get(tool_name, False)
 
-    def get_enabled_tools(self) -> List[str]:
-        """Get list of all enabled tools"""
-        return [
-            name for name, enabled in self.ENABLED_TOOLS.items() if enabled
-        ]
-
-    def set_tool_enabled(self, tool_name: str, enabled: bool):
-        """Enable or disable a tool at runtime"""
-        self.ENABLED_TOOLS[tool_name] = enabled
-        logging.info("Tool '%s' dynamically set to: %s", tool_name, enabled)
-
 
 @dataclass
 class EnvironmentConfig:

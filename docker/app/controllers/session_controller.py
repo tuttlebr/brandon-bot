@@ -575,54 +575,6 @@ class SessionController:
         st.session_state.messages.append({"role": role, "content": content})
         self.increment_message_count()
 
-    def set_messages(self, messages: List[Dict[str, Any]]) -> None:
-        """Set messages in session state
-
-        Args:
-            messages: List of message dictionaries
-        """
-        if not getattr(st.session_state, "initialized", False):
-            self.initialize_session_state()
-
-        st.session_state.messages = messages
-
-    def store_pdf_document(self, filename: str, pdf_data: dict) -> str:
-        """Store PDF document in session
-
-        Args:
-            filename: PDF filename
-            pdf_data: Processed PDF data
-
-        Returns:
-            PDF ID for retrieval
-        """
-        session = self.get_current_session()
-
-        pdf_id = self.file_storage.store_pdf(
-            filename, pdf_data, session.session_id
-        )
-
-        if "stored_pdfs" not in st.session_state:
-            st.session_state.stored_pdfs = []
-        st.session_state.stored_pdfs.append(pdf_id)
-
-        if (
-            len(st.session_state.stored_pdfs)
-            > config.session.MAX_PDFS_IN_SESSION
-        ):
-            removed = st.session_state.stored_pdfs[
-                : -config.session.MAX_PDFS_IN_SESSION
-            ]
-            st.session_state.stored_pdfs = st.session_state.stored_pdfs[
-                -config.session.MAX_PDFS_IN_SESSION :
-            ]
-
-            for pdf_id in removed:
-                logging.info("Removing old PDF: %s", pdf_id)
-
-        logging.info("Stored PDF document '%s' with ID '%s'", filename, pdf_id)
-        return pdf_id
-
     def get_latest_pdf_document(self) -> Optional[Dict[str, Any]]:
         """Get the most recently uploaded PDF document
 

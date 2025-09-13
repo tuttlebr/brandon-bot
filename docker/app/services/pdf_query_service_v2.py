@@ -225,49 +225,6 @@ class PDFQueryServiceV2:
             "unique_chunks": unique_count,
         }
 
-    def update_search_config(self, **kwargs) -> None:
-        """
-        Update search configuration parameters.
-
-        Args:
-            **kwargs: Any valid PDFSearchConfig parameters to update
-                     (e.g., topk, radius, range_filter)
-        """
-        # Update the search config with new values
-        for key, value in kwargs.items():
-            if hasattr(self.search_config, key):
-                setattr(self.search_config, key, value)
-                logger.debug(f"Updated search config {key} to {value}")
-            else:
-                logger.warning(f"Invalid search config parameter: {key}")
-
-        # Reinitialize Milvus client with updated config if collection parameters changed
-        if any(
-            key
-            in [
-                "collection_name",
-                "uri",
-                "db_name",
-                "vector_field",
-                "output_fields",
-            ]
-            for key in kwargs
-        ):
-            self.milvus = SimilaritySearch(
-                collection_name=self.search_config.collection_name,
-                uri=self.search_config.uri,
-                db_name=self.search_config.db_name,
-                vector_field=self.search_config.vector_field,
-                output_fields=self.search_config.output_fields,
-            )
-            logger.info(
-                "Reinitialized Milvus client with updated configuration"
-            )
-
-    def get_search_config(self) -> PDFSearchConfig:
-        """Get current search configuration."""
-        return self.search_config
-
     # ------------------------------------------------------------------
     def _format_context(self, matches: List[PDFChunkMatch]) -> str:
         """Format PDF chunks for tool injection into LLM conversation."""
@@ -343,31 +300,3 @@ class PDFQueryServiceV2:
         }
 
         return tool_response
-
-    def query_as_tool(
-        self,
-        pdf_id: str,
-        query: str,
-        top_k: Optional[int] = None,
-        pdf_filename: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """
-        Query PDF and return results formatted as a tool response.
-
-        This is a convenience method that returns just the tool_response
-        from the query method, ready for injection into LLM conversation.
-
-        Args:
-            pdf_id: The PDF identifier to filter results
-            query: The search query string
-            top_k: Override for number of results (default: 5)
-            pdf_filename: Optional filename for display
-
-        Returns:
-            Dict with role="tool" and formatted content
-        """
-        result = self.query(
-            pdf_id=pdf_id, query=query, top_k=top_k, pdf_filename=pdf_filename
-        )
-
-        return result["tool_response"]
