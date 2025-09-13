@@ -968,11 +968,11 @@ class DeepResearchController(ToolController):
             tool = get_tool(tool_name)
 
             # Set a reasonable timeout for tool execution
-            timeout = 60.0  # 60 seconds default
+            timeout = 256.0  # 60 seconds default
             if tool_name == "extract_web_content":
-                timeout = 30.0  # 30 seconds for web extraction
+                timeout = 256.0  # 30 seconds for web extraction
             elif tool_name == "serpapi_internet_search":
-                timeout = 45.0  # 45 seconds for search
+                timeout = 256.0  # 45 seconds for search
 
             try:
                 if tool and hasattr(tool._controller, "process_async"):

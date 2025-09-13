@@ -123,7 +123,7 @@ class TextProcessorService:
                         messages=final_messages,
                         temperature=0.6,
                     ),
-                    timeout=256.0,  # 60 second timeout
+                    timeout=256.0,
                 )
             except asyncio.TimeoutError:
                 logger.error(

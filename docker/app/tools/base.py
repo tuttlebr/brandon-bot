@@ -109,7 +109,7 @@ class BaseTool(ABC):
         # Execution mode
         self.execution_mode: ExecutionMode = ExecutionMode.SYNC
         # Timeout for async operations
-        self.timeout: Optional[float] = 30.0
+        self.timeout: Optional[float] = 256.0
 
         # MVC components (to be initialized in subclasses)
         self._controller: Optional[ToolController] = None

@@ -98,7 +98,7 @@ class ImageGenerationTool(BaseTool):
         self.execution_mode = (
             ExecutionMode.SYNC
         )  # Image generation is synchronous
-        self.timeout = 120.0  # Image generation can take longer
+        self.timeout = 256.0  # Image generation can take longer
 
     def _initialize_mvc(self):
         """Initialize MVC components"""
@@ -218,7 +218,7 @@ class ImageGenerationTool(BaseTool):
         self, messages: List[Dict[str, Any]]
     ) -> Optional[Dict[str, Any]]:
         """
-        Get conversation context for image generation using conversation_context tool
+        Get convo context for image generation using conversation_context tool
 
         Args:
             messages: List of conversation messages
@@ -375,10 +375,12 @@ class ImageGenerationTool(BaseTool):
 
         Args:
             user_prompt: Original user prompt
-            aspect_ratio: Aspect ratio for the image ("square", "portrait", or "landscape")
+            aspect_ratio: Aspect ratio for the image ("square", "portrait", or
+            "landscape")
             cfg_scale: Guidance scale for image generation (1.5-4.5)
             use_conversation_context: Whether to use conversation context
-            enhanced_prompt: The enhanced/rewritten prompt to use for image generation
+            enhanced_prompt: The enhanced/rewritten prompt to use for image
+            generation
             config: Chat configuration
             messages: Optional conversation messages for context
 
@@ -412,7 +414,8 @@ class ImageGenerationTool(BaseTool):
         if use_conversation_context and messages:
             conversation_context = self._get_conversation_context(messages)
 
-        # Use the provided enhanced prompt, or fall back to user_prompt if not provided
+        # Use the provided enhanced prompt, or fall back to user_prompt if not
+        # provided
         if enhanced_prompt is None:
             enhanced_prompt = user_prompt
             logger.info(
@@ -449,12 +452,15 @@ class ImageGenerationTool(BaseTool):
         )
 
         if generated_image:
-            # Handle the returned image data (it's already base64 string when return_bytes_io=False)
+            # Handle the returned image data (it's already base64 string when
+            # return_bytes_io=False)
             try:
-                # Since return_bytes_io=False, generated_image is already a base64 string
+                # Since return_bytes_io=False, generated_image is already a
+                #  base64 string
                 image_b64 = generated_image
 
-                # Create response dict WITHOUT image_data for the result field (to avoid massive strings in LLM processing)
+                # Create response dict WITHOUT image_data for the result field
+                # (to avoid massive strings in LLM processing)
                 result_dict = {
                     "success": True,
                     "original_prompt": user_prompt,
@@ -486,7 +492,7 @@ class ImageGenerationTool(BaseTool):
 
                 return ImageGenerationResponse(
                     success=True,
-                    image_data=image_b64,  # Keep image data in response object for Streamlit app
+                    image_data=image_b64,
                     original_prompt=user_prompt,
                     enhanced_prompt=enhanced_prompt,
                     direct_response=True,
@@ -536,7 +542,9 @@ class ImageGenerationTool(BaseTool):
 
         Args:
             params: Dictionary containing the required parameters
-                   Expected keys: 'user_prompt', 'aspect_ratio', 'cfg_scale', 'use_conversation_context', 'enhanced_prompt', optionally 'messages'
+                   Expected keys: 'user_prompt', 'aspect_ratio', 'cfg_scale',
+                   'use_conversation_context', 'enhanced_prompt',
+                   optionally 'messages'
 
         Returns:
             ImageGenerationResponse: The image generation result

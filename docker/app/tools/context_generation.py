@@ -55,7 +55,7 @@ class ContextGenerationTool(BaseTool):
         )
         self.supported_contexts = ["image_generation", "image_editing"]
         self.execution_mode = ExecutionMode.SYNC
-        self.timeout = 120.0  # Context generation can take time
+        self.timeout = 256.0
 
     def _initialize_mvc(self):
         """Initialize MVC components"""

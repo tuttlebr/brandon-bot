@@ -314,7 +314,7 @@ class GeneralistTool(BaseTool):
             "explanation",
         ]
         self.execution_mode = ExecutionMode.AUTO  # Support both sync and async
-        self.timeout = 30.0
+        self.timeout = 256.0
 
     def _initialize_mvc(self):
         """Initialize MVC components"""

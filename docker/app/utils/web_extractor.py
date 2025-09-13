@@ -46,7 +46,7 @@ class WebDataExtractor:
 
             # Make request
             response = requests.get(
-                url, headers=self.headers, timeout=30, allow_redirects=True
+                url, headers=self.headers, timeout=256, allow_redirects=True
             )
             response.raise_for_status()
 
@@ -158,7 +158,7 @@ class WebDataExtractor:
         try:
             start_time = time.time()
 
-            timeout = aiohttp.ClientTimeout(total=30)
+            timeout = aiohttp.ClientTimeout(total=256)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.get(
                     url, headers=self.headers, allow_redirects=True

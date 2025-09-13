@@ -276,7 +276,7 @@ class PDFAssistantTool(BaseTool):
                 " about uploaded documents."
             )
             # Increase timeout for PDF operations which can take longer
-            self.timeout = 120.0  # 2 minutes
+            self.timeout = 256.0
             # Set execution mode to ASYNC to use process_async
             from tools.base import ExecutionMode
 
