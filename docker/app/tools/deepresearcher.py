@@ -1723,8 +1723,8 @@ class DeepResearcherTool(BaseTool):
                                 "(default: 5)"
                             ),
                             "minimum": 1,
-                            "maximum": 10,
-                            "default": 5,
+                            "maximum": 5,
+                            "default": 3,
                         },
                         "but_why": {
                             "type": "integer",

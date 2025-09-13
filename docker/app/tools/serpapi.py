@@ -2,7 +2,7 @@ import logging
 from typing import Any, Dict, List, Optional, Type
 
 import serpapi
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from tools.base import BaseTool, BaseToolResponse
 from utils.text_processing import clean_content, strip_think_tags
 
@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 class SearchMetadata(BaseModel):
     """Search metadata from SerpAPI"""
+
+    model_config = ConfigDict(extra='allow')
 
     id: str
     status: str
@@ -39,12 +41,16 @@ class SearchParameters(BaseModel):
 class SearchInformation(BaseModel):
     """Search information from SerpAPI"""
 
+    model_config = ConfigDict(extra='allow')
+
     query_displayed: str
     organic_results_state: str
 
 
 class OrganicResult(BaseModel):
     """Individual organic search result from SerpAPI"""
+
+    model_config = ConfigDict(extra='allow')
 
     position: int
     title: str
@@ -71,13 +77,19 @@ class RelatedQuestion(BaseModel):
 class RelatedSearch(BaseModel):
     """Related search from SerpAPI"""
 
-    query: str
-    link: str
-    serpapi_link: str
+    model_config = ConfigDict(extra='allow')
+
+    query: Optional[str] = None
+    link: Optional[str] = None
+    serpapi_link: Optional[str] = None
+    # Additional fields that might be in the response
+    block_position: Optional[int] = None
 
 
 class SerpAPIResponse(BaseToolResponse):
     """Complete response from SerpAPI"""
+
+    model_config = ConfigDict(extra='allow')
 
     search_metadata: SearchMetadata
     search_parameters: SearchParameters
@@ -86,9 +98,9 @@ class SerpAPIResponse(BaseToolResponse):
     related_questions: Optional[List[RelatedQuestion]] = None
     related_searches: Optional[List[RelatedSearch]] = None
     serpapi_pagination: Optional[Dict[str, Any]] = None
-    # formatted_results: Optional[str] = Field(
-    #     default="", description="Formatted results for display"
-    # )
+    formatted_results: Optional[str] = Field(
+        default="", description="Formatted results for display"
+    )
 
 
 class SerpAPITool(BaseTool):
@@ -133,8 +145,7 @@ class SerpAPITool(BaseTool):
                             "description": (
                                 "Query used to search the internet. Required "
                                 "to be in the form of a question. "
-                                "Examples: 'What is the weather today?', "
-                                "'How does photosynthesis work?', "
+                                "Examples: 'How does photosynthesis work?', "
                                 "'When was the Eiffel Tower built?'"
                             ),
                         },
@@ -313,6 +324,19 @@ class SerpAPITool(BaseTool):
             client = serpapi.Client(api_key=api_key)
             response_data = client.search(search_params)
 
+            # Log the raw response for debugging (only if debug logging is enabled)
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
+                    "Raw SerpAPI response keys: %s", list(response_data.keys())
+                )
+                # Log related_searches structure if present
+                if 'related_searches' in response_data:
+                    related = response_data['related_searches']
+                    logger.debug(
+                        "Related searches structure: %s",
+                        related[:1] if related else "Empty",
+                    )
+
             # Parse the JSON response and validate with Pydantic
             serpapi_response = SerpAPIResponse(**response_data)
 
@@ -322,9 +346,9 @@ class SerpAPITool(BaseTool):
             )
 
             # Format the results for display
-            # serpapi_response.formatted_results = self.format_results(
-            #     serpapi_response.organic_results
-            # )
+            serpapi_response.formatted_results = self.format_results(
+                serpapi_response.organic_results
+            )
 
             logger.info(
                 "Search completed successfully. "
@@ -353,6 +377,12 @@ class SerpAPITool(BaseTool):
             ) from e
         except ValueError as e:
             logger.error("Value error during SerpAPI search: %s", e)
+            # Log additional context if it's a Pydantic validation error
+            if "validation error" in str(e).lower():
+                logger.error(
+                    "This may be due to unexpected API response structure. "
+                    "Enable debug logging to see the raw response."
+                )
             raise
         except Exception as e:
             logger.error("Unexpected error during SerpAPI search: %s", e)
