@@ -28,11 +28,11 @@ def set_active_pdf_id(pdf_id: str | None):
     try:
         import streamlit as st
 
-        if hasattr(st, 'session_state'):
+        if hasattr(st, "session_state"):
             if pdf_id:
-                st.session_state['active_pdf_id'] = pdf_id
-            elif 'active_pdf_id' in st.session_state:
-                del st.session_state['active_pdf_id']
+                st.session_state["active_pdf_id"] = pdf_id
+            elif "active_pdf_id" in st.session_state:
+                del st.session_state["active_pdf_id"]
     except ImportError:
         # Fallback to contextvars if Streamlit not available
         pass
@@ -47,10 +47,10 @@ def get_active_pdf_id() -> Optional[str]:
         import streamlit as st
 
         if (
-            hasattr(st, 'session_state')
-            and 'active_pdf_id' in st.session_state
+            hasattr(st, "session_state")
+            and "active_pdf_id" in st.session_state
         ):
-            pdf_id = st.session_state['active_pdf_id']
+            pdf_id = st.session_state["active_pdf_id"]
             import logging
 
             logging.debug(
@@ -79,11 +79,11 @@ def set_session_id(session_id: str | None):
     try:
         import streamlit as st
 
-        if hasattr(st, 'session_state'):
+        if hasattr(st, "session_state"):
             if session_id:
-                st.session_state['session_id'] = session_id
-            elif 'session_id' in st.session_state:
-                del st.session_state['session_id']
+                st.session_state["session_id"] = session_id
+            elif "session_id" in st.session_state:
+                del st.session_state["session_id"]
     except ImportError:
         pass
 
@@ -96,8 +96,8 @@ def get_session_id() -> Optional[str]:
     try:
         import streamlit as st
 
-        if hasattr(st, 'session_state') and 'session_id' in st.session_state:
-            return st.session_state['session_id']
+        if hasattr(st, "session_state") and "session_id" in st.session_state:
+            return st.session_state["session_id"]
     except ImportError:
         pass
 

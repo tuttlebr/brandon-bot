@@ -103,7 +103,7 @@ class ImageController:
                     False,
                     {
                         "error": (
-                            f"Image file too large. Maximum size: "
+                            "Image file too large. Maximum size: "
                             f"{config.file_processing.MAX_IMAGE_SIZE // (1024*1024)}MB"
                         )
                     },
@@ -156,11 +156,11 @@ class ImageController:
                     # Save resized image to bytes
                     img_buffer = BytesIO()
                     # Determine format from file type or default to PNG
-                    img_format = uploaded_file.type.split('/')[-1].upper()
-                    if img_format == 'JPG':
-                        img_format = 'JPEG'
-                    if img_format not in ['JPEG', 'PNG', 'GIF', 'BMP']:
-                        img_format = 'PNG'
+                    img_format = uploaded_file.type.split("/")[-1].upper()
+                    if img_format == "JPG":
+                        img_format = "JPEG"
+                    if img_format not in ["JPEG", "PNG", "GIF", "BMP"]:
+                        img_format = "PNG"
 
                     logging.debug(
                         "Saving resized image as format: %s", img_format
@@ -266,7 +266,7 @@ class ImageController:
                     image_data["file_object"] = stored_image_data["file_path"]
                     logging.info(
                         "Added file path to image_data: %s",
-                        stored_image_data['file_path'],
+                        stored_image_data["file_path"],
                     )
                 else:
                     logging.warning(
@@ -284,7 +284,7 @@ class ImageController:
                     "Stored image in session state - "
                     "filename: %s, data length: %s",
                     filename,
-                    len(image_data['image_data']),
+                    len(image_data["image_data"]),
                 )
 
                 # Verify the size of what we stored in session state
@@ -313,7 +313,7 @@ class ImageController:
                 # Add assistant response
                 assistant_message = (
                     f"I've received your image **{filename}**. "
-                    f"What would you like to know about it?"
+                    "What would you like to know about it?"
                 )
                 self.message_controller.safe_add_message_to_history(
                     "assistant", assistant_message
@@ -349,7 +349,7 @@ class ImageController:
             error_result: Error information dictionary
         """
         error_msg = (
-            f"❌ **Image Processing Error:** "
+            "❌ **Image Processing Error:** "
             f"{error_result.get('error', 'Unknown error')}"
         )
         self._display_error_message(error_msg)

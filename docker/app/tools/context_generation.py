@@ -81,7 +81,8 @@ class ContextGenerationTool(BaseTool):
                         "prompt": {
                             "type": "string",
                             "description": (
-                                "Verbatim, the user's original message requesting image generation"
+                                "Verbatim, the user's original message"
+                                " requesting image generation"
                             ),
                         },
                         "aspect_ratio": {
@@ -238,8 +239,8 @@ class ContextGenerationTool(BaseTool):
                 # Convert base64 image to bytes for OpenAI API
                 image_bytes = base64.b64decode(image_base64)
                 image_file = io.BytesIO(image_bytes)
-                image_file.name = (
-                    "edit_image.png"  # OpenAI requires a filename
+                image_file.name = (  # OpenAI requires a filename
+                    "edit_image.png"
                 )
 
                 # Use OpenAI's image edit API
@@ -376,7 +377,8 @@ class ContextGenerationTool(BaseTool):
                                 ):
                                     generated_image_data = artifact["base64"]
                                     logger.info(
-                                        "Found image data in artifacts[0].base64"
+                                        "Found image data in"
+                                        " artifacts[0].base64"
                                     )
                                     break
                             else:
@@ -400,7 +402,7 @@ class ContextGenerationTool(BaseTool):
                         else:
                             available_fields = "N/A"
                         raise ValueError(
-                            f"Could not find image data in response. "
+                            "Could not find image data in response. "
                             f"Available fields: {available_fields}"
                         )
 
@@ -448,7 +450,7 @@ class ContextGenerationTool(BaseTool):
                 try:
                     error_detail = e.response.json()
                     error_message = (
-                        f"Context generation API error: "
+                        "Context generation API error: "
                         f"{error_detail.get('error', str(e))}"
                     )
                 except Exception:

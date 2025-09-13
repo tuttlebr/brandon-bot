@@ -297,11 +297,17 @@ class DeepResearchController(ToolController):
                 if next_phase != ResearchPhase.FOLLOW_UP_SEARCH
                 else "Follow-up search iteration"
             )
-            yield f"\n> _Phase {iteration_count + 1}: {phase_description} {iteration_count + 1}/{max_iterations}_\n\n"
+            yield (
+                f"\n> _Phase {iteration_count + 1}:"
+                f" {phase_description} {iteration_count + 1}/{max_iterations}_\n\n"
+            )
 
             if not needs_more:
                 # Update status to show we're done with iterations
-                yield f"\n_Research complete after {iteration_count} iterations_\n\n"
+                yield (
+                    "\n_Research complete after"
+                    f" {iteration_count} iterations_\n\n"
+                )
                 break
 
             # Continue with next iteration
@@ -317,7 +323,10 @@ class DeepResearchController(ToolController):
             if follow_up_questions:
                 # Update status for follow-up questions
                 num_questions = min(2, len(follow_up_questions))
-                yield f"> > _Found {num_questions} follow-up questions to explore_\n\n"
+                yield (
+                    f"> > _Found {num_questions} follow-up questions to"
+                    " explore_\n\n"
+                )
 
             # Execute follow-up research
             questions_to_research = follow_up_questions[:2]
@@ -328,7 +337,10 @@ class DeepResearchController(ToolController):
                     if next_phase == ResearchPhase.FOLLOW_UP_SEARCH
                     else "Deep diving into"
                 )
-                yield f"> > > _{action} sub-question {i}/{len(questions_to_research)}..._\n\n"
+                yield (
+                    f"> > > _{action} sub-question"
+                    f" {i}/{len(questions_to_research)}..._\n\n"
+                )
 
                 iteration = await self._perform_research_iteration(
                     query=question,
@@ -449,7 +461,8 @@ class DeepResearchController(ToolController):
         current_synthesis = iteration.synthesis
 
         logger.info(
-            "← Iteration 1 complete: Found %d sources, synthesis length: %d chars",
+            "← Iteration 1 complete: Found %d sources, synthesis length: %d"
+            " chars",
             len(iteration.sources_found),
             len(current_synthesis),
         )
@@ -483,7 +496,8 @@ class DeepResearchController(ToolController):
 
             if not needs_more:
                 logger.info(
-                    "Research COMPLETE after %d iterations - Sufficient depth achieved",
+                    "Research COMPLETE after %d iterations - Sufficient depth"
+                    " achieved",
                     iteration_count,
                 )
                 break
@@ -579,7 +593,8 @@ class DeepResearchController(ToolController):
             confidence_level=confidence_level,
         )
         logger.info(
-            "Research depth achieved: %s (iterations=%d, sources=%d, confidence=%s)",
+            "Research depth achieved: %s (iterations=%d, sources=%d,"
+            " confidence=%s)",
             research_depth.upper(),
             len(iterations),
             len(all_sources),
@@ -644,7 +659,10 @@ class DeepResearchController(ToolController):
             additional_refs = []
             for source in uncited_sources:
                 additional_refs.append(self._format_single_reference(source))
-            additional_sources_section = f"\n\n### Additional Sources Consulted\n\n{chr(10).join(additional_refs)}"
+            additional_sources_section = (
+                "\n\n### Additional Sources"
+                f" Consulted\n\n{chr(10).join(additional_refs)}"
+            )
 
         research_summary = f"""## Deep Research Complete
 
@@ -683,7 +701,7 @@ class DeepResearchController(ToolController):
     ) -> ResearchIteration:
         """Perform a single research iteration"""
         logger.info(
-            "┌─ Iteration %d - Phase: %s\n" "└─ Query: %s",
+            "┌─ Iteration %d - Phase: %s\n└─ Query: %s",
             iteration_number,
             phase.value,
             query[:100],
@@ -844,7 +862,8 @@ class DeepResearchController(ToolController):
             ][:3]
 
             logger.info(
-                "Deep dive phase: extracting content from %d URLs (skipping %d already extracted)",
+                "Deep dive phase: extracting content from %d URLs (skipping %d"
+                " already extracted)",
                 len(urls_to_extract),
                 len(extracted_urls),
             )
@@ -861,7 +880,9 @@ class DeepResearchController(ToolController):
                     {
                         "url": url,
                         "but_why": 5,
-                        "location_requested": "Saline, Michigan, United States",
+                        "location_requested": (
+                            "Saline, Michigan, United States"
+                        ),
                     },
                 )
                 tools_used.append("extract_web_content")
@@ -1243,7 +1264,8 @@ Example format: {{"questions": ["question1", "question2", "question3"]}}"""
             result = json.loads(result_content)
         except json.JSONDecodeError:
             logger.warning(
-                "Questions JSON parsing failed, attempting fallback text extraction"
+                "Questions JSON parsing failed, attempting fallback text"
+                " extraction"
             )
             result = {}
 
@@ -1348,7 +1370,8 @@ Return as JSON with:
             result = json.loads(result_content)
         except json.JSONDecodeError:
             logger.warning(
-                "Final synthesis JSON parsing failed, attempting fallback text extraction"
+                "Final synthesis JSON parsing failed, attempting fallback text"
+                " extraction"
             )
             result = {}
 
@@ -1366,7 +1389,8 @@ Return as JSON with:
             confidence_level = ConfidenceLevel(confidence_str.lower())
         except ValueError:
             logger.warning(
-                f"Invalid confidence level '{confidence_str}', defaulting to medium"
+                f"Invalid confidence level '{confidence_str}', defaulting to"
+                " medium"
             )
             confidence_level = ConfidenceLevel.MEDIUM
 
@@ -1711,8 +1735,7 @@ class DeepResearcherTool(BaseTool):
                                 "comprehensive",
                             ],
                             "description": (
-                                "Target depth of research "
-                                "(default: moderate)"
+                                "Target depth of research (default: moderate)"
                             ),
                             "default": "moderate",
                         },

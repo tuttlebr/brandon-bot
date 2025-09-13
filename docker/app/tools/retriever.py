@@ -326,7 +326,8 @@ class SimilaritySearch:
 
                             if not isinstance(value, (int, float)):
                                 logging.debug(
-                                    "Skipping non-numeric value of type %s: %s",
+                                    "Skipping non-numeric value of type"
+                                    " %s: %s",
                                     type(value),
                                     value,
                                 )
@@ -387,7 +388,8 @@ class SimilaritySearch:
             # Verify we have a valid numeric array
             if not np.issubdtype(scores.dtype, np.number):
                 logging.error(
-                    "All values must be numeric. Found non-numeric values in data."
+                    "All values must be numeric. Found non-numeric values in"
+                    " data."
                 )
                 return data
 
@@ -432,7 +434,8 @@ class SimilaritySearch:
                 # Filter scores (keep values <= cutoff)
                 filtered_scores = scores[scores <= cutoff]
                 logging.info(
-                    "Natural break filtering: kept %s/%s values, cutoff: %s, largest gap: %s",
+                    "Natural break filtering: kept %s/%s values, cutoff: %s,"
+                    " largest gap: %s",
                     len(filtered_scores),
                     original_count,
                     cutoff,
@@ -456,7 +459,8 @@ class SimilaritySearch:
                         continue
 
                 logging.info(
-                    "Natural break filtering: kept %s/%s items, cutoff: %s, largest gap: %s",
+                    "Natural break filtering: kept %s/%s items, cutoff: %s,"
+                    " largest gap: %s",
                     len(filtered_data),
                     original_count,
                     cutoff,
@@ -500,7 +504,8 @@ class SimilaritySearch:
 
         if duplicate_count > 0:
             logger.info(
-                "Formatted %d unique results from %d total results (%d duplicates removed)",
+                "Formatted %d unique results from %d total results (%d"
+                " duplicates removed)",
                 len(formatted_entries),
                 len(results[0]),
                 duplicate_count,
@@ -517,8 +522,7 @@ class SimilaritySearch:
         source = entity["source"].strip()
         creation_date = entity["creation_date"].strip()
         base_text = (
-            f"<small>{index}. [{title}]({source}), "
-            f"_'{text}'_, {creation_date}"
+            f"<small>{index}. [{title}]({source}), _'{text}'_, {creation_date}"
         )
 
         return f"{base_text}</small>"
@@ -563,7 +567,11 @@ class RetrieverTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "retrieval_search"
-        self.description = "Search specialized knowledge base for NVIDIA technical documentation. For best results, pair with serpapi_internet_search."
+        self.description = (
+            "Search specialized knowledge base for NVIDIA technical"
+            " documentation. For best results, pair with"
+            " serpapi_internet_search."
+        )
 
     def _initialize_mvc(self):
         """Initialize MVC components"""
@@ -602,11 +610,17 @@ class RetrieverTool(BaseTool):
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "The search query to find relevant documents",
+                            "description": (
+                                "The search query to find relevant documents"
+                            ),
                         },
                         "but_why": {
                             "type": "integer",
-                            "description": "An integer from 1-5 where a larger number indicates confidence this is the right tool to help the user.",
+                            "description": (
+                                "An integer from 1-5 where a larger number"
+                                " indicates confidence this is the right tool"
+                                " to help the user."
+                            ),
                         },
                     },
                     "required": ["query", "but_why"],
@@ -707,7 +721,8 @@ class RetrieverTool(BaseTool):
             )
 
             logger.info(
-                f"Search completed successfully. Found {len(results)} results (reranked: {response.reranked})"
+                f"Search completed successfully. Found {len(results)} results"
+                f" (reranked: {response.reranked})"
             )
             return response
 
@@ -736,7 +751,8 @@ class RetrieverTool(BaseTool):
         max_results = params.get("max_results", MAX_RESULTS)
 
         logger.debug(
-            "run_with_dict method called with query: '%s', use_reranker: %s, max_results: %s",
+            "run_with_dict method called with query: '%s', use_reranker: %s,"
+            " max_results: %s",
             query,
             use_reranker,
             max_results,

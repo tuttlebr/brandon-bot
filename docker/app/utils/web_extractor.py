@@ -26,7 +26,10 @@ class WebDataExtractor:
             headers: Optional custom headers for requests
         """
         self.headers = headers or {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                " (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            )
         }
 
     def extract_sync(self, url: str) -> Dict[str, any]:
@@ -55,7 +58,10 @@ class WebDataExtractor:
             ):
                 return {
                     "success": False,
-                    "error": f"URL does not return HTML content. Content-Type: {content_type}",
+                    "error": (
+                        "URL does not return HTML content. Content-Type:"
+                        f" {content_type}"
+                    ),
                     "content": "",
                     "title": None,
                 }
@@ -99,7 +105,8 @@ class WebDataExtractor:
 
             elapsed_time = time.time() - start_time
             logger.info(
-                f"Successfully extracted content from {url} in {elapsed_time:.2f}s"
+                f"Successfully extracted content from {url} in"
+                f" {elapsed_time:.2f}s"
             )
 
             return {
@@ -168,7 +175,10 @@ class WebDataExtractor:
                     ):
                         return {
                             "success": False,
-                            "error": f"URL does not return HTML content. Content-Type: {content_type}",
+                            "error": (
+                                "URL does not return HTML content."
+                                f" Content-Type: {content_type}"
+                            ),
                             "content": "",
                             "title": None,
                         }
@@ -184,7 +194,8 @@ class WebDataExtractor:
 
             elapsed_time = time.time() - start_time
             logger.info(
-                f"Successfully extracted content from {url} in {elapsed_time:.2f}s"
+                f"Successfully extracted content from {url} in"
+                f" {elapsed_time:.2f}s"
             )
 
             result["response_time"] = elapsed_time

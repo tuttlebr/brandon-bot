@@ -190,11 +190,11 @@ class StreamingService:
 
             async for chunk in response_stream:
                 # Collect response metadata from first chunk
-                if response_id is None and hasattr(chunk, 'id'):
+                if response_id is None and hasattr(chunk, "id"):
                     response_id = chunk.id
-                if created_time is None and hasattr(chunk, 'created'):
+                if created_time is None and hasattr(chunk, "created"):
                     created_time = chunk.created
-                if hasattr(chunk, 'model'):
+                if hasattr(chunk, "model"):
                     response_model = chunk.model
 
                 if chunk.choices:
@@ -202,52 +202,52 @@ class StreamingService:
 
                     # Collect content
                     if (
-                        hasattr(choice.delta, 'content')
+                        hasattr(choice.delta, "content")
                         and choice.delta.content
                     ):
                         collected_content += choice.delta.content
 
                     # Collect tool calls
                     if (
-                        hasattr(choice.delta, 'tool_calls')
+                        hasattr(choice.delta, "tool_calls")
                         and choice.delta.tool_calls
                     ):
                         for tool_call_delta in choice.delta.tool_calls:
                             # Handle index - might be None for single calls
-                            idx = getattr(tool_call_delta, 'index', 0)
+                            idx = getattr(tool_call_delta, "index", 0)
                             if idx is None:
                                 idx = 0
 
                             if idx not in collected_tool_calls:
                                 collected_tool_calls[idx] = {
-                                    'id': '',
-                                    'type': 'function',
-                                    'function': {'name': '', 'arguments': ''},
+                                    "id": "",
+                                    "type": "function",
+                                    "function": {"name": "", "arguments": ""},
                                 }
 
                             tc = collected_tool_calls[idx]
 
                             # Update ID if provided
                             if (
-                                hasattr(tool_call_delta, 'id')
+                                hasattr(tool_call_delta, "id")
                                 and tool_call_delta.id
                             ):
-                                tc['id'] = tool_call_delta.id
+                                tc["id"] = tool_call_delta.id
 
                             # Update function details
-                            if hasattr(tool_call_delta, 'function'):
+                            if hasattr(tool_call_delta, "function"):
                                 func = tool_call_delta.function
 
                                 # Update name if provided (only comes once)
                                 if (
-                                    hasattr(func, 'name')
+                                    hasattr(func, "name")
                                     and func.name is not None
                                 ):
-                                    tc['function']['name'] = func.name
+                                    tc["function"]["name"] = func.name
 
                                 # Append arguments if provided
                                 if (
-                                    hasattr(func, 'arguments')
+                                    hasattr(func, "arguments")
                                     and func.arguments is not None
                                 ):
                                     # Log each argument chunk for debugging
@@ -255,17 +255,17 @@ class StreamingService:
                                         "Tool call %d (%s) - appending "
                                         "arguments chunk: %s (length: %d)",
                                         idx,
-                                        tc['function']['name'] or 'unknown',
+                                        tc["function"]["name"] or "unknown",
                                         repr(func.arguments),
-                                        len(tc['function']['arguments']),
+                                        len(tc["function"]["arguments"]),
                                     )
-                                    tc['function'][
-                                        'arguments'
+                                    tc["function"][
+                                        "arguments"
                                     ] += func.arguments
 
                     # Get finish reason
                     if (
-                        hasattr(choice, 'finish_reason')
+                        hasattr(choice, "finish_reason")
                         and choice.finish_reason
                     ):
                         finish_reason = choice.finish_reason
@@ -280,19 +280,19 @@ class StreamingService:
             for idx in sorted(collected_tool_calls.keys()):
                 tc = collected_tool_calls[idx]
                 # Log the collected arguments for debugging
-                if tc['function']['arguments']:
+                if tc["function"]["arguments"]:
                     logger.debug(
                         "Tool call %d (%s) arguments: %s",
                         idx,
-                        tc['function']['name'],
-                        repr(tc['function']['arguments']),
+                        tc["function"]["name"],
+                        repr(tc["function"]["arguments"]),
                     )
                 tool_call_obj = SimpleNamespace(
-                    id=tc['id'],
-                    type=tc['type'],
+                    id=tc["id"],
+                    type=tc["type"],
                     function=SimpleNamespace(
-                        name=tc['function']['name'],
-                        arguments=tc['function']['arguments'],
+                        name=tc["function"]["name"],
+                        arguments=tc["function"]["arguments"],
                     ),
                 )
                 tool_calls_list.append(tool_call_obj)
@@ -311,7 +311,7 @@ class StreamingService:
             # Build response object
             response = SimpleNamespace(
                 id=response_id,
-                object='chat.completion',
+                object="chat.completion",
                 created=created_time,
                 model=response_model,
                 choices=[choice],

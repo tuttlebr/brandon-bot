@@ -1,6 +1,5 @@
 import re
 
-
 START_CONTEXT = "<START_CONTEXT>"
 END_CONTEXT = "<END_CONTEXT>"
 

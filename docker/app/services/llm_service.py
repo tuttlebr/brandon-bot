@@ -87,7 +87,8 @@ class LLMService:
 
             if estimated_tokens > max_tokens:
                 logger.warning(
-                    f"Message tokens ({estimated_tokens}) exceed limit ({max_tokens}). Truncating..."
+                    f"Message tokens ({estimated_tokens}) exceed limit"
+                    f" ({max_tokens}). Truncating..."
                 )
                 windowed_messages, was_truncated = self._truncate_messages(
                     windowed_messages, max_tokens
@@ -95,7 +96,11 @@ class LLMService:
 
                 if was_truncated:
                     # Yield a warning message to the user
-                    yield "\n⚠️ **Note:** The conversation history was truncated to fit within the model's context limit. Some older messages may have been removed.\n\n"
+                    yield (
+                        "\n⚠️ **Note:** The conversation history was truncated"
+                        " to fit within the model's context limit. Some older"
+                        " messages may have been removed.\n\n"
+                    )
 
             # Get current user message for context injection
             current_user_message = ""
@@ -149,7 +154,8 @@ class LLMService:
             # If it's just an acknowledgment, don't use tools
             if is_user_acknowledging and not actual_request:
                 logger.info(
-                    "User message is an acknowledgment - skipping tool selection"
+                    "User message is an acknowledgment - skipping tool"
+                    " selection"
                 )
                 # Stream response without tools
                 async for chunk in self.streaming_service.stream_completion(
@@ -174,11 +180,13 @@ class LLMService:
 
                     pdf_guidance = {
                         "role": "system",
-                        "content": prompt_manager.get_context_prompt(
-                            "pdf_active", filename=pdf_info['filename']
-                        ).replace(
-                            f"{pdf_info['filename']}",
-                            f"'{pdf_info['filename']}'",
+                        "content": (
+                            prompt_manager.get_context_prompt(
+                                "pdf_active", filename=pdf_info["filename"]
+                            ).replace(
+                                f"{pdf_info['filename']}",
+                                f"'{pdf_info['filename']}'",
+                            )
                         ),
                     }
                     # Insert at the beginning after any existing system messages
@@ -208,7 +216,8 @@ class LLMService:
                 )
                 if pdf_tool:
                     logger.info(
-                        f"Active PDF detected: '{pdf_info['filename']}'. Forcing pdf_assistant tool."
+                        f"Active PDF detected: '{pdf_info['filename']}'."
+                        " Forcing pdf_assistant tool."
                     )
                     # Force specific tool
                     tool_choice = {
@@ -223,7 +232,8 @@ class LLMService:
                     ]
                 else:
                     logger.error(
-                        "pdf_assistant tool not found in available tools! PDF functionality will not function."
+                        "pdf_assistant tool not found in available tools! PDF"
+                        " functionality will not function."
                     )
                     # Fall back to context injection only
 
@@ -263,7 +273,8 @@ class LLMService:
                 )
                 if pdf_tool_available:
                     logger.warning(
-                        f"PDF active but pdf_assistant not selected. Forcing it now."
+                        f"PDF active but pdf_assistant not selected. Forcing"
+                        f" it now."
                     )
                     # Force the PDF assistant tool
                     tool_calls = [
@@ -279,7 +290,8 @@ class LLMService:
                 # Log which tools were selected (without arguments to avoid logging base64 data)
                 tool_names = [tc.get("name", "unknown") for tc in tool_calls]
                 logger.info(
-                    f"Tool selection ({tool_selection_model_type} model): {', '.join(tool_names)}"
+                    f"Tool selection ({tool_selection_model_type} model):"
+                    f" {', '.join(tool_names)}"
                 )
 
                 # Stream chunks from tool handling
@@ -299,7 +311,10 @@ class LLMService:
         except Exception as e:
             logger.error(f"Error generating response: {e}")
             if "maximum context length" in str(e):
-                yield "⚠️ The message was too long even after truncation. Please try with a shorter message or start a new conversation."
+                yield (
+                    "⚠️ The message was too long even after truncation. Please"
+                    " try with a shorter message or start a new conversation."
+                )
             else:
                 yield f"Error: {str(e)}"
 
@@ -344,7 +359,8 @@ class LLMService:
                 response_llm_type = get_tool_llm_type(primary_tool_name)
                 response_model = self._get_model_for_type(response_llm_type)
                 logger.info(
-                    f"Using LLM type '{response_llm_type}' for final response based on primary tool '{primary_tool_name}'"
+                    f"Using LLM type '{response_llm_type}' for final response"
+                    f" based on primary tool '{primary_tool_name}'"
                 )
 
         # Collect direct response tools with UI elements (like images)
@@ -359,7 +375,7 @@ class LLMService:
                     tool_result = response.get("tool_result")
                     if (
                         tool_result
-                        and hasattr(tool_result, 'success')
+                        and hasattr(tool_result, "success")
                         and tool_result.success
                     ):
                         ui_elements.append(
@@ -369,13 +385,13 @@ class LLMService:
                                 "data": {
                                     "success": tool_result.success,
                                     "image_data": getattr(
-                                        tool_result, 'image_data', None
+                                        tool_result, "image_data", None
                                     ),
                                     "original_prompt": getattr(
-                                        tool_result, 'original_prompt', ''
+                                        tool_result, "original_prompt", ""
                                     ),
                                     "enhanced_prompt": getattr(
-                                        tool_result, 'enhanced_prompt', ''
+                                        tool_result, "enhanced_prompt", ""
                                     ),
                                 },
                             }
@@ -388,8 +404,8 @@ class LLMService:
         for response in tool_responses:
             if response.get("role") == "tool":
                 # Truncate tool response content to prevent token limit issues
-                tool_content = response.get('content', '')
-                tool_name = response.get('tool_name', 'unknown')
+                tool_content = response.get("content", "")
+                tool_name = response.get("tool_name", "unknown")
 
                 # Limit tool response content based on configured max tokens
                 max_tool_tokens = config.llm.MAX_TOOL_RESPONSE_TOKENS
@@ -398,20 +414,25 @@ class LLMService:
 
                 if len(tool_content) > max_tool_content_chars:
                     logger.warning(
-                        f"Tool '{tool_name}' response too long ({len(tool_content)} chars, "
-                        f"~{self._estimate_tokens(tool_content)} tokens). "
-                        f"Truncating to {max_tool_content_chars} characters (~{max_tool_tokens} tokens)."
+                        f"Tool '{tool_name}' response too long"
+                        f" ({len(tool_content)} chars,"
+                        f" ~{self._estimate_tokens(tool_content)} tokens)."
+                        f" Truncating to {max_tool_content_chars} characters"
+                        f" (~{max_tool_tokens} tokens)."
                     )
                     # Keep first part of content and add truncation notice
                     tool_content = (
                         tool_content[:max_tool_content_chars]
-                        + f"\n\n[Tool response truncated due to length. First ~{max_tool_tokens} tokens shown.]"
+                        + "\n\n[Tool response truncated due to length. First"
+                        f" ~{max_tool_tokens} tokens shown.]"
                     )
 
                 extended_messages.append(
                     {
                         "role": "assistant",
-                        "content": f"Tool {tool_name} returned: {tool_content}",
+                        "content": (
+                            f"Tool {tool_name} returned: {tool_content}"
+                        ),
                     }
                 )
             elif response.get("role") == "direct_response":
@@ -419,25 +440,32 @@ class LLMService:
                 tool_name = response.get("tool_name", "unknown")
                 if tool_name == "generate_image":
                     tool_result = response.get("tool_result")
-                    if tool_result and hasattr(tool_result, 'success'):
+                    if tool_result and hasattr(tool_result, "success"):
                         if tool_result.success:
                             enhanced_prompt = getattr(
-                                tool_result, 'enhanced_prompt', ''
+                                tool_result, "enhanced_prompt", ""
                             )
                             extended_messages.append(
                                 {
                                     "role": "assistant",
-                                    "content": f"Tool generate_image successfully created an image with prompt: {enhanced_prompt}",
+                                    "content": (
+                                        "Tool generate_image successfully"
+                                        " created an image with prompt:"
+                                        f" {enhanced_prompt}"
+                                    ),
                                 }
                             )
                         else:
                             error_msg = getattr(
-                                tool_result, 'error_message', 'Unknown error'
+                                tool_result, "error_message", "Unknown error"
                             )
                             extended_messages.append(
                                 {
                                     "role": "assistant",
-                                    "content": f"Tool generate_image failed: {error_msg}",
+                                    "content": (
+                                        "Tool generate_image failed:"
+                                        f" {error_msg}"
+                                    ),
                                 }
                             )
                 else:
@@ -449,7 +477,8 @@ class LLMService:
 
                     if len(content) > max_tool_content_chars:
                         logger.warning(
-                            f"Direct response tool '{tool_name}' content too long. Truncating for message history."
+                            f"Direct response tool '{tool_name}' content too"
+                            " long. Truncating for message history."
                         )
                         content = (
                             content[:max_tool_content_chars]
@@ -470,7 +499,8 @@ class LLMService:
 
         if estimated_tokens > max_tokens:
             logger.warning(
-                f"Messages with tool responses ({estimated_tokens} tokens) exceed limit ({max_tokens}). Truncating..."
+                f"Messages with tool responses ({estimated_tokens} tokens)"
+                f" exceed limit ({max_tokens}). Truncating..."
             )
             extended_messages, was_truncated = self._truncate_messages(
                 extended_messages, max_tokens
@@ -478,7 +508,10 @@ class LLMService:
 
             if was_truncated:
                 # Yield a warning about truncation
-                yield "\n⚠️ **Note:** The conversation including tool responses exceeded the context limit and was truncated.\n\n"
+                yield (
+                    "\n⚠️ **Note:** The conversation including tool responses"
+                    " exceeded the context limit and was truncated.\n\n"
+                )
 
         # Filter messages to ensure LLM compatibility
         extended_messages = self._filter_messages_for_llm(extended_messages)
@@ -495,7 +528,8 @@ class LLMService:
 
         if all_direct_responses:
             logger.info(
-                "All tools are direct response tools - skipping LLM synthesis to avoid redundant commentary"
+                "All tools are direct response tools - skipping LLM synthesis"
+                " to avoid redundant commentary"
             )
             # For direct response tools, yield their content directly to the UI
             # BUT skip image generation tools since they're handled by the response controller
@@ -523,7 +557,9 @@ class LLMService:
         else:
             # Stream the final synthesized response using the tool's configured LLM type
             logger.info(
-                f"Streaming final response with {response_model}:{response_llm_type} (based on tool configuration)"
+                "Streaming final response with"
+                f" {response_model}:{response_llm_type} (based on tool"
+                " configuration)"
             )
             async for chunk in self.streaming_service.stream_completion(
                 extended_messages, response_model, response_llm_type
@@ -556,7 +592,8 @@ class LLMService:
         # This prevents context loss in normal usage
         if len(conversation_messages) <= 50:  # ~25 turns of conversation
             logger.debug(
-                f"Keeping full conversation context ({len(conversation_messages)} messages)"
+                "Keeping full conversation context"
+                f" ({len(conversation_messages)} messages)"
             )
             return system_messages + tool_messages + conversation_messages
 
@@ -567,7 +604,8 @@ class LLMService:
 
         if len(conversation_messages) > window_size:
             logger.info(
-                f"Applying sliding window: keeping last {window_size} messages out of {len(conversation_messages)}"
+                f"Applying sliding window: keeping last {window_size} messages"
+                f" out of {len(conversation_messages)}"
             )
             conversation_messages = conversation_messages[-window_size:]
 
@@ -594,7 +632,8 @@ class LLMService:
                 content = msg.get("content")
                 if isinstance(content, dict):
                     logger.debug(
-                        f"Filtering out system message with dict content of type: {content.get('type')}"
+                        "Filtering out system message with dict content of"
+                        f" type: {content.get('type')}"
                     )
                     continue
 
@@ -697,7 +736,8 @@ class LLMService:
             # Even with just system + latest user message, we're over limit
             # Truncate the user message content
             logger.warning(
-                f"Message exceeds token limit even with minimal context. Truncating user message."
+                f"Message exceeds token limit even with minimal context."
+                f" Truncating user message."
             )
             truncated_content = latest_user_msg["content"]
             while self._estimate_tokens(truncated_content) > (
@@ -710,8 +750,10 @@ class LLMService:
 
             latest_user_msg = {
                 **latest_user_msg,
-                "content": truncated_content
-                + "\n\n[Note: Message truncated due to length]",
+                "content": (
+                    truncated_content
+                    + "\n\n[Note: Message truncated due to length]"
+                ),
             }
             return system_messages + [latest_user_msg], True
 

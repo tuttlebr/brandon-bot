@@ -119,7 +119,7 @@ class PDFIngestionService:
                     # Configuration says to skip existing PDFs
                     logger.info(
                         f"PDF already exists: {pdf_id} - skipping upload "
-                        f"(using existing)"
+                        "(using existing)"
                     )
                     # Return existing PDF information without re-processing
                     return {

@@ -245,11 +245,11 @@ class PDFQueryServiceV2:
         if any(
             key
             in [
-                'collection_name',
-                'uri',
-                'db_name',
-                'vector_field',
-                'output_fields',
+                "collection_name",
+                "uri",
+                "db_name",
+                "vector_field",
+                "output_fields",
             ]
             for key in kwargs
         ):
@@ -330,7 +330,10 @@ class PDFQueryServiceV2:
         # Create tool response structure
         tool_response = {
             "role": "tool",
-            "content": f"PDF Search Results from '{pdf_filename}':\n\n{formatted_content}",
+            "content": (
+                "PDF Search Results from"
+                f" '{pdf_filename}':\n\n{formatted_content}"
+            ),
             "metadata": {
                 "tool_name": "pdf_search",
                 "pdf_filename": pdf_filename,

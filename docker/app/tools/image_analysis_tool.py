@@ -47,7 +47,10 @@ class ImageAnalysisTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "analyze_image"
-        self.description = "Analyze uploaded images to describe content or answer visual questions. Use when user uploads an image AND asks about it."
+        self.description = (
+            "Analyze uploaded images to describe content or answer visual"
+            " questions. Use when user uploads an image AND asks about it."
+        )
         self.llm_type = "vlm"  # Use VLM model for image analysis
         self.execution_mode = ExecutionMode.AUTO  # Support both sync and async
         self.timeout = 256.0  # Image analysis can take time
@@ -70,11 +73,17 @@ class ImageAnalysisTool(BaseTool):
                     "properties": {
                         "question": {
                             "type": "string",
-                            "description": "The question to ask about the uploaded image",
+                            "description": (
+                                "The question to ask about the uploaded image"
+                            ),
                         },
                         "but_why": {
                             "type": "integer",
-                            "description": "An integer from 1-5 where a larger number indicates confidence this is the right tool to help the user.",
+                            "description": (
+                                "An integer from 1-5 where a larger number"
+                                " indicates confidence this is the right tool"
+                                " to help the user."
+                            ),
                         },
                     },
                     "required": ["question", "but_why"],
@@ -126,7 +135,10 @@ class ImageAnalysisTool(BaseTool):
                     filename="Unknown",
                     analysis="",
                     question=question,
-                    message="No image found. Please upload an image first using the image uploader in the sidebar.",
+                    message=(
+                        "No image found. Please upload an image first using"
+                        " the image uploader in the sidebar."
+                    ),
                     error_message="No image data available",
                     error_code="NO_IMAGE_DATA",
                     direct_response=True,
@@ -147,7 +159,8 @@ class ImageAnalysisTool(BaseTool):
         try:
             image_bytes = base64.b64decode(image_base64)
             logger.debug(
-                f"Image size being sent to VLM: {len(image_bytes) / 1024:.2f} KB"
+                "Image size being sent to VLM:"
+                f" {len(image_bytes) / 1024:.2f} KB"
             )
         except Exception as e:
             logger.error(f"Failed to decode base64 for size check: {e}")
@@ -198,7 +211,10 @@ class ImageAnalysisTool(BaseTool):
             ):
                 # Return error response with empty generator
                 async def empty_generator():
-                    yield "No image found. Please upload an image first using the image uploader in the sidebar."
+                    yield (
+                        "No image found. Please upload an image first using"
+                        " the image uploader in the sidebar."
+                    )
 
                 return StreamingImageAnalysisResponse(
                     success=False,
@@ -225,7 +241,8 @@ class ImageAnalysisTool(BaseTool):
         try:
             image_bytes = base64.b64decode(image_base64)
             logger.debug(
-                f"Image size being sent to VLM: {len(image_bytes) / 1024:.2f} KB"
+                "Image size being sent to VLM:"
+                f" {len(image_bytes) / 1024:.2f} KB"
             )
         except Exception as e:
             logger.error(f"Failed to decode base64 for size check: {e}")
@@ -294,7 +311,8 @@ class ImageAnalysisTool(BaseTool):
             model_name = config_obj.vlm_model_name
 
             logger.info(
-                f"Using VLM model with streaming: {model_name} at endpoint: {config_obj.vlm_endpoint}"
+                f"Using VLM model with streaming: {model_name} at endpoint:"
+                f" {config_obj.vlm_endpoint}"
             )
 
             # For better results, make sure to put the image before any text part in the request body.
@@ -305,7 +323,9 @@ class ImageAnalysisTool(BaseTool):
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": f"data:image/png;base64,{processed_base64}"
+                                "url": (
+                                    f"data:image/png;base64,{processed_base64}"
+                                )
                             },
                         },
                         {"type": "text", "text": question},
@@ -385,7 +405,8 @@ class ImageAnalysisTool(BaseTool):
             model_name = config_obj.vlm_model_name
 
             logger.info(
-                f"Using VLM model with streaming: {model_name} at endpoint: {config_obj.vlm_endpoint}"
+                f"Using VLM model with streaming: {model_name} at endpoint:"
+                f" {config_obj.vlm_endpoint}"
             )
 
             # For better results, make sure to put the image before any text part in the request body.
@@ -396,7 +417,9 @@ class ImageAnalysisTool(BaseTool):
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": f"data:image/png;base64,{processed_base64}"
+                                "url": (
+                                    f"data:image/png;base64,{processed_base64}"
+                                )
                             },
                         },
                         {"type": "text", "text": question},
@@ -460,13 +483,15 @@ class ImageAnalysisTool(BaseTool):
             original_aspect = original_width / original_height
 
             logger.info(
-                f"VLM preprocessing - Original image dimensions: {original_width}x{original_height}, aspect ratio: {original_aspect:.3f}"
+                "VLM preprocessing - Original image dimensions:"
+                f" {original_width}x{original_height}, aspect ratio:"
+                f" {original_aspect:.3f}"
             )
 
             # Find best tile configuration (w_tiles × h_tiles ≤ 12) that maintains closest aspect ratio
             # with maximum dimension constraint of 3072 pixels
             best_tiles = (1, 1)
-            best_aspect_diff = float('inf')
+            best_aspect_diff = float("inf")
             max_dimension = 3072
             tile_size = 512
             max_tiles_per_dimension = (
@@ -504,36 +529,41 @@ class ImageAnalysisTool(BaseTool):
                 )
 
                 logger.info(
-                    f"Resized image for VLM from {original_width}x{original_height} to {target_width}x{target_height} (tiles: {best_tiles[0]}x{best_tiles[1]})"
+                    "Resized image for VLM from"
+                    f" {original_width}x{original_height} to"
+                    f" {target_width}x{target_height} (tiles:"
+                    f" {best_tiles[0]}x{best_tiles[1]})"
                 )
             else:
                 resized_img = img
                 logger.info(
-                    f"Image already at target size: {target_width}x{target_height}"
+                    "Image already at target size:"
+                    f" {target_width}x{target_height}"
                 )
 
             # Convert to RGB and encode (lossless PNG format)
             buffer = BytesIO()
-            if resized_img.mode in ('RGBA', 'LA', 'P'):
+            if resized_img.mode in ("RGBA", "LA", "P"):
                 # Convert to RGB (no alpha channel support)
-                rgb_img = Image.new('RGB', resized_img.size, (255, 255, 255))
+                rgb_img = Image.new("RGB", resized_img.size, (255, 255, 255))
                 rgb_img.paste(
                     resized_img,
                     mask=(
                         resized_img.split()[-1]
-                        if resized_img.mode == 'RGBA'
+                        if resized_img.mode == "RGBA"
                         else None
                     ),
                 )
                 resized_img = rgb_img
 
-            resized_img.save(buffer, format='PNG')
+            resized_img.save(buffer, format="PNG")
             buffer.seek(0)
             resized_bytes = buffer.getvalue()
-            processed_base64 = base64.b64encode(resized_bytes).decode('utf-8')
+            processed_base64 = base64.b64encode(resized_bytes).decode("utf-8")
 
             logger.info(
-                f"VLM image size after processing: {len(resized_bytes) / 1024:.2f} KB"
+                "VLM image size after processing:"
+                f" {len(resized_bytes) / 1024:.2f} KB"
             )
 
             return processed_base64

@@ -30,7 +30,7 @@ def get_animated_loading_html(
         HTML string with embedded CSS for the animated loading indicator
     """
     # Build icon HTML if provided
-    icon_html = f'<div class="thinking-icon">{icon}</div>' if icon else ''
+    icon_html = f'<div class="thinking-icon">{icon}</div>' if icon else ""
 
     # Adjust padding based on whether it's inline or not
     container_padding = "padding: 10px 0;" if icon else "padding: 5px 0;"
@@ -184,7 +184,7 @@ def get_galaxy_animation_html(
         # Calculate center position for line
         center_x = (x1 + x2) / 2
         center_y = (y1 + y2) / 2
-        connections_html += f'''
+        connections_html += f"""
         <div class="network-connection connection-{i}" style="
             position: absolute;
             width: {length}px;
@@ -198,7 +198,7 @@ def get_galaxy_animation_html(
             transform: translate(-50%, -50%) rotate({angle}deg);
             transform-origin: center center;
             opacity: 0.4;
-        "></div>'''
+        "></div>"""
 
     # Generate nodes HTML
     nodes_html = ""
@@ -208,7 +208,7 @@ def get_galaxy_animation_html(
 
         if node["type"] == "triangle":
             # Create triangular shape
-            nodes_html += f'''
+            nodes_html += f"""
             <div class="network-node triangle-node node-{i}" style="
                 position: absolute;
                 width: 0;
@@ -221,10 +221,10 @@ def get_galaxy_animation_html(
                 --base-x: {x}px;
                 --base-y: {y}px;
                 filter: drop-shadow(0 0 3px #76B900);
-            "></div>'''
+            "></div>"""
         else:
             # Create circular dot
-            nodes_html += f'''
+            nodes_html += f"""
             <div class="network-node dot-node node-{i}" style="
                 position: absolute;
                 width: {node['size']}px;
@@ -239,7 +239,7 @@ def get_galaxy_animation_html(
                 --base-x: {x}px;
                 --base-y: {y}px;
                 box-shadow: 0 0 4px rgba(118, 185, 0, 0.8);
-            "></div>'''
+            "></div>"""
 
     # Generate individual expansion keyframes for each node
     expansion_keyframes = ""
@@ -249,7 +249,7 @@ def get_galaxy_animation_html(
         # Calculate expanded position (30% further from center)
         x_expanded = x * 1.3
         y_expanded = y * 1.3
-        size_offset = node['size'] / 2
+        size_offset = node["size"] / 2
 
         expansion_keyframes += f"""
     @keyframes node-expand-{i} {{
@@ -416,7 +416,7 @@ def get_galaxy_animation_html(
     for i, node in enumerate(nodes_config):
         x = node["radius"] * math.cos(math.radians(node["angle"]))
         y = node["radius"] * math.sin(math.radians(node["angle"]))
-        size_offset = node['size'] / 2
+        size_offset = node["size"] / 2
         delay = (i * 0.2) % 1.2  # Stagger the animations
 
         if node["type"] == "triangle":

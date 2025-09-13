@@ -120,7 +120,7 @@ class FileController:
                     False,
                     {
                         "error": (
-                            f"PDF file too large. Maximum size: "
+                            "PDF file too large. Maximum size: "
                             f"{config.file_processing.MAX_PDF_SIZE // (1024*1024)}MB"
                         )
                     },
@@ -184,7 +184,10 @@ class FileController:
         except requests.exceptions.RequestException as e:
             logging.error("Request error during PDF processing: %s", e)
             return False, {
-                "error": "Failed to connect to PDF processing server. Please try again later."
+                "error": (
+                    "Failed to connect to PDF processing server. Please try"
+                    " again later."
+                )
             }
         except json.JSONDecodeError as e:
             logging.error("JSON decode error: %s", e)

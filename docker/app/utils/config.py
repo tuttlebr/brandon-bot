@@ -57,9 +57,9 @@ class FileProcessingConfig:
     MAX_IMAGE_SIZE: int = 20 * 1024 * 1024
 
     # Supported file types
-    SUPPORTED_PDF_TYPES: List[str] = field(default_factory=lambda: ['pdf'])
+    SUPPORTED_PDF_TYPES: List[str] = field(default_factory=lambda: ["pdf"])
     SUPPORTED_IMAGE_TYPES: List[str] = field(
-        default_factory=lambda: ['png', 'jpg', 'jpeg']
+        default_factory=lambda: ["png", "jpg", "jpeg"]
     )
 
     # PDF Summarization settings
@@ -261,10 +261,10 @@ class ToolConfig:
         import yaml
 
         try:
-            with open(config_file, 'r') as f:
-                if config_file.endswith('.json'):
+            with open(config_file, "r") as f:
+                if config_file.endswith(".json"):
                     config_data = json.load(f)
-                elif config_file.endswith(('.yaml', '.yml')):
+                elif config_file.endswith((".yaml", ".yml")):
                     config_data = yaml.safe_load(f)
                 else:
                     logging.warning(
@@ -439,11 +439,11 @@ class EnvironmentConfig:
             List of missing required environment variables
         """
         required_vars = [
-            ('FAST_LLM_MODEL_NAME', self.FAST_LLM_MODEL_NAME),
-            ('FAST_LLM_ENDPOINT', self.FAST_LLM_ENDPOINT),
+            ("FAST_LLM_MODEL_NAME", self.FAST_LLM_MODEL_NAME),
+            ("FAST_LLM_ENDPOINT", self.FAST_LLM_ENDPOINT),
             # Only require NVIDIA_API_KEY if no individual API keys are set
             (
-                'NVIDIA_API_KEY or individual model API keys',
+                "NVIDIA_API_KEY or individual model API keys",
                 (
                     self.NVIDIA_API_KEY
                     if (
@@ -544,7 +544,7 @@ class AppConfig:
         if (
             self.env.NVINGEST_ENDPOINT
             and not self.env.NVINGEST_ENDPOINT.startswith(
-                ('http://', 'https://')
+                ("http://", "https://")
             )
         ):
             raise ValueError(

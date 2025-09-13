@@ -226,8 +226,8 @@ class WeatherController(ToolController):
 
     def process(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Process the weather request"""
-        location = params['location']
-        include_hourly = params.get('include_hourly', True)
+        location = params["location"]
+        include_hourly = params.get("include_hourly", True)
 
         # Geocode location
         location_result = self.api_client.geocode_location(location)
@@ -358,7 +358,11 @@ class WeatherTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "get_weather"
-        self.description = "Get current weather for a specific location. Use when user asks for weather, temperature, or forecast AND provides a city/location."
+        self.description = (
+            "Get current weather for a specific location. Use when user asks"
+            " for weather, temperature, or forecast AND provides a"
+            " city/location."
+        )
         self.execution_mode = ExecutionMode.SYNC
         self.timeout = 10.0
 
@@ -379,11 +383,18 @@ class WeatherTool(BaseTool):
                     "properties": {
                         "location": {
                             "type": "string",
-                            "description": "The city and state/country to get weather for (e.g., 'New York, NY' or 'London, UK')",
+                            "description": (
+                                "The city and state/country to get weather for"
+                                " (e.g., 'New York, NY' or 'London, UK')"
+                            ),
                         },
                         "but_why": {
                             "type": "integer",
-                            "description": "An integer from 1-5 where a larger number indicates confidence this is the right tool to help the user.",
+                            "description": (
+                                "An integer from 1-5 where a larger number"
+                                " indicates confidence this is the right tool"
+                                " to help the user."
+                            ),
                         },
                     },
                     "required": ["location", "but_why"],

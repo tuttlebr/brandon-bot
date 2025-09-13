@@ -156,10 +156,12 @@ class ChatService:
                 cleaned_messages.append(
                     {
                         "role": message["role"],
-                        "content": ChatMessage(
-                            message["role"],
-                            extract_context_regex(message["content"]),
-                        ).get_display_content(),
+                        "content": (
+                            ChatMessage(
+                                message["role"],
+                                extract_context_regex(message["content"]),
+                            ).get_display_content()
+                        ),
                     }
                 )
 

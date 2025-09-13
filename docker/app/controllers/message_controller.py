@@ -69,7 +69,7 @@ class MessageController:
             return False
 
         # Quick string check first - if no '<TOOLCALL' found, return early
-        if '<TOOLCALL' not in content.upper():
+        if "<TOOLCALL" not in content.upper():
             return False
 
         # Only do regex if the quick check passes
@@ -106,7 +106,7 @@ class MessageController:
             if self.contains_tool_call_instructions(content):
                 logging.warning(
                     f"Removing {message.get('role', 'unknown')} message "
-                    f"with tool call instructions from chat history"
+                    "with tool call instructions from chat history"
                 )
                 continue
 
@@ -146,7 +146,7 @@ class MessageController:
                 if not cleaned_content:
                     logging.warning(
                         f"Attempted to add empty {role} message to chat "
-                        f"history, skipping"
+                        "history, skipping"
                     )
                     return False
 
@@ -156,7 +156,7 @@ class MessageController:
                 ):
                     logging.warning(
                         f"Attempted to add {role} message with tool call "
-                        f"instructions to chat history, skipping"
+                        "instructions to chat history, skipping"
                     )
                     return False
 
@@ -180,7 +180,7 @@ class MessageController:
                 if not content:
                     logging.warning(
                         f"Attempted to add empty {role} message to chat "
-                        f"history, skipping"
+                        "history, skipping"
                     )
                     return False
         elif isinstance(content, dict):
@@ -189,7 +189,7 @@ class MessageController:
             if not content:
                 logging.warning(
                     f"Attempted to add empty dict {role} message to "
-                    f"chat history, skipping"
+                    "chat history, skipping"
                 )
                 return False
         else:
@@ -197,13 +197,13 @@ class MessageController:
             if not content:
                 logging.warning(
                     f"Attempted to add empty {role} message to chat "
-                    f"history, skipping"
+                    "history, skipping"
                 )
                 return False
 
         # Add the validated message to history using session controller
         # if available
-        if hasattr(self, 'session_controller') and self.session_controller:
+        if hasattr(self, "session_controller") and self.session_controller:
             self.session_controller.add_message(role, content)
         else:
             # Fallback to direct access with safety check

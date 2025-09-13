@@ -169,7 +169,8 @@ class FileStorageService:
         """
         try:
             logger.debug(
-                f"Storing uploaded image: {filename}, type: {file_type}, base64 length: {len(image_data)}"
+                f"Storing uploaded image: {filename}, type: {file_type},"
+                f" base64 length: {len(image_data)}"
             )
 
             # Generate unique ID based on content hash
@@ -180,16 +181,16 @@ class FileStorageService:
             self._check_storage_limits(session_id, "images")
 
             # Determine file extension from MIME type
-            extension = '.png'  # default
+            extension = ".png"  # default
             if file_type:
-                if 'jpeg' in file_type or 'jpg' in file_type:
-                    extension = '.jpg'
-                elif 'png' in file_type:
-                    extension = '.png'
-                elif 'gif' in file_type:
-                    extension = '.gif'
-                elif 'bmp' in file_type:
-                    extension = '.bmp'
+                if "jpeg" in file_type or "jpg" in file_type:
+                    extension = ".jpg"
+                elif "png" in file_type:
+                    extension = ".png"
+                elif "gif" in file_type:
+                    extension = ".gif"
+                elif "bmp" in file_type:
+                    extension = ".bmp"
 
             # Save image file
             image_path = self.images_dir / f"{image_id}{extension}"
@@ -197,7 +198,8 @@ class FileStorageService:
                 image_bytes = base64.b64decode(image_data)
                 image_path.write_bytes(image_bytes)
                 logger.debug(
-                    f"Saved image file: {image_path}, size: {len(image_bytes)} bytes"
+                    f"Saved image file: {image_path}, size:"
+                    f" {len(image_bytes)} bytes"
                 )
 
             # Save metadata
@@ -217,7 +219,8 @@ class FileStorageService:
             metadata_path.write_text(json.dumps(metadata, indent=2))
 
             logger.info(
-                f"Stored uploaded image {image_id} ({filename}), size: {metadata['size_bytes'] / 1024:.1f} KB"
+                f"Stored uploaded image {image_id} ({filename}), size:"
+                f" {metadata['size_bytes'] / 1024:.1f} KB"
             )
             return image_id
 
@@ -274,7 +277,7 @@ class FileStorageService:
         """
         try:
             # PDF ID should always be provided by the caller
-            pdf_id = pdf_data.get('pdf_id')
+            pdf_id = pdf_data.get("pdf_id")
             if not pdf_id:
                 raise ValueError("pdf_id must be provided in pdf_data")
 
@@ -286,7 +289,8 @@ class FileStorageService:
             logger.debug(f"Storing PDF at: {pdf_path}")
             pdf_path.write_text(json.dumps(pdf_data, indent=2))
             logger.debug(
-                f"PDF stored successfully at: {pdf_path}, exists: {pdf_path.exists()}"
+                f"PDF stored successfully at: {pdf_path}, exists:"
+                f" {pdf_path.exists()}"
             )
 
             # Save metadata
@@ -327,7 +331,8 @@ class FileStorageService:
                 # List available PDFs for debugging
                 available_pdfs = list(self.pdfs_dir.glob("*.json"))
                 logger.debug(
-                    f"Available PDFs in storage: {[p.name for p in available_pdfs]}"
+                    "Available PDFs in storage:"
+                    f" {[p.name for p in available_pdfs]}"
                 )
                 return None
 
@@ -338,33 +343,36 @@ class FileStorageService:
             if metadata_path.exists():
                 metadata = json.loads(metadata_path.read_text())
                 # Add filename from metadata to pdf_data
-                filename = metadata.get('filename', '')
+                filename = metadata.get("filename", "")
                 if not filename:
                     # If no filename in metadata, try to derive from PDF data or use a default
-                    filename = pdf_data.get('filename', f'{pdf_id}.pdf')
+                    filename = pdf_data.get("filename", f"{pdf_id}.pdf")
                     logger.warning(
-                        f"No filename in metadata for {pdf_id}, using: {filename}"
+                        f"No filename in metadata for {pdf_id}, using:"
+                        f" {filename}"
                     )
 
-                pdf_data['filename'] = filename
+                pdf_data["filename"] = filename
                 # Add total_pages from metadata to pdf_data
-                total_pages = metadata.get('total_pages', 0)
-                pdf_data['total_pages'] = total_pages
+                total_pages = metadata.get("total_pages", 0)
+                pdf_data["total_pages"] = total_pages
                 # Optionally add other metadata fields if needed
-                pdf_data['pdf_id'] = metadata.get('pdf_id', pdf_id)
+                pdf_data["pdf_id"] = metadata.get("pdf_id", pdf_id)
             else:
                 # If no metadata, ensure we still have a filename
-                if 'filename' not in pdf_data or not pdf_data['filename']:
-                    pdf_data['filename'] = f'{pdf_id}.pdf'
+                if "filename" not in pdf_data or not pdf_data["filename"]:
+                    pdf_data["filename"] = f"{pdf_id}.pdf"
                     logger.warning(
-                        f"No metadata found for {pdf_id}, using filename: {pdf_data['filename']}"
+                        f"No metadata found for {pdf_id}, using filename:"
+                        f" {pdf_data['filename']}"
                     )
-                pdf_data['pdf_id'] = pdf_id
+                pdf_data["pdf_id"] = pdf_id
                 # Calculate total_pages from pages if metadata not available
-                pdf_data['total_pages'] = len(pdf_data.get('pages', []))
+                pdf_data["total_pages"] = len(pdf_data.get("pages", []))
 
             logger.debug(
-                f"Retrieved PDF {pdf_id} with filename: {pdf_data.get('filename')}"
+                f"Retrieved PDF {pdf_id} with filename:"
+                f" {pdf_data.get('filename')}"
             )
             return pdf_data
 
@@ -392,8 +400,8 @@ class FileStorageService:
             # Remove metadata fields from pdf_data before storing
             # (they should remain in the metadata file only)
             pdf_data_to_store = pdf_data.copy()
-            pdf_data_to_store.pop('filename', None)
-            pdf_data_to_store.pop('pdf_id', None)
+            pdf_data_to_store.pop("filename", None)
+            pdf_data_to_store.pop("pdf_id", None)
 
             # Update the PDF data
             pdf_path.write_text(json.dumps(pdf_data_to_store, indent=2))

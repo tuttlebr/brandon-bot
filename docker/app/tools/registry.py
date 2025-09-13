@@ -88,7 +88,7 @@ class ToolFactory:
 class ToolRegistry:
     """Singleton registry for managing all tools with factory pattern"""
 
-    _instance: Optional['ToolRegistry'] = None
+    _instance: Optional["ToolRegistry"] = None
     _initialized: bool = False
 
     def __new__(cls):
@@ -108,7 +108,7 @@ class ToolRegistry:
         logger.info("ToolRegistry initialized")
 
     @classmethod
-    def get_instance(cls) -> 'ToolRegistry':
+    def get_instance(cls) -> "ToolRegistry":
         """Get singleton instance of ToolRegistry"""
         if cls._instance is None:
             cls._instance = cls()
@@ -280,7 +280,8 @@ class ToolRegistry:
                     )
 
         logger.info(
-            f"Returning {len(definitions)} tool definitions (out of {len(all_tool_names)} registered)"
+            f"Returning {len(definitions)} tool definitions (out of"
+            f" {len(all_tool_names)} registered)"
         )
         return definitions
 

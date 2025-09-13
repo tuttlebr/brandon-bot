@@ -59,7 +59,9 @@ class AssistantResponse(BaseToolResponse):
     )
     direct_response: bool = Field(
         default=True,
-        description="Flag indicating this response should be returned directly to user",
+        description=(
+            "Flag indicating this response should be returned directly to user"
+        ),
     )
 
 
@@ -87,19 +89,20 @@ class AssistantController(ToolController):
 
     async def process_async(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Process the assistant request asynchronously"""
-        task_type = params['task_type']
-        text = params['text']
-        instructions = params.get('instructions')
-        source_language = params.get('source_language')
-        target_language = params.get('target_language')
-        messages = params.get('messages', [])
+        task_type = params["task_type"]
+        text = params["text"]
+        instructions = params.get("instructions")
+        source_language = params.get("source_language")
+        target_language = params.get("target_language")
+        messages = params.get("messages", [])
 
         # Validate task type
         try:
             task_enum = AssistantTaskType(task_type.lower())
         except ValueError:
             raise ValueError(
-                f"Invalid task_type: {task_type}. Must be one of: {[t.value for t in AssistantTaskType]}"
+                f"Invalid task_type: {task_type}. Must be one of:"
+                f" {[t.value for t in AssistantTaskType]}"
             )
 
         # Prepare text with context
@@ -128,7 +131,8 @@ class AssistantController(ToolController):
             pdf_data = PDFDataExtractor.extract_from_messages(messages)
             if pdf_data:
                 logger.info(
-                    f"Found PDF data: {pdf_data.get('filename')} with {len(pdf_data.get('pages', []))} pages"
+                    f"Found PDF data: {pdf_data.get('filename')} with"
+                    f" {len(pdf_data.get('pages', []))} pages"
                 )
                 pdf_text = PDFDataExtractor.extract_text_from_pdf_data(
                     pdf_data
@@ -145,12 +149,16 @@ class AssistantController(ToolController):
                         or "document" in text_lower
                     ):
                         logger.info(
-                            "Replacing generic PDF reference with actual content"
+                            "Replacing generic PDF reference with actual"
+                            " content"
                         )
                         return pdf_text
                     else:
                         # Append as additional context
-                        return f"{text}\n\n--- Additional Context ---\n\n{pdf_text}"
+                        return (
+                            f"{text}\n\n--- Additional Context"
+                            f" ---\n\n{pdf_text}"
+                        )
                 else:
                     logger.warning(
                         "PDF data found but no text could be extracted"
@@ -352,7 +360,9 @@ class AssistantController(ToolController):
                 # Extract base ID before '_batch_' suffix
                 pdf_id = latest_batch_file.stem.split("_batch_")[0]
                 logger.info(
-                    f"Derived base PDF ID '{pdf_id}' from batch file '{latest_batch_file.name}' because no standalone PDF file found."
+                    f"Derived base PDF ID '{pdf_id}' from batch file"
+                    f" '{latest_batch_file.name}' because no standalone PDF"
+                    " file found."
                 )
 
             logger.info(f"Loading complete document for PDF: {pdf_id}")
@@ -361,7 +371,8 @@ class AssistantController(ToolController):
             batches = file_storage.get_pdf_batches(pdf_id)
             logger.info(f"Attempting to load batches for PDF ID: {pdf_id}")
             logger.info(
-                f"Available batch files: {[f.name for f in pdf_files if 'batch' in f.name]}"
+                "Available batch files:"
+                f" {[f.name for f in pdf_files if 'batch' in f.name]}"
             )
 
             if batches:
@@ -375,7 +386,8 @@ class AssistantController(ToolController):
                     all_pages.extend(batch_pages)
 
                 logger.info(
-                    f"Successfully loaded {len(all_pages)} pages from batches for analysis"
+                    f"Successfully loaded {len(all_pages)} pages from batches"
+                    " for analysis"
                 )
 
                 return all_pages
@@ -444,11 +456,15 @@ class AssistantTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "text_assistant"
-        self.description = "Process text with specific operations: summarize, translate, proofread, rewrite, analyze documents, or develop code. Use when user provides text AND requests processing."
+        self.description = (
+            "Process text with specific operations: summarize, translate,"
+            " proofread, rewrite, analyze documents, or develop code. Use when"
+            " user provides text AND requests processing."
+        )
         self.supported_contexts = [
-            'translation',
-            'text_processing',
-            'code_generation',
+            "translation",
+            "text_processing",
+            "code_generation",
         ]
 
     def _initialize_mvc(self):
@@ -463,41 +479,75 @@ class AssistantTool(BaseTool):
             "type": "function",
             "function": {
                 "name": self.name,
-                "description": self.description
-                + " Important: For PDF operations, use the pdf_assistant tool instead.",
+                "description": (
+                    self.description
+                    + " Important: For PDF operations, use the pdf_assistant"
+                    " tool instead."
+                ),
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "task_type": {
                             "type": "string",
                             "enum": [t.value for t in AssistantTaskType],
-                            "description": "The type of text processing task to perform. Choose 'analyze' for text analysis, 'summarize' to condense text, 'proofread' to correct errors, 'rewrite' to enhance clarity, 'critic' for feedback, 'translate' for language conversion, or 'develop' for code assistance.",
+                            "description": (
+                                "The type of text processing task to perform."
+                                " Choose 'analyze' for text analysis,"
+                                " 'summarize' to condense text, 'proofread' to"
+                                " correct errors, 'rewrite' to enhance"
+                                " clarity, 'critic' for feedback, 'translate'"
+                                " for language conversion, or 'develop' for"
+                                " code assistance."
+                            ),
                         },
                         "text": {
                             "type": "string",
-                            "description": "The plain text content to be processed. Note: For PDF documents, use the pdf_assistant tool instead.",
+                            "description": (
+                                "The plain text content to be processed. Note:"
+                                " For PDF documents, use the pdf_assistant"
+                                " tool instead."
+                            ),
                         },
                         "instructions": {
                             "type": "string",
-                            "description": "Specific guidance for the task (e.g., 'focus on technical accuracy' for proofreading, 'make it more formal' for rewriting, 'target audience: executives' for summarize).",
+                            "description": (
+                                "Specific guidance for the task (e.g., 'focus"
+                                " on technical accuracy' for proofreading,"
+                                " 'make it more formal' for rewriting, 'target"
+                                " audience: executives' for summarize)."
+                            ),
                         },
                         "source_language": {
                             "type": "string",
-                            "enum": TranslationService(
-                                ChatConfig.from_environment(), "llm"
-                            ).get_supported_languages(),
-                            "description": "The source language for translation (optional - will auto-detect if not provided)",
+                            "enum": (
+                                TranslationService(
+                                    ChatConfig.from_environment(), "llm"
+                                ).get_supported_languages()
+                            ),
+                            "description": (
+                                "The source language for translation (optional"
+                                " - will auto-detect if not provided)"
+                            ),
                         },
                         "target_language": {
                             "type": "string",
-                            "enum": TranslationService(
-                                ChatConfig.from_environment(), "llm"
-                            ).get_supported_languages(),
-                            "description": "The target language for translation (required for translation tasks)",
+                            "enum": (
+                                TranslationService(
+                                    ChatConfig.from_environment(), "llm"
+                                ).get_supported_languages()
+                            ),
+                            "description": (
+                                "The target language for translation (required"
+                                " for translation tasks)"
+                            ),
                         },
                         "but_why": {
                             "type": "integer",
-                            "description": "An integer from 1-5 where a larger number indicates confidence this is the right tool to help the user.",
+                            "description": (
+                                "An integer from 1-5 where a larger number"
+                                " indicates confidence this is the right tool"
+                                " to help the user."
+                            ),
                         },
                     },
                     "required": ["task_type", "text", "but_why"],

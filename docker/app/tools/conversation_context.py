@@ -59,7 +59,9 @@ class ConversationContextResponse(BaseToolResponse):
     )
     direct_response: bool = Field(
         default=True,
-        description="Flag indicating this response should be returned directly to user",
+        description=(
+            "Flag indicating this response should be returned directly to user"
+        ),
     )
     success: bool = Field(default=True, description="Success status")
     error_message: Optional[str] = Field(
@@ -92,7 +94,9 @@ class StreamingConversationContextResponse(StreamingToolResponse):
     )
     direct_response: bool = Field(
         default=True,
-        description="Flag indicating this response should be returned directly to user",
+        description=(
+            "Flag indicating this response should be returned directly to user"
+        ),
     )
 
 
@@ -118,7 +122,8 @@ class ConversationContextController(ToolController):
             context_enum = ContextType(params["query"].lower())
         except ValueError:
             raise ValueError(
-                f"Invalid query: {params['query']}. Must be one of: {[t.value for t in ContextType]}"
+                f"Invalid query: {params['query']}. Must be one of:"
+                f" {[t.value for t in ContextType]}"
             )
 
         # Limit messages to the requested count, excluding system messages
@@ -134,7 +139,8 @@ class ConversationContextController(ToolController):
         filtered_messages.reverse()
 
         logger.debug(
-            f"Context analysis: {params['query']}, {len(filtered_messages)} messages"
+            f"Context analysis: {params['query']},"
+            f" {len(filtered_messages)} messages"
         )
 
         # Create config from environment
@@ -165,7 +171,8 @@ class ConversationContextController(ToolController):
             context_enum = ContextType(params["query"].lower())
         except ValueError:
             raise ValueError(
-                f"Invalid query: {params['query']}. Must be one of: {[t.value for t in ContextType]}"
+                f"Invalid query: {params['query']}. Must be one of:"
+                f" {[t.value for t in ContextType]}"
             )
 
         # Limit messages to the requested count, excluding system messages
@@ -181,7 +188,8 @@ class ConversationContextController(ToolController):
         filtered_messages.reverse()
 
         logger.debug(
-            f"Context analysis: {params['query']}, {len(filtered_messages)} messages"
+            f"Context analysis: {params['query']},"
+            f" {len(filtered_messages)} messages"
         )
 
         # Create config from environment
@@ -247,22 +255,44 @@ class ConversationContextController(ToolController):
             conversation_text = self._format_messages_for_analysis(messages)
 
             if context_type == ContextType.RECENT_TOPICS:
-                user_message = f"Extract and list the main topics from this conversation:\n\n{conversation_text}"
+                user_message = (
+                    "Extract and list the main topics from this"
+                    f" conversation:\n\n{conversation_text}"
+                )
             elif context_type == ContextType.USER_PREFERENCES:
-                user_message = f"Analyze the user's preferences and interaction patterns from this conversation:\n\n{conversation_text}"
+                user_message = (
+                    "Analyze the user's preferences and interaction patterns"
+                    f" from this conversation:\n\n{conversation_text}"
+                )
             elif context_type == ContextType.TASK_CONTINUITY:
-                user_message = f"Track the task progression and identify next steps from this conversation:\n\n{conversation_text}"
+                user_message = (
+                    "Track the task progression and identify next steps from"
+                    f" this conversation:\n\n{conversation_text}"
+                )
             elif context_type == ContextType.CREATIVE_DIRECTOR:
-                user_message = f"Maintain creative continuity and track project evolution from this conversation:\n\n{conversation_text}"
+                user_message = (
+                    "Maintain creative continuity and track project evolution"
+                    f" from this conversation:\n\n{conversation_text}"
+                )
             elif context_type == ContextType.DOCUMENT_ANALYSIS:
                 # Include document content if available
                 doc_content = self._get_document_content(messages, pdf_data)
                 if doc_content:
-                    user_message = f"Analyze this document in relation to the conversation:\n\nDocument Content:\n{doc_content}\n\nConversation:\n{conversation_text}"
+                    user_message = (
+                        "Analyze this document in relation to the"
+                        " conversation:\n\nDocument"
+                        f" Content:\n{doc_content}\n\nConversation:\n{conversation_text}"
+                    )
                 else:
-                    user_message = f"Analyze document-related aspects of this conversation:\n\n{conversation_text}"
+                    user_message = (
+                        "Analyze document-related aspects of this"
+                        f" conversation:\n\n{conversation_text}"
+                    )
             else:  # CONVERSATION_SUMMARY
-                user_message = f"Summarize this conversation and identify if the latest message requires action:\n\n{conversation_text}"
+                user_message = (
+                    "Summarize this conversation and identify if the latest"
+                    f" message requires action:\n\n{conversation_text}"
+                )
 
             if focus_query:
                 user_message += f"\n\nFocus particularly on: {focus_query}"
@@ -273,7 +303,8 @@ class ConversationContextController(ToolController):
             ]
 
             logger.debug(
-                f"Making context analysis request with model: {model_name} (type: {self.llm_type})"
+                "Making context analysis request with model:"
+                f" {model_name} (type: {self.llm_type})"
             )
 
             response = client.chat.completions.create(
@@ -393,22 +424,44 @@ class ConversationContextController(ToolController):
             conversation_text = self._format_messages_for_analysis(messages)
 
             if context_type == ContextType.RECENT_TOPICS:
-                user_message = f"Extract and list the main topics from this conversation:\n\n{conversation_text}"
+                user_message = (
+                    "Extract and list the main topics from this"
+                    f" conversation:\n\n{conversation_text}"
+                )
             elif context_type == ContextType.USER_PREFERENCES:
-                user_message = f"Analyze the user's preferences and interaction patterns from this conversation:\n\n{conversation_text}"
+                user_message = (
+                    "Analyze the user's preferences and interaction patterns"
+                    f" from this conversation:\n\n{conversation_text}"
+                )
             elif context_type == ContextType.TASK_CONTINUITY:
-                user_message = f"Track the task progression and identify next steps from this conversation:\n\n{conversation_text}"
+                user_message = (
+                    "Track the task progression and identify next steps from"
+                    f" this conversation:\n\n{conversation_text}"
+                )
             elif context_type == ContextType.CREATIVE_DIRECTOR:
-                user_message = f"Maintain creative continuity and track project evolution from this conversation:\n\n{conversation_text}"
+                user_message = (
+                    "Maintain creative continuity and track project evolution"
+                    f" from this conversation:\n\n{conversation_text}"
+                )
             elif context_type == ContextType.DOCUMENT_ANALYSIS:
                 # Include document content if available
                 doc_content = self._get_document_content(messages, pdf_data)
                 if doc_content:
-                    user_message = f"Analyze this document in relation to the conversation:\n\nDocument Content:\n{doc_content}\n\nConversation:\n{conversation_text}"
+                    user_message = (
+                        "Analyze this document in relation to the"
+                        " conversation:\n\nDocument"
+                        f" Content:\n{doc_content}\n\nConversation:\n{conversation_text}"
+                    )
                 else:
-                    user_message = f"Analyze document-related aspects of this conversation:\n\n{conversation_text}"
+                    user_message = (
+                        "Analyze document-related aspects of this"
+                        f" conversation:\n\n{conversation_text}"
+                    )
             else:  # CONVERSATION_SUMMARY
-                user_message = f"Summarize this conversation and identify if the latest message requires action:\n\n{conversation_text}"
+                user_message = (
+                    "Summarize this conversation and identify if the latest"
+                    f" message requires action:\n\n{conversation_text}"
+                )
 
             if focus_query:
                 user_message += f"\n\nFocus particularly on: {focus_query}"
@@ -419,7 +472,8 @@ class ConversationContextController(ToolController):
             ]
 
             logger.debug(
-                f"Making streaming context analysis request with model: {model_name} (type: {self.llm_type})"
+                "Making streaming context analysis request with model:"
+                f" {model_name} (type: {self.llm_type})"
             )
 
             response = await client.chat.completions.create(
@@ -467,10 +521,18 @@ class ConversationContextController(ToolController):
         context_prompt_map = {
             ContextType.CONVERSATION_SUMMARY: "conversation_context_summary",
             ContextType.RECENT_TOPICS: "conversation_context_recent_topics",
-            ContextType.USER_PREFERENCES: "conversation_context_user_preferences",
-            ContextType.TASK_CONTINUITY: "conversation_context_task_continuity",
-            ContextType.CREATIVE_DIRECTOR: "conversation_context_creative_director",
-            ContextType.DOCUMENT_ANALYSIS: "conversation_context_document_analysis",
+            ContextType.USER_PREFERENCES: (
+                "conversation_context_user_preferences"
+            ),
+            ContextType.TASK_CONTINUITY: (
+                "conversation_context_task_continuity"
+            ),
+            ContextType.CREATIVE_DIRECTOR: (
+                "conversation_context_creative_director"
+            ),
+            ContextType.DOCUMENT_ANALYSIS: (
+                "conversation_context_document_analysis"
+            ),
         }
 
         prompt_key = context_prompt_map.get(
@@ -481,7 +543,10 @@ class ConversationContextController(ToolController):
         prompt = get_tool_system_prompt(prompt_key, "")
 
         if focus_query:
-            prompt += f"\n\nSpecial focus: Pay particular attention to anything related to: {focus_query}"
+            prompt += (
+                "\n\nSpecial focus: Pay particular attention to anything"
+                f" related to: {focus_query}"
+            )
 
         return prompt
 
@@ -639,13 +704,13 @@ class ConversationContextController(ToolController):
         if pdf_data:
             # Limit to first 5 pages for context analysis
             limited_data = {
-                'pages': pdf_data.get('pages', [])[:5],
-                'filename': pdf_data.get('filename'),
+                "pages": pdf_data.get("pages", [])[:5],
+                "filename": pdf_data.get("filename"),
             }
             # Get text but limit each page to 1000 chars
             pages_text = []
-            for page in limited_data['pages']:
-                page_text = page.get('text', '')
+            for page in limited_data["pages"]:
+                page_text = page.get("text", "")
                 if page_text:
                     pages_text.append(
                         f"Page {page.get('page', '?')}: {page_text[:1000]}..."
@@ -669,13 +734,13 @@ class ConversationContextController(ToolController):
         if pdf_data:
             # Limit to first 5 pages for context analysis
             limited_data = {
-                'pages': pdf_data.get('pages', [])[:5],
-                'filename': pdf_data.get('filename'),
+                "pages": pdf_data.get("pages", [])[:5],
+                "filename": pdf_data.get("filename"),
             }
             # Get text but limit each page to 1000 chars
             pages_text = []
-            for page in limited_data['pages']:
-                page_text = page.get('text', '')
+            for page in limited_data["pages"]:
+                page_text = page.get("text", "")
                 if page_text:
                     pages_text.append(
                         f"Page {page.get('page', '?')}: {page_text[:1000]}..."
@@ -730,7 +795,10 @@ class ConversationContextTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "conversation_context"
-        self.description = "INTERNAL SYSTEM TOOL: Analyze conversation history for context. Never select for user queries."
+        self.description = (
+            "INTERNAL SYSTEM TOOL: Analyze conversation history for context."
+            " Never select for user queries."
+        )
 
     def _initialize_mvc(self):
         """Initialize MVC components"""
@@ -757,21 +825,40 @@ class ConversationContextTool(BaseTool):
                                 "creative_director",
                                 "document_analysis",
                             ],
-                            "description": "Type of context analysis to perform. Choose 'conversation_summary' for overall summary, 'recent_topics' to list discussion topics, 'user_preferences' for user patterns, 'task_continuity' for tracking tasks, 'creative_director' for creative projects, or 'document_analysis' for document-related context.",
+                            "description": (
+                                "Type of context analysis to perform. Choose"
+                                " 'conversation_summary' for overall summary,"
+                                " 'recent_topics' to list discussion topics,"
+                                " 'user_preferences' for user patterns,"
+                                " 'task_continuity' for tracking tasks,"
+                                " 'creative_director' for creative projects,"
+                                " or 'document_analysis' for document-related"
+                                " context."
+                            ),
                         },
                         "max_messages": {
                             "type": "integer",
-                            "description": "Maximum number of messages to analyze (default: 20)",
+                            "description": (
+                                "Maximum number of messages to analyze"
+                                " (default: 20)"
+                            ),
                             "default": 20,
                         },
                         "include_document_content": {
                             "type": "boolean",
-                            "description": "Whether to include full document content in analysis if documents are present",
+                            "description": (
+                                "Whether to include full document content in"
+                                " analysis if documents are present"
+                            ),
                             "default": True,
                         },
                         "but_why": {
                             "type": "string",
-                            "description": "An integer from 1-5 where a larger number indicates confidence this is the right tool to help the user.",
+                            "description": (
+                                "An integer from 1-5 where a larger number"
+                                " indicates confidence this is the right tool"
+                                " to help the user."
+                            ),
                         },
                     },
                     "required": ["query", "max_messages", "but_why"],

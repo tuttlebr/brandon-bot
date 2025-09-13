@@ -98,7 +98,8 @@ class ProductionStreamlitChatApp:
             pdf_info = get_active_pdf_info()
             if pdf_info:
                 st.success(
-                    f"📄 **Active PDF**: {pdf_info['filename']} ({pdf_info['total_pages']} pages)"
+                    "📄 **Active PDF**:"
+                    f" {pdf_info['filename']} ({pdf_info['total_pages']} pages)"
                 )
 
             # Use session controller's safe message access
@@ -289,7 +290,11 @@ class ProductionStreamlitChatApp:
                 "Choose PDF file",
                 type=self.file_controller.get_supported_file_types(),
                 accept_multiple_files=False,
-                help=f"Upload a PDF document to analyze and discuss its content (Max size: {self.file_controller.get_file_size_limit_mb()}MB)",
+                help=(
+                    "Upload a PDF document to analyze and discuss its content"
+                    " (Max size:"
+                    f" {self.file_controller.get_file_size_limit_mb()}MB)"
+                ),
                 key="pdf_uploader",
             )
 
@@ -322,18 +327,26 @@ class ProductionStreamlitChatApp:
                                 st.session_state.pdf_processing_status = (
                                     "completed"
                                 )
-                                st.session_state.pdf_processing_message = f"✅ Successfully processed PDF: {uploaded_file.name}"
+                                st.session_state.pdf_processing_message = (
+                                    "✅ Successfully processed PDF:"
+                                    f" {uploaded_file.name}"
+                                )
                                 logging.debug(
-                                    "Synchronous PDF processing completed for: %s",
+                                    "Synchronous PDF processing completed"
+                                    " for: %s",
                                     uploaded_file.name,
                                 )
                             else:
                                 st.session_state.pdf_processing_status = (
                                     "error"
                                 )
-                                st.session_state.pdf_processing_message = f"❌ Failed to process PDF: {uploaded_file.name}"
+                                st.session_state.pdf_processing_message = (
+                                    "❌ Failed to process PDF:"
+                                    f" {uploaded_file.name}"
+                                )
                                 logging.error(
-                                    "Synchronous PDF processing failed for: %s",
+                                    "Synchronous PDF processing failed"
+                                    " for: %s",
                                     uploaded_file.name,
                                 )
 
@@ -363,8 +376,9 @@ class ProductionStreamlitChatApp:
                         == filename
                     ):
                         st.info(
-                            f"🚀 **PDF fully indexed in Milvus!** "
-                            f"{st.session_state.pdf_milvus_upload_chunks} chunks ready for semantic search"
+                            "🚀 **PDF fully indexed in Milvus!**"
+                            f" {st.session_state.pdf_milvus_upload_chunks} chunks"
+                            " ready for semantic search"
                         )
                         # Clear the upload flag after displaying
                         if not hasattr(
@@ -382,7 +396,8 @@ class ProductionStreamlitChatApp:
                         > config.file_processing.PDF_SUMMARIZATION_THRESHOLD
                     ):
                         st.markdown(
-                            "💡 This is a large document. You can ask me to 'summarize the PDF' for a quick overview!",
+                            "💡 This is a large document. You can ask me to"
+                            " 'summarize the PDF' for a quick overview!",
                             unsafe_allow_html=True,
                         )
 
@@ -454,7 +469,11 @@ class ProductionStreamlitChatApp:
                     "Choose image file",
                     type=self.image_controller.get_supported_file_types(),
                     accept_multiple_files=False,
-                    help=f"Upload an image to analyze and discuss its content (Max size: {self.image_controller.get_file_size_limit_mb()}MB)",
+                    help=(
+                        "Upload an image to analyze and discuss its content"
+                        " (Max size:"
+                        f" {self.image_controller.get_file_size_limit_mb()}MB)"
+                    ),
                     key="image_uploader",
                 )
 
@@ -483,7 +502,10 @@ class ProductionStreamlitChatApp:
                             st.rerun()
                         else:
                             st.session_state.image_processing_status = "error"
-                            st.session_state.image_processing_message = f"❌ Failed to process image: {uploaded_image.name}"
+                            st.session_state.image_processing_message = (
+                                "❌ Failed to process image:"
+                                f" {uploaded_image.name}"
+                            )
 
                     except Exception as e:
                         logging.error("Image processing error: %s", e)
@@ -596,7 +618,8 @@ def main():
     except Exception as e:
         logging.error("Unexpected validation error: %s", e)
         st.error(
-            "Failed to validate configuration. Please check your environment variables."
+            "Failed to validate configuration. Please check your environment"
+            " variables."
         )
         st.stop()
 

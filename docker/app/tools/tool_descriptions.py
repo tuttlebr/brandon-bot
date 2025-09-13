@@ -11,7 +11,10 @@ from typing import Any, Dict, List, Optional
 # SINGLE SOURCE OF TRUTH for all tool descriptions and metadata
 TOOL_DEFINITIONS = {
     "generate_image": {
-        "description": "Generate AI images from text descriptions. Use when user requests creating, generating, making, or drawing images.",
+        "description": (
+            "Generate AI images from text descriptions. Use when user requests"
+            " creating, generating, making, or drawing images."
+        ),
         "trigger_words": [
             "generate",
             "create",
@@ -48,7 +51,11 @@ TOOL_DEFINITIONS = {
         ],
     },
     "text_assistant": {
-        "description": "Process text with specific operations: summarize, translate, proofread, rewrite, analyze documents, or develop code. Use when user provides text AND requests processing.",
+        "description": (
+            "Process text with specific operations: summarize, translate,"
+            " proofread, rewrite, analyze documents, or develop code. Use when"
+            " user provides text AND requests processing."
+        ),
         "trigger_words": [
             "analyze",
             "summarize",
@@ -81,7 +88,10 @@ TOOL_DEFINITIONS = {
         ],
     },
     "analyze_image": {
-        "description": "Analyze uploaded images to describe content or answer visual questions. Use when user uploads an image AND asks about it.",
+        "description": (
+            "Analyze uploaded images to describe content or answer visual"
+            " questions. Use when user uploads an image AND asks about it."
+        ),
         "trigger_words": [
             "look at",
             "analyze",
@@ -103,7 +113,11 @@ TOOL_DEFINITIONS = {
         ],
     },
     "serpapi_internet_search": {
-        "description": "Search the internet for current information and real-time data. Use for up-to-date facts, current events, or information that changes frequently.",
+        "description": (
+            "Search the internet for current information and real-time data."
+            " Use for up-to-date facts, current events, or information that"
+            " changes frequently."
+        ),
         "trigger_words": [
             "search",
             "find",
@@ -132,7 +146,12 @@ TOOL_DEFINITIONS = {
         ],
     },
     "generalist_conversation": {
-        "description": "DEFAULT: Handle general conversation without external tools. Use for explanations, discussions, advice, and casual chat. Do not use for creative writing or when the user asks about the bots capabilities.",
+        "description": (
+            "DEFAULT: Handle general conversation without external tools. Use"
+            " for explanations, discussions, advice, and casual chat. Do not"
+            " use for creative writing or when the user asks about the bots"
+            " capabilities."
+        ),
         "is_default": True,
         "example_uses": [
             "What is machine learning?",
@@ -144,7 +163,11 @@ TOOL_DEFINITIONS = {
         ],
     },
     "get_weather": {
-        "description": "Get current weather for a specific location. Use when user asks for weather, temperature, or forecast AND provides a city/location.",
+        "description": (
+            "Get current weather for a specific location. Use when user asks"
+            " for weather, temperature, or forecast AND provides a"
+            " city/location."
+        ),
         "trigger_words": [
             "weather",
             "temperature",
@@ -167,7 +190,11 @@ TOOL_DEFINITIONS = {
         ],
     },
     "retrieval_search": {
-        "description": "Search specialized knowledge base for mental health resources or NVIDIA technical documentation. Use ONLY for these specific domains.",
+        "description": (
+            "Search specialized knowledge base for mental health resources or"
+            " NVIDIA technical documentation. Use ONLY for these specific"
+            " domains."
+        ),
         "trigger_words": [
             "nvidia",
             "gpu",
@@ -190,12 +217,18 @@ TOOL_DEFINITIONS = {
         ],
     },
     "conversation_context": {
-        "description": "INTERNAL SYSTEM TOOL: Analyze conversation history for context. Never select for user queries.",
+        "description": (
+            "INTERNAL SYSTEM TOOL: Analyze conversation history for context."
+            " Never select for user queries."
+        ),
         "is_internal": True,
         "never_use_for_user_queries": True,
     },
     "extract_web_content": {
-        "description": "Extract and read content from a specific URL. Use when user provides a URL AND asks to read or analyze it.",
+        "description": (
+            "Extract and read content from a specific URL. Use when user"
+            " provides a URL AND asks to read or analyze it."
+        ),
         "trigger_words": ["read", "extract", "analyze", "check", "look at"],
         "requires_url": True,
         "example_uses": [
@@ -210,7 +243,11 @@ TOOL_DEFINITIONS = {
         ],
     },
     "pdf_assistant": {
-        "description": "Handle ALL PDF-related operations: summarization, Q&A, page extraction, and analysis. Use whenever user asks about an uploaded PDF.",
+        "description": (
+            "Handle ALL PDF-related operations: summarization, Q&A, page"
+            " extraction, and analysis. Use whenever user asks about an"
+            " uploaded PDF."
+        ),
         "context_requirement": "uploaded_pdf",
         "trigger_words": [
             "pdf",
@@ -240,7 +277,11 @@ TOOL_DEFINITIONS = {
         ],
     },
     "serpapi_news_search": {
-        "description": "Search specifically for news articles and breaking events. Use when user explicitly asks for news, headlines, or current events.",
+        "description": (
+            "Search specifically for news articles and breaking events. Use"
+            " when user explicitly asks for news, headlines, or current"
+            " events."
+        ),
         "trigger_words": [
             "news",
             "headlines",

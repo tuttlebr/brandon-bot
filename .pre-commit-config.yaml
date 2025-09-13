@@ -17,7 +17,13 @@ repos:
     rev: 25.1.0
     hooks:
       - id: black
-        args: ["--skip-string-normalization", "--line-length=79"]
+        args:
+          [
+            "--line-length=79",
+            "--preview",
+            "--enable-unstable-feature",
+            "string_processing",
+          ]
         additional_dependencies: ["click==8.0.4"]
   - repo: https://github.com/pycqa/isort
     rev: 5.12.0

@@ -36,7 +36,8 @@ def get_dimensions_from_aspect_ratio(aspect_ratio: str) -> Tuple[int, int]:
     """
     if aspect_ratio not in ASPECT_RATIO_MAPPINGS:
         raise ValueError(
-            f"Invalid aspect ratio '{aspect_ratio}'. Must be one of: {', '.join(ALLOWED_ASPECT_RATIOS)}"
+            f"Invalid aspect ratio '{aspect_ratio}'. Must be one of:"
+            f" {', '.join(ALLOWED_ASPECT_RATIOS)}"
         )
 
     return ASPECT_RATIO_MAPPINGS[aspect_ratio]
@@ -87,8 +88,13 @@ class ImageGenerationTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "generate_image"
-        self.description = "Generate images or visualizations from text descriptions. Use when user requests creating, generating, making, or drawing images or other visuals. OK to use for graphs, charts or signs with text."
-        self.supported_contexts = ['image_generation']
+        self.description = (
+            "Generate images or visualizations from text descriptions. Use"
+            " when user requests creating, generating, making, or drawing"
+            " images or other visuals. OK to use for graphs, charts or signs"
+            " with text."
+        )
+        self.supported_contexts = ["image_generation"]
         self.execution_mode = (
             ExecutionMode.SYNC
         )  # Image generation is synchronous
@@ -117,16 +123,22 @@ class ImageGenerationTool(BaseTool):
                     "properties": {
                         "user_prompt": {
                             "type": "string",
-                            "description": "The user's original message requesting image generation",
+                            "description": (
+                                "The user's original message requesting image"
+                                " generation"
+                            ),
                         },
                         "aspect_ratio": {
                             "type": "string",
                             "description": (
-                                "Aspect ratio for the image. Choose based on the content: "
-                                "'square' for balanced compositions, social media posts, or general "
-                                "purpose images; 'portrait' for vertical subjects like people, tall "
-                                "buildings, or phone wallpapers; 'landscape' for wide scenes, "
-                                "natural vistas, or desktop wallpapers."
+                                "Aspect ratio for the image. Choose based on"
+                                " the content: 'square' for balanced"
+                                " compositions, social media posts, or general"
+                                " purpose images; 'portrait' for vertical"
+                                " subjects like people, tall buildings, or"
+                                " phone wallpapers; 'landscape' for wide"
+                                " scenes, natural vistas, or desktop"
+                                " wallpapers."
                             ),
                             "enum": ALLOWED_ASPECT_RATIOS,
                             "default": "square",
@@ -134,26 +146,31 @@ class ImageGenerationTool(BaseTool):
                         "use_conversation_context": {
                             "type": "boolean",
                             "description": (
-                                "Whether to use conversation history to enhance the prompt. "
-                                "Useful for generating images related to ongoing discussions or stories."
+                                "Whether to use conversation history to"
+                                " enhance the prompt. Useful for generating"
+                                " images related to ongoing discussions or"
+                                " stories."
                             ),
                             "default": True,
                         },
                         "but_why": {
                             "type": "integer",
                             "description": (
-                                "An integer from 1-5 where a larger number indicates confidence "
-                                "this is the right tool to help the user."
+                                "An integer from 1-5 where a larger number"
+                                " indicates confidence this is the right tool"
+                                " to help the user."
                             ),
                         },
                         "enhanced_prompt": {
                             "type": "string",
                             "description": (
-                                "The enhanced/rewritten prompt to use for image generation. "
-                                "If the original user prompt is already detailed and well-formed, "
-                                "you can use it as-is. Otherwise, enhance it with more specific "
-                                "details, artistic direction, and visual elements to improve the "
-                                "image generation result."
+                                "The enhanced/rewritten prompt to use for"
+                                " image generation. If the original user"
+                                " prompt is already detailed and well-formed,"
+                                " you can use it as-is. Otherwise, enhance it"
+                                " with more specific details, artistic"
+                                " direction, and visual elements to improve"
+                                " the image generation result."
                             ),
                         },
                     },
@@ -219,9 +236,16 @@ class ImageGenerationTool(BaseTool):
             context_params = {
                 "query": "conversation_summary",
                 "max_messages": 8,  # Look at more messages for richer context
-                "focus_query": "visual elements, story details, characters, settings, artistic themes, and descriptive elements that could be visualized",
+                "focus_query": (
+                    "visual elements, story details, characters, settings,"
+                    " artistic themes, and descriptive elements that could be"
+                    " visualized"
+                ),
                 "messages": messages,
-                "but_why": "Gathering conversation context to enhance image generation prompt with relevant visual details",
+                "but_why": (
+                    "Gathering conversation context to enhance image"
+                    " generation prompt with relevant visual details"
+                ),
             }
 
             # Use the tool registry to execute conversation context tool
@@ -309,7 +333,8 @@ class ImageGenerationTool(BaseTool):
             else:
                 # Use existing custom API endpoint
                 logger.info(
-                    "Generating image with prompt: '%s', dimensions: %dx%d, cfg_scale: %.1f",
+                    "Generating image with prompt: '%s', dimensions: %dx%d,"
+                    " cfg_scale: %.1f",
                     enhanced_prompt,
                     width,
                     height,
@@ -405,7 +430,10 @@ class ImageGenerationTool(BaseTool):
                 "success": False,
                 "original_prompt": user_prompt,
                 "enhanced_prompt": enhanced_prompt,
-                "error_message": "Image generation is not configured. Please set the IMAGE_ENDPOINT environment variable.",
+                "error_message": (
+                    "Image generation is not configured. Please set the"
+                    " IMAGE_ENDPOINT environment variable."
+                ),
                 "error_code": "CONFIGURATION_ERROR",
                 "direct_response": True,
             }
@@ -435,7 +463,11 @@ class ImageGenerationTool(BaseTool):
                     "dimensions": f"{width}x{height}",
                     "cfg_scale": cfg_scale,
                     "direct_response": True,
-                    "message": f"Successfully generated {aspect_ratio} ({width}x{height}) image with cfg_scale {cfg_scale} and prompt: {enhanced_prompt}",
+                    "message": (
+                        "Successfully generated"
+                        f" {aspect_ratio} ({width}x{height}) image with"
+                        f" cfg_scale {cfg_scale} and prompt: {enhanced_prompt}"
+                    ),
                 }
 
                 # Add context info if used
@@ -468,7 +500,9 @@ class ImageGenerationTool(BaseTool):
                     "success": False,
                     "original_prompt": user_prompt,
                     "enhanced_prompt": enhanced_prompt,
-                    "error_message": f"Error processing generated image: {str(e)}",
+                    "error_message": (
+                        f"Error processing generated image: {str(e)}"
+                    ),
                     "error_code": "IMAGE_PROCESSING_ERROR",
                     "direct_response": True,
                 }
@@ -482,7 +516,10 @@ class ImageGenerationTool(BaseTool):
                 "success": False,
                 "original_prompt": user_prompt,
                 "enhanced_prompt": enhanced_prompt,
-                "error_message": "Failed to generate image. Please try again with a different prompt.",
+                "error_message": (
+                    "Failed to generate image. Please try again with a"
+                    " different prompt."
+                ),
                 "error_code": "GENERATION_FAILED",
                 "direct_response": True,
             }

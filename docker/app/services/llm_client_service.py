@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 class LLMClientService:
     """Service for providing LLM clients based on type"""
 
-    _instance: Optional['LLMClientService'] = None
+    _instance: Optional["LLMClientService"] = None
 
     def __new__(cls):
         if cls._instance is None:
@@ -46,7 +46,8 @@ class LLMClientService:
         # Skip if already initialized with same config
         if self._config is not None:
             logger.debug(
-                "LLM Client Service already initialized, skipping re-initialization"
+                "LLM Client Service already initialized, skipping"
+                " re-initialization"
             )
             return
 
@@ -92,7 +93,8 @@ class LLMClientService:
                 self._config = ChatConfig.from_environment()
             except Exception as e:
                 raise ValueError(
-                    f"LLM Client Service not initialized and failed to auto-initialize: {e}"
+                    "LLM Client Service not initialized and failed to"
+                    f" auto-initialize: {e}"
                 )
 
         # Check cache first
@@ -155,7 +157,8 @@ class LLMClientService:
                 self._config = ChatConfig.from_environment()
             except Exception as e:
                 raise ValueError(
-                    f"LLM Client Service not initialized and failed to auto-initialize: {e}"
+                    "LLM Client Service not initialized and failed to"
+                    f" auto-initialize: {e}"
                 )
 
         # Check cache first
@@ -196,7 +199,8 @@ class LLMClientService:
             # Cache the client
             self._async_clients[llm_type] = client
             logger.debug(
-                f"Created {llm_type} async LLM client with concurrent connection support"
+                f"Created {llm_type} async LLM client with concurrent"
+                " connection support"
             )
 
             return client

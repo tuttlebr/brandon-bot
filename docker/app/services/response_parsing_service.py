@@ -60,7 +60,7 @@ class ResponseParsingService:
 
     def _extract_openai_tool_calls(self, message: Any) -> List[Dict[str, Any]]:
         """Extract standard OpenAI format tool calls"""
-        if not hasattr(message, 'tool_calls') or not message.tool_calls:
+        if not hasattr(message, "tool_calls") or not message.tool_calls:
             return []
 
         tool_calls = []
@@ -79,9 +79,9 @@ class ResponseParsingService:
 
                 tool_calls.append(
                     {
-                        'name': tool_call.function.name,
-                        'arguments': parsed_args,
-                        'id': getattr(tool_call, 'id', None),
+                        "name": tool_call.function.name,
+                        "arguments": parsed_args,
+                        "id": getattr(tool_call, "id", None),
                     }
                 )
             except json.JSONDecodeError as e:
@@ -107,7 +107,7 @@ class ResponseParsingService:
             return []
 
         # Pattern for custom tool calls: <TOOLCALL-[...]</TOOLCALL>
-        pattern = r'<TOOLCALL[^>]*?\[(.*?)\]</TOOLCALL>'
+        pattern = r"<TOOLCALL[^>]*?\[(.*?)\]</TOOLCALL>"
         matches = re.findall(pattern, content, re.DOTALL | re.IGNORECASE)
 
         tool_calls = []
@@ -121,8 +121,8 @@ class ResponseParsingService:
                     for item in parsed:
                         if (
                             isinstance(item, dict)
-                            and 'name' in item
-                            and 'arguments' in item
+                            and "name" in item
+                            and "arguments" in item
                         ):
                             tool_calls.append(item)
             except json.JSONDecodeError as e:
@@ -142,10 +142,10 @@ class ResponseParsingService:
         for call in openai_calls:
             normalized.append(
                 {
-                    'name': call['name'],
-                    'arguments': call['arguments'],
-                    'source': 'openai',
-                    'id': call.get('id'),
+                    "name": call["name"],
+                    "arguments": call["arguments"],
+                    "source": "openai",
+                    "id": call.get("id"),
                 }
             )
 
@@ -153,10 +153,10 @@ class ResponseParsingService:
         for call in custom_calls:
             normalized.append(
                 {
-                    'name': call['name'],
-                    'arguments': call.get('arguments', {}),
-                    'source': 'custom',
-                    'id': None,
+                    "name": call["name"],
+                    "arguments": call.get("arguments", {}),
+                    "source": "custom",
+                    "id": None,
                 }
             )
 
@@ -169,14 +169,14 @@ class ResponseParsingService:
 
         # Remove tool call patterns
         patterns = [
-            r'<TOOLCALL[^>]*?\[.*?\]</TOOLCALL>',
-            r'<toolcall[^>]*?\[.*?\]</toolcall>',
+            r"<TOOLCALL[^>]*?\[.*?\]</TOOLCALL>",
+            r"<toolcall[^>]*?\[.*?\]</toolcall>",
         ]
 
         cleaned = content
         for pattern in patterns:
             cleaned = re.sub(
-                pattern, '', cleaned, flags=re.DOTALL | re.IGNORECASE
+                pattern, "", cleaned, flags=re.DOTALL | re.IGNORECASE
             )
 
         return cleaned.strip()

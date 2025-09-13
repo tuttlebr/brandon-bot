@@ -62,7 +62,7 @@ class DocumentAnalyzerService:
             if estimated_tokens > max_tokens:
                 logger.warning(
                     f"Document too large ({estimated_tokens} estimated "
-                    f"tokens), processing in chunks"
+                    "tokens), processing in chunks"
                 )
                 return await self._analyze_large_document_chunked(
                     document_text, instructions, document_type, filename
@@ -88,7 +88,7 @@ class DocumentAnalyzerService:
                 )
             else:
                 user_message = (
-                    f"Please analyze the following document and answer "
+                    "Please analyze the following document and answer "
                     f"this question: {instructions}\n\nDocument:\n"
                     f"{document_text}"
                 )
@@ -115,7 +115,7 @@ class DocumentAnalyzerService:
                 "success": True,
                 "result": result,
                 "processing_notes": (
-                    f"Document analysis completed for query: "
+                    "Document analysis completed for query: "
                     f"{instructions[:100]}"
                     f"{'...' if len(instructions) > 100 else ''}"
                 ),
@@ -154,7 +154,7 @@ class DocumentAnalyzerService:
             if estimated_tokens > max_tokens:
                 logger.warning(
                     f"Document too large ({estimated_tokens} estimated "
-                    f"tokens), analyzing in chunks"
+                    "tokens), analyzing in chunks"
                 )
                 return await self._analyze_large_document_chunked(
                     document_text, instructions, document_type, filename
@@ -180,7 +180,7 @@ class DocumentAnalyzerService:
                 )
             else:
                 user_message = (
-                    f"Please analyze the following document and answer "
+                    "Please analyze the following document and answer "
                     f"this question: {instructions}\n\nDocument:\n"
                     f"{document_text}"
                 )
@@ -226,7 +226,7 @@ class DocumentAnalyzerService:
                 "success": True,
                 "result": collected_result,
                 "processing_notes": (
-                    f"Document analysis completed for query: "
+                    "Document analysis completed for query: "
                     f"{instructions[:100]}"
                     f"{'...' if len(instructions) > 100 else ''}"
                 ),
@@ -308,7 +308,8 @@ class DocumentAnalyzerService:
                         f"Chunk {i+1} failed with exception: {result}"
                     )
                     chunk_results.append(
-                        f"Section {i+1} processing failed due to error: {str(result)}"
+                        f"Section {i+1} processing failed due to error:"
+                        f" {str(result)}"
                     )
                 else:
                     chunk_results.append(result)
@@ -316,7 +317,9 @@ class DocumentAnalyzerService:
             if not chunk_results:
                 return {
                     "success": False,
-                    "error": "No content could be processed from the document.",
+                    "error": (
+                        "No content could be processed from the document."
+                    ),
                 }
 
             # Combine chunk results
@@ -325,8 +328,9 @@ class DocumentAnalyzerService:
 
                 # Create final synthesis
                 synthesis_instructions = (
-                    f"Based on these analysis sections, provide a direct answer to: {instructions}. "
-                    f"Combine all relevant information into a concise response."
+                    "Based on these analysis sections, provide a direct"
+                    f" answer to: {instructions}. Combine all relevant"
+                    " information into a concise response."
                 )
 
                 return await self._analyze_single_chunk(
@@ -375,9 +379,15 @@ class DocumentAnalyzerService:
             )
 
             if filename:
-                user_message = f"Based on the document '{filename}', please answer this question: {instructions}\n\nDocument:\n{chunk_text}"
+                user_message = (
+                    f"Based on the document '{filename}', please answer this"
+                    f" question: {instructions}\n\nDocument:\n{chunk_text}"
+                )
             else:
-                user_message = f"Please analyze the following document and answer this question: {instructions}\n\nDocument:\n{chunk_text}"
+                user_message = (
+                    "Please analyze the following document and answer this"
+                    f" question: {instructions}\n\nDocument:\n{chunk_text}"
+                )
 
             messages = [
                 {"role": "system", "content": system_prompt},
@@ -398,7 +408,10 @@ class DocumentAnalyzerService:
             return {
                 "success": True,
                 "result": result,
-                "processing_notes": f"Chunk analysis completed for query: {instructions[:100]}{'...' if len(instructions) > 100 else ''}",
+                "processing_notes": (
+                    "Chunk analysis completed for query:"
+                    f" {instructions[:100]}{'...' if len(instructions) > 100 else ''}"
+                ),
             }
 
         except Exception as e:
@@ -424,14 +437,18 @@ class DocumentAnalyzerService:
         if total_pages == 0:
             return {
                 "success": False,
-                "error": "The document appears to be empty or contains no extractable text.",
+                "error": (
+                    "The document appears to be empty or contains no"
+                    " extractable text."
+                ),
             }
 
         # Categorize document and route appropriately
         doc_size = DocumentProcessor.categorize_document_size(total_pages)
 
         logger.info(
-            f"Analyzing {doc_size} document '{filename}' with {total_pages} pages"
+            f"Analyzing {doc_size} document '{filename}' with"
+            f" {total_pages} pages"
         )
 
         try:
@@ -475,9 +492,9 @@ class DocumentAnalyzerService:
         ):
             # Determine actual page numbers for this batch
             if batch_pages:
-                start_page_num = batch_pages[0].get('page', i + 1)
+                start_page_num = batch_pages[0].get("page", i + 1)
                 end_page_num = batch_pages[-1].get(
-                    'page', min(i + batch_size, len(pages))
+                    "page", min(i + batch_size, len(pages))
                 )
             else:
                 start_page_num = i + 1
@@ -488,9 +505,11 @@ class DocumentAnalyzerService:
             )
 
             batch_instruction = (
-                f"Analyze pages {start_page_num}-{end_page_num} of '{filename}' for this question: {instructions}. "
-                f"If relevant information is found, provide it with page numbers. "
-                f"If not relevant, say 'No relevant information found in these pages.'"
+                f"Analyze pages {start_page_num}-{end_page_num} of"
+                f" '{filename}' for this question: {instructions}. If relevant"
+                " information is found, provide it with page numbers. If not"
+                " relevant, say 'No relevant information found in these"
+                " pages.'"
             )
 
             result = await self.analyze_document(
@@ -538,7 +557,8 @@ class DocumentAnalyzerService:
         """Analyze large documents relevantly by processing ALL pages"""
 
         logger.info(
-            f"Starting relevant analysis of all {len(pages)} pages for '{filename}'"
+            f"Starting relevant analysis of all {len(pages)} pages for"
+            f" '{filename}'"
         )
 
         # Process ALL pages in batches for relevant analysis
@@ -552,8 +572,8 @@ class DocumentAnalyzerService:
             # Determine actual page numbers for this batch
             batch_end = min(i + batch_size, len(pages))
             if batch_pages:
-                start_page_num = batch_pages[0].get('page', i + 1)
-                end_page_num = batch_pages[-1].get('page', batch_end)
+                start_page_num = batch_pages[0].get("page", i + 1)
+                end_page_num = batch_pages[-1].get("page", batch_end)
             else:
                 start_page_num = i + 1
                 end_page_num = batch_end
@@ -563,11 +583,15 @@ class DocumentAnalyzerService:
             )
 
             batch_instruction = (
-                f"You are analyzing a chunk of a larger document. This chunk covers pages {start_page_num}-{end_page_num} of '{filename}'. "
-                f"The user's overall question is: {instructions}. "
-                f"Provide a detailed analysis of any information in this chunk that is relevant to the user's question. "
-                f"If no relevant information is found, explicitly state that this section was reviewed but contained no relevant content. "
-                f"Cite page numbers for any specific findings at the end of your response."
+                "You are analyzing a chunk of a larger document. This chunk"
+                f" covers pages {start_page_num}-{end_page_num} of"
+                f" '{filename}'. The user's overall question is:"
+                f" {instructions}. Provide a detailed analysis of any"
+                " information in this chunk that is relevant to the user's"
+                " question. If no relevant information is found, explicitly"
+                " state that this section was reviewed but contained no"
+                " relevant content. Cite page numbers for any specific"
+                " findings at the end of your response."
             )
 
             result = await self.analyze_document(
@@ -626,7 +650,8 @@ class DocumentAnalyzerService:
         # If there are many results, create intermediate summaries first
         if len(batch_results) > 1:
             logger.info(
-                f"Performing hierarchical summarization on {len(batch_results)} batch results."
+                "Performing hierarchical summarization on"
+                f" {len(batch_results)} batch results."
             )
             intermediate_summaries = []
             intermediate_batch_size = 5
@@ -635,13 +660,16 @@ class DocumentAnalyzerService:
             async def create_intermediate_summary(chunk):
                 chunk_findings = "\n\n".join(
                     [
-                        f"Analysis of pages {result['page_range']}:\n{result['analysis']}"
+                        "Analysis of pages"
+                        f" {result['page_range']}:\n{result['analysis']}"
                         for result in chunk
                     ]
                 )
                 synthesis_instruction = (
-                    f"Synthesize the following findings from a document analysis into a coherent intermediate summary. "
-                    f"Focus only on the key points related to the user's query: {instructions}"
+                    "Synthesize the following findings from a document"
+                    " analysis into a coherent intermediate summary. Focus"
+                    " only on the key points related to the user's query:"
+                    f" {instructions}"
                 )
                 return await self.analyze_document(
                     chunk_findings,
@@ -670,20 +698,26 @@ class DocumentAnalyzerService:
             # Combine intermediate summaries for the final synthesis
             combined_findings = "\n\n---\n\n".join(intermediate_summaries)
             synthesis_instruction = (
-                f"Based on these intermediate summaries from '{filename}', provide a final concise answer to: {instructions}. "
-                f"Citing page ranges where possible at the end of your response. Be sure to answer the user's question, not simply tell them where to look in the document."
+                f"Based on these intermediate summaries from '{filename}',"
+                f" provide a final concise answer to: {instructions}. Citing"
+                " page ranges where possible at the end of your response. Be"
+                " sure to answer the user's question, not simply tell them"
+                " where to look in the document."
             )
         else:
             # Format batch results for a single synthesis pass
             combined_findings = "\n\n".join(
                 [
-                    f"Analysis of pages {result['page_range']}:\n{result['analysis']}"
+                    "Analysis of pages"
+                    f" {result['page_range']}:\n{result['analysis']}"
                     for result in batch_results
                 ]
             )
             synthesis_instruction = (
-                f"Based on these analyses from '{filename}', provide a concise answer to: {instructions}. "
-                f"Synthesize all relevant information into a cohesive response. Be concise and to the point."
+                f"Based on these analyses from '{filename}', provide a concise"
+                f" answer to: {instructions}. Synthesize all relevant"
+                " information into a cohesive response. Be concise and to the"
+                " point."
             )
 
         return await self.analyze_document(

@@ -65,41 +65,42 @@ class PDFAssistantController(ToolController):
 
     async def process_async(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Process PDF operation asynchronously"""
-        operation = params.get('operation', 'query')
-        query = params.get('query')
+        operation = params.get("operation", "query")
+        query = params.get("query")
 
         # Get active PDF
         pdf_id = get_active_pdf_id()
         if not pdf_id:
             return {
-                'success': False,
-                'error': 'No PDF document found in current session',
-                'operation': operation,
-                'filename': 'None',
+                "success": False,
+                "error": "No PDF document found in current session",
+                "operation": operation,
+                "filename": "None",
             }
 
         # Get PDF metadata
         pdf_data = self.file_storage.get_pdf(pdf_id)
         if not pdf_data:
             return {
-                'success': False,
-                'error': 'PDF metadata not found',
-                'operation': operation,
-                'filename': 'Unknown',
+                "success": False,
+                "error": "PDF metadata not found",
+                "operation": operation,
+                "filename": "Unknown",
             }
 
-        filename = pdf_data.get('filename', 'Unknown')
+        filename = pdf_data.get("filename", "Unknown")
 
         # Determine operation from query if auto
-        if operation == 'auto':
+        if operation == "auto":
             operation = self._determine_operation(query)
 
         # Route to appropriate handler
         try:
-            if operation == 'summarize':
+            if operation == "summarize":
                 logger.info(f"Summarizing PDF: {filename} (pdf_id: {pdf_id})")
                 logger.debug(
-                    f"PDF data keys: {list(pdf_data.keys()) if pdf_data else 'None'}"
+                    "PDF data keys:"
+                    f" {list(pdf_data.keys()) if pdf_data else 'None'}"
                 )
 
                 # Pass the user's query as instruction for context
@@ -108,58 +109,64 @@ class PDFAssistantController(ToolController):
                 )
 
                 logger.info(
-                    f"Summarization complete. Strategy: {result.get('strategy', 'unknown')}"
+                    "Summarization complete. Strategy:"
+                    f" {result.get('strategy', 'unknown')}"
                 )
 
                 # Check if summarization failed
-                if result.get('strategy') == 'error':
+                if result.get("strategy") == "error":
                     return {
-                        'operation': 'summarize',
-                        'filename': filename,
-                        'success': False,
-                        'error': result.get(
-                            'summary', 'Unknown error during summarization'
+                        "operation": "summarize",
+                        "filename": filename,
+                        "success": False,
+                        "error": result.get(
+                            "summary", "Unknown error during summarization"
                         ),
-                        'processing_notes': 'Summarization failed',
+                        "processing_notes": "Summarization failed",
                     }
 
                 return {
-                    'operation': 'summarize',
-                    'filename': filename,
-                    'success': True,
-                    'result': result['summary'],
-                    'processing_notes': f"Used {result['strategy']} summarization strategy",
-                    'direct_response': True,
+                    "operation": "summarize",
+                    "filename": filename,
+                    "success": True,
+                    "result": result["summary"],
+                    "processing_notes": (
+                        f"Used {result['strategy']} summarization strategy"
+                    ),
+                    "direct_response": True,
                 }
 
-            elif operation == 'query':
+            elif operation == "query":
                 if not query:
                     return {
-                        'success': False,
-                        'error': 'Query text is required for Q&A',
-                        'operation': operation,
-                        'filename': filename,
+                        "success": False,
+                        "error": "Query text is required for Q&A",
+                        "operation": operation,
+                        "filename": filename,
                     }
 
                 query_result = self.query_service.query(pdf_id, query)
 
                 # Format chunks into readable response
-                if query_result['used']:
-                    chunks_text = query_result['formatted_context']
+                if query_result["used"]:
+                    chunks_text = query_result["formatted_context"]
                     result = f"\n{chunks_text}\n"
                 else:
-                    result = "No relevant sections found in the document for your query."
+                    result = (
+                        "No relevant sections found in the document for your"
+                        " query."
+                    )
 
                 return {
-                    'operation': 'query',
-                    'filename': filename,
-                    'success': True,
-                    'result': result,
-                    'used_vector_search': True,
-                    'processing_notes': f"",
+                    "operation": "query",
+                    "filename": filename,
+                    "success": True,
+                    "result": result,
+                    "used_vector_search": True,
+                    "processing_notes": f"",
                 }
 
-            elif operation == 'info':
+            elif operation == "info":
                 info = f"PDF: {filename}\n"
                 info += f"Pages: {pdf_data.get('total_pages', 'Unknown')}\n"
                 info += (
@@ -168,43 +175,43 @@ class PDFAssistantController(ToolController):
                 info += f"PDF ID: {pdf_id}"
 
                 return {
-                    'operation': 'info',
-                    'filename': filename,
-                    'success': True,
-                    'result': info,
+                    "operation": "info",
+                    "filename": filename,
+                    "success": True,
+                    "result": info,
                 }
 
             else:
                 # For now, extract and analyze operations just use query
                 return await self.process_async(
-                    {**params, 'operation': 'query'}
+                    {**params, "operation": "query"}
                 )
 
         except Exception as e:
             logger.error(f"Error in PDF operation {operation}: {e}")
             return {
-                'success': False,
-                'error': str(e),
-                'operation': operation,
-                'filename': filename,
+                "success": False,
+                "error": str(e),
+                "operation": operation,
+                "filename": filename,
             }
 
     def _determine_operation(self, query: str) -> str:
         """Determine operation type from query"""
         if not query:
-            return 'info'
+            return "info"
 
         query_lower = query.lower()
 
         # Check for summarization keywords
         if any(
             word in query_lower
-            for word in ['summary', 'summarize', 'overview', 'brief']
+            for word in ["summary", "summarize", "overview", "brief"]
         ):
-            return 'summarize'
+            return "summarize"
 
         # Default to query (Q&A)
-        return 'query'
+        return "query"
 
 
 class PDFAssistantView(ToolView):
@@ -215,14 +222,14 @@ class PDFAssistantView(ToolView):
     ) -> BaseToolResponse:
         """Format successful response"""
         return response_type(
-            success=data.get('success', True),
-            operation=data.get('operation', 'unknown'),
-            filename=data.get('filename', 'Unknown'),
-            result=data.get('result', ''),
-            pages_processed=data.get('pages_processed'),
-            used_vector_search=data.get('used_vector_search', False),
-            processing_notes=data.get('processing_notes'),
-            direct_response=data.get('direct_response', False),
+            success=data.get("success", True),
+            operation=data.get("operation", "unknown"),
+            filename=data.get("filename", "Unknown"),
+            result=data.get("result", ""),
+            pages_processed=data.get("pages_processed"),
+            used_vector_search=data.get("used_vector_search", False),
+            processing_notes=data.get("processing_notes"),
+            direct_response=data.get("direct_response", False),
         )
 
     def format_error(
@@ -232,8 +239,8 @@ class PDFAssistantView(ToolView):
         return response_type(
             success=False,
             error_message=str(error),
-            operation='error',
-            filename='Unknown',
+            operation="error",
+            filename="Unknown",
             result=f"Error processing PDF: {str(error)}",
             direct_response=False,  # Changed to show in tool context expander
         )
@@ -262,9 +269,11 @@ class PDFAssistantTool(BaseTool):
             self.name = "pdf_assistant"
             # Set the base description directly
             self.description = (
-                "Unified tool for all PDF operations. Automatically handles summarization, "
-                "Q&A, page extraction, and analysis of uploaded PDF documents. "
-                "Use this tool whenever users ask about PDFs, request summaries of PDFs, or have questions about uploaded documents."
+                "Unified tool for all PDF operations. Automatically handles"
+                " summarization, Q&A, page extraction, and analysis of"
+                " uploaded PDF documents. Use this tool whenever users ask"
+                " about PDFs, request summaries of PDFs, or have questions"
+                " about uploaded documents."
             )
             # Increase timeout for PDF operations which can take longer
             self.timeout = 120.0  # 2 minutes
@@ -273,7 +282,8 @@ class PDFAssistantTool(BaseTool):
 
             self.execution_mode = ExecutionMode.ASYNC
             logger.info(
-                f"PDFAssistantTool initialized successfully with name: {self.name}, timeout: {self.timeout}s, mode: ASYNC"
+                "PDFAssistantTool initialized successfully with name:"
+                f" {self.name}, timeout: {self.timeout}s, mode: ASYNC"
             )
             self._initialize_mvc()
         except Exception as e:
@@ -292,11 +302,14 @@ class PDFAssistantTool(BaseTool):
             pdf_info = get_active_pdf_info()
             if pdf_info:
                 return (
-                    f"IMPORTANT: A PDF is currently uploaded and active. "
-                    f"USE THIS TOOL for ANY questions about PDFs, including summarization requests. "
-                    f"Active PDF: '{pdf_info['filename']}' ({pdf_info['total_pages']} pages). "
-                    f"This tool handles: summarization, Q&A, analysis, and information extraction. "
-                    f"When users ask to 'summarize the PDF' or 'summarize the uploaded PDF', THIS is the tool to use."
+                    "IMPORTANT: A PDF is currently uploaded and active. USE"
+                    " THIS TOOL for ANY questions about PDFs, including"
+                    " summarization requests. Active PDF:"
+                    f" '{pdf_info['filename']}'"
+                    f" ({pdf_info['total_pages']} pages). This tool handles:"
+                    " summarization, Q&A, analysis, and information"
+                    " extraction. When users ask to 'summarize the PDF' or"
+                    " 'summarize the uploaded PDF', THIS is the tool to use."
                 )
 
         return self.description
@@ -343,25 +356,34 @@ class PDFAssistantTool(BaseTool):
                             "type": "string",
                             "default": "Please summarize the PDF",
                             "description": (
-                                "User's question or instruction. Required for query, analyze, and auto operations. "
-                                "For summarize, this can specify what aspect to focus on."
+                                "User's question or instruction. Required for"
+                                " query, analyze, and auto operations. For"
+                                " summarize, this can specify what aspect to"
+                                " focus on."
                             ),
                         },
                         "page_numbers": {
                             "type": "array",
                             "items": {"type": "integer"},
-                            "description": "Specific page numbers for extraction (optional)",
+                            "description": (
+                                "Specific page numbers for extraction"
+                                " (optional)"
+                            ),
                         },
                         "summary_type": {
                             "type": "string",
                             "enum": ["pages", "all"],
                             "default": "all",
-                            "description": "Type of summary for summarize operation",
+                            "description": (
+                                "Type of summary for summarize operation"
+                            ),
                         },
                         "max_chunks": {
                             "type": "integer",
                             "default": 10,
-                            "description": "Maximum chunks to retrieve for Q&A (advanced)",
+                            "description": (
+                                "Maximum chunks to retrieve for Q&A (advanced)"
+                            ),
                         },
                     },
                     "required": ["operation", "query"],

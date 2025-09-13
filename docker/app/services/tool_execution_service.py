@@ -168,7 +168,8 @@ class ToolExecutionService:
         )
 
         logger.info(
-            f"Executing tool '{tool_name}' with args: {list(modified_args.keys())}"
+            f"Executing tool '{tool_name}' with args:"
+            f" {list(modified_args.keys())}"
         )
 
         # Check if tool has async implementation to avoid deadlock
@@ -176,19 +177,20 @@ class ToolExecutionService:
 
         tool = get_tool(tool_name)
         has_async = (
-            tool and hasattr(tool._controller, 'process_async')
-            if hasattr(tool, '_controller')
+            tool and hasattr(tool._controller, "process_async")
+            if hasattr(tool, "_controller")
             else False
         )
 
         if has_async:
             # For async tools, execute the controller directly to avoid event loop deadlock
             logger.info(
-                f"Tool '{tool_name}' has async implementation, executing controller directly"
+                f"Tool '{tool_name}' has async implementation, executing"
+                " controller directly"
             )
             try:
                 # Validate parameters (normally done in BaseTool.execute)
-                if hasattr(tool, '_validate_params'):
+                if hasattr(tool, "_validate_params"):
                     tool._validate_params(modified_args)
 
                 # Execute the async controller method directly
@@ -202,7 +204,7 @@ class ToolExecutionService:
                     f"Error executing async tool {tool_name}: {e}",
                     exc_info=True,
                 )
-                if hasattr(tool, '_view'):
+                if hasattr(tool, "_view"):
                     result = tool._view.format_error(
                         e, tool.get_response_type()
                     )
@@ -284,7 +286,8 @@ class ToolExecutionService:
                 # When multiple tools are called, disable conversation context for image generation
                 # to prevent confusion from other tool contexts
                 logger.info(
-                    "Multi-tool call detected: disabling conversation context for image generation"
+                    "Multi-tool call detected: disabling conversation context"
+                    " for image generation"
                 )
                 modified_args["use_conversation_context"] = False
             else:
@@ -312,7 +315,8 @@ class ToolExecutionService:
                 and user_content
             ):
                 logger.info(
-                    f"Adding user question as instructions for PDF analysis: {user_content}"
+                    "Adding user question as instructions for PDF analysis:"
+                    f" {user_content}"
                 )
                 modified_args["instructions"] = user_content
 
@@ -322,21 +326,24 @@ class ToolExecutionService:
                 import streamlit as st
 
                 if (
-                    hasattr(st.session_state, 'current_image_base64')
+                    hasattr(st.session_state, "current_image_base64")
                     and st.session_state.current_image_base64
                 ):
                     modified_args["image_base64"] = (
                         st.session_state.current_image_base64
                     )
                     modified_args["filename"] = getattr(
-                        st.session_state, 'current_image_filename', 'Unknown'
+                        st.session_state, "current_image_filename", "Unknown"
                     )
                     logger.info(
-                        f"Successfully added image data to analyze_image arguments - filename: {modified_args['filename']}, data length: {len(modified_args['image_base64'])}"
+                        "Successfully added image data to analyze_image"
+                        f" arguments - filename: {modified_args['filename']},"
+                        f" data length: {len(modified_args['image_base64'])}"
                     )
                 else:
                     logger.warning(
-                        "No image data found in session state for analyze_image tool"
+                        "No image data found in session state for"
+                        " analyze_image tool"
                     )
 
                     # Try to get from session controller as fallback
@@ -349,15 +356,16 @@ class ToolExecutionService:
                         latest_image = (
                             session_controller.get_latest_uploaded_image()
                         )
-                        if latest_image and latest_image.get('image_data'):
+                        if latest_image and latest_image.get("image_data"):
                             modified_args["image_base64"] = latest_image[
-                                'image_data'
+                                "image_data"
                             ]
                             modified_args["filename"] = latest_image.get(
-                                'filename', 'Unknown'
+                                "filename", "Unknown"
                             )
                             logger.info(
-                                f"Retrieved image from session controller - filename: {modified_args['filename']}"
+                                "Retrieved image from session controller -"
+                                f" filename: {modified_args['filename']}"
                             )
                         else:
                             logger.warning(
@@ -379,21 +387,24 @@ class ToolExecutionService:
                 import streamlit as st
 
                 if (
-                    hasattr(st.session_state, 'current_image_base64')
+                    hasattr(st.session_state, "current_image_base64")
                     and st.session_state.current_image_base64
                 ):
                     modified_args["image_base64"] = (
                         st.session_state.current_image_base64
                     )
                     modified_args["filename"] = getattr(
-                        st.session_state, 'current_image_filename', 'Unknown'
+                        st.session_state, "current_image_filename", "Unknown"
                     )
                     logger.info(
-                        f"Successfully added image data to context_generation arguments - filename: {modified_args['filename']}, data length: {len(modified_args['image_base64'])}"
+                        "Successfully added image data to context_generation"
+                        f" arguments - filename: {modified_args['filename']},"
+                        f" data length: {len(modified_args['image_base64'])}"
                     )
                 else:
                     logger.warning(
-                        "No image data found in session state for context_generation tool"
+                        "No image data found in session state for"
+                        " context_generation tool"
                     )
 
                     # Try to get from session controller as fallback
@@ -406,29 +417,34 @@ class ToolExecutionService:
                         latest_image = (
                             session_controller.get_latest_uploaded_image()
                         )
-                        if latest_image and latest_image.get('image_data'):
+                        if latest_image and latest_image.get("image_data"):
                             modified_args["image_base64"] = latest_image[
-                                'image_data'
+                                "image_data"
                             ]
                             modified_args["filename"] = latest_image.get(
-                                'filename', 'Unknown'
+                                "filename", "Unknown"
                             )
                             logger.info(
-                                f"Retrieved image from session controller for context_generation - filename: {modified_args['filename']}"
+                                "Retrieved image from session controller for"
+                                " context_generation - filename:"
+                                f" {modified_args['filename']}"
                             )
                         else:
                             logger.warning(
-                                "No image found in session controller either for context_generation"
+                                "No image found in session controller either"
+                                " for context_generation"
                             )
                     except Exception as e:
                         logger.error(
-                            "Error accessing session controller for context_generation: %s",
+                            "Error accessing session controller for"
+                            " context_generation: %s",
                             e,
                         )
 
             except Exception as e:
                 logger.error(
-                    "Error accessing session state for context_generation image data: %s",
+                    "Error accessing session state for context_generation"
+                    " image data: %s",
                     e,
                 )
 

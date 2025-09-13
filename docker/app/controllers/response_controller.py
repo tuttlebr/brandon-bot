@@ -212,7 +212,7 @@ class ResponseController:
 
                 # Check for progress markers
                 progress_match = re.search(
-                    r'<<<PROGRESS:([0-9.]+):(.+?)>>>', chunk
+                    r"<<<PROGRESS:([0-9.]+):(.+?)>>>", chunk
                 )
                 if progress_match:
                     # Extract progress info
@@ -238,7 +238,7 @@ class ResponseController:
                         progress_text.markdown(f"*{progress_message}*")
 
                     # Remove progress marker from chunk before processing
-                    chunk = re.sub(r'<<<PROGRESS:[0-9.]+:.+?>>>', '', chunk)
+                    chunk = re.sub(r"<<<PROGRESS:[0-9.]+:.+?>>>", "", chunk)
 
                 # Process chunk through streaming filter
                 filtered_chunk = think_filter.process_chunk(chunk)
@@ -301,7 +301,7 @@ class ResponseController:
         # This method handles post-streaming tasks
 
         # Get the full response that was streamed
-        full_response = getattr(self, '_full_response', "")
+        full_response = getattr(self, "_full_response", "")
 
         # Add response to chat history if there's text content
         if full_response and full_response.strip():
@@ -322,7 +322,7 @@ class ResponseController:
         logging.debug("Checking for image generation response")
 
         if (
-            not hasattr(self.llm_service, 'last_tool_responses')
+            not hasattr(self.llm_service, "last_tool_responses")
             or not self.llm_service.last_tool_responses
         ):
             logging.debug("No tool responses found")
@@ -337,20 +337,20 @@ class ResponseController:
                 try:
                     tool_result = tool_response.get("tool_result")
 
-                    if tool_result and hasattr(tool_result, 'success'):
+                    if tool_result and hasattr(tool_result, "success"):
                         response_data = {
                             "success": tool_result.success,
                             "image_data": getattr(
-                                tool_result, 'image_data', None
+                                tool_result, "image_data", None
                             ),
                             "original_prompt": getattr(
-                                tool_result, 'original_prompt', ''
+                                tool_result, "original_prompt", ""
                             ),
                             "enhanced_prompt": getattr(
-                                tool_result, 'enhanced_prompt', ''
+                                tool_result, "enhanced_prompt", ""
                             ),
                             "error_message": getattr(
-                                tool_result, 'error_message', None
+                                tool_result, "error_message", None
                             ),
                         }
 
@@ -532,7 +532,7 @@ class ResponseController:
 
         # First, check LLM service's last tool responses
         if (
-            hasattr(self.llm_service, 'last_tool_responses')
+            hasattr(self.llm_service, "last_tool_responses")
             and self.llm_service.last_tool_responses
         ):
             for tool_response in self.llm_service.last_tool_responses:
@@ -798,7 +798,7 @@ class ResponseController:
             return "\n\n".join(context_parts)
         else:
             return (
-                f"**PDF Query Result:** "
+                "**PDF Query Result:** "
                 f"{tool_data.get('message', 'No content found')}"
             )
 
@@ -809,7 +809,7 @@ class ResponseController:
         Returns:
             List of UI element dictionaries
         """
-        if hasattr(self.llm_service, 'last_ui_elements'):
+        if hasattr(self.llm_service, "last_ui_elements"):
             return self.llm_service.last_ui_elements
         return []
 
@@ -876,7 +876,7 @@ class ResponseController:
                             "Stored generated image in session state - "
                             "image_id: %s, data length: %s",
                             image_id,
-                            len(image_data['image_data']),
+                            len(image_data["image_data"]),
                         )
 
                         # Create history message for the image

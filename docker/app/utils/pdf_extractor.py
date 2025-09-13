@@ -44,7 +44,8 @@ class PDFDataExtractor:
                     if data.get("type") == "pdf_data" and data.get("pages"):
                         # Found PDF data in system message
                         logger.debug(
-                            f"Found PDF data in system message: {data.get('filename')}"
+                            "Found PDF data in system message:"
+                            f" {data.get('filename')}"
                         )
                         return {
                             "filename": data.get("filename", "Unknown"),
@@ -59,7 +60,8 @@ class PDFDataExtractor:
                         "batch_processed"
                     ):
                         logger.debug(
-                            f"Found batch-processed PDF in system message: {data.get('filename')}"
+                            "Found batch-processed PDF in system message:"
+                            f" {data.get('filename')}"
                         )
                         return {
                             "filename": data.get("filename", "Unknown"),
@@ -83,7 +85,8 @@ class PDFDataExtractor:
                     )
                     if pdf_data:
                         logger.debug(
-                            f"Found PDF data in context message: {pdf_data.get('filename')}"
+                            "Found PDF data in context message:"
+                            f" {pdf_data.get('filename')}"
                         )
                         return pdf_data
 
@@ -94,7 +97,7 @@ class PDFDataExtractor:
     def _parse_pdf_context_message(content: str) -> Optional[Dict[str, Any]]:
         """Parse PDF content from context message format"""
         try:
-            lines = content.split('\n')
+            lines = content.split("\n")
             filename = None
             pages = []
             in_pdf_content = False
@@ -116,7 +119,7 @@ class PDFDataExtractor:
                         pages.append(
                             {
                                 "page": current_page,
-                                "text": '\n'.join(current_page_text).strip(),
+                                "text": "\n".join(current_page_text).strip(),
                             }
                         )
                 elif in_pdf_content:
@@ -126,9 +129,9 @@ class PDFDataExtractor:
                             pages.append(
                                 {
                                     "page": current_page,
-                                    "text": '\n'.join(
-                                        current_page_text
-                                    ).strip(),
+                                    "text": (
+                                        "\n".join(current_page_text).strip()
+                                    ),
                                 }
                             )
                         # Start new page
@@ -144,7 +147,8 @@ class PDFDataExtractor:
 
             if pages:
                 logger.info(
-                    f"Extracted PDF data from context message: {filename} with {len(pages)} pages"
+                    f"Extracted PDF data from context message: {filename} with"
+                    f" {len(pages)} pages"
                 )
                 return {"filename": filename or "Unknown", "pages": pages}
 

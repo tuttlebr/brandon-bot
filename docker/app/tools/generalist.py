@@ -31,7 +31,9 @@ class GeneralistResponse(BaseToolResponse):
     response: str = Field(description="The conversational response")
     direct_response: bool = Field(
         default=True,
-        description="Flag indicating this response should be returned directly to user",
+        description=(
+            "Flag indicating this response should be returned directly to user"
+        ),
     )
 
 
@@ -41,7 +43,9 @@ class StreamingGeneralistResponse(StreamingToolResponse):
     query: str = Field(description="The original user query, VERBATIM only.")
     direct_response: bool = Field(
         default=True,
-        description="Flag indicating this response should be returned directly to user",
+        description=(
+            "Flag indicating this response should be returned directly to user"
+        ),
     )
 
 
@@ -53,8 +57,8 @@ class GeneralistController(ToolController):
 
     def process(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Process the generalist conversation request"""
-        query = params['query']
-        messages = params.get('messages')
+        query = params["query"]
+        messages = params.get("messages")
 
         try:
             # Get LLM client and model based on tool configuration
@@ -95,8 +99,8 @@ class GeneralistController(ToolController):
 
     async def process_async(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Process the generalist conversation request asynchronously with streaming"""
-        query = params['query']
-        messages = params.get('messages')
+        query = params["query"]
+        messages = params.get("messages")
 
         try:
             # Create streaming generator
@@ -132,7 +136,9 @@ class GeneralistController(ToolController):
 
             system_prompt = get_tool_system_prompt(
                 "generalist_conversation",
-                "you're a helpful assistant that can answer questions and help with tasks or just chat. This tool needs the user's message, verbatim.",
+                "you're a helpful assistant that can answer questions and help"
+                " with tasks or just chat. This tool needs the user's message,"
+                " verbatim.",
             )
 
             # Build conversation messages
@@ -141,7 +147,8 @@ class GeneralistController(ToolController):
             )
 
             logger.debug(
-                f"Generating streaming conversational response using {model_name}"
+                "Generating streaming conversational response using"
+                f" {model_name}"
             )
 
             # Generate response with streaming
@@ -271,7 +278,10 @@ class GeneralistView(ToolView):
 
         return GeneralistResponse(
             query="",
-            response=f"I apologize, but I encountered an error while processing your message: {str(error)}",
+            response=(
+                "I apologize, but I encountered an error while processing"
+                f" your message: {str(error)}"
+            ),
             success=False,
             error_message=str(error),
             error_code=error_code,
@@ -299,9 +309,9 @@ class GeneralistTool(BaseTool):
             "discussions, advice, creative writing, and casual chat."
         )
         self.supported_contexts = [
-            'general_conversation',
-            'discussion',
-            'explanation',
+            "general_conversation",
+            "discussion",
+            "explanation",
         ]
         self.execution_mode = ExecutionMode.AUTO  # Support both sync and async
         self.timeout = 30.0

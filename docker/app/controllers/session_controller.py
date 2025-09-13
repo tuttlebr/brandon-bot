@@ -85,7 +85,7 @@ class SessionController:
             )
             if not validation_result.is_valid:
                 logging.warning(
-                    f"Session validation warnings: "
+                    "Session validation warnings: "
                     f"{validation_result.get_error_messages()}"
                 )
 
@@ -96,7 +96,7 @@ class SessionController:
             if not hasattr(st.session_state, "current_page"):
                 st.session_state.current_page = config.ui.CURRENT_PAGE_DEFAULT
                 logging.info(
-                    f"Initialized current_page to "
+                    "Initialized current_page to "
                     f"{config.ui.CURRENT_PAGE_DEFAULT}"
                 )
 
@@ -115,7 +115,7 @@ class SessionController:
 
             st.session_state.system_prompt = get_system_prompt()
             logging.info(
-                f"Initialized system prompt with available tools "
+                "Initialized system prompt with available tools "
                 f"({len(st.session_state.system_prompt)} chars)"
             )
 
@@ -134,7 +134,7 @@ class SessionController:
     def _get_or_create_session_id(self) -> str:
         """Get existing session ID or create new one"""
         if (
-            hasattr(st.session_state, 'session_id')
+            hasattr(st.session_state, "session_id")
             and st.session_state.session_id
         ):
             return st.session_state.session_id
@@ -145,7 +145,7 @@ class SessionController:
 
     def _get_or_create_user_id(self) -> str:
         """Get existing user ID or create new one"""
-        if hasattr(st.session_state, 'user_id') and st.session_state.user_id:
+        if hasattr(st.session_state, "user_id") and st.session_state.user_id:
             return st.session_state.user_id
 
         return f"user_{int(time.time() * 1000)}_{random.randint(100, 999)}"
@@ -161,7 +161,7 @@ class SessionController:
             setattr(st.session_state, key, value)
 
         for key, value in user_data.items():
-            if not key.startswith('session_'):  # Avoid duplication
+            if not key.startswith("session_"):  # Avoid duplication
                 setattr(st.session_state, f"user_{key}", value)
 
     def get_current_session(self) -> Session:
@@ -173,44 +173,44 @@ class SessionController:
         """
         if self._current_session is None:
             # Load from session state
-            if hasattr(st.session_state, 'session_id'):
+            if hasattr(st.session_state, "session_id"):
                 session_data = {
-                    'session_id': getattr(st.session_state, 'session_id', ''),
-                    'user_id': getattr(st.session_state, 'user_id', ''),
-                    'status': getattr(
-                        st.session_state, 'status', SessionStatus.ACTIVE
+                    "session_id": getattr(st.session_state, "session_id", ""),
+                    "user_id": getattr(st.session_state, "user_id", ""),
+                    "status": getattr(
+                        st.session_state, "status", SessionStatus.ACTIVE
                     ),
-                    'processing_status': getattr(
+                    "processing_status": getattr(
                         st.session_state,
-                        'processing_status',
+                        "processing_status",
                         ProcessingStatus.IDLE,
                     ),
-                    'message_count': getattr(
-                        st.session_state, 'message_count', 0
+                    "message_count": getattr(
+                        st.session_state, "message_count", 0
                     ),
-                    'uploaded_files': getattr(
-                        st.session_state, 'uploaded_files', []
+                    "uploaded_files": getattr(
+                        st.session_state, "uploaded_files", []
                     ),
-                    'context_data': getattr(
-                        st.session_state, 'context_data', {}
+                    "context_data": getattr(
+                        st.session_state, "context_data", {}
                     ),
-                    'llm_model_name': getattr(
-                        st.session_state, 'llm_model_name', ''
+                    "llm_model_name": getattr(
+                        st.session_state, "llm_model_name", ""
                     ),
-                    'fast_llm_model_name': getattr(
-                        st.session_state, 'fast_llm_model_name', ''
+                    "fast_llm_model_name": getattr(
+                        st.session_state, "fast_llm_model_name", ""
                     ),
-                    'intelligent_llm_model_name': getattr(
-                        st.session_state, 'intelligent_llm_model_name', ''
+                    "intelligent_llm_model_name": getattr(
+                        st.session_state, "intelligent_llm_model_name", ""
                     ),
-                    'vlm_model_name': getattr(
-                        st.session_state, 'vlm_model_name', ''
+                    "vlm_model_name": getattr(
+                        st.session_state, "vlm_model_name", ""
                     ),
-                    'created_at': getattr(
-                        st.session_state, 'created_at', time.time()
+                    "created_at": getattr(
+                        st.session_state, "created_at", time.time()
                     ),
-                    'updated_at': getattr(
-                        st.session_state, 'updated_at', time.time()
+                    "updated_at": getattr(
+                        st.session_state, "updated_at", time.time()
                     ),
                 }
 
@@ -238,21 +238,21 @@ class SessionController:
         if self._current_user is None:
             # Load from session state
             user_data = {
-                'user_id': getattr(
+                "user_id": getattr(
                     st.session_state,
-                    'user_user_id',
-                    getattr(st.session_state, 'user_id', 'anonymous'),
+                    "user_user_id",
+                    getattr(st.session_state, "user_id", "anonymous"),
                 ),
-                'session_id': getattr(st.session_state, 'session_id', ''),
-                'role': getattr(st.session_state, 'user_role', UserRole.USER),
-                'preferences': getattr(
-                    st.session_state, 'user_preferences', {}
+                "session_id": getattr(st.session_state, "session_id", ""),
+                "role": getattr(st.session_state, "user_role", UserRole.USER),
+                "preferences": getattr(
+                    st.session_state, "user_preferences", {}
                 ),
-                'message_count': getattr(
-                    st.session_state, 'user_message_count', 0
+                "message_count": getattr(
+                    st.session_state, "user_message_count", 0
                 ),
-                'session_count': getattr(
-                    st.session_state, 'user_session_count', 0
+                "session_count": getattr(
+                    st.session_state, "user_session_count", 0
                 ),
             }
 
@@ -261,7 +261,7 @@ class SessionController:
             except Exception as e:
                 logging.error("Error loading user from state: %s", e)
                 # Create default user
-                self._current_user = User(user_id=user_data['user_id'])
+                self._current_user = User(user_id=user_data["user_id"])
 
         return self._current_user
 
@@ -324,7 +324,7 @@ class SessionController:
 
         # Generate file ID
         file_id = f"file_{int(time.time() * 1000)}_{random.randint(100, 999)}"
-        file_size = getattr(file_data, 'size', 0) if file_data else 0
+        file_size = getattr(file_data, "size", 0) if file_data else 0
 
         # Add file to session
         file_info = session.add_uploaded_file(
@@ -443,7 +443,7 @@ class SessionController:
             The system prompt with full tools list
         """
         # Get from session state if available
-        system_prompt = getattr(st.session_state, 'system_prompt', None)
+        system_prompt = getattr(st.session_state, "system_prompt", None)
 
         # If not in session state, get it and store it
         if not system_prompt:
@@ -462,7 +462,7 @@ class SessionController:
 
     def clear_tool_context(self) -> None:
         """Clear tool context from session state"""
-        if hasattr(st.session_state, 'last_tool_context'):
+        if hasattr(st.session_state, "last_tool_context"):
             st.session_state.last_tool_context = None
 
     def store_generated_image(
@@ -484,7 +484,7 @@ class SessionController:
             image_data, enhanced_prompt, original_prompt, session.session_id
         )
 
-        if 'stored_images' not in st.session_state:
+        if "stored_images" not in st.session_state:
             st.session_state.stored_images = []
         st.session_state.stored_images.append(image_id)
 
@@ -546,7 +546,7 @@ class SessionController:
         if not hasattr(st.session_state, "messages"):
             # Use system prompt from session state if available,
             # otherwise get it
-            system_prompt = getattr(st.session_state, 'system_prompt', None)
+            system_prompt = getattr(st.session_state, "system_prompt", None)
             if not system_prompt:
                 system_prompt = get_system_prompt()
                 st.session_state.system_prompt = system_prompt
@@ -602,7 +602,7 @@ class SessionController:
             filename, pdf_data, session.session_id
         )
 
-        if 'stored_pdfs' not in st.session_state:
+        if "stored_pdfs" not in st.session_state:
             st.session_state.stored_pdfs = []
         st.session_state.stored_pdfs.append(pdf_id)
 
@@ -630,7 +630,7 @@ class SessionController:
             PDF data dictionary or None
         """
         if (
-            not hasattr(st.session_state, 'stored_pdfs')
+            not hasattr(st.session_state, "stored_pdfs")
             or not st.session_state.stored_pdfs
         ):
             return None
@@ -640,21 +640,21 @@ class SessionController:
 
         if hasattr(st.session_state, batch_info_key):
             batch_info = getattr(st.session_state, batch_info_key)
-            if batch_info.get('batch_processed', False):
+            if batch_info.get("batch_processed", False):
                 return {
-                    'pdf_id': latest_pdf_id,
-                    'filename': batch_info.get('filename', 'Unknown'),
-                    'total_pages': batch_info.get('total_pages', 0),
-                    'batch_processed': True,
-                    'total_batches': batch_info.get('total_batches', 0),
-                    'pages': [],
+                    "pdf_id": latest_pdf_id,
+                    "filename": batch_info.get("filename", "Unknown"),
+                    "total_pages": batch_info.get("total_pages", 0),
+                    "batch_processed": True,
+                    "total_batches": batch_info.get("total_batches", 0),
+                    "pages": [],
                 }
 
         return self.file_storage.get_pdf(latest_pdf_id)
 
     def clear_pdf_documents(self) -> None:
         """Clear all PDF documents from session"""
-        if hasattr(st.session_state, 'stored_pdfs'):
+        if hasattr(st.session_state, "stored_pdfs"):
             st.session_state.stored_pdfs = []
             logging.info(
                 "Cleared all PDF document references from session state"
@@ -667,7 +667,7 @@ class SessionController:
             True if PDFs are available, False otherwise
         """
         return (
-            hasattr(st.session_state, 'stored_pdfs')
+            hasattr(st.session_state, "stored_pdfs")
             and len(st.session_state.stored_pdfs) > 0
         )
 
@@ -690,7 +690,7 @@ class SessionController:
             image_data, filename, file_type, session.session_id
         )
 
-        if 'stored_images' not in st.session_state:
+        if "stored_images" not in st.session_state:
             st.session_state.stored_images = []
         st.session_state.stored_images.append(image_id)
 
@@ -720,7 +720,7 @@ class SessionController:
             Image data dictionary or None
         """
         if (
-            not hasattr(st.session_state, 'stored_images')
+            not hasattr(st.session_state, "stored_images")
             or not st.session_state.stored_images
         ):
             return None
@@ -730,7 +730,7 @@ class SessionController:
 
     def clear_uploaded_images(self) -> None:
         """Clear all uploaded images from session"""
-        if hasattr(st.session_state, 'stored_images'):
+        if hasattr(st.session_state, "stored_images"):
             st.session_state.stored_images = []
             logging.info(
                 "Cleared all uploaded image references from session state"
@@ -744,6 +744,6 @@ class SessionController:
             True if images are available, False otherwise
         """
         return (
-            hasattr(st.session_state, 'stored_images')
+            hasattr(st.session_state, "stored_images")
             and len(st.session_state.stored_images) > 0
         )

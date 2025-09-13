@@ -32,7 +32,7 @@ def handle_pdf_upload(uploaded_file) -> Optional[Dict[str, Any]]:
 
     try:
         # Get session ID from Streamlit
-        session_id = st.session_state.get('session_id', 'default')
+        session_id = st.session_state.get("session_id", "default")
         set_session_id(session_id)
 
         filename = uploaded_file.name
@@ -48,7 +48,7 @@ def handle_pdf_upload(uploaded_file) -> Optional[Dict[str, Any]]:
             )
 
         if not success:
-            error_msg = pdf_data.get('error', 'Failed to extract PDF text')
+            error_msg = pdf_data.get("error", "Failed to extract PDF text")
             st.error(f"❌ {error_msg}")
             return None
 
@@ -69,22 +69,22 @@ def handle_pdf_upload(uploaded_file) -> Optional[Dict[str, Any]]:
         )
 
         # Set as active PDF
-        pdf_id = result['pdf_id']
+        pdf_id = result["pdf_id"]
         set_active_pdf_id(pdf_id)
 
         # Store in session state for UI
-        st.session_state['active_pdf'] = {
-            'pdf_id': pdf_id,
-            'filename': filename,
-            'total_pages': result['total_pages'],
-            'char_count': result['char_count'],
-            'chunk_count': result['chunk_count'],
+        st.session_state["active_pdf"] = {
+            "pdf_id": pdf_id,
+            "filename": filename,
+            "total_pages": result["total_pages"],
+            "char_count": result["char_count"],
+            "chunk_count": result["chunk_count"],
         }
 
         logger.info(f"PDF ingestion complete: {result}")
 
         # Display success message
-        if result.get('skipped_existing'):
+        if result.get("skipped_existing"):
             st.success(f"✅ PDF already exists, using existing: {filename}")
             st.info(
                 f"📄 **{filename}** (Already Processed)\n"
@@ -92,9 +92,9 @@ def handle_pdf_upload(uploaded_file) -> Optional[Dict[str, Any]]:
                 f"- Characters: {result['char_count']:,}\n"
                 f"- Chunks: {result['chunk_count']}\n"
                 f"- PDF ID: `{pdf_id}`\n"
-                f"- Status: Using existing document chunks"
+                "- Status: Using existing document chunks"
             )
-        elif result.get('replaced_existing'):
+        elif result.get("replaced_existing"):
             st.success(f"✅ Successfully replaced existing PDF: {filename}")
             st.info(
                 f"📄 **{filename}** (Updated)\n"
@@ -124,10 +124,10 @@ def handle_pdf_upload(uploaded_file) -> Optional[Dict[str, Any]]:
 def clear_active_pdf():
     """Clear the active PDF from session state"""
     set_active_pdf_id(None)
-    if 'active_pdf' in st.session_state:
-        del st.session_state['active_pdf']
+    if "active_pdf" in st.session_state:
+        del st.session_state["active_pdf"]
 
 
 def get_active_pdf_info() -> Optional[Dict[str, Any]]:
     """Get information about the currently active PDF"""
-    return st.session_state.get('active_pdf')
+    return st.session_state.get("active_pdf")

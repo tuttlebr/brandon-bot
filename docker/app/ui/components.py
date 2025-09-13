@@ -76,8 +76,8 @@ class ChatHistoryComponent:
                             # Get image data from file storage
                             image_info = self.file_storage.get_image(image_id)
 
-                            if image_info and 'image_data' in image_info:
-                                image_data = image_info['image_data']
+                            if image_info and "image_data" in image_info:
+                                image_data = image_info["image_data"]
 
                                 # Convert base64 back to PIL Image for display
                                 image = base64_to_pil_image(image_data)
@@ -89,17 +89,20 @@ class ChatHistoryComponent:
                                     )
                                 else:
                                     logging.error(
-                                        f"Failed to convert image data for image_id: {image_id}"
+                                        "Failed to convert image data for"
+                                        f" image_id: {image_id}"
                                     )
                                     st.info(
-                                        "🖼️ Image could not be displayed (conversion error)"
+                                        "🖼️ Image could not be displayed"
+                                        " (conversion error)"
                                     )
                             else:
                                 logging.warning(
                                     f"Image not found in storage: {image_id}"
                                 )
                                 st.info(
-                                    "🖼️ Image not available (may have been removed)"
+                                    "🖼️ Image not available (may have been"
+                                    " removed)"
                                 )
 
                         except Exception as e:
@@ -130,7 +133,7 @@ class ChatHistoryComponent:
                     message["role"] == "assistant"
                     and i == len(display_messages[start_idx:end_idx]) - 1
                     and hasattr(
-                        st.session_state, 'last_tool_context'
+                        st.session_state, "last_tool_context"
                     )  # Last message in current page
                     and st.session_state.last_tool_context
                     and not st.session_state.get(

@@ -11,7 +11,7 @@ from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 class BatchProcessor:
@@ -114,10 +114,10 @@ class DocumentProcessor:
         formatted_pages = []
 
         for i, page in enumerate(pages):
-            page_num = page.get('page')
+            page_num = page.get("page")
             if page_num is None:
                 page_num = i + 1
-            page_text = page.get('text', '')
+            page_text = page.get("text", "")
 
             if max_chars_per_page and len(page_text) > max_chars_per_page:
                 page_text = page_text[:max_chars_per_page] + "..."

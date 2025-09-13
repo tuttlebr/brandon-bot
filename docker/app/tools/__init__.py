@@ -34,7 +34,6 @@ from .news import NewsTool
 from .news import SerpAPINewsResponse as NewsResponse
 from .news import get_news_tool_definition
 
-
 # Import registry functions
 from .registry import (
     execute_tool,

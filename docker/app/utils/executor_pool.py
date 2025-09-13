@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class ExecutorPool:
     """Singleton executor pool for shared use across services"""
 
-    _instance: Optional['ExecutorPool'] = None
+    _instance: Optional["ExecutorPool"] = None
     _executor: Optional[concurrent.futures.ThreadPoolExecutor] = None
 
     def __new__(cls):

@@ -69,7 +69,8 @@ class TextProcessorService:
 
             if estimated_tokens > max_tokens:
                 logger.warning(
-                    f"Text too large ({estimated_tokens} estimated tokens), processing in chunks"
+                    f"Text too large ({estimated_tokens} estimated tokens),"
+                    " processing in chunks"
                 )
                 return await self._process_large_text_chunked(
                     task_type, text, instructions, messages
@@ -91,7 +92,8 @@ class TextProcessorService:
                 ]
 
             logger.info(
-                f"Processing text with {task_type} using {model_name} - Text length: {len(text)} chars"
+                f"Processing text with {task_type} using {model_name} - Text"
+                f" length: {len(text)} chars"
             )
 
             # Log message details
@@ -100,12 +102,14 @@ class TextProcessorService:
                 len(msg.get("content", "")) for msg in final_messages
             )
             logger.info(
-                f"📤 Sending to LLM endpoint: {num_messages} messages, ~{total_chars} total chars"
+                f"📤 Sending to LLM endpoint: {num_messages} messages,"
+                f" ~{total_chars} total chars"
             )
             logger.info("   Model: %s", model_name)
             logger.info("   Task: %s", task_type)
             logger.debug(
-                f"   System prompt preview: {final_messages[0]['content'][:100]}..."
+                "   System prompt preview:"
+                f" {final_messages[0]['content'][:100]}..."
             )
 
             # Add timeout to prevent hanging
@@ -127,7 +131,10 @@ class TextProcessorService:
                 )
                 return {
                     "success": False,
-                    "error": "Request timed out - the document might be too large or the service is slow",
+                    "error": (
+                        "Request timed out - the document might be too large"
+                        " or the service is slow"
+                    ),
                     "task_type": task_type,
                 }
 
@@ -179,7 +186,8 @@ class TextProcessorService:
 
             if estimated_tokens > max_tokens:
                 logger.warning(
-                    f"Text too large ({estimated_tokens} estimated tokens), processing in chunks"
+                    f"Text too large ({estimated_tokens} estimated tokens),"
+                    " processing in chunks"
                 )
                 return await self._process_large_text_chunked(
                     task_type, text, instructions, messages
@@ -201,7 +209,8 @@ class TextProcessorService:
                 ]
 
             logger.info(
-                f"Processing text with streaming {task_type} using {model_name}"
+                f"Processing text with streaming {task_type} using"
+                f" {model_name}"
             )
 
             # Log message details for streaming
@@ -210,12 +219,14 @@ class TextProcessorService:
                 len(msg.get("content", "")) for msg in final_messages
             )
             logger.info(
-                f"📤 Sending to LLM endpoint (streaming): {num_messages} messages, ~{total_chars} total chars"
+                "📤 Sending to LLM endpoint (streaming):"
+                f" {num_messages} messages, ~{total_chars} total chars"
             )
             logger.info("   Model: %s", model_name)
             logger.info("   Task: %s", task_type)
             logger.debug(
-                f"   System prompt preview: {final_messages[0]['content'][:100]}..."
+                "   System prompt preview:"
+                f" {final_messages[0]['content'][:100]}..."
             )
 
             logger.info(
@@ -300,7 +311,8 @@ class TextProcessorService:
             async def process_chunk_async(i: int, chunk: str):
                 try:
                     chunk_instructions = (
-                        f"{instructions} (Processing section {i+1} of {len(chunks)})"
+                        f"{instructions} (Processing section {i+1} of"
+                        f" {len(chunks)})"
                         if instructions
                         else f"Processing section {i+1} of {len(chunks)}"
                     )
@@ -310,10 +322,16 @@ class TextProcessorService:
                     if chunk_result["success"]:
                         return chunk_result["result"]
                     else:
-                        return f"Section {i+1} processing failed: {chunk_result.get('error', 'Unknown error')}"
+                        return (
+                            f"Section {i+1} processing failed:"
+                            f" {chunk_result.get('error', 'Unknown error')}"
+                        )
                 except Exception as e:
                     logger.error("Error processing chunk %d: %s", i + 1, e)
-                    return f"Section {i+1} processing failed due to error: {str(e)}"
+                    return (
+                        f"Section {i+1} processing failed due to error:"
+                        f" {str(e)}"
+                    )
 
             # Run all chunk processing tasks concurrently
             chunk_results = await asyncio.gather(
@@ -332,7 +350,8 @@ class TextProcessorService:
                         "Chunk %d failed with exception: %s", i + 1, result
                     )
                     processed_results.append(
-                        f"Section {i+1} processing failed due to error: {str(result)}"
+                        f"Section {i+1} processing failed due to error:"
+                        f" {str(result)}"
                     )
                 else:
                     processed_results.append(result)
@@ -411,7 +430,9 @@ class TextProcessorService:
                 "success": True,
                 "result": result,
                 "task_type": task_type,
-                "processing_notes": f"Chunk processing completed for {task_type}",
+                "processing_notes": (
+                    f"Chunk processing completed for {task_type}"
+                ),
             }
 
         except Exception as e:
@@ -426,8 +447,9 @@ class TextProcessorService:
             combined_text = "\n\n---\n\n".join(chunk_results)
 
             synthesis_instructions = (
-                f"Create an executive summary based on these section summaries. "
-                f"Combine the information into a cohesive whole. {instructions or ''}"
+                "Create an executive summary based on these section"
+                " summaries. Combine the information into a cohesive whole."
+                f" {instructions or ''}"
             )
 
             return await self._process_single_chunk(
@@ -455,7 +477,9 @@ class TextProcessorService:
                 "success": True,
                 "result": combined_result,
                 "task_type": TextTaskType.TRANSLATE,
-                "processing_notes": "Translation completed in chunks and combined",
+                "processing_notes": (
+                    "Translation completed in chunks and combined"
+                ),
             }
         except Exception as e:
             logger.error("Error combining translations: %s", e)
@@ -476,8 +500,9 @@ class TextProcessorService:
             combined_text = "\n\n---\n\n".join(chunk_results)
 
             synthesis_instructions = (
-                f"Process the combined content from all sections. "
-                f"Ensure consistency and coherence across the entire document. {instructions or ''}"
+                "Process the combined content from all sections. Ensure"
+                " consistency and coherence across the entire document."
+                f" {instructions or ''}"
             )
 
             return await self._process_single_chunk(
@@ -501,7 +526,10 @@ class TextProcessorService:
         if specific_prompt:
             # If instructions are provided, append them
             if instructions:
-                return f"{specific_prompt}\n\nAdditional instructions: {instructions}"
+                return (
+                    f"{specific_prompt}\n\nAdditional instructions:"
+                    f" {instructions}"
+                )
             return specific_prompt
 
         # Fall back to the context-aware system prompt
@@ -552,7 +580,10 @@ class TextProcessorService:
         """Generate processing notes for the task"""
 
         if task_type == TextTaskType.SUMMARIZE:
-            return f"Original: {len(original.split())} words, Summary: {len(result.split())} words"
+            return (
+                f"Original: {len(original.split())} words, Summary:"
+                f" {len(result.split())} words"
+            )
         elif task_type == TextTaskType.PROOFREAD:
             return "Proofreading completed with suggestions for improvement"
         elif task_type == TextTaskType.REWRITE:

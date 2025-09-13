@@ -40,7 +40,9 @@ class WebExtractResponse(BaseToolResponse):
     )
     direct_response: bool = Field(
         default=True,
-        description="Flag indicating this response should be returned directly to user",
+        description=(
+            "Flag indicating this response should be returned directly to user"
+        ),
     )
 
 
@@ -51,7 +53,9 @@ class StreamingExtractResponse(StreamingToolResponse):
     title: Optional[str] = Field(None, description="Page title if found")
     direct_response: bool = Field(
         default=True,
-        description="Flag indicating this response should be returned directly to user",
+        description=(
+            "Flag indicating this response should be returned directly to user"
+        ),
     )
 
 
@@ -63,8 +67,13 @@ class WebExtractController(ToolController):
 
         # Request headers to mimic a real browser
         self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                " (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+            ),
+            "Accept": (
+                "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
+            ),
             "Accept-Language": "en-US,en;q=0.5",
             "Accept-Encoding": "gzip, deflate",
             "Connection": "keep-alive",
@@ -80,7 +89,11 @@ class WebExtractController(ToolController):
             # Extract content from URL
             extractor = WebDataExtractor(
                 headers={
-                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                    "User-Agent": (
+                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"
+                        " AppleWebKit/537.36 (KHTML, like Gecko)"
+                        " Chrome/91.0.4472.124 Safari/537.36"
+                    )
                 }
             )
 
@@ -89,7 +102,8 @@ class WebExtractController(ToolController):
 
             if not result["success"]:
                 raise RuntimeError(
-                    f"Failed to extract content from {url}: {result.get('error', 'Unknown error')}"
+                    f"Failed to extract content from {url}:"
+                    f" {result.get('error', 'Unknown error')}"
                 )
 
             content = result["content"]
@@ -134,7 +148,11 @@ class WebExtractController(ToolController):
             # Extract content from URL
             extractor = WebDataExtractor(
                 headers={
-                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+                    "User-Agent": (
+                        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"
+                        " AppleWebKit/537.36 (KHTML, like Gecko)"
+                        " Chrome/91.0.4472.124 Safari/537.36"
+                    )
                 }
             )
 
@@ -149,7 +167,10 @@ class WebExtractController(ToolController):
 
                 # Return error with streaming response
                 async def error_generator():
-                    yield f"Failed to extract content from {url}: Request timed out after 30 seconds"
+                    yield (
+                        f"Failed to extract content from {url}: Request timed"
+                        " out after 30 seconds"
+                    )
 
                 return {
                     "url": url,
@@ -164,7 +185,10 @@ class WebExtractController(ToolController):
             if not result["success"]:
                 # Return error with streaming response
                 async def error_generator():
-                    yield f"Failed to extract content from {url}: {result.get('error', 'Unknown error')}"
+                    yield (
+                        f"Failed to extract content from {url}:"
+                        f" {result.get('error', 'Unknown error')}"
+                    )
 
                 return {
                     "url": url,
@@ -287,7 +311,8 @@ class WebExtractController(ToolController):
                 and "application/xhtml" not in content_type
             ):
                 raise ValueError(
-                    f"URL does not return HTML content. Content-Type: {content_type}"
+                    "URL does not return HTML content. Content-Type:"
+                    f" {content_type}"
                 )
 
             soup = BeautifulSoup(response.text, "html.parser")
@@ -413,7 +438,8 @@ Instructions:
             model_name = llm_client_service.get_model_name(self.llm_type)
 
             logger.debug(
-                f"Using LLM type '{self.llm_type}' for async web extraction (configured in tool_llm_config.py)"
+                f"Using LLM type '{self.llm_type}' for async web extraction"
+                " (configured in tool_llm_config.py)"
             )
 
             if len(html_content) > 200000:
@@ -422,7 +448,8 @@ Instructions:
                     + "\n[Content truncated due to length]"
                 )
                 logger.info(
-                    f"Truncated HTML content to 200k characters for LLM processing"
+                    f"Truncated HTML content to 200k characters for LLM"
+                    f" processing"
                 )
 
             # Get system prompt from centralized configuration
@@ -430,7 +457,11 @@ Instructions:
 
             system_prompt = get_tool_system_prompt("extract_web_content", "")
 
-            user_message = f"Extract the main content from this webpage and convert it to markdown. Be sure to escape any special characters as needed:\n\nURL: {url}\n\nHTML Content:\n{html_content}"
+            user_message = (
+                "Extract the main content from this webpage and convert it to"
+                " markdown. Be sure to escape any special characters as"
+                f" needed:\n\nURL: {url}\n\nHTML Content:\n{html_content}"
+            )
 
             messages = [
                 {"role": "system", "content": system_prompt},
@@ -438,7 +469,8 @@ Instructions:
             ]
 
             logger.info(
-                f"Extracting content from URL using {model_name} (async non-streaming)"
+                f"Extracting content from URL using {model_name} (async"
+                " non-streaming)"
             )
 
             response = await client.chat.completions.create(
@@ -456,7 +488,8 @@ Instructions:
             cleaned_result = clean_content(result)
 
             logger.info(
-                f"Successfully extracted {len(cleaned_result)} characters from URL (async)"
+                f"Successfully extracted {len(cleaned_result)} characters from"
+                " URL (async)"
             )
 
             return cleaned_result
@@ -510,7 +543,8 @@ Instructions:
             ]
 
             logger.debug(
-                f"Streaming web content transformation with {model_name} for {url}"
+                f"Streaming web content transformation with {model_name} for"
+                f" {url}"
             )
 
             # Generate response with streaming
@@ -623,7 +657,10 @@ class WebExtractTool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "extract_web_content"
-        self.description = "Extract and read content from a specific URL. Use when user provides a URL AND asks to read or analyze it."
+        self.description = (
+            "Extract and read content from a specific URL. Use when user"
+            " provides a URL AND asks to read or analyze it."
+        )
         self.execution_mode = (
             ExecutionMode.AUTO
         )  # Changed to AUTO to support both sync and async
@@ -646,15 +683,28 @@ class WebExtractTool(BaseTool):
                     "properties": {
                         "url": {
                             "type": "string",
-                            "description": "The web URL to extract content from. Must be a valid HTTP or HTTPS URL.",
+                            "description": (
+                                "The web URL to extract content from. Must be"
+                                " a valid HTTP or HTTPS URL."
+                            ),
                         },
                         "request": {
                             "type": "string",
-                            "description": "Optional specific request about what to extract or how to process the content (e.g., 'summarize the main points', 'extract pricing information'). If empty, returns the full extracted content.",
+                            "description": (
+                                "Optional specific request about what to"
+                                " extract or how to process the content (e.g.,"
+                                " 'summarize the main points', 'extract"
+                                " pricing information'). If empty, returns the"
+                                " full extracted content."
+                            ),
                         },
                         "but_why": {
                             "type": "integer",
-                            "description": "An integer from 1-5 where a larger number indicates confidence this is the right tool to help the user.",
+                            "description": (
+                                "An integer from 1-5 where a larger number"
+                                " indicates confidence this is the right tool"
+                                " to help the user."
+                            ),
                         },
                     },
                     "required": ["url", "but_why"],

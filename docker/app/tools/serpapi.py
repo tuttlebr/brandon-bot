@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class SearchMetadata(BaseModel):
     """Search metadata from SerpAPI"""
 
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
 
     id: str
     status: str
@@ -41,7 +41,7 @@ class SearchParameters(BaseModel):
 class SearchInformation(BaseModel):
     """Search information from SerpAPI"""
 
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
 
     query_displayed: str
     organic_results_state: str
@@ -50,7 +50,7 @@ class SearchInformation(BaseModel):
 class OrganicResult(BaseModel):
     """Individual organic search result from SerpAPI"""
 
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
 
     position: int
     title: str
@@ -77,7 +77,7 @@ class RelatedQuestion(BaseModel):
 class RelatedSearch(BaseModel):
     """Related search from SerpAPI"""
 
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
 
     query: Optional[str] = None
     link: Optional[str] = None
@@ -89,7 +89,7 @@ class RelatedSearch(BaseModel):
 class SerpAPIResponse(BaseToolResponse):
     """Complete response from SerpAPI"""
 
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
 
     search_metadata: SearchMetadata
     search_parameters: SearchParameters
@@ -330,8 +330,8 @@ class SerpAPITool(BaseTool):
                     "Raw SerpAPI response keys: %s", list(response_data.keys())
                 )
                 # Log related_searches structure if present
-                if 'related_searches' in response_data:
-                    related = response_data['related_searches']
+                if "related_searches" in response_data:
+                    related = response_data["related_searches"]
                     logger.debug(
                         "Related searches structure: %s",
                         related[:1] if related else "Empty",

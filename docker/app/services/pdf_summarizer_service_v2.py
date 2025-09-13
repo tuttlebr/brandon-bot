@@ -41,13 +41,15 @@ class PDFSummarizerServiceV2:
     ) -> Dict[str, Any]:
         """Return {summary: str, strategy: str}."""
         logger.info(
-            f"Starting PDF summarization. PDF data keys: {list(pdf_data.keys())}"
+            "Starting PDF summarization. PDF data keys:"
+            f" {list(pdf_data.keys())}"
         )
 
         # Check if pages exist
         if "pages" not in pdf_data:
             logger.error(
-                f"PDF data missing 'pages' key. Available keys: {list(pdf_data.keys())}"
+                "PDF data missing 'pages' key. Available keys:"
+                f" {list(pdf_data.keys())}"
             )
             return {
                 "summary": "Error: PDF data is missing page content",
@@ -100,7 +102,8 @@ class PDFSummarizerServiceV2:
 
         full_text = "\n\n".join(page_texts)
         logger.info(
-            f"📝 Concatenated text: {len(full_text)} characters from {len(page_texts)} pages"
+            f"📝 Concatenated text: {len(full_text)} characters from"
+            f" {len(page_texts)} pages"
         )
 
         try:
@@ -120,10 +123,14 @@ class PDFSummarizerServiceV2:
 
             if not result.get("success", True):
                 logger.error(
-                    f"Text processing failed: {result.get('error', 'Unknown error')}"
+                    "Text processing failed:"
+                    f" {result.get('error', 'Unknown error')}"
                 )
                 return {
-                    "summary": f"Error: {result.get('error', 'Failed to summarize document')}",
+                    "summary": (
+                        "Error:"
+                        f" {result.get('error', 'Failed to summarize document')}"
+                    ),
                     "strategy": "error",
                 }
 
@@ -156,13 +163,15 @@ class PDFSummarizerServiceV2:
         import asyncio
 
         logger.info(
-            f"🗺️  Starting MAP phase: Summarizing {len(chunks)} chunks in parallel..."
+            f"🗺️  Starting MAP phase: Summarizing {len(chunks)} chunks in"
+            " parallel..."
         )
 
         async def summarize_chunk(chunk_idx, chunk):
             try:
                 logger.info(
-                    f"   Processing chunk {chunk_idx + 1}/{len(chunks)} ({len(chunk['text'])} chars)..."
+                    "   Processing chunk"
+                    f" {chunk_idx + 1}/{len(chunks)} ({len(chunk['text'])} chars)..."
                 )
                 result = await self.text_processor.process_text(
                     TextTaskType.SUMMARIZE,
@@ -171,10 +180,14 @@ class PDFSummarizerServiceV2:
                 )
                 if not result.get("success", True):
                     logger.error(
-                        f"Chunk {chunk_idx + 1} summarization failed: {result.get('error')}"
+                        f"Chunk {chunk_idx + 1} summarization failed:"
+                        f" {result.get('error')}"
                     )
                     return {
-                        "result": f"[Error summarizing chunk {chunk_idx + 1}: {result.get('error')}]"
+                        "result": (
+                            f"[Error summarizing chunk {chunk_idx + 1}:"
+                            f" {result.get('error')}]"
+                        )
                     }
                 logger.info(
                     f"   ✓ Chunk {chunk_idx + 1} summarized successfully"
@@ -195,7 +208,8 @@ class PDFSummarizerServiceV2:
         partial_summaries = [r["result"] for r in chunk_results]
 
         logger.info(
-            f"✅ MAP phase complete: {len(partial_summaries)} chunk summaries generated"
+            f"✅ MAP phase complete: {len(partial_summaries)} chunk summaries"
+            " generated"
         )
 
         # Step 3: reduce – recursively combine summaries into <= _CHUNK_SUMMARY_TOKENS
@@ -203,7 +217,8 @@ class PDFSummarizerServiceV2:
         while len(partial_summaries) > 1:
             iteration += 1
             logger.info(
-                f"🔄 REDUCE phase iteration {iteration}: Combining {len(partial_summaries)} summaries..."
+                f"🔄 REDUCE phase iteration {iteration}: Combining"
+                f" {len(partial_summaries)} summaries..."
             )
 
             combined_batches: List[str] = []
@@ -218,12 +233,16 @@ class PDFSummarizerServiceV2:
             # summarize each combined batch
             async def summarize_batch(batch_idx, batch_text):
                 logger.info(
-                    f"   Reducing batch {batch_idx + 1}/{len(combined_batches)} ({len(batch_text)} chars)..."
+                    "   Reducing batch"
+                    f" {batch_idx + 1}/{len(combined_batches)} ({len(batch_text)} chars)..."
                 )
                 result = await self.text_processor.process_text(
                     TextTaskType.SUMMARIZE,
                     text=batch_text,
-                    instructions="Condense the following summary segments into a shorter combined summary.",
+                    instructions=(
+                        "Condense the following summary segments into a"
+                        " shorter combined summary."
+                    ),
                 )
                 logger.info(f"   ✓ Batch {batch_idx + 1} reduced successfully")
                 return result["result"]
@@ -235,7 +254,8 @@ class PDFSummarizerServiceV2:
                 )
             )
             logger.info(
-                f"✅ REDUCE iteration {iteration} complete: {len(partial_summaries)} summaries remaining"
+                f"✅ REDUCE iteration {iteration} complete:"
+                f" {len(partial_summaries)} summaries remaining"
             )
 
         logger.info("🎉 Map-reduce summarization complete!")

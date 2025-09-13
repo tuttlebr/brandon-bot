@@ -65,13 +65,19 @@ class TranslationService:
         if target_language not in self.supported_languages:
             return {
                 "success": False,
-                "error": f"Target language '{target_language}' not supported. Supported: {', '.join(self.supported_languages)}",
+                "error": (
+                    f"Target language '{target_language}' not supported."
+                    f" Supported: {', '.join(self.supported_languages)}"
+                ),
             }
 
         if source_language and source_language not in self.supported_languages:
             return {
                 "success": False,
-                "error": f"Source language '{source_language}' not supported. Supported: {', '.join(self.supported_languages)}",
+                "error": (
+                    f"Source language '{source_language}' not supported."
+                    f" Supported: {', '.join(self.supported_languages)}"
+                ),
             }
 
         try:
@@ -112,7 +118,11 @@ class TranslationService:
                 "result": translated_text,
                 "source_language": source_language or "auto-detected",
                 "target_language": target_language,
-                "processing_notes": f"Translation completed from {source_language or 'auto-detected'} to {target_language}",
+                "processing_notes": (
+                    "Translation completed from"
+                    f" {source_language or 'auto-detected'} to"
+                    f" {target_language}"
+                ),
             }
 
         except Exception as e:
@@ -127,7 +137,7 @@ class TranslationService:
 
         # Use the new context-aware system prompt
         return get_context_system_prompt(
-            context='translation',
+            context="translation",
             target_language=target_language,
             source_language=source_language,
         )

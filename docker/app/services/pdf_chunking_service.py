@@ -129,11 +129,11 @@ class PDFChunkingService:
             logger.error("Milvus client not initialized")
             return False
 
-        filename = pdf_data.get('filename', 'Unknown')
-        pdf_id = pdf_data.get('pdf_id')
+        filename = pdf_data.get("filename", "Unknown")
+        pdf_id = pdf_data.get("pdf_id")
         if not pdf_id:
             raise ValueError("pdf_id must be provided in pdf_data")
-        pages = pdf_data.get('pages', [])
+        pages = pdf_data.get("pages", [])
 
         logger.info(f"Processing {filename} ({len(pages)} pages)")
 
@@ -145,7 +145,7 @@ class PDFChunkingService:
 
         for i, chunk in enumerate(chunks):
             # Create embedding
-            embedding = self._create_embedding(chunk['text'])
+            embedding = self._create_embedding(chunk["text"])
             if not embedding:
                 continue
 
@@ -158,14 +158,16 @@ class PDFChunkingService:
             # Use the fields that MilvusClient auto-schema expects
             chunk_data = {
                 "id": chunk_id,
-                "vector": embedding,  # MilvusClient often expects 'vector' not 'embedding'
-                "text": chunk['text'][:60000],  # Limit text size
+                "vector": (
+                    embedding
+                ),  # MilvusClient often expects 'vector' not 'embedding'
+                "text": chunk["text"][:60000],  # Limit text size
                 "metadata": json.dumps(
                     {
                         "pdf_id": pdf_id,
                         "filename": filename,
                         "chunk_index": i,
-                        "pages": chunk['pages'],
+                        "pages": chunk["pages"],
                         "total_chunks": len(chunks),
                     }
                 ),
@@ -176,15 +178,18 @@ class PDFChunkingService:
         if data_to_insert:
             try:
                 logger.info(
-                    f"📤 Starting Milvus upload for {filename}: {len(data_to_insert)} chunks"
+                    f"📤 Starting Milvus upload for {filename}:"
+                    f" {len(data_to_insert)} chunks"
                 )
 
                 # Log details about chunks being uploaded
                 total_text_size = sum(
-                    len(chunk['text']) for chunk in data_to_insert
+                    len(chunk["text"]) for chunk in data_to_insert
                 )
                 logger.info(
-                    f"📊 Chunk details: Total text size: {total_text_size:,} chars, Average chunk size: {total_text_size // len(data_to_insert):,} chars"
+                    "📊 Chunk details: Total text size:"
+                    f" {total_text_size:,} chars, Average chunk size:"
+                    f" {total_text_size // len(data_to_insert):,} chars"
                 )
 
                 # Insert all at once
@@ -193,7 +198,9 @@ class PDFChunkingService:
                 )
 
                 logger.info(
-                    f"✅ Successfully stored {len(data_to_insert)} chunks for {filename} in Milvus collection '{self.collection_name}'"
+                    f"✅ Successfully stored {len(data_to_insert)} chunks for"
+                    f" {filename} in Milvus collection"
+                    f" '{self.collection_name}'"
                 )
 
                 # Log individual chunk info for debugging
@@ -201,7 +208,8 @@ class PDFChunkingService:
                     data_to_insert[:3]
                 ):  # Log first 3 chunks
                     logger.debug(
-                        f"  Chunk {i}: ID={chunk['id']}, Text preview: {chunk['text'][:100]}..."
+                        f"  Chunk {i}: ID={chunk['id']}, Text preview:"
+                        f" {chunk['text'][:100]}..."
                     )
                 if len(data_to_insert) > 3:
                     logger.debug(
@@ -214,7 +222,8 @@ class PDFChunkingService:
                         collection_name=self.collection_name
                     )
                     logger.info(
-                        f"📚 Milvus collection '{self.collection_name}' loaded successfully"
+                        f"📚 Milvus collection '{self.collection_name}' loaded"
+                        " successfully"
                     )
                 except:
                     pass  # Ignore if already loaded
@@ -222,7 +231,7 @@ class PDFChunkingService:
                 # Update session state to indicate Milvus upload complete
                 import streamlit as st
 
-                if hasattr(st, 'session_state'):
+                if hasattr(st, "session_state"):
                     st.session_state.pdf_milvus_upload_complete = True
                     st.session_state.pdf_milvus_upload_filename = filename
                     st.session_state.pdf_milvus_upload_chunks = len(
@@ -248,8 +257,8 @@ class PDFChunkingService:
         page_boundaries = {}
 
         for page in pages:
-            page_num = page.get('page', len(page_boundaries) + 1)
-            page_text = page.get('text', '').strip()
+            page_num = page.get("page", len(page_boundaries) + 1)
+            page_text = page.get("text", "").strip()
 
             if page_text:
                 page_start = len(full_text)
@@ -263,7 +272,7 @@ class PDFChunkingService:
 
             # Try to end at paragraph
             if end < len(full_text):
-                para_end = full_text.rfind('\n\n', start, end)
+                para_end = full_text.rfind("\n\n", start, end)
                 if para_end > start + self.min_chunk_size:
                     end = para_end
 
@@ -288,9 +297,9 @@ class PDFChunkingService:
 
             chunks.append(
                 {
-                    'text': chunk_text,
-                    'pages': sorted(set(chunk_pages)),
-                    'pdf_id': pdf_id,
+                    "text": chunk_text,
+                    "pages": sorted(set(chunk_pages)),
+                    "pdf_id": pdf_id,
                 }
             )
 
@@ -352,14 +361,14 @@ class PDFChunkingService:
             # Filter by pdf_id and format results
             relevant_chunks = []
             for hit in results[0]:
-                metadata = json.loads(hit['entity'].get('metadata', '{}'))
-                if metadata.get('pdf_id') == pdf_id:
+                metadata = json.loads(hit["entity"].get("metadata", "{}"))
+                if metadata.get("pdf_id") == pdf_id:
                     relevant_chunks.append(
                         {
-                            'text': hit['entity'].get('text', ''),
-                            'pages': metadata.get('pages', []),
-                            'chunk_index': metadata.get('chunk_index', 0),
-                            'score': hit['distance'],
+                            "text": hit["entity"].get("text", ""),
+                            "pages": metadata.get("pages", []),
+                            "chunk_index": metadata.get("chunk_index", 0),
+                            "score": hit["distance"],
                         }
                     )
 
@@ -391,7 +400,7 @@ class PDFChunkingService:
             )
 
             if all_results:
-                ids_to_delete = [r['id'] for r in all_results]
+                ids_to_delete = [r["id"] for r in all_results]
                 # Delete by primary key IDs
                 self.milvus_client.delete(
                     collection_name=self.collection_name, ids=ids_to_delete
@@ -412,21 +421,21 @@ class PDFChunkingService:
         self, pdf_data: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
         """Create chunks from PDF document (compatibility method)"""
-        filename = pdf_data.get('filename', 'Unknown')
-        pdf_id = pdf_data.get('pdf_id')
+        filename = pdf_data.get("filename", "Unknown")
+        pdf_id = pdf_data.get("pdf_id")
         if not pdf_id:
             raise ValueError("pdf_id must be provided in pdf_data")
-        pages = pdf_data.get('pages', [])
+        pages = pdf_data.get("pages", [])
 
         logger.info(f"Creating chunks for {filename} ({len(pages)} pages)")
         chunks = self._create_simple_chunks(pages, pdf_id)
 
         # Add metadata to match original format
         for i, chunk in enumerate(chunks):
-            chunk['chunk_index'] = i
-            chunk['filename'] = filename
-            chunk['total_chunks'] = len(chunks)
-            chunk['type'] = 'sliding_window'
+            chunk["chunk_index"] = i
+            chunk["filename"] = filename
+            chunk["total_chunks"] = len(chunks)
+            chunk["type"] = "sliding_window"
 
         return chunks
 
@@ -438,11 +447,12 @@ class PDFChunkingService:
             return False
 
         # Get PDF info from first chunk
-        pdf_id = chunks[0].get('pdf_id')
-        filename = chunks[0].get('filename', 'Unknown')
+        pdf_id = chunks[0].get("pdf_id")
+        filename = chunks[0].get("filename", "Unknown")
 
         logger.info(
-            f"📤 Starting Milvus upload for {filename}: {len(chunks)} pre-chunked segments"
+            f"📤 Starting Milvus upload for {filename}:"
+            f" {len(chunks)} pre-chunked segments"
         )
 
         # Prepare data for insertion
@@ -450,7 +460,7 @@ class PDFChunkingService:
 
         for chunk in chunks:
             # Create embedding
-            embedding = self._create_embedding(chunk['text'])
+            embedding = self._create_embedding(chunk["text"])
             if not embedding:
                 continue
 
@@ -463,14 +473,14 @@ class PDFChunkingService:
             chunk_data = {
                 "id": chunk_id,
                 "vector": embedding,
-                "text": chunk['text'][:60000],  # Limit text size
+                "text": chunk["text"][:60000],  # Limit text size
                 "metadata": json.dumps(
                     {
                         "pdf_id": pdf_id,
                         "filename": filename,
-                        "chunk_index": chunk['chunk_index'],
-                        "pages": chunk['pages'],
-                        "total_chunks": chunk.get('total_chunks', len(chunks)),
+                        "chunk_index": chunk["chunk_index"],
+                        "pages": chunk["pages"],
+                        "total_chunks": chunk.get("total_chunks", len(chunks)),
                     }
                 ),
             }
@@ -489,7 +499,9 @@ class PDFChunkingService:
                 )
 
                 logger.info(
-                    f"✅ Successfully stored {len(data_to_insert)} chunks for {filename} in Milvus collection '{self.collection_name}'"
+                    f"✅ Successfully stored {len(data_to_insert)} chunks for"
+                    f" {filename} in Milvus collection"
+                    f" '{self.collection_name}'"
                 )
 
                 # Try to load collection after first insert
@@ -498,7 +510,8 @@ class PDFChunkingService:
                         collection_name=self.collection_name
                     )
                     logger.info(
-                        f"📚 Milvus collection '{self.collection_name}' loaded successfully"
+                        f"📚 Milvus collection '{self.collection_name}' loaded"
+                        " successfully"
                     )
                 except:
                     pass  # Ignore if already loaded
@@ -506,7 +519,7 @@ class PDFChunkingService:
                 # Update session state to indicate Milvus upload complete
                 import streamlit as st
 
-                if hasattr(st, 'session_state'):
+                if hasattr(st, "session_state"):
                     st.session_state.pdf_milvus_upload_complete = True
                     st.session_state.pdf_milvus_upload_filename = filename
                     st.session_state.pdf_milvus_upload_chunks = len(
@@ -524,7 +537,7 @@ class PDFChunkingService:
     def get_pdf_chunk_info(self, pdf_id: str) -> Dict[str, Any]:
         """Get information about chunks for a PDF"""
         if not self.milvus_client:
-            return {'error': 'Milvus client not initialized'}
+            return {"error": "Milvus client not initialized"}
 
         try:
             # Query all chunks for this PDF
@@ -541,22 +554,22 @@ class PDFChunkingService:
                 all_pages = set()
 
                 for result in all_results:
-                    metadata = json.loads(result.get('metadata', '{}'))
-                    pages = metadata.get('pages', [])
+                    metadata = json.loads(result.get("metadata", "{}"))
+                    pages = metadata.get("pages", [])
                     all_pages.update(pages)
 
                 # Get first chunk metadata for type
-                json.loads(all_results[0].get('metadata', '{}'))
+                json.loads(all_results[0].get("metadata", "{}"))
 
                 return {
-                    'pdf_id': pdf_id,
-                    'total_chunks': total_chunks,
-                    'pages_covered': sorted(all_pages),
-                    'chunk_type': 'sliding_window',
+                    "pdf_id": pdf_id,
+                    "total_chunks": total_chunks,
+                    "pages_covered": sorted(all_pages),
+                    "chunk_type": "sliding_window",
                 }
             else:
-                return {'pdf_id': pdf_id, 'total_chunks': 0}
+                return {"pdf_id": pdf_id, "total_chunks": 0}
 
         except Exception as e:
             logger.error(f"Error getting chunk info: {e}")
-            return {'error': str(e)}
+            return {"error": str(e)}

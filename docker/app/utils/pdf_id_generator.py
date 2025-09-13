@@ -9,7 +9,6 @@ import hashlib
 import logging
 from typing import BinaryIO, Union
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -33,11 +32,11 @@ def generate_pdf_id(
     """
     try:
         # Handle both bytes and file-like objects
-        if hasattr(pdf_content, 'read'):
+        if hasattr(pdf_content, "read"):
             # It's a file-like object (e.g., UploadedFile from Streamlit)
             # Read the content and reset position
             current_pos = (
-                pdf_content.tell() if hasattr(pdf_content, 'tell') else 0
+                pdf_content.tell() if hasattr(pdf_content, "tell") else 0
             )
             pdf_content.seek(0)
             content_bytes = pdf_content.read()
@@ -121,19 +120,19 @@ def get_existing_pdf_info(pdf_id: str, file_storage_service) -> dict:
         if pdf_data:
             # Count chunks if available in pages data
             chunk_count = 0
-            pages = pdf_data.get('pages', [])
+            pages = pdf_data.get("pages", [])
             if pages:
                 # Estimate chunk count based on page count
                 # Typically 2-3 chunks per page with overlapping windows
                 chunk_count = len(pages) * 2
 
             return {
-                'pdf_id': pdf_id,
-                'filename': pdf_data.get('filename', 'Unknown'),
-                'total_pages': pdf_data.get('total_pages', 0),
-                'char_count': pdf_data.get('char_count', 0),
-                'chunk_count': chunk_count,
-                'already_exists': True,
+                "pdf_id": pdf_id,
+                "filename": pdf_data.get("filename", "Unknown"),
+                "total_pages": pdf_data.get("total_pages", 0),
+                "char_count": pdf_data.get("char_count", 0),
+                "chunk_count": chunk_count,
+                "already_exists": True,
             }
     except Exception as e:
         logger.debug(f"Could not retrieve existing PDF info: {e}")

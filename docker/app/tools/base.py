@@ -219,7 +219,8 @@ class BaseTool(ABC):
             if loop.is_running():
                 # If loop is already running, use run_coroutine_threadsafe
                 logger.info(
-                    f"Executing {self.name} async with timeout={self.timeout}s in running loop"
+                    f"Executing {self.name} async with timeout={self.timeout}s"
+                    " in running loop"
                 )
                 future = asyncio.run_coroutine_threadsafe(
                     self._execute_controller_async(params), loop
@@ -247,7 +248,7 @@ class BaseTool(ABC):
         self, params: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Execute controller asynchronously"""
-        if hasattr(self._controller, 'process_async'):
+        if hasattr(self._controller, "process_async"):
             return await self._controller.process_async(params)
         else:
             # Fallback to sync in thread
@@ -255,7 +256,7 @@ class BaseTool(ABC):
 
     def _has_async_implementation(self) -> bool:
         """Check if controller has async implementation"""
-        return hasattr(self._controller, 'process_async')
+        return hasattr(self._controller, "process_async")
 
     def _validate_params(self, params: Dict[str, Any]) -> None:
         """
@@ -292,7 +293,8 @@ class BaseTool(ABC):
                     )
 
                 logger.debug(
-                    f"Added default but_why ({params['but_why']}) for internal {self.name} call"
+                    f"Added default but_why ({params['but_why']}) for internal"
+                    f" {self.name} call"
                 )
 
         # Check required parameters
@@ -341,7 +343,8 @@ class BaseTool(ABC):
                 # Enum validation
                 if "enum" in expected and param_value not in expected["enum"]:
                     raise ValidationError(
-                        f"Parameter '{param_name}' must be one of: {expected['enum']}"
+                        f"Parameter '{param_name}' must be one of:"
+                        f" {expected['enum']}"
                     )
 
     def _create_error_response(

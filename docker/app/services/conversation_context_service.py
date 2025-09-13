@@ -121,7 +121,7 @@ class ConversationContextService:
                 enhanced_messages.append(msg)
 
         logger.info(
-            f"Injected conversation context summary "
+            "Injected conversation context summary "
             f"({len(context_summary)} chars)"
         )
         return enhanced_messages
@@ -201,7 +201,8 @@ class ConversationContextService:
         """
         return {
             "role": "system",
-            "content": f"""## Conversation Context
+            "content": (
+                f"""## Conversation Context
 
 You are continuing an ongoing conversation. Here's a summary of the
 discussion so far:
@@ -211,5 +212,6 @@ discussion so far:
 Total messages in conversation: {total_messages}
 
 Please maintain continuity with the previous discussion and refer to
-earlier topics when relevant.""",
+earlier topics when relevant."""
+            ),
         }
