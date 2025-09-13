@@ -1,6 +1,6 @@
-# Streamlit Agentic Chatbot
+# Brandon Bot
 
-A production-ready conversational AI application built with Streamlit, featuring advanced language model capabilities, intelligent document analysis, multimodal interactions, and a sophisticated **Model-View-Controller (MVC)** architecture with framework abstraction.
+A production-ready conversational AI application built with Streamlit, featuring advanced language model capabilities, intelligent document analysis, multimodal interactions, and a sophisticated Model-View-Controller (MVC) architecture with framework abstraction.
 
 ## Table of Contents
 
@@ -15,33 +15,35 @@ A production-ready conversational AI application built with Streamlit, featuring
 - [Services Layer](#services-layer)
 - [Development Guide](#development-guide)
 - [Production Deployment](#production-deployment)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Overview
 
-This application provides a sophisticated agentic chatbot interface powered by NVIDIA's language models, available both as a web UI and a RESTful API, with a **production-grade MVC architecture** that ensures:
+Brandon Bot provides a sophisticated agentic chatbot interface powered by NVIDIA's language models, available both as a web UI and a RESTful API, with a production-grade MVC architecture that ensures:
 
-- 🏗️ **Clean separation of concerns** between Models, Views, and Controllers
-- 🎯 **Framework abstraction** through view interfaces and helpers
-- 🔗 **Service-oriented architecture** with specialized business logic services
-- ✅ **Domain-driven design** with rich models and validation
-- 🧪 **High testability** through dependency injection and interfaces
-- 🚀 **Production scalability** with external file storage and efficient processing
+- **Clean separation of concerns** between Models, Views, and Controllers
+- **Framework abstraction** through view interfaces and helpers
+- **Service-oriented architecture** with specialized business logic services
+- **Domain-driven design** with rich models and validation
+- **High testability** through dependency injection and interfaces
+- **Production scalability** with external file storage and efficient processing
 
 ### Core Capabilities
 
-- 🤖 **Real-time streaming responses** with advanced tool orchestration
-- 📄 **Intelligent PDF analysis** with query-aware processing and batch handling
-- 🎨 **AI-powered image generation and analysis** with VLM support
-- 🔍 **Multi-source information retrieval** (web search, news, weather)
-- 💬 **Smart context management** with automatic conversation and PDF context injection
-- 📁 **Robust session management** with isolated user sessions and file storage
-- ⚡ **Optimized processing** for large documents and multimodal content
+- **Real-time streaming responses** with advanced tool orchestration
+- **Intelligent PDF analysis** with query-aware processing and batch handling
+- **AI-powered image generation and analysis** with Vision Language Model support
+- **Multi-source information retrieval** (web search, news, weather)
+- **Smart context management** with automatic conversation and PDF context injection
+- **Robust session management** with isolated user sessions and file storage
+- **Optimized processing** for large documents and multimodal content
 
 ## Features
 
 ### Advanced Tool System
 
-The application includes **12 specialized tools** providing comprehensive AI capabilities:
+The application includes **14 specialized tools** providing comprehensive AI capabilities:
 
 1. **Text Assistant** (`text_assistant`) - Comprehensive text processing with multiple capabilities:
    - Document analysis and insights extraction
@@ -64,15 +66,11 @@ The application includes **12 specialized tools** providing comprehensive AI cap
    - Visual question answering
    - Automatic image optimization for VLM processing
 
-1. **PDF Summary** (`retrieve_pdf_summary`) - Intelligent document summarization with:
-   - Recursive summarization for large documents
-   - Query-aware processing
-   - Batch processing for efficiency
-
-1. **PDF Text Processor** (`process_pdf_text`) - Advanced PDF analysis:
-   - Query-specific document analysis
-   - Intelligent page selection
-   - Context-aware responses
+1. **PDF Assistant** (`pdf_assistant`) - Comprehensive PDF document handling:
+   - Intelligent document summarization
+   - Query-specific analysis and search
+   - Vector-based similarity search
+   - Batch processing for large documents
 
 1. **Web Search** (`serpapi_internet_search`) - General web search integration
 
@@ -93,6 +91,12 @@ The application includes **12 specialized tools** providing comprehensive AI cap
 1. **Generalist Conversation** (`generalist_conversation`) - General discussion and explanations
 
 1. **Context Generation** (`context_generation`) - Generate or modify images based on an existing image and text
+
+1. **Deep Researcher** (`deep_researcher`) - Advanced multi-source research:
+   - Iterative research with multiple phases
+   - Automatic source verification and citation
+   - Synthesis of findings from multiple sources
+   - Academic-style citations and references
 
 ### Production Features
 
@@ -227,16 +231,18 @@ This application implements a **sophisticated MVC pattern** with service-oriente
 ### Prerequisites
 
 - Docker and Docker Compose
-- NVIDIA API Key
-- (Optional) Tavily API Key for web search
+- NVIDIA API Key (or individual model API keys)
+- (Optional) SerpAPI Key for web search functionality
 - (Optional) Image generation endpoint
+- (Optional) Milvus vector database for retrieval tool
+- (Optional) NVIngest endpoint for PDF processing
 
 ### Installation
 
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/tuttlebr/streamlit-agent.git
+   git clone <repository-url>
    cd streamlit-chatbot
    ```
 
@@ -291,7 +297,7 @@ VLM_ENDPOINT=https://integrate.api.nvidia.com/v1
 VLM_MODEL_NAME=nvidia/llama-3.1-nemotron-nano-vl-8b-v1
 
 # Application Settings
-BOT_TITLE=Streamlit Agentic Chatbot
+BOT_TITLE=Brandon Bot
 ```
 
 ### Per-Model API Keys (Optional)
@@ -323,8 +329,8 @@ IMAGE_API_KEY=your_image_generation_api_key     # For image generation
 # Image Generation
 IMAGE_ENDPOINT=your_image_generation_endpoint
 
-# Web Search (Tavily)
-TAVILY_API_KEY=your_tavily_api_key
+# Web Search (SerpAPI)
+SERPAPI_KEY=your_serpapi_key
 
 # PDF Processing (NVIngest)
 NVINGEST_ENDPOINT=http://localhost:7670
@@ -383,10 +389,17 @@ Example tool configuration file (`tool_config.json`):
   "enabled_tools": {
     "text_assistant": true,
     "conversation_context": true,
-    "serpapi_internet_search": false,
+    "serpapi_internet_search": true,
+    "serpapi_news_search": true,
+    "retrieval_search": true,
     "pdf_assistant": true,
     "analyze_image": true,
-    "generate_image": true
+    "generate_image": true,
+    "context_generation": true,
+    "get_weather": true,
+    "generalist_conversation": true,
+    "deep_researcher": true,
+    "extract_web_content": true
   }
 }
 ```
@@ -565,10 +578,10 @@ The service layer provides specialized business logic:
 
 ### PDF Processing Services
 
-- **PDFAnalysisService**: Intelligent query-specific analysis
-- **PDFSummarizationService**: Recursive summarization for large documents
-- **PDFContextService**: Automatic PDF context injection
-- **PDFBatchProcessor**: Efficient batch processing for large files
+- **PDFChunkingService**: Intelligent PDF chunking with embeddings
+- **PDFIngestionService**: PDF ingestion and vector storage
+- **PDFQueryServiceV2**: Vector-based similarity search for PDF chunks
+- **PDFSummarizerServiceV2**: Recursive summarization for large documents
 
 ### Text Processing Services
 
@@ -848,7 +861,7 @@ Basic configuration:
 NVIDIA_API_KEY=your_key_here
 
 # Optional services
-TAVILY_API_KEY=your_key_here
+SERPAPI_KEY=your_key_here
 IMAGE_ENDPOINT=your_endpoint_here
 
 # Optional per-model API keys (see env.example for full list)
@@ -945,3 +958,56 @@ If you have a `.env` file with all your settings:
 - **Input Validation**: All user inputs sanitized
 
 This architecture ensures the application is production-ready with proper separation of concerns, comprehensive error handling, and scalable design.
+
+## Contributing
+
+We welcome contributions to Brandon Bot! Please follow these guidelines:
+
+### How to Contribute
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+### Development Standards
+
+- Follow the MVC pattern established in the codebase
+- Use type hints for all function parameters and returns
+- Write comprehensive docstrings for classes and methods
+- Add unit tests for new functionality
+- Ensure all tests pass before submitting PR
+- Update documentation as needed
+
+### Code Style
+
+- Follow PEP 8 style guidelines
+- Use Black for code formatting
+- Use isort for import ordering
+- Run pre-commit hooks before committing
+
+### Testing
+
+```bash
+# Run tests
+pytest tests/
+
+# Run with coverage
+pytest --cov=app tests/
+
+# Run specific test file
+pytest tests/test_services.py
+```
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Acknowledgments
+
+- Built with [Streamlit](https://streamlit.io/)
+- Powered by NVIDIA's language models
+- Uses [FastAPI](https://fastapi.tiangolo.com/) for REST API
+- Implements MVC architecture patterns
+- Integrates multiple AI/ML services
