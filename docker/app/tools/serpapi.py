@@ -324,7 +324,7 @@ class SerpAPITool(BaseTool):
             client = serpapi.Client(api_key=api_key)
             response_data = client.search(search_params)
 
-            # Log the raw response for debugging (only if debug logging is enabled)
+            # Log the raw response for debugging
             if logger.isEnabledFor(logging.DEBUG):
                 logger.debug(
                     "Raw SerpAPI response keys: %s", list(response_data.keys())
