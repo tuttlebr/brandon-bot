@@ -76,6 +76,7 @@ class ResponseParsingService:
                 )
 
                 # Parse the arguments
+                logger.info(f"Raw arguments: {raw_args}")
                 parsed_args = json.loads(raw_args)
 
                 tool_calls.append(

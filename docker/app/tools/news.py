@@ -9,7 +9,6 @@ from tools.base import BaseTool, BaseToolResponse
 
 # Configure logger
 from utils.logging_config import get_logger
-from utils.text_processing import clean_content
 
 logger = get_logger(__name__)
 
@@ -720,8 +719,6 @@ Important: Respond ONLY with the JSON object, no other text."""
 
         formatted_entries = []
         for i, result in enumerate(results, 1):
-            # Clean up snippet text to remove formatting artifacts
-            clean_snippet = clean_content(result.snippet)
 
             # Build metadata components
             metadata_parts = [result.source.name]
@@ -744,31 +741,31 @@ Important: Respond ONLY with the JSON object, no other text."""
             metadata_parts.append(result.date)
 
             # Build the entry with metadata
-            entry = f"{i}. [{result.title}]({result.link}) - "
-
-            # Check if snippet contains merged content
-            if "\n\n" in result.snippet:
-                snippet_parts = result.snippet.split("\n\n")
-                entry += f"[Merged {len(snippet_parts)} snippets] "
-                # Show first snippet only in summary
-                clean_first_snippet = clean_content(snippet_parts[0])
-                entry += (
-                    f"{' | '.join(metadata_parts)}: {clean_first_snippet}\n\n"
-                )
-            else:
-                entry += f"{' | '.join(metadata_parts)}: {clean_snippet}\n\n"
-
-            # No longer showing extracted content in formatted results
+            entry = f"{i}. [{result.source.name}]({result.link})"
+            # Format authors properly
+            if result.source.authors:
+                authors = result.source.authors
+                if len(authors) == 1:
+                    entry += f" by {authors[0]}"
+                elif len(authors) == 2:
+                    entry += f" by {authors[0]} and {authors[1]}"
+                else:
+                    # 3 or more authors
+                    entry += f" by {', '.join(authors[:-1])} and {authors[-1]}"
+            entry += f" - {result.title}\n\n"
             formatted_entries.append(entry)
 
         return "\n".join(formatted_entries)
 
-    def search_serpapi_news(self, query: str, **kwargs) -> SerpAPINewsResponse:
+    def search_serpapi_news(
+        self, query: str, top_n: int = 2, **kwargs
+    ) -> SerpAPINewsResponse:
         """
         Search for news using SerpAPI with google_news_light engine.
 
         Args:
             query (str): The search query
+            top_n (int): Number of news results to return (default: 2)
             **kwargs: Additional search parameters to override defaults
 
         Returns:
@@ -779,7 +776,11 @@ Important: Respond ONLY with the JSON object, no other text."""
             ValueError: If SERPAPI_KEY environment variable is not set
                        or if the SerpAPI request fails
         """
-        logger.info("Starting SerpAPI news search for query: '%s'", query)
+        logger.info(
+            "Starting SerpAPI news search for query: '%s' with top_n: %d",
+            query,
+            top_n,
+        )
 
         # Get API key from environment
         from utils.config import config
@@ -795,7 +796,7 @@ Important: Respond ONLY with the JSON object, no other text."""
         default_params = {
             "q": query,
             "engine": "google_news",
-            "num": 7,  # Always set to 7 as per requirement
+            "num": top_n,  # Use the top_n parameter to limit results
             "hl": "en",
             "gl": "us",
         }
@@ -816,6 +817,16 @@ Important: Respond ONLY with the JSON object, no other text."""
 
             # Extract news_results from response
             news_results = response_data.get("news_results", [])
+
+            # Limit results to top_n immediately
+            if len(news_results) > top_n:
+                logger.info(
+                    "SerpAPI returned %d results, limiting to top_n=%d",
+                    len(news_results),
+                    top_n,
+                )
+                news_results = news_results[:top_n]
+
             # Convert news_results to NewsResult objects
             result_objects = []
             for news_item in news_results:
@@ -869,7 +880,7 @@ Important: Respond ONLY with the JSON object, no other text."""
 
             # Extract content for news results with intelligent decision making
             serpapi_response.news_results = self._extract_news_results(
-                serpapi_response.news_results, user_query=query
+                serpapi_response.news_results, user_query=query, top_n=top_n
             )
 
             # Calculate extraction statistics
@@ -934,6 +945,7 @@ Important: Respond ONLY with the JSON object, no other text."""
                    Expected keys:
                    - 'query': Search query
                    - 'but_why': Confidence level (1-5)
+                   - 'top_n': Number of results to return (optional, default: 2)
 
         Returns:
             SerpAPINewsResponse: The search results in a validated Pydantic
@@ -945,9 +957,14 @@ Important: Respond ONLY with the JSON object, no other text."""
             )
 
         query = params["query"]
+        top_n = params.get("top_n", 2)  # Default to 2 if not provided
 
-        logger.debug("run_with_dict method called with query: '%s'", query)
-        return self.search_serpapi_news(query)
+        logger.debug(
+            "run_with_dict method called with query: '%s', top_n: %d",
+            query,
+            top_n,
+        )
+        return self.search_serpapi_news(query, top_n=top_n)
 
 
 # Helper functions for backward compatibility

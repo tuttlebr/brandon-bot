@@ -151,7 +151,7 @@ class LLMConfig:
         True  # Automatically inject conversation context
     )
     MIN_TURNS_FOR_CONTEXT_INJECTION: int = (
-        1  # Minimum turns before injecting context
+        15  # Minimum turns before injecting context
     )
 
 
