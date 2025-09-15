@@ -5,7 +5,6 @@ This service handles streaming responses from LLM models with
 a simplified approach that avoids complex threading patterns.
 """
 
-import logging
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from models.chat_config import ChatConfig
@@ -13,7 +12,9 @@ from services.llm_client_service import llm_client_service
 from utils.config import config
 from utils.exceptions import StreamingError
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class StreamingService:

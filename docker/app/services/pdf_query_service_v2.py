@@ -12,7 +12,6 @@ Given a `pdf_id` and a natural-language query it:
 from __future__ import annotations
 
 import json
-import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
@@ -20,7 +19,9 @@ from models.chat_config import ChatConfig
 from tools.retriever import EmbeddingCreator, SearchConfig, SimilaritySearch
 from utils.config import config as app_config
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 _COLLECTION = "pdf_chunks"
 # Use configured max chunks per query (default: 10)

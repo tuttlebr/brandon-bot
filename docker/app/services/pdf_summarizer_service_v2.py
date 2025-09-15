@@ -10,7 +10,6 @@ Uses TextProcessorService (summarize task) for chunk-level and final reduction.
 
 from __future__ import annotations
 
-import logging
 from typing import Any, Dict, List, Optional
 
 from models.chat_config import ChatConfig
@@ -18,7 +17,9 @@ from services.pdf_chunking_service import PDFChunkingService
 from services.text_processor_service import TextProcessorService, TextTaskType
 from tools.tool_llm_config import get_tool_llm_type
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 _SMALL_CHAR_LIMIT = 32000
 _CHUNK_SUMMARY_TOKENS = 400  # heuristic

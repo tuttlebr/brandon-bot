@@ -5,12 +5,13 @@ This module provides a centralized registry for managing tools
 following the Factory and Singleton patterns with dependency injection support.
 """
 
-import logging
 from typing import Any, Dict, List, Optional, Type
 
 from tools.base import BaseTool
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class ToolFactory:

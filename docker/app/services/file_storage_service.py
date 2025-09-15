@@ -8,14 +8,15 @@ keeping only references in session state to avoid memory issues.
 import base64
 import hashlib
 import json
-import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from utils.config import config
 from utils.exceptions import FileProcessingError, MemoryLimitError
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class FileStorageService:

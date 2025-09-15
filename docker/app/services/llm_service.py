@@ -5,7 +5,6 @@ This is a simplified LLM service that orchestrates the focused services
 for streaming, parsing, and tool execution.
 """
 
-import logging
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
 from models.chat_config import ChatConfig
@@ -17,7 +16,9 @@ from tools.registry import get_all_tool_definitions
 from tools.tool_llm_config import DEFAULT_LLM_TYPE, get_tool_llm_type
 from utils.config import config
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class LLMService:

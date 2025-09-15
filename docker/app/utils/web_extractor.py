@@ -5,7 +5,6 @@ Utility for extracting content from web pages
 """
 
 import asyncio
-import logging
 import time
 from typing import Dict, Optional
 
@@ -13,7 +12,9 @@ import aiohttp
 import requests
 from bs4 import BeautifulSoup
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class WebDataExtractor:

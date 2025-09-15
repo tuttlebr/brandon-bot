@@ -8,16 +8,16 @@ Handles the ingestion of PDF documents into the system, including:
 – Safe to call multiple times; if pdf_id already exists, chunks are replaced.
 """
 
-import logging
 import uuid
 from typing import Any, BinaryIO, Dict
 
 from models.chat_config import ChatConfig
 from services.file_storage_service import FileStorageService
 from services.pdf_chunking_service import PDFChunkingService
+from utils.logging_config import get_logger
 from utils.pdf_id_generator import generate_pdf_id, get_existing_pdf_info
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class PDFIngestionService:

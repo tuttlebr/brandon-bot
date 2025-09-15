@@ -6,7 +6,6 @@ following the Model-View-Controller pattern with proper separation of concerns.
 """
 
 import asyncio
-import logging
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional, Type
@@ -15,7 +14,9 @@ from pydantic import BaseModel, Field
 from pydantic import ValidationError as PydanticValidationError
 from utils.exceptions import ValidationError
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class ExecutionMode(str, Enum):

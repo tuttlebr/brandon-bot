@@ -7,10 +7,11 @@ multiple executor instances across different services.
 
 import atexit
 import concurrent.futures
-import logging
 from typing import Optional
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class ExecutorPool:

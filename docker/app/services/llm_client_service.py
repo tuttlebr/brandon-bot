@@ -5,14 +5,15 @@ This service provides the appropriate LLM client based on the requested type.
 It ensures tools get the correct client for their configured LLM type.
 """
 
-import logging
 from typing import Literal, Optional
 
 import httpx
 from models.chat_config import ChatConfig
 from openai import AsyncOpenAI, OpenAI
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class LLMClientService:
@@ -66,7 +67,7 @@ class LLMClientService:
             ),
             timeout=httpx.Timeout(
                 connect=30.0,  # 30 seconds to connect
-                read=300.0,  # 5 minutes to read response (for long LLM calls)
+                read=600.0,  # 10 minutes to read response (for long LLM calls)
                 write=30.0,  # 30 seconds to write request
                 pool=10.0,  # 10 seconds to get connection from pool
             ),

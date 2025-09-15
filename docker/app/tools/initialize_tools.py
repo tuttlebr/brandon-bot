@@ -5,11 +5,11 @@ This module handles the initialization and registration of all tools
 with the tool registry at application startup.
 """
 
-import logging
-
 from tools.registry import ToolRegistry, register_tool_class
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def initialize_all_tools():

@@ -5,13 +5,14 @@ Provides centralized validation services for domain models,
 including business rule validation and cross-model consistency checks.
 """
 
-import logging
 from typing import Any, List, Optional
+
+from utils.logging_config import get_logger
 
 from .session import FileInfo, Session
 from .user import User, UserPreferences
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ValidationError(Exception):

@@ -1,13 +1,14 @@
-import logging
 from typing import Any, Dict, List, Optional, Type
 
 import serpapi
 from pydantic import BaseModel, Field
 from tools.base import BaseTool, BaseToolResponse
-from utils.text_processing import clean_content, strip_think_tags
 
 # Configure logger
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+from utils.text_processing import clean_content, strip_think_tags
+
+logger = get_logger(__name__)
 
 
 class NewsSource(BaseModel):

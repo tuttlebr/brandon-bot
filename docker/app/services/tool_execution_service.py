@@ -6,16 +6,16 @@ execution strategies, and tool-specific modifications.
 """
 
 import asyncio
-import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 
 from models.chat_config import ChatConfig
 from tools.registry import execute_tool
 from utils.exceptions import ToolExecutionError
+from utils.logging_config import get_logger
 from utils.streamlit_context import run_with_streamlit_context
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ToolExecutionService:
@@ -182,23 +182,47 @@ class ToolExecutionService:
             else False
         )
 
+        # Get the tool's timeout, default to 60 seconds if not specified
+        tool_timeout = getattr(tool, "timeout", 60.0)
+        logger.info("Tool '%s' timeout: %ss", tool_name, tool_timeout)
+
         if has_async:
-            # For async tools, execute the controller directly to avoid event loop deadlock
+            # For async tools, execute controller directly to avoid deadlock
             logger.info(
-                f"Tool '{tool_name}' has async implementation, executing"
-                " controller directly"
+                "Tool '%s' has async implementation, executing"
+                " controller directly with timeout %ss",
+                tool_name,
+                tool_timeout,
             )
             try:
                 # Validate parameters (normally done in BaseTool.execute)
                 if hasattr(tool, "_validate_params"):
                     tool._validate_params(modified_args)
 
-                # Execute the async controller method directly
-                raw_data = await tool._controller.process_async(modified_args)
+                # Execute the async controller method directly with timeout
+                raw_data = await asyncio.wait_for(
+                    tool._controller.process_async(modified_args),
+                    timeout=tool_timeout,
+                )
                 # Format the response using the view
                 result = tool._view.format_response(
                     raw_data, tool.get_response_type()
                 )
+            except asyncio.TimeoutError:
+                logger.error(
+                    "Tool '%s' timed out after %ss", tool_name, tool_timeout
+                )
+                error_msg = (
+                    f"Tool '{tool_name}' timed out after {tool_timeout} "
+                    "seconds. This might be due to slow processing or high "
+                    "server load. Please try again or simplify your request."
+                )
+                if hasattr(tool, "_view"):
+                    result = tool._view.format_error(
+                        TimeoutError(error_msg), tool.get_response_type()
+                    )
+                else:
+                    raise TimeoutError(error_msg)
             except Exception as e:
                 logger.error(
                     f"Error executing async tool {tool_name}: {e}",
@@ -213,16 +237,44 @@ class ToolExecutionService:
         else:
             # Execute sync tools in thread pool with context preservation
             logger.info(
-                "Tool '%s' is sync, executing in thread pool", tool_name
+                "Tool '%s' is sync, executing in thread pool with timeout %ss",
+                tool_name,
+                tool_timeout,
             )
             loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(
-                self.executor,
-                run_with_streamlit_context,
-                execute_tool,
-                tool_name,
-                modified_args,
-            )
+            try:
+                result = await asyncio.wait_for(
+                    loop.run_in_executor(
+                        self.executor,
+                        run_with_streamlit_context,
+                        execute_tool,
+                        tool_name,
+                        modified_args,
+                    ),
+                    timeout=tool_timeout,
+                )
+            except asyncio.TimeoutError:
+                logger.error(
+                    "Tool '%s' timed out after %ss", tool_name, tool_timeout
+                )
+                error_msg = (
+                    f"Tool '{tool_name}' timed out after {tool_timeout} "
+                    "seconds. This might be due to slow processing or high "
+                    "server load. Please try again or simplify your request."
+                )
+                # Try to format error using tool's view if available
+                if tool and hasattr(tool, "_view"):
+                    result = tool._view.format_error(
+                        TimeoutError(error_msg), tool.get_response_type()
+                    )
+                else:
+                    # Return a generic error response
+                    result = {
+                        "success": False,
+                        "error_message": error_msg,
+                        "error_code": "TIMEOUT_ERROR",
+                        "direct_response": True,
+                    }
 
         # Format response
         if hasattr(result, "direct_response") and result.direct_response:

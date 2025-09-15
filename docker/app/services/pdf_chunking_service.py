@@ -7,7 +7,6 @@ that's compatible with MilvusClient's auto-schema generation.
 """
 
 import json
-import logging
 from typing import Any, Dict, List, Optional
 
 from models.chat_config import ChatConfig
@@ -15,7 +14,9 @@ from openai import OpenAI
 from pymilvus import MilvusClient
 from utils.config import config
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class PDFChunkingService:

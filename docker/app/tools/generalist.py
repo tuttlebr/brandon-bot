@@ -5,7 +5,6 @@ This tool handles general conversation and thoughtful discussion on any topic
 that doesn't require external data or specialized tools, following MVC pattern.
 """
 
-import logging
 from datetime import datetime
 from typing import Any, AsyncGenerator, Dict, List, Optional, Type
 
@@ -19,9 +18,10 @@ from tools.base import (
     ToolController,
     ToolView,
 )
+from utils.logging_config import get_logger
 from utils.text_processing import StreamingThinkTagFilter, strip_think_tags
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class GeneralistResponse(BaseToolResponse):

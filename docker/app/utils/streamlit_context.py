@@ -5,7 +5,6 @@ This module provides utilities for preserving Streamlit's script run context
 when executing code in threads or async contexts.
 """
 
-import logging
 from typing import Any, Callable
 
 from streamlit.runtime.scriptrunner import (
@@ -13,7 +12,9 @@ from streamlit.runtime.scriptrunner import (
     get_script_run_ctx,
 )
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def run_with_streamlit_context(func: Callable, *args, **kwargs) -> Any:

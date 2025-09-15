@@ -10,6 +10,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
+from utils.logging_config import configure_logging
 
 
 @dataclass
@@ -180,6 +181,16 @@ class APIConfig:
     DEFAULT_REQUEST_TIMEOUT: int = 3600
     LLM_REQUEST_TIMEOUT: int = 3600
     IMAGE_REQUEST_TIMEOUT: int = 3600
+
+    # Tool-specific timeouts (in seconds)
+    TOOL_DEFAULT_TIMEOUT: int = 60  # Default tool timeout
+    TOOL_DEEP_RESEARCHER_TIMEOUT: int = 300  # 5 minutes for deep research
+    TOOL_IMAGE_GENERATION_TIMEOUT: int = 300  # 5 minutes for image generation
+    TOOL_CONTEXT_GENERATION_TIMEOUT: int = (
+        300  # 5 minutes for context generation
+    )
+    TOOL_WEB_EXTRACT_TIMEOUT: int = 30  # 30 seconds for web extraction
+    TOOL_SERPAPI_TIMEOUT: int = 45  # 45 seconds for search APIs
 
 
 @dataclass
@@ -549,19 +560,5 @@ class AppConfig:
 # Use this throughout the application instead of scattered constants
 config = AppConfig()
 
-# Ensure log directory exists before configuring logging
-import os
-
-log_dir = "/tmp/chatbot_storage"
-os.makedirs(log_dir, exist_ok=True)
-
-# Configure logging with centralized format
-logging.basicConfig(
-    level=getattr(logging, config.system.LOG_LEVEL.upper()),
-    format="%(asctime)s %(levelname)s %(filename)s:%(lineno)d %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler(os.path.join(log_dir, "chatbot.log"), mode="a"),
-    ],
-)
+# Configure logging using centralized utility
+configure_logging(log_level=config.system.LOG_LEVEL)

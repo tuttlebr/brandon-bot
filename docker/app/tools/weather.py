@@ -5,7 +5,6 @@ This tool provides weather information for a given location using the Open-Meteo
 following the Model-View-Controller pattern.
 """
 
-import logging
 from typing import Any, Dict, List, Optional, Type
 
 import requests
@@ -18,7 +17,9 @@ from tools.base import (
     ToolView,
 )
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class CurrentWeather(BaseModel):

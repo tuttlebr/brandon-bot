@@ -6,7 +6,6 @@ following the Model-View-Controller pattern.
 """
 
 import asyncio
-import logging
 from enum import Enum
 from typing import Any, Dict, List, Optional, Type
 
@@ -16,10 +15,11 @@ from services.document_analyzer_service import DocumentAnalyzerService
 from services.text_processor_service import TextProcessorService, TextTaskType
 from services.translation_service import TranslationService
 from tools.base import BaseTool, BaseToolResponse, ToolController, ToolView
+from utils.logging_config import get_logger
 from utils.pdf_extractor import PDFDataExtractor
 from utils.text_processing import strip_think_tags
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class AssistantTaskType(str, Enum):

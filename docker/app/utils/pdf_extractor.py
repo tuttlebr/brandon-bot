@@ -6,11 +6,12 @@ eliminating duplicate code across multiple tools.
 """
 
 import json
-import logging
 import re
 from typing import Any, Dict, List, Optional
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class PDFDataExtractor:

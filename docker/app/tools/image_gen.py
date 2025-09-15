@@ -1,4 +1,3 @@
-import logging
 from typing import Any, Dict, List, Optional, Tuple, Type
 
 from models.chat_config import ChatConfig
@@ -9,7 +8,9 @@ from tools.base import BaseTool, BaseToolResponse, ExecutionMode
 from utils.image import generate_image
 
 # Configure logger
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 # Aspect ratio mappings to dimensions
 ASPECT_RATIO_MAPPINGS = {
@@ -98,7 +99,10 @@ class ImageGenerationTool(BaseTool):
         self.execution_mode = (
             ExecutionMode.SYNC
         )  # Image generation is synchronous
-        self.timeout = 256.0  # Image generation can take longer
+        # Use timeout from config
+        from utils.config import config
+
+        self.timeout = config.api.TOOL_IMAGE_GENERATION_TIMEOUT
 
     def _initialize_mvc(self):
         """Initialize MVC components"""

@@ -5,14 +5,15 @@ This service handles language translation operations.
 Extracted from the monolithic AssistantTool.
 """
 
-import logging
 from typing import Dict, List, Optional
 
 from models.chat_config import ChatConfig
 from services.llm_client_service import llm_client_service
 from utils.config import config as app_config
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 # Supported languages for translation
 SUPPORTED_LANGUAGES = [

@@ -6,7 +6,6 @@ functionality through a single /agent endpoint, accepting OpenAI-compatible
 chat completion requests and returning responses in the same format.
 """
 
-import logging
 from typing import Any, Dict, List, Optional, Union
 
 # Import the application components
@@ -26,11 +25,12 @@ from tools.registry import get_all_tool_definitions
 from ui import ChatHistoryComponent
 from utils.config import config
 from utils.exceptions import ConfigurationError
+
+# Get logger using centralized logging configuration
+from utils.logging_config import get_logger
 from utils.startup import initialize_app
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 # Pydantic models for API requests/responses

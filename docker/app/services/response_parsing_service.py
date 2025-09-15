@@ -6,13 +6,14 @@ of tool calls from both standard OpenAI format and custom formats.
 """
 
 import json
-import logging
 import re
 from typing import Any, Dict, List, Tuple
 
 from utils.exceptions import LLMServiceError
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class ResponseParsingService:

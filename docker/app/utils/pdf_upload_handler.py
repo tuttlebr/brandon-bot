@@ -5,7 +5,6 @@ Handles PDF file uploads for Streamlit, using NVIngest for extraction
 and PDFIngestionService for chunking and embedding.
 """
 
-import logging
 from typing import Any, Dict, Optional
 
 import streamlit as st
@@ -14,7 +13,9 @@ from models.chat_config import ChatConfig
 from services.pdf_ingestion_service import PDFIngestionService
 from services.session_state import set_active_pdf_id, set_session_id
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def handle_pdf_upload(uploaded_file) -> Optional[Dict[str, Any]]:

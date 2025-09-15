@@ -7,7 +7,6 @@ Simplified tool that delegates to the new PDF services:
 - PDFSummarizerServiceV2 for summaries
 """
 
-import logging
 from typing import Any, Dict, List, Optional, Type
 
 from models.chat_config import ChatConfig
@@ -18,7 +17,9 @@ from services.pdf_summarizer_service_v2 import PDFSummarizerServiceV2
 from services.session_state import get_active_pdf_id
 from tools.base import BaseTool, BaseToolResponse, ToolController, ToolView
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class PDFAssistantResponse(BaseToolResponse):
@@ -260,9 +261,9 @@ class PDFAssistantTool(BaseTool):
 
     def __init__(self):
         try:
-            import logging
+            from utils.logging_config import get_logger
 
-            logger = logging.getLogger(__name__)
+            logger = get_logger(__name__)
             logger.info("Creating PDFAssistantTool instance")
 
             super().__init__()

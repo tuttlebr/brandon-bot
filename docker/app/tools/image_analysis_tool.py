@@ -5,7 +5,6 @@ This tool analyzes uploaded images using vision-capable language models.
 """
 
 import asyncio
-import logging
 from typing import Any, AsyncGenerator, Dict, Type
 
 from pydantic import Field
@@ -16,7 +15,9 @@ from tools.base import (
     StreamingToolResponse,
 )
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class ImageAnalysisResponse(BaseToolResponse):

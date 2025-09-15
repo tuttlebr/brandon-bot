@@ -7,7 +7,6 @@ and text prompt.
 
 import base64
 import io
-import logging
 import os
 from typing import Any, Dict, Optional, Type
 
@@ -17,7 +16,9 @@ from pydantic import Field
 from tools.base import BaseTool, BaseToolResponse, ExecutionMode
 
 # Configure logger
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class ContextGenerationResponse(BaseToolResponse):
@@ -55,7 +56,10 @@ class ContextGenerationTool(BaseTool):
         )
         self.supported_contexts = ["image_generation", "image_editing"]
         self.execution_mode = ExecutionMode.SYNC
-        self.timeout = 256.0
+        # Use timeout from config
+        from utils.config import config
+
+        self.timeout = config.api.TOOL_CONTEXT_GENERATION_TIMEOUT
 
     def _initialize_mvc(self):
         """Initialize MVC components"""
@@ -233,8 +237,13 @@ class ContextGenerationTool(BaseTool):
                 logger.info("Using OpenAI API for image editing")
                 logger.info("Editing image with prompt: '%s'", prompt)
 
-                # Initialize OpenAI client with the API key
-                client = OpenAI(api_key=api_key)
+                # Initialize OpenAI client with the API key and timeout
+                import httpx
+
+                client = OpenAI(
+                    api_key=api_key,
+                    timeout=httpx.Timeout(self.timeout, connect=30.0),
+                )
 
                 # Convert base64 image to bytes for OpenAI API
                 image_bytes = base64.b64decode(image_base64)

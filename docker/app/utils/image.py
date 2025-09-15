@@ -1,5 +1,4 @@
 import base64
-import logging
 import os
 import re
 from io import BytesIO
@@ -11,7 +10,9 @@ from PIL import Image
 from pydantic import BaseModel
 
 # Configure logging
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 # Constants
 DEFAULT_PROMPT = "A simple coffee shop interior"
@@ -125,8 +126,12 @@ def generate_image(
         request_data = ImageProcessingRequest(**params)
 
         # Make the request using the model's json method
+        # Use a generous timeout for image generation
         response = requests.post(
-            invoke_url, json=request_data.model_dump(), headers=HTTP_HEADERS
+            invoke_url,
+            json=request_data.model_dump(),
+            headers=HTTP_HEADERS,
+            timeout=300,  # 5 minutes timeout for image generation
         )
 
         # Raise HTTP errors

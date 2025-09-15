@@ -6,13 +6,14 @@ into LLM messages to ensure the model always has access to recent
 conversation history up to the configured maximum turns.
 """
 
-import logging
 from typing import Any, Dict, List, Optional
 
 from models.chat_config import ChatConfig
 from utils.config import config
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class ConversationContextService:

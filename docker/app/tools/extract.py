@@ -5,7 +5,6 @@ This tool extracts content from URLs using LLM-based HTML processing,
 following the Model-View-Controller pattern.
 """
 
-import logging
 import re
 from typing import Any, AsyncGenerator, Dict, List, Optional, Type
 
@@ -19,11 +18,13 @@ from tools.base import (
     ToolController,
     ToolView,
 )
+
+# Configure logger
+from utils.logging_config import get_logger
 from utils.text_processing import StreamingThinkTagFilter
 from utils.web_extractor import WebDataExtractor
 
-# Configure logger
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class WebExtractResponse(BaseToolResponse):

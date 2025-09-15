@@ -6,7 +6,6 @@ Extracted from the monolithic AssistantTool to separate concerns.
 """
 
 import asyncio
-import logging
 from typing import Any, Dict, List, Optional
 
 from models.chat_config import ChatConfig
@@ -14,7 +13,9 @@ from services.llm_client_service import llm_client_service
 from utils.batch_processor import DocumentProcessor
 from utils.config import config as app_config
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class DocumentAnalyzerService:

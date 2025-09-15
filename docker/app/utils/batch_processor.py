@@ -5,10 +5,11 @@ This module provides a reusable batch processing framework for handling
 large documents and datasets efficiently.
 """
 
-import logging
 from typing import Any, Dict, List, Optional
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class DocumentProcessor:

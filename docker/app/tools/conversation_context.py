@@ -5,7 +5,6 @@ This tool analyzes conversation history to extract specific types of context
 following the Model-View-Controller pattern.
 """
 
-import logging
 from enum import Enum
 from typing import Any, AsyncGenerator, Dict, List, Optional, Type
 
@@ -20,11 +19,13 @@ from tools.base import (
     ToolView,
 )
 from utils.config import config as app_config
+
+# Configure logger
+from utils.logging_config import get_logger
 from utils.pdf_extractor import PDFDataExtractor
 from utils.text_processing import strip_think_tags
 
-# Configure logger
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ContextType(str, Enum):

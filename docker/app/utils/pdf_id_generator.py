@@ -6,10 +6,11 @@ and reliable identification across sessions.
 """
 
 import hashlib
-import logging
 from typing import BinaryIO, Union
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 def generate_pdf_id(

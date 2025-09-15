@@ -9,10 +9,12 @@ from pydantic import BaseModel, Field
 from pymilvus import MilvusClient
 from tools.base import BaseTool, BaseToolResponse
 from utils.config import config
-from utils.text_processing import strip_think_tags
 
 # Configure logger
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+from utils.text_processing import strip_think_tags
+
+logger = get_logger(__name__)
 
 MAX_RESULTS = 25
 

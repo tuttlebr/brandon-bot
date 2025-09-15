@@ -8,7 +8,6 @@ research questions.
 
 import asyncio
 import json
-import logging
 import re
 from enum import Enum
 from typing import Any, Dict, List, Optional, Type
@@ -24,9 +23,10 @@ from tools.base import (
     ToolView,
 )
 from tools.registry import execute_tool
+from utils.logging_config import get_logger
 from utils.text_processing import strip_think_tags
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class ConfidenceLevel(str, Enum):
@@ -1680,7 +1680,10 @@ class DeepResearcherTool(BaseTool):
             "research, fact-checking, or comprehensive analysis."
         )
         self.supported_contexts = ["research", "analysis", "fact_checking"]
-        self.timeout = 120.0  # Longer timeout for deep research
+        # Use timeout from config
+        from utils.config import config
+
+        self.timeout = config.api.TOOL_DEEP_RESEARCHER_TIMEOUT
 
     def _initialize_mvc(self):
         """Initialize MVC components"""

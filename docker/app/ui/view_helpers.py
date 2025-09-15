@@ -5,14 +5,15 @@ Provides abstraction layer for UI framework-specific operations,
 reducing coupling between controllers and Streamlit framework.
 """
 
-import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Optional
 
 import streamlit as st
 
-logger = logging.getLogger(__name__)
+from utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class UIMessage:
