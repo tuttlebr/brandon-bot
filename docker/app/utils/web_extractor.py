@@ -89,6 +89,15 @@ class WebDataExtractor:
                 or soup.find(id="main")
                 or soup.find(id="content")
                 or soup.find(class_="content")
+                or soup.find(class_="main-content")
+                or soup.find(class_="article-content")
+                or soup.find(class_="entry-content")
+                or soup.find(class_="post-content")
+                or soup.find(class_="page-content")
+                or soup.find(role="main")
+                or soup.find(
+                    "div", class_=lambda x: x and "content" in x.lower()
+                )
                 or soup.find("body")
             )
 
@@ -105,9 +114,24 @@ class WebDataExtractor:
             content = "\n".join(lines)
 
             elapsed_time = time.time() - start_time
+
+            # Check if we actually got any content
+            if not content or len(content.strip()) == 0:
+                logger.warning(
+                    f"No content extracted from {url} - page may use "
+                    "JavaScript or have anti-scraping measures"
+                )
+                return {
+                    "success": False,
+                    "error": "No content could be extracted from the page",
+                    "content": "",
+                    "title": title,
+                    "response_time": elapsed_time,
+                }
+
             logger.info(
-                f"Successfully extracted content from {url} in"
-                f" {elapsed_time:.2f}s"
+                f"Successfully extracted {len(content)} characters from "
+                f"{url} in {elapsed_time:.2f}s"
             )
 
             return {
@@ -264,6 +288,15 @@ class WebDataExtractor:
                 or soup.find(id="main")
                 or soup.find(id="content")
                 or soup.find(class_="content")
+                or soup.find(class_="main-content")
+                or soup.find(class_="article-content")
+                or soup.find(class_="entry-content")
+                or soup.find(class_="post-content")
+                or soup.find(class_="page-content")
+                or soup.find(role="main")
+                or soup.find(
+                    "div", class_=lambda x: x and "content" in x.lower()
+                )
                 or soup.find("body")
             )
 
@@ -278,6 +311,19 @@ class WebDataExtractor:
             lines = content.split("\n")
             lines = [line.strip() for line in lines if line.strip()]
             content = "\n".join(lines)
+
+            # Check if we actually got any content
+            if not content or len(content.strip()) == 0:
+                logger.warning(
+                    "No content extracted during HTML parsing - page may use"
+                    " JavaScript or have anti-scraping measures"
+                )
+                return {
+                    "success": False,
+                    "error": "No content could be extracted from the page",
+                    "content": "",
+                    "title": title,
+                }
 
             return {
                 "success": True,

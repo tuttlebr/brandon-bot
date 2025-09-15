@@ -215,7 +215,7 @@ class SerpAPITool(BaseTool):
                         "top_n": {
                             "type": "integer",
                             "description": (
-                                "Number of top results to process (default: 3)"
+                                "Number of top results to process (default: 2)"
                             ),
                             "default": 2,
                             "maximum": 3,
@@ -398,7 +398,7 @@ class SerpAPITool(BaseTool):
                     result = future.result(timeout=30.0)
                     analysis_results.append(result)
                 except Exception as e:
-                    logger.warning("Snippet analysis failed: %s", e)
+                    logger.error("Snippet analysis failed: %s", e)
                     # Default to extraction on failure
                     analysis_results.append((True, ""))
 
@@ -480,7 +480,7 @@ class SerpAPITool(BaseTool):
                             )
                 except Exception as e:
                     for idx, result in candidates:
-                        logger.warning(
+                        logger.error(
                             "Extraction failed for result %d (%s): %s",
                             idx + 1,
                             result.link,
@@ -538,7 +538,7 @@ class SerpAPITool(BaseTool):
                     loop.close()
 
             except Exception as e:
-                logger.warning(
+                logger.error(
                     "Extraction attempt %d/%d failed for %s: %s",
                     attempt + 1,
                     max_retries,
@@ -729,7 +729,18 @@ Important: Respond ONLY with the JSON object, no other text."""
             result = await extract_tool._execute_controller_async(params)
 
             if result and result.get("success", False):
-                content = result.get("content", "")
+                # Handle streaming response
+                if result.get("is_streaming") and result.get(
+                    "content_generator"
+                ):
+                    # Collect content from the async generator
+                    content = ""
+                    async for chunk in result["content_generator"]:
+                        content += chunk
+                else:
+                    # Handle non-streaming response
+                    content = result.get("content", "")
+
                 logger.info(
                     "Successfully extracted %d characters from %s",
                     len(content),
@@ -737,7 +748,7 @@ Important: Respond ONLY with the JSON object, no other text."""
                 )
                 return content
             else:
-                logger.warning(
+                logger.error(
                     "Web extraction failed for %s: %s",
                     url,
                     (
@@ -749,7 +760,7 @@ Important: Respond ONLY with the JSON object, no other text."""
                 return None
 
         except Exception as e:
-            logger.warning("Error extracting content from %s: %s", url, e)
+            logger.error("Error extracting content from %s: %s", url, e)
             return None
 
     def _get_cached_content(self, url: str) -> Optional[str]:

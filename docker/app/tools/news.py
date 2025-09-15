@@ -1,12 +1,15 @@
-from typing import Any, Dict, List, Optional, Type
+import asyncio
+import time
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Dict, List, Optional, Tuple, Type
 
 import serpapi
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from tools.base import BaseTool, BaseToolResponse
 
 # Configure logger
 from utils.logging_config import get_logger
-from utils.text_processing import clean_content, strip_think_tags
+from utils.text_processing import clean_content
 
 logger = get_logger(__name__)
 
@@ -49,31 +52,73 @@ class NewsResult(BaseModel):
         None, description="True if the result is a video"
     )
     extracted_content: Optional[str] = Field(
-        None, description="Extracted content from URL"
+        None, description="Extracted content from URL or snippet fallback"
+    )
+    extraction_decision: Optional[str] = Field(
+        None, description="LLM's decision on extraction necessity"
+    )
+    extraction_confidence: Optional[float] = Field(
+        None, description="Confidence score for the extraction decision"
+    )
+    extraction_method: Optional[str] = Field(
+        None, description="Method used for content (snippet/extracted/cached)"
     )
 
 
 class SerpAPINewsResponse(BaseToolResponse):
     """Complete response from SerpAPI News Search"""
 
+    model_config = ConfigDict(extra="allow")
+
     query: str
     news_results: List[NewsResult] = Field(default_factory=list)
     formatted_results: str = Field(
         default="", description="Formatted results for display"
     )
+    extraction_stats: Optional[Dict[str, Any]] = Field(
+        None, description="Statistics about the extraction process"
+    )
+
+
+class ExtractionConfig(BaseModel):
+    """Configuration for extraction behavior"""
+
+    max_parallel_extractions: int = Field(
+        default=5, description="Max parallel web extractions"
+    )
+    extraction_timeout: float = Field(
+        default=10.0, description="Timeout for each extraction"
+    )
+    retry_on_failure: bool = Field(
+        default=True, description="Retry failed extractions"
+    )
+    max_retries: int = Field(default=2, description="Max retry attempts")
+    always_extract_top_n: int = Field(
+        default=5,
+        description="Always extract top N results regardless of analysis",
+    )
+    use_cached_content: bool = Field(
+        default=True, description="Use cached extracted content"
+    )
+    cache_ttl_seconds: int = Field(
+        default=3600, description="Cache TTL in seconds"
+    )
 
 
 class NewsTool(BaseTool):
-    """Tool for performing SerpAPI news searches"""
+    """Tool for performing SerpAPI news searches with intelligent extraction"""
 
-    def __init__(self):
+    def __init__(self, extraction_config: Optional[ExtractionConfig] = None):
         super().__init__()
         self.name = "serpapi_news_search"
         self.description = (
-            "Up-to-date news articles and breaking events. "
+            "Up-to-date news articles and breaking events with intelligently "
+            "extracted article content (or snippet if extraction not needed). "
             "Use when the user explicitly asks for news, headlines, "
             "or current events."
         )
+        self.extraction_config = extraction_config or ExtractionConfig()
+        self._content_cache = {}  # Simple in-memory cache
 
     def _initialize_mvc(self):
         """Initialize MVC components (not needed for this tool)"""
@@ -111,6 +156,15 @@ class NewsTool(BaseTool):
                                 "to help the user."
                             ),
                         },
+                        "top_n": {
+                            "type": "integer",
+                            "description": (
+                                "Number of top results to process (default: 2)"
+                            ),
+                            "default": 2,
+                            "maximum": 3,
+                            "minimum": 1,
+                        },
                     },
                     "required": ["query", "but_why"],
                 },
@@ -125,115 +179,531 @@ class NewsTool(BaseTool):
         """Execute the tool with given parameters"""
         return self.run_with_dict(params)
 
-    def _extract_content_for_results(
-        self, results: List[NewsResult]
+    def _extract_news_results(
+        self, results: List[NewsResult], user_query: str = "", top_n: int = 2
     ) -> List[NewsResult]:
         """
-        Extract content for news results using batch extraction
+        Extract content for news results with intelligent decision making.
+        Uses LLM-based analysis to determine if web extraction is needed.
+        Implements parallel processing for efficiency.
+        Deduplicates results by URL to avoid redundant extractions.
 
         Args:
             results: List of news results
+            user_query: The original user query for context
 
         Returns:
-            List of news results with extracted content added
+            List of news results with extracted content
         """
         if not results:
-            logger.warning("No news results found for extraction")
+            logger.warning("No news results found")
             return []
 
+        # Deduplicate by URL while preserving order and merging snippets
+        url_to_results = {}  # Map URL to list of results with that URL
+        deduplicated_results = []
+
+        for result in results:
+            if result.link not in url_to_results:
+                url_to_results[result.link] = []
+                deduplicated_results.append(result)
+            url_to_results[result.link].append(result)
+
+        # Merge snippets for duplicate URLs
+        duplicate_count = 0
+        for url, results_list in url_to_results.items():
+            if len(results_list) > 1:
+                duplicate_count += len(results_list) - 1
+                # Merge snippets into the first result
+                primary_result = results_list[0]
+                merged_snippets = [primary_result.snippet]
+
+                for duplicate in results_list[1:]:
+                    if duplicate.snippet not in merged_snippets:
+                        merged_snippets.append(duplicate.snippet)
+
+                # Update the primary result with merged snippets
+                if len(merged_snippets) > 1:
+                    primary_result.snippet = "\n\n".join(merged_snippets)
+                    logger.info(
+                        "Merged %d snippets for URL: %s",
+                        len(merged_snippets),
+                        url[:80] + "..." if len(url) > 80 else url,
+                    )
+
+        if duplicate_count > 0:
+            logger.info(
+                "Found %d duplicate URLs, merged into %d unique results",
+                duplicate_count,
+                len(deduplicated_results),
+            )
+
+        results = deduplicated_results
+
         logger.info(
-            "Extracting content for %d news results",
+            "Processing %d unique news results with intelligent extraction",
             len(results),
         )
 
-        # Import extract tool
-        from tools.extract import execute_web_extract_batch
+        # Initialize all results with snippet as extracted_content
+        # This ensures we always have content to return
+        for result in results:
+            result.extracted_content = result.snippet
+            result.extraction_method = "snippet"
 
-        try:
-            # Get URLs for all results
-            urls = [result.link for result in results]
-
-            # Perform batch extraction
-            extract_results = execute_web_extract_batch(urls)
-
-            # Create a mapping of URL to extracted content
-            url_to_content = {}
-            for extract_result in extract_results:
-                logger.debug("Extract result: %s", extract_result)
-
-                # Handle both WebExtractResponse and StreamingExtractResponse
-                content = None
-                if extract_result.success:
-                    if (
-                        hasattr(extract_result, "content")
-                        and extract_result.content
-                    ):
-                        # Regular WebExtractResponse
-                        content = extract_result.content
-                    elif (
-                        hasattr(extract_result, "content_generator")
-                        and extract_result.content_generator
-                    ):
-                        # StreamingExtractResponse - collect the content
-                        try:
-                            import asyncio
-
-                            # Create a new event loop if one doesn't exist
-                            try:
-                                loop = asyncio.get_event_loop()
-                            except RuntimeError:
-                                loop = asyncio.new_event_loop()
-                                asyncio.set_event_loop(loop)
-
-                            # Collect content from the async generator
-                            async def collect_content():
-                                collected = ""
-                                async for (
-                                    chunk
-                                ) in extract_result.content_generator:
-                                    collected += chunk
-                                return collected
-
-                            content = loop.run_until_complete(
-                                collect_content()
-                            )
-                        except Exception as e:
-                            logger.error(
-                                "Failed to collect streaming content "
-                                "from %s: %s",
-                                extract_result.url,
-                                e,
-                            )
-                            content = None
-
-                if content:
-                    url_to_content[extract_result.url] = content
-                    logger.debug(
-                        "Successfully extracted content from %s",
-                        extract_result.url,
-                    )
-                else:
-                    logger.warning(
-                        "Failed to extract content from %s: %s",
-                        extract_result.url,
-                        extract_result.error_message,
-                    )
-
-            # Update results with extracted content
-            for result in results:
-                if result.link in url_to_content:
-                    result.extracted_content = url_to_content[result.link]
-
+        # If no user query provided, skip intelligent analysis and use snippets
+        if not user_query:
             logger.info(
-                "Batch extraction completed. %d successful extractions",
-                len(url_to_content),
+                "No user query provided, using snippets for all %d results",
+                len(results),
+            )
+            return results
+
+        # Use thread-based parallel processing
+        logger.info(
+            "Using thread-based parallel processing for %d results",
+            len(results),
+        )
+
+        # First, analyze all snippets in parallel
+        analysis_results = self._analyze_snippets_parallel(
+            results, user_query, top_n
+        )
+
+        # Collect results that need extraction
+        extraction_candidates = []
+        for i, (result, (needs_extraction, _)) in enumerate(
+            zip(results, analysis_results)
+        ):
+            result.extraction_decision = None
+            result.extraction_confidence = (
+                None  # No longer using confidence scores
             )
 
-        except Exception as e:
-            logger.error("Error in batch extraction: %s", e)
-            # Continue without extracted content - don't fail the entire search
+            # Determine if we should extract
+            should_extract = needs_extraction or (
+                i < self.extraction_config.always_extract_top_n
+            )
+
+            if should_extract:
+                extraction_candidates.append((i, result))
+                logger.info(
+                    "Result %d will be extracted: %s",
+                    i + 1,
+                    result.title[:50] + "...",
+                )
+            else:
+                logger.info(
+                    "Result %d snippet is sufficient: %s",
+                    i + 1,
+                    result.title[:50] + "...",
+                )
+
+        # Extract content in parallel with rate limiting
+        if extraction_candidates:
+            self._extract_content_parallel(extraction_candidates)
 
         return results
+
+    def _analyze_snippets_parallel(
+        self, results: List[NewsResult], user_query: str, top_n: int
+    ) -> List[Tuple[bool, str]]:
+        """
+        Analyze multiple snippets in parallel to determine extraction needs.
+
+        Returns:
+            List of tuples (needs_extraction, decision_reason)
+        """
+        with ThreadPoolExecutor(max_workers=min(len(results), 5)) as executor:
+            futures = []
+            for result in results:
+                future = executor.submit(
+                    self._analyze_snippet_sync_wrapper,
+                    result.snippet,
+                    user_query,
+                    result.link,
+                    top_n,
+                )
+                futures.append(future)
+
+            analysis_results = []
+            for future in futures:
+                try:
+                    result = future.result(timeout=30.0)
+                    analysis_results.append(result)
+                except Exception as e:
+                    logger.warning("Snippet analysis failed: %s", e)
+                    # Default to extraction on failure
+                    analysis_results.append((True, ""))
+
+            return analysis_results
+
+    def _extract_content_parallel(
+        self, extraction_candidates: List[Tuple[int, NewsResult]]
+    ):
+        """
+        Extract content from multiple URLs in parallel with rate limiting.
+        Deduplicates extraction requests by URL to avoid redundant work.
+        """
+        # Check cache first
+        if self.extraction_config.use_cached_content:
+            remaining_candidates = []
+            for idx, result in extraction_candidates:
+                cached_content = self._get_cached_content(result.link)
+                if cached_content:
+                    result.extracted_content = cached_content
+                    result.extraction_method = "cached"
+                    logger.info(
+                        "Using cached content for result %d: %s",
+                        idx + 1,
+                        result.title[:50] + "...",
+                    )
+                else:
+                    remaining_candidates.append((idx, result))
+            extraction_candidates = remaining_candidates
+
+        if not extraction_candidates:
+            return
+
+        # Group candidates by URL to avoid duplicate extractions
+        url_to_candidates = {}
+        for idx, result in extraction_candidates:
+            if result.link not in url_to_candidates:
+                url_to_candidates[result.link] = []
+            url_to_candidates[result.link].append((idx, result))
+
+        # Limit parallel extractions
+        max_parallel = self.extraction_config.max_parallel_extractions
+
+        with ThreadPoolExecutor(max_workers=max_parallel) as executor:
+            futures = {}
+            # Submit one extraction per unique URL
+            for url, candidates in url_to_candidates.items():
+                future = executor.submit(self._extract_with_retry, url)
+                futures[future] = candidates
+
+            for future in futures:
+                candidates = futures[future]
+                try:
+                    extracted_content = future.result(
+                        timeout=self.extraction_config.extraction_timeout
+                    )
+                    if extracted_content:
+                        # Share extracted content among all results with URL
+                        for idx, result in candidates:
+                            result.extracted_content = extracted_content
+                            result.extraction_method = "extracted"
+                            logger.info(
+                                "Successfully extracted content for "
+                                "result %d: %s",
+                                idx + 1,
+                                result.title[:50] + "...",
+                            )
+
+                        # Cache the content once
+                        if self.extraction_config.use_cached_content:
+                            self._cache_content(
+                                candidates[0][1].link, extracted_content
+                            )
+                    else:
+                        for idx, result in candidates:
+                            logger.info(
+                                "Extraction returned empty for result %d, "
+                                "keeping snippet",
+                                idx + 1,
+                            )
+                except Exception as e:
+                    for idx, result in candidates:
+                        logger.error(
+                            "Extraction failed for result %d (%s): %s",
+                            idx + 1,
+                            result.link,
+                            e,
+                        )
+
+    def _analyze_snippet_sync_wrapper(
+        self, snippet: str, user_query: str, url: str, top_n: int
+    ) -> Tuple[bool, str]:
+        """
+        Synchronous wrapper for async snippet analysis.
+
+        Returns:
+            Tuple of (needs_extraction, decision_reason)
+        """
+        try:
+            # Create a new event loop for this thread
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                result = loop.run_until_complete(
+                    self._analyze_snippet_completeness_enhanced(
+                        snippet, user_query, url, top_n
+                    )
+                )
+                return result
+            finally:
+                loop.close()
+        except Exception as e:
+            logger.warning("Failed to analyze snippet: %s", e)
+            return (True, "")
+
+    def _extract_with_retry(self, url: str) -> Optional[str]:
+        """
+        Extract content with retry logic.
+        """
+        max_retries = (
+            self.extraction_config.max_retries
+            if self.extraction_config.retry_on_failure
+            else 1
+        )
+
+        for attempt in range(max_retries):
+            try:
+                # Create a new event loop for this thread
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    content = loop.run_until_complete(
+                        self._extract_web_content_safely(url)
+                    )
+                    if content:
+                        return content
+                finally:
+                    loop.close()
+
+            except Exception as e:
+                logger.warning(
+                    "Extraction attempt %d/%d failed for %s: %s",
+                    attempt + 1,
+                    max_retries,
+                    url,
+                    e,
+                )
+                if attempt < max_retries - 1:
+                    time.sleep(1)  # Brief delay before retry
+
+        return None
+
+    async def _analyze_snippet_completeness_enhanced(
+        self, snippet: str, user_query: str, url: str, top_n: int
+    ) -> Tuple[bool, str]:
+        """
+        Enhanced snippet analysis for news articles.
+
+        Args:
+            snippet: The search result snippet
+            user_query: The original user query
+            url: The URL of the search result
+
+        Returns:
+            Tuple of (needs_extraction, empty_string)
+        """
+        COMPLETENESS_SCHEMA = {
+            "type": "object",
+            "properties": {
+                "needs_extraction": {"type": "boolean"},
+            },
+            "required": ["needs_extraction"],
+        }
+
+        try:
+            from services.llm_client_service import llm_client_service
+
+            # Use the configured LLM for this tool
+            client = llm_client_service.get_async_client(self.llm_type)
+            model_name = llm_client_service.get_model_name(self.llm_type)
+
+            system_prompt = """/no_think
+You analyze news snippets to determine if they contain sufficient information.
+
+Task: Determine if the news snippet fully answers the user's question about news.
+
+You must respond with valid JSON in this exact format:
+{
+    "needs_extraction": true
+}
+ - OR -
+{
+    "needs_extraction": false
+}
+Set needs_extraction to true if:
+- The snippet is truncated or incomplete
+- Important details about the news event are missing
+- The snippet references information not shown
+- The user needs more context about the news
+
+Set needs_extraction to false if:
+- The snippet completely answers the question
+- All key facts are present in the snippet
+- No additional information is needed
+
+Important: Respond ONLY with the JSON object, no other text."""
+
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {
+                    "role": "user",
+                    "content": (
+                        f"User Question: {user_query}\n\nNews Article"
+                        f" Snippet: {snippet}"
+                    ),
+                },
+            ]
+
+            response = await client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                temperature=0.0,
+                extra_body={"nvext": {"guided_json": COMPLETENESS_SCHEMA}},
+            )
+
+            # Parse the JSON response
+            import json
+
+            raw_content = response.choices[0].message.content
+            if not raw_content:
+                logger.error("Empty response from LLM for snippet analysis")
+                return (True, "")
+
+            # Log raw response for debugging
+            logger.debug(
+                "Raw LLM response for snippet analysis: %s", raw_content
+            )
+
+            try:
+                decision_data = json.loads(raw_content)
+            except json.JSONDecodeError as json_err:
+                logger.error(
+                    "Failed to parse JSON from LLM response: %s. "
+                    "Raw content: %s",
+                    json_err,
+                    raw_content[:200],
+                )
+                return (True, "")
+
+            # Validate response is a dictionary
+            if not isinstance(decision_data, dict):
+                logger.error(
+                    "LLM response is not a dictionary. Type: %s, Content: %s",
+                    type(decision_data).__name__,
+                    str(decision_data)[:200],
+                )
+                return (True, "")
+
+            # Handle both boolean and string representations
+            needs_extraction_raw = decision_data.get("needs_extraction", True)
+            if isinstance(needs_extraction_raw, str):
+                needs_extraction = needs_extraction_raw.lower() in [
+                    "true",
+                    "yes",
+                    "1",
+                ]
+            else:
+                needs_extraction = bool(needs_extraction_raw)
+
+            logger.info(
+                "News snippet analysis for '%s': needs_extraction=%s",
+                url[:80] + "..." if len(url) > 80 else url,
+                needs_extraction,
+            )
+
+            return (needs_extraction, "")
+
+        except Exception as e:
+            logger.error(
+                "Failed to analyze snippet for %s: %s. "
+                "Defaulting to extraction.",
+                url,
+                e,
+            )
+            # If analysis fails, default to extraction to be safe
+            return (True, "")
+
+    async def _extract_web_content_safely(self, url: str) -> Optional[str]:
+        """
+        Safely extract web content using the web extraction tool
+        without causing deadlocks.
+
+        Args:
+            url: The URL to extract content from
+
+        Returns:
+            Extracted content or None if extraction fails
+        """
+        try:
+            from tools.registry import get_tool
+
+            # Get the web extraction tool
+            extract_tool = get_tool("extract_web_content")
+            if not extract_tool:
+                logger.warning("Web extraction tool not available")
+                return None
+
+            # Use the tool's async execution method to avoid deadlock
+            params = {
+                "url": url,
+                "request": "",  # No specific request, just get content
+                "but_why": 5,  # High confidence
+            }
+
+            # Execute the tool asynchronously
+            result = await extract_tool._execute_controller_async(params)
+
+            if result and result.get("success", False):
+                # Handle streaming response
+                if result.get("is_streaming") and result.get(
+                    "content_generator"
+                ):
+                    # Collect content from the async generator
+                    content = ""
+                    async for chunk in result["content_generator"]:
+                        content += chunk
+                else:
+                    # Handle non-streaming response
+                    content = result.get("content", "")
+
+                logger.info(
+                    "Successfully extracted %d characters from %s",
+                    len(content),
+                    url,
+                )
+                return content
+            else:
+                logger.warning(
+                    "Web extraction failed for %s: %s",
+                    url,
+                    (
+                        result.get("error_message", "Unknown error")
+                        if result
+                        else "No result"
+                    ),
+                )
+                return None
+
+        except Exception as e:
+            logger.warning("Error extracting content from %s: %s", url, e)
+            return None
+
+    def _get_cached_content(self, url: str) -> Optional[str]:
+        """Get cached content if available and not expired."""
+        if url in self._content_cache:
+            cached_data = self._content_cache[url]
+            if (
+                time.time() - cached_data["timestamp"]
+                < self.extraction_config.cache_ttl_seconds
+            ):
+                return cached_data["content"]
+            else:
+                # Remove expired cache entry
+                del self._content_cache[url]
+        return None
+
+    def _cache_content(self, url: str, content: str):
+        """Cache extracted content."""
+        self._content_cache[url] = {
+            "content": content,
+            "timestamp": time.time(),
+        }
 
     def format_results(self, results: List[NewsResult]) -> str:
         """
@@ -273,19 +743,22 @@ class NewsTool(BaseTool):
 
             metadata_parts.append(result.date)
 
-            # Format as: 1. [title](link) - metadata: snippet
-            entry = (
-                f"{i}. [{result.title}]({result.link}) - "
-                f"{' | '.join(metadata_parts)}: {clean_snippet}\n\n"
-            )
+            # Build the entry with metadata
+            entry = f"{i}. [{result.title}]({result.link}) - "
 
-            # Add extracted content if available
-            if result.extracted_content:
-                # Strip think tags from extracted content before display
-                cleaned_extract = strip_think_tags(result.extracted_content)
+            # Check if snippet contains merged content
+            if "\n\n" in result.snippet:
+                snippet_parts = result.snippet.split("\n\n")
+                entry += f"[Merged {len(snippet_parts)} snippets] "
+                # Show first snippet only in summary
+                clean_first_snippet = clean_content(snippet_parts[0])
+                entry += (
+                    f"{' | '.join(metadata_parts)}: {clean_first_snippet}\n\n"
+                )
+            else:
+                entry += f"{' | '.join(metadata_parts)}: {clean_snippet}\n\n"
 
-                entry += f"\n\n**Extracted Content:**\n{cleaned_extract}"
-            entry += "\n\n___"
+            # No longer showing extracted content in formatted results
             formatted_entries.append(entry)
 
         return "\n".join(formatted_entries)
@@ -391,10 +864,29 @@ class NewsTool(BaseTool):
                 query=query, news_results=result_objects
             )
 
-            # Extract content for news results
-            serpapi_response.news_results = self._extract_content_for_results(
-                serpapi_response.news_results
+            # Track extraction statistics
+            start_time = time.time()
+
+            # Extract content for news results with intelligent decision making
+            serpapi_response.news_results = self._extract_news_results(
+                serpapi_response.news_results, user_query=query
             )
+
+            # Calculate extraction statistics
+            extraction_time = time.time() - start_time
+            extraction_stats = {
+                "total_results": len(serpapi_response.news_results),
+                "extraction_time_seconds": round(extraction_time, 2),
+                "extraction_methods": {},
+            }
+
+            for result in serpapi_response.news_results:
+                method = result.extraction_method or "unknown"
+                extraction_stats["extraction_methods"][method] = (
+                    extraction_stats["extraction_methods"].get(method, 0) + 1
+                )
+
+            serpapi_response.extraction_stats = extraction_stats
 
             # Format the results for display
             serpapi_response.formatted_results = self.format_results(
@@ -402,9 +894,18 @@ class NewsTool(BaseTool):
             )
 
             logger.info(
-                "Search completed successfully. Found %d news results",
+                "Search completed successfully. "
+                "Found %d news results with content (extraction took %.2fs)",
                 len(serpapi_response.news_results),
+                extraction_time,
             )
+
+            # Log extraction statistics
+            logger.info(
+                "Extraction methods used: %s",
+                extraction_stats["extraction_methods"],
+            )
+
             logger.debug(
                 "Search results: %s",
                 [result.title for result in serpapi_response.news_results],

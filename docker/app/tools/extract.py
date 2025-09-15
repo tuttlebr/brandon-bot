@@ -60,8 +60,10 @@ class StreamingExtractResponse(StreamingToolResponse):
 class WebExtractController(ToolController):
     """Controller handling web extraction business logic"""
 
-    def __init__(self, llm_type: str):
-        self.llm_type = llm_type
+    def __init__(self, llm_type: str = None):
+        # llm_type is kept for backward compatibility but not used
+        # The actual LLM type is determined from tool_llm_config
+        pass
 
         # Request headers to mimic a real browser
         self.headers = {
@@ -271,38 +273,28 @@ class WebExtractController(ToolController):
             Processed content as string
         """
         try:
-            # Get sync LLM client and model
-            from models.chat_config import ChatConfig
-            from openai import OpenAI
+            # Get sync LLM client and model using the configured LLM type
+            from tools.tool_llm_config import get_tool_llm_type
 
-            config_obj = ChatConfig.from_environment()
-
-            # Get appropriate client based on tool's llm_type
-            if self.llm_type == "fast":
-                client = OpenAI(
-                    api_key=config_obj.fast_api_key,
-                    base_url=config_obj.fast_endpoint,
-                )
-                model_name = config_obj.fast_model_name
-            else:  # default
-                client = OpenAI(
-                    api_key=config_obj.api_key, base_url=config_obj.endpoint
-                )
-                model_name = config_obj.model_name
+            llm_type = get_tool_llm_type("extract_web_content")
+            client = llm_client_service.get_client(llm_type)
+            model_name = llm_client_service.get_model_name(llm_type)
 
             # Create system prompt for extraction
-            system_prompt = f"""You are a helpful assistant that processes web content.
-Your task is to respond to the user's request based on the provided web content.
-
-Content URL: {url}
-Content Title: {title}
-
-Instructions:
-- Focus on the user's specific request
-- Provide clear, well-structured responses
-- Maintain accuracy to the source content
-- Include relevant quotes when appropriate
-- If the content doesn't contain information to answer the request, say so clearly"""
+            system_prompt = (
+                "You are a helpful assistant that processes web content.\n"
+                "Your task is to respond to the user's request based on the "
+                "provided web content.\n\n"
+                f"Content URL: {url}\n"
+                f"Content Title: {title}\n\n"
+                "Instructions:\n"
+                "- Focus on the user's specific request\n"
+                "- Provide clear, well-structured responses\n"
+                "- Maintain accuracy to the source content\n"
+                "- Include relevant quotes when appropriate\n"
+                "- If the content doesn't contain information to answer the "
+                "request, say so clearly"
+            )
 
             # Prepare messages
             user_message = f"""Based on the following web content, {request}:
@@ -369,23 +361,28 @@ Instructions:
             Processed content chunks
         """
         try:
-            # Get async LLM client and model
-            client = llm_client_service.get_async_client(self.llm_type)
-            model_name = llm_client_service.get_model_name(self.llm_type)
+            # Get async LLM client and model using the configured LLM type
+            from tools.tool_llm_config import get_tool_llm_type
+
+            llm_type = get_tool_llm_type("extract_web_content")
+            client = llm_client_service.get_async_client(llm_type)
+            model_name = llm_client_service.get_model_name(llm_type)
 
             # Create system prompt for extraction
-            system_prompt = f"""You are a helpful assistant that processes web content.
-Your task is to respond to the user's request based on the provided web content.
-
-Content URL: {url}
-Content Title: {title}
-
-Instructions:
-- Focus on the user's specific request
-- Provide clear, well-structured responses
-- Maintain accuracy to the source content
-- Include relevant quotes when appropriate
-- If the content doesn't contain information to answer the request, say so clearly"""
+            system_prompt = (
+                "You are a helpful assistant that processes web content.\n"
+                "Your task is to respond to the user's request based on the "
+                "provided web content.\n\n"
+                f"Content URL: {url}\n"
+                f"Content Title: {title}\n\n"
+                "Instructions:\n"
+                "- Focus on the user's specific request\n"
+                "- Provide clear, well-structured responses\n"
+                "- Maintain accuracy to the source content\n"
+                "- Include relevant quotes when appropriate\n"
+                "- If the content doesn't contain information to answer the "
+                "request, say so clearly"
+            )
 
             # Prepare messages
             user_message = f"""Based on the following web content, {request}:
@@ -493,14 +490,15 @@ class WebExtractView(ToolView):
 
 
 class WebExtractTool(BaseTool):
-    """Tool for extracting content from web URLs using LLM-based HTML processing"""
+    """Tool for extracting content from web URLs using
+    LLM-based HTML processing"""
 
     def __init__(self):
         super().__init__()
         self.name = "extract_web_content"
         self.description = (
-            "Extract and read content from a specific URL. Use when user"
-            " provides a URL AND asks to read or analyze it."
+            "Extract and read content from a specific URL. Use when user "
+            "provides a URL AND asks to read or analyze it."
         )
         self.execution_mode = (
             ExecutionMode.AUTO
@@ -509,7 +507,7 @@ class WebExtractTool(BaseTool):
 
     def _initialize_mvc(self):
         """Initialize MVC components"""
-        self._controller = WebExtractController(self.llm_type)
+        self._controller = WebExtractController()
         self._view = WebExtractView()
 
     def get_definition(self) -> Dict[str, Any]:

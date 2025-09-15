@@ -688,6 +688,12 @@ class DeepResearchController(ToolController):
 
         tools_used = []
         sources_found = []
+
+        # Build a set of all URLs we've already seen across all sources
+        all_urls_seen = {s.url for s in all_sources if s.url}
+        logger.debug(
+            "Starting iteration with %d URLs already seen", len(all_urls_seen)
+        )
         # Determine which tools to use based on phase
         if phase in [
             ResearchPhase.INITIAL_SEARCH,
@@ -726,6 +732,14 @@ class DeepResearchController(ToolController):
                         len(results_to_process),
                         result.title[:80],
                     )
+                    # Check if we've already seen this URL
+                    if result.link and result.link in all_urls_seen:
+                        logger.debug(
+                            "Skipping duplicate URL: %s",
+                            result.link[:80],
+                        )
+                        continue
+
                     # Extract domain from URL
                     domain = None
                     if result.link:
@@ -752,6 +766,11 @@ class DeepResearchController(ToolController):
                         domain=domain,
                     )
                     sources_found.append(source)
+
+                    # Add URL to our seen set
+                    if result.link:
+                        all_urls_seen.add(result.link)
+
                     logger.debug(
                         "Added source: %s with citation %s",
                         source.title[:80],
@@ -789,6 +808,14 @@ class DeepResearchController(ToolController):
                         len(news_to_process),
                         result.title[:80],
                     )
+                    # Check if we've already seen this URL
+                    if result.link and result.link in all_urls_seen:
+                        logger.debug(
+                            "Skipping duplicate news URL: %s",
+                            result.link[:80],
+                        )
+                        continue
+
                     # Extract domain and date from news results
                     domain = None
                     date = None
@@ -819,6 +846,11 @@ class DeepResearchController(ToolController):
                         date=date,
                     )
                     sources_found.append(source)
+
+                    # Add URL to our seen set
+                    if result.link:
+                        all_urls_seen.add(result.link)
+
                     logger.debug(
                         "Added news source: %s with citation %s",
                         source.title[:80],
@@ -832,18 +864,33 @@ class DeepResearchController(ToolController):
                 extracted_urls = set()
 
             # Extract content from specific URLs if we have them
+            # First, identify all candidate URLs
+            all_candidate_urls = [
+                s.url for s in all_sources if s.url and s.relevance_score > 0.7
+            ]
+
+            # Filter out already extracted URLs
             urls_to_extract = [
-                s.url
-                for s in all_sources
-                if s.url
-                and s.relevance_score > 0.7
-                and s.url not in extracted_urls
+                url for url in all_candidate_urls if url not in extracted_urls
             ][:3]
 
+            # Log skipped URLs for transparency
+            skipped_urls = [
+                url for url in all_candidate_urls if url in extracted_urls
+            ]
+
+            if skipped_urls:
+                logger.info(
+                    "Skipping %d URLs already extracted: %s",
+                    len(skipped_urls),
+                    ", ".join([url[:50] + "..." for url in skipped_urls[:3]]),
+                )
+
             logger.info(
-                "Deep dive phase: extracting content from %d URLs (skipping %d"
-                " already extracted)",
+                "Deep dive phase: extracting content from %d URLs "
+                "(filtered from %d candidates, %d already extracted)",
                 len(urls_to_extract),
+                len(all_candidate_urls),
                 len(extracted_urls),
             )
 
@@ -933,11 +980,22 @@ class DeepResearchController(ToolController):
             next_questions=next_questions,
         )
 
+        # Calculate how many URLs were new vs duplicates
+        new_urls_count = len([s for s in sources_found if s.url])
+        total_urls_after = len(
+            {s.url for s in all_sources + sources_found if s.url}
+        )
+        duplicates_avoided = len(all_urls_seen) - (
+            total_urls_after - new_urls_count
+        )
+
         logger.info(
-            "└─ Iteration %d results: %d sources, %d tools used, "
-            "needs_more=%s",
+            "└─ Iteration %d results: %d sources (%d new URLs, "
+            "%d duplicates skipped), %d tools used, needs_more=%s",
             iteration_number,
             len(sources_found),
+            new_urls_count,
+            duplicates_avoided,
             len(tools_used),
             needs_more,
         )
