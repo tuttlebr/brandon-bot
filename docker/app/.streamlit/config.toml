@@ -6,9 +6,12 @@ showErrorDetails = "none"
 
 [server]
 headless = true
-runOnSave = true
-enableCORS = true
+runOnSave = false
+enableCORS = false
+enableXsrfProtection = false
 maxMessageSize = 200
+maxUploadSize = 200
+disconnectedSessionTTL = 3600
 
 [theme]
 base = "dark"

@@ -175,24 +175,28 @@ class LLMClientService:
                     api_key=self._config.fast_llm_api_key,
                     base_url=self._config.fast_llm_endpoint,
                     http_client=http_client,
+                    max_retries=2,  # Reduce retries for faster failure
                 )
             elif llm_type == "llm":
                 client = AsyncOpenAI(
                     api_key=self._config.llm_api_key,
                     base_url=self._config.llm_endpoint,
                     http_client=http_client,
+                    max_retries=2,  # Reduce retries for faster failure
                 )
             elif llm_type == "intelligent":
                 client = AsyncOpenAI(
                     api_key=self._config.intelligent_llm_api_key,
                     base_url=self._config.intelligent_llm_endpoint,
                     http_client=http_client,
+                    max_retries=2,  # Reduce retries for faster failure
                 )
             elif llm_type == "vlm":
                 client = AsyncOpenAI(
                     api_key=self._config.vlm_api_key,
                     base_url=self._config.vlm_endpoint,
                     http_client=http_client,
+                    max_retries=2,  # Reduce retries for faster failure
                 )
             else:
                 raise ValueError(f"Invalid LLM type: {llm_type}")

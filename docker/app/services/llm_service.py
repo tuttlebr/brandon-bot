@@ -15,6 +15,7 @@ from services.tool_execution_service import ToolExecutionService
 from tools.registry import get_all_tool_definitions
 from tools.tool_llm_config import DEFAULT_LLM_TYPE, get_tool_llm_type
 from utils.config import config
+from utils.exceptions import StreamingError
 
 from utils.logging_config import get_logger
 
@@ -309,6 +310,23 @@ class LLMService:
                 ):
                     yield chunk
 
+        except StreamingError as e:
+            logger.error(f"Streaming error: {e}")
+            # Check if it's a connection error
+            if "Connection to LLM service failed" in str(e):
+                yield (
+                    "⚠️ Connection to the AI service failed. This may be a"
+                    " temporary issue. Please try again in a moment, or if the"
+                    " problem persists, try using a different model."
+                )
+            elif "Request timed out" in str(e):
+                yield (
+                    "⚠️ The request timed out. The AI service is taking longer"
+                    " than expected. Please try with a shorter message or try"
+                    " again later."
+                )
+            else:
+                yield f"⚠️ Streaming error: {str(e)}"
         except Exception as e:
             logger.error(f"Error generating response: {e}")
             if "maximum context length" in str(e):

@@ -570,9 +570,13 @@ class RetrieverTool(BaseTool):
         super().__init__()
         self.name = "retrieval_search"
         self.description = (
-            "Search specialized knowledge base for NVIDIA technical"
-            " documentation. For best results, pair with"
-            " serpapi_internet_search."
+            "NVIDIA-ONLY technical documentation knowledge base containing "
+            "proprietary NVIDIA product information, GPU specifications, "
+            "CUDA documentation, and internal technical resources. "
+            "Use ONLY for questions specifically about NVIDIA hardware, "
+            "software, or technologies. For general AI/ML questions or "
+            "information about other companies' products (e.g., Anthropic, "
+            "OpenAI, Google), use serpapi_internet_search instead."
         )
 
     def _initialize_mvc(self):
@@ -613,7 +617,15 @@ class RetrieverTool(BaseTool):
                         "query": {
                             "type": "string",
                             "description": (
-                                "The search query to find relevant documents"
+                                "User query to pass to the NVIDIA technical"
+                                " documentation knowledge base. ONLY use this"
+                                " for questions specifically about: NVIDIA"
+                                " GPUs (e.g., H100, A100, RTX series), CUDA"
+                                " programming, NVIDIA software (e.g.,"
+                                " TensorRT, cuDNN), NVLink, DGX systems, or"
+                                " other NVIDIA-specific technologies. DO NOT"
+                                " use for questions about other companies'"
+                                " products or general AI/ML topics."
                             ),
                         },
                         "but_why": {
@@ -621,7 +633,11 @@ class RetrieverTool(BaseTool):
                             "description": (
                                 "An integer from 1-5 where a larger number"
                                 " indicates confidence this is the right tool"
-                                " to help the user."
+                                " to answer the user's question. Use 1-2 for"
+                                " general AI questions, 3 for questions that"
+                                " might involve NVIDIA, 4-5 ONLY for questions"
+                                " explicitly about NVIDIA"
+                                " products/technologies."
                             ),
                         },
                     },

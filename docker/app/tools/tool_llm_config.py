@@ -12,24 +12,24 @@ from utils.system_prompts import prompt_manager
 
 # Tool LLM type configurations - matching actual tool names from tool classes
 TOOL_LLM_TYPES = {
-    "conversation_context": "intelligent",
-    "extract_web_content": "intelligent",
-    "get_weather": "fast",
-    "serpapi_news_search": "intelligent",
-    "serpapi_internet_search": "intelligent",
-    "retrieval_search": "intelligent",
-    "pdf_assistant": "intelligent",
-    "text_assistant": "intelligent",
-    "generate_image": "fast",
+    "conversation_context": "llm",
+    "extract_web_content": "llm",
+    "get_weather": "llm",
+    "serpapi_news_search": "llm",
+    "serpapi_internet_search": "llm",
+    "retrieval_search": "llm",
+    "pdf_assistant": "llm",
+    "text_assistant": "llm",
+    "generate_image": "llm",
     "analyze_image": "vlm",
-    "generalist_conversation": "intelligent",
+    "generalist_conversation": "llm",
     "tool_selection": "intelligent",
     "deep_researcher": "llm",
 }
 
 
 # Default LLM type if not specified
-DEFAULT_LLM_TYPE = "intelligent"
+DEFAULT_LLM_TYPE = "llm"
 
 
 def get_tool_llm_type(tool_name: str) -> str:

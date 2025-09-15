@@ -103,7 +103,19 @@ class StreamingService:
 
         except Exception as e:
             logger.error("Streaming error: %s", e)
-            raise StreamingError(f"Failed to stream response: {e}") from e
+            # Check for common connection errors
+            error_str = str(e).lower()
+            if "connection" in error_str or "connect" in error_str:
+                raise StreamingError(
+                    "Connection to LLM service failed. "
+                    "The service may be temporarily unavailable."
+                ) from e
+            elif "timeout" in error_str or "timed out" in error_str:
+                raise StreamingError(
+                    "Request timed out. The response is taking too long."
+                ) from e
+            else:
+                raise StreamingError(f"Failed to stream response: {e}") from e
 
     async def sync_completion(
         self,

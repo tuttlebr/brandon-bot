@@ -470,7 +470,8 @@ class AppConfig:
     Centralized application configuration
 
     This class provides a single point of access to all configuration values
-    across the application, replacing scattered constants and environment variables.
+    across the application, replacing scattered constants and environment
+    variables.
     """
 
     def __init__(self):
@@ -531,8 +532,10 @@ class AppConfig:
         Validate that critical environment variables are properly configured
 
         Raises:
-            ValueError: If required environment variables are missing or invalid
+            ValueError: If required environment variables are missing or
+            invalid
         """
+
         missing_vars = self.env.validate_required_env_vars()
         if missing_vars:
             raise ValueError(
