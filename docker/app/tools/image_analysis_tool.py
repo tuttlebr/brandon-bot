@@ -78,16 +78,8 @@ class ImageAnalysisTool(BaseTool):
                                 "The question to ask about the uploaded image"
                             ),
                         },
-                        "but_why": {
-                            "type": "integer",
-                            "description": (
-                                "An integer from 1-5 where a larger number"
-                                " indicates confidence this is the right tool"
-                                " to help the user."
-                            ),
-                        },
                     },
-                    "required": ["question", "but_why"],
+                    "required": ["question"],
                 },
             },
         }

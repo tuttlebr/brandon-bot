@@ -1,8 +1,8 @@
 """
 Weather Tool - MVC Pattern Implementation
 
-This tool provides weather information for a given location using the Open-Meteo API,
-following the Model-View-Controller pattern.
+This tool provides weather information for a given location using the
+Open-Meteo API, following the Model-View-Controller pattern.
 """
 
 from typing import Any, Dict, List, Optional, Type
@@ -389,16 +389,8 @@ class WeatherTool(BaseTool):
                                 " (e.g., 'New York, NY' or 'London, UK')"
                             ),
                         },
-                        "but_why": {
-                            "type": "integer",
-                            "description": (
-                                "An integer from 1-5 where a larger number"
-                                " indicates confidence this is the right tool"
-                                " to help the user."
-                            ),
-                        },
                     },
-                    "required": ["location", "but_why"],
+                    "required": ["location"],
                 },
             },
         }

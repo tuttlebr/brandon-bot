@@ -157,14 +157,6 @@ class ImageGenerationTool(BaseTool):
                             ),
                             "default": True,
                         },
-                        "but_why": {
-                            "type": "integer",
-                            "description": (
-                                "An integer from 1-5 where a larger number"
-                                " indicates confidence this is the right tool"
-                                " to help the user."
-                            ),
-                        },
                         "enhanced_prompt": {
                             "type": "string",
                             "description": (
@@ -182,7 +174,6 @@ class ImageGenerationTool(BaseTool):
                         "user_prompt",
                         "aspect_ratio",
                         "use_conversation_context",
-                        "but_why",
                         "enhanced_prompt",
                     ],
                 },
@@ -246,10 +237,6 @@ class ImageGenerationTool(BaseTool):
                     " visualized"
                 ),
                 "messages": messages,
-                "but_why": (
-                    "Gathering conversation context to enhance image"
-                    " generation prompt with relevant visual details"
-                ),
             }
 
             # Use the tool registry to execute conversation context tool

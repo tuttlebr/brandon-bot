@@ -194,14 +194,6 @@ class SerpAPITool(BaseTool):
                                 "'When was the Eiffel Tower built?'"
                             ),
                         },
-                        "but_why": {
-                            "type": "integer",
-                            "description": (
-                                "An integer from 1-5 where a larger number "
-                                "indicates confidence this is the right "
-                                "tool to help the user."
-                            ),
-                        },
                         "location_requested": {
                             "type": "string",
                             "description": (
@@ -222,7 +214,7 @@ class SerpAPITool(BaseTool):
                             "minimum": 1,
                         },
                     },
-                    "required": ["query", "but_why"],
+                    "required": ["query"],
                 },
             },
         }
@@ -723,7 +715,6 @@ Important: Respond ONLY with the JSON object, no other text."""
             params = {
                 "url": url,
                 "request": "",  # No specific request, just get content
-                "but_why": 5,  # High confidence
             }
 
             # Execute the tool asynchronously
@@ -981,7 +972,6 @@ Important: Respond ONLY with the JSON object, no other text."""
             params: Dictionary containing the required parameters
                    Expected keys:
                    - 'query': Search query (MUST be in question form)
-                   - 'but_why': Confidence level (1-5)
                    - 'location_requested': Location for search (defaults
                      to 'Saline, Michigan, United States' if not
                      provided or empty)
@@ -996,7 +986,21 @@ Important: Respond ONLY with the JSON object, no other text."""
             )
 
         query = params["query"]
+        # Ensure top_n is an integer
         top_n = params.get("top_n", 3)
+        if isinstance(top_n, str):
+            try:
+                top_n = int(top_n)
+            except ValueError:
+                logger.warning(
+                    "Invalid top_n value: %s, using default 3", top_n
+                )
+                top_n = 3
+        elif not isinstance(top_n, int):
+            logger.warning(
+                "Invalid top_n type: %s, using default 3", type(top_n)
+            )
+            top_n = 3
 
         # Use location_requested if provided and not empty, otherwise default
         location_requested = params.get("location_requested", "").strip()

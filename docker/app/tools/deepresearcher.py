@@ -705,7 +705,6 @@ class DeepResearchController(ToolController):
                 "serpapi_internet_search",
                 {
                     "query": query,
-                    "but_why": 5,
                     # "location_requested": "Saline, Michigan, United States",
                 },
             )
@@ -785,7 +784,6 @@ class DeepResearchController(ToolController):
                 "serpapi_news_search",
                 {
                     "query": query,
-                    "but_why": 3,
                     "location_requested": "Saline, Michigan, United States",
                 },
             )
@@ -905,7 +903,6 @@ class DeepResearchController(ToolController):
                     "extract_web_content",
                     {
                         "url": url,
-                        "but_why": 5,
                         "location_requested": (
                             "Saline, Michigan, United States"
                         ),
@@ -1791,17 +1788,8 @@ class DeepResearcherTool(BaseTool):
                             "maximum": 5,
                             "default": 3,
                         },
-                        "but_why": {
-                            "type": "integer",
-                            "description": (
-                                "Confidence level 1-5 that deep "
-                                "research is needed"
-                            ),
-                            "minimum": 1,
-                            "maximum": 5,
-                        },
                     },
-                    "required": ["query", "but_why"],
+                    "required": ["query"],
                 },
             },
         }

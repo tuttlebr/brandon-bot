@@ -128,16 +128,8 @@ class ContextGenerationTool(BaseTool):
                             ),
                             "default": 42,
                         },
-                        "but_why": {
-                            "type": "integer",
-                            "description": (
-                                "An integer from 1-5 where a larger number "
-                                "indicates confidence this is the right tool "
-                                "to help the user."
-                            ),
-                        },
                     },
-                    "required": ["prompt", "but_why"],
+                    "required": ["prompt"],
                 },
             },
         }

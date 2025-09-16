@@ -147,14 +147,6 @@ class NewsTool(BaseTool):
                                 "news-related topics)"
                             ),
                         },
-                        "but_why": {
-                            "type": "integer",
-                            "description": (
-                                "An integer from 1-5 where a larger number "
-                                "indicates confidence this is the right tool "
-                                "to help the user."
-                            ),
-                        },
                         "top_n": {
                             "type": "integer",
                             "description": (
@@ -165,7 +157,7 @@ class NewsTool(BaseTool):
                             "minimum": 1,
                         },
                     },
-                    "required": ["query", "but_why"],
+                    "required": ["query"],
                 },
             },
         }
@@ -643,7 +635,6 @@ Important: Respond ONLY with the JSON object, no other text."""
             params = {
                 "url": url,
                 "request": "",  # No specific request, just get content
-                "but_why": 5,  # High confidence
             }
 
             # Execute the tool asynchronously
@@ -945,7 +936,6 @@ Important: Respond ONLY with the JSON object, no other text."""
             params: Dictionary containing the required parameters
                    Expected keys:
                    - 'query': Search query
-                   - 'but_why': Confidence level (1-5)
                    - 'top_n': Number of results to return (optional, default: 2)
 
         Returns:

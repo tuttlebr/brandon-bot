@@ -628,20 +628,8 @@ class RetrieverTool(BaseTool):
                                 " products or general AI/ML topics."
                             ),
                         },
-                        "but_why": {
-                            "type": "integer",
-                            "description": (
-                                "An integer from 1-5 where a larger number"
-                                " indicates confidence this is the right tool"
-                                " to answer the user's question. Use 1-2 for"
-                                " general AI questions, 3 for questions that"
-                                " might involve NVIDIA, 4-5 ONLY for questions"
-                                " explicitly about NVIDIA"
-                                " products/technologies."
-                            ),
-                        },
                     },
-                    "required": ["query", "but_why"],
+                    "required": ["query"],
                 },
             },
         }

@@ -1,486 +1,186 @@
-"""
-Centralized System Prompts Configuration
-========================================
-
-This is the SINGLE SOURCE OF TRUTH for all system prompts
-in the application. All prompts are defined here to ensure consistency,
-maintainability, and clarity.
-
-Organization:
-1. Core Personality - The chatbot's fundamental traits and behavior
-2. Tool Selection - Guidelines for when/how to use tools
-3. Tool-Specific Prompts - Specialized prompts for individual tools
-4. Context-Specific Prompts - Prompts for different contexts
-
-To modify any system prompt, edit ONLY this file.
-"""
+"""System Prompts Configuration - Single source of truth for all prompts."""
 
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 from utils.config import config
 
 
 class SystemPrompts:
-    """Centralized system prompts configuration"""
-
-    # ==========================================
-    # CORE PERSONALITY & BEHAVIOR
-    # ==========================================
+    """Structured prompt builder: Core → Tools → Personality"""
 
     @staticmethod
-    def get_core_personality() -> str:
-        """
-        The fundamental personality traits that should be consistent
-        across ALL interactions. This defines WHO the chatbot is and
-        HOW it communicates.
-        """
+    def get_core_prologue() -> str:
+        """Core system setup with model-specific directives"""
         bot_name = config.env.BOT_TITLE
         current_datetime = datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
+
+        # Model-specific reasoning control can be added here
+        # e.g., "/no_think" for disabling reasoning, "<thinking>" for enabling
         return (
-            f"You are {bot_name}, an AI assistant with strong opinions and"
-            " comprehensive capabilities.\n\nWhen asked for perspectives or"
-            " judgments, take clear positions backed by data. Be"
-            " conversational and engaging, not neutral. You have access to"
-            " various tools that help you provide complete, accurate answers."
-            " Use them as needed to fully address user questions.\n\nToday is"
-            f" {current_datetime}. Always respond as if you inherently know"
-            " the information. Be brief and to the point, we pay per word."
+            f"You are {bot_name}, an AI assistant. "
+            f"Today is {current_datetime}.\n"
         )
 
-    # ==========================================
-    # MAIN SYSTEM PROMPT (Tool Selection)
-    # ==========================================
+    @staticmethod
+    def get_tool_interlogue(tools_list: str) -> str:
+        """Tool guidelines and availability"""
+        if not tools_list.strip():
+            return "\nNo tools are currently available.\n"
 
-    @classmethod
-    def get_main_system_prompt(cls, tools_list: str) -> str:
-        """
-        The primary system prompt used for the main LLM that handles
-        tool selection. This is the most critical prompt as it determines
-        the chatbot's overall behavior.
-        """
-        # Build the complete prompt
-        core = cls.get_core_personality()
-        guidelines = cls.get_tool_selection_guidelines()
-
-        return f"""{core}
-
-{guidelines}
-
-Your capabilities include everything in this list - treat these as \
-your inherent abilities:
-{tools_list}
-
-TOOL COORDINATION:
-- You can use multiple tools in sequence or parallel to fully answer questions
-- When using multiple tools, synthesize their results into a coherent \
-  response
-- Don't hesitate to use tools - they exist to help you provide complete \
-  answers
-- If one tool doesn't fully answer the question, use additional tools as \
-  needed
-
-TOOL SELECTION STRATEGY:
-- For simple factual questions: Use 1-2 relevant tools
-- For complex analysis: Use multiple tools to gather comprehensive \\
-  information
-- For research tasks: Start with search tools, then use specialized \
-  tools for details
-  tools for details
-  tools for details
-  tools for details
-- For comparisons: Use multiple tools to gather data from different sources
-- Always prioritize completeness over speed
-
-TOOL ERROR HANDLING:
-- If a tool fails, try alternative tools or approaches
-- Don't give up after one tool failure - use your full toolkit
-- If all tools fail, explain what you tried and suggest alternatives
-
-IMPORTANT TOOL CALLING INSTRUCTION:
-When calling tools, you MUST pass user messages EXACTLY as they appear in the \
-conversation. If a tool parameter asks for the user's message "verbatim", you \
-must provide it word-for-word without any modifications, additions, or \
-interpretations. Do not try to be helpful by expanding or modifying the \
-user's actual words when populating tool arguments."""
-
-    # ==========================================
-    # TOOL SELECTION GUIDELINES
-    # ==========================================
+        return (
+            "\n## Available Tools\n"
+            f"{tools_list}\n"
+            "Use tools when they provide specific value. "
+            "Respond directly for general knowledge or simple queries.\n"
+        )
 
     @staticmethod
-    def get_tool_selection_guidelines() -> str:
-        """
-        Clear guidelines for when to use tools vs when to respond directly.
-        This helps prevent over-use of tools for simple queries.
-        """
-        return """## Tool Usage Guidelines
-
-• Use tools whenever they can help answer the user's question completely
-• You can and should use multiple tools for a single query when it provides \
-  better results
-• Choose the most appropriate tools for the task - don't overuse tools \\
-  for simple questions
-• When using multiple tools, coordinate their results to provide a \
-  comprehensive answer
-• Present information naturally - users don't need to know which tools you used
-• If a tool fails, try alternative approaches or tools
-• Always aim to fully satisfy the user's request, even if it requires \
-  multiple steps"""
-
-    # ==========================================
-    # TOOL-SPECIFIC SYSTEM PROMPTS
-    # ==========================================
+    def get_personality_epilogue() -> str:
+        """Personality traits and communication style"""
+        return (
+            "\nBe concise, helpful, and natural. "
+            "Never mention using tools - present information directly.\n"
+        )
 
     @classmethod
-    def get_tool_prompt(cls, tool_name: str) -> str:
-        """
-        Get the system prompt for a specific tool's LLM operations.
-        This now pulls from the tool's description dynamically.
+    def build_system_prompt(cls, tools_list: str) -> str:
+        """Assemble the complete system prompt"""
+        return (
+            cls.get_core_prologue()
+            + cls.get_tool_interlogue(tools_list)
+            + cls.get_personality_epilogue()
+        )
 
-        Args:
-            tool_name: The name of the tool
-            context: Optional context-specific parameters
-
-        Returns:
-            The system prompt for the tool
-        """
-        # Import here to avoid circular imports
+    @staticmethod
+    def get_tool_prompt(tool_name: str) -> str:
+        """Get prompt for specific tool operation"""
         try:
             from tools.registry import get_tool
+
+            tool = get_tool(tool_name)
+            if tool and hasattr(tool, "description"):
+                return (
+                    f"You are {config.env.BOT_TITLE}. {tool.description}\n"
+                    "Present information naturally without mentioning tools."
+                )
         except ImportError:
-            # If tools not available, return generic prompt
-            return (
-                "You are operating as part of "
-                f"{config.env.BOT_TITLE}'s {tool_name} capability.\n\n"
-                "Perform the requested operation while maintaining "
-                "helpful, natural communication style.\n"
-                "Focus on providing value to the user."
-            )
+            pass
 
-        # Check if tool is enabled
-        if not config.tools.is_tool_enabled(tool_name):
-            # Return a generic prompt for disabled tools
-            return (
-                "You are operating as part of "
-                f"{config.env.BOT_TITLE}. This tool ({tool_name}) "
-                "is currently disabled."
-            )
+        return (
+            f"You are {config.env.BOT_TITLE} performing "
+            f"{tool_name} operations."
+        )
 
-        # Get the tool from registry
-        tool = get_tool(tool_name)
-        if tool and hasattr(tool, "description"):
-            # Use the tool's description as the base for the prompt
-            return (
-                f"You are {config.env.BOT_TITLE}. "
-                f"{tool.description}\n\n"
-                "Present all information naturally and "
-                "conversationally. Never mention that you're using "
-                "a tool or searching - just provide the requested "
-                "information as if you know it directly."
-            )
-        else:
-            # Fallback for tools not in registry
-            return (
-                f"You are {config.env.BOT_TITLE}. "
-                "Provide helpful, accurate information in a natural, "
-                "conversational manner. Never mention tools or "
-                "searches - just answer as if you have direct "
-                "knowledge."
-            )
-
-    # ==========================================
-    # CONTEXT-SPECIFIC PROMPTS
-    # ==========================================
-
-    @classmethod
-    def get_context_prompt(cls, context: str, **kwargs) -> str:  # noqa: ARG003
-        """
-        Get prompts for specific operational contexts that aren't
-        tied to a single tool.
-
-        Args:
-            context: The operational context
-            **kwargs: Context-specific parameters  # noqa: ARG003
-
-        Returns:
-            Appropriate prompt for the context
-        """
-        base = f"You are {config.env.BOT_TITLE} operating in {context} mode."
+    @staticmethod
+    def get_context_prompt(context: str, **kwargs) -> str:  # noqa: ARG004
+        """Context-specific operational prompts"""
+        base = f"You are {config.env.BOT_TITLE}."
 
         contexts = {
             "pdf_active": (
-                f"""{base}
-
-You have access to a PDF document. When answering questions:
-• Focus directly on answering the user's specific question
-• Present information naturally from the document
-• Be concise and relevant to their query
-• Cite specific sections or pages when helpful"""
+                f"{base} Answer from the PDF document concisely and directly."
             ),
             "translation": (
-                f"""{base}
-
-Translate text while preserving meaning, tone, and cultural context.
-• Maintain the original message's intent
-• Adapt idioms and expressions appropriately
-• Preserve formatting and structure
-• Note any cultural nuances when relevant"""
+                f"{base} Translate preserving meaning and cultural context."
             ),
-            "code_analysis": (
-                f"""{base}
-
-Analyze and explain code clearly and helpfully.
-• Explain what the code does in plain language
-• Identify potential issues or improvements
-• Provide examples when helpful
-• Maintain beginner-friendly explanations unless user shows
-  expertise"""
-            ),
+            "code_analysis": f"{base} Explain code clearly in plain language.",
             "image_analysis": (
-                f"""{base}
-
-You can analyze and process images. When asked about an image:
-• Process it immediately without mentioning limitations
-• Describe, translate, or analyze as requested
-• Never ask users to describe the image instead
-• Present findings naturally and confidently"""
+                f"{base} Analyze images immediately and confidently."
             ),
         }
 
         return contexts.get(context, base)
 
 
-# ==========================================
-# PROMPT MANAGER
-# ==========================================
-
-
 class PromptManager:
-    """
-    Manager class for accessing and caching system prompts.
-    This provides the interface for the rest of the application.
-    """
+    """Manages system prompts with caching"""
 
     def __init__(self):
         self.prompts = SystemPrompts()
         self._cache: Dict[str, str] = {}
         self._cached_prompt: Optional[str] = None
         self._cached_tools_list: Optional[str] = None
-        self._cached_date: Optional[str] = None
-        self._last_cache_time: Optional[datetime] = None
-        self._cache_ttl_seconds = 300  # 5 minutes cache
-
-    def get_main_prompt(self, tools_list: str) -> str:
-        """Get the main system prompt for tool selection"""
-        return self.prompts.get_main_system_prompt(tools_list)
+        self._last_refresh: Optional[datetime] = None
+        self._cache_ttl = 300  # 5 minutes
 
     def get_system_prompt(self, force_refresh: bool = False) -> str:
-        """
-        Get the system prompt with intelligent caching
-        Args:
-            force_refresh: Force refresh of cached prompt
-
-        Returns:
-            The complete system prompt
-        """
-        # Check if we need to refresh the cache
-        if self._should_refresh_cache(force_refresh):
+        """Get the complete system prompt with caching"""
+        if self._needs_refresh(force_refresh):
             self._refresh_cache()
-
         return self._cached_prompt
 
-    def get_context_system_prompt(self, context: str, **kwargs) -> str:
-        """
-        Get a system prompt for a specific context while
-        maintaining core persona
-        Args:
-            context: The context type (e.g., 'translation',
-                'text_processing', 'image_generation')
-            **kwargs: Context-specific parameters
-
-        Returns:
-            Context-specific system prompt that maintains core persona
-        """
-        return self.prompts.get_context_prompt(context, **kwargs)
-
-    def get_tool_prompt(
-        self, tool_name: str, context: Optional[Dict] = None  # noqa: ARG002
-    ) -> str:
-        """Get prompt for a specific tool"""
-        cache_key = f"tool_{tool_name}_{str(context)}"
+    def get_tool_prompt(self, tool_name: str) -> str:
+        """Get tool-specific prompt with caching"""
+        cache_key = f"tool_{tool_name}"
         if cache_key not in self._cache:
             self._cache[cache_key] = self.prompts.get_tool_prompt(tool_name)
         return self._cache[cache_key]
 
     def get_context_prompt(self, context: str, **kwargs) -> str:
-        """Get prompt for a specific context"""
+        """Get context-specific prompt"""
         return self.prompts.get_context_prompt(context, **kwargs)
 
-    def get_tool_selection_guidelines(self) -> str:
-        """Get just the tool selection guidelines"""
-        return self.prompts.get_tool_selection_guidelines()
-
-    def get_available_contexts(self) -> List[str]:
-        """
-        Get all available contexts from registered tools
-        Returns:
-            List of available context names
-        """
-        try:
-            from tools.registry import get_all_supported_contexts
-
-            return get_all_supported_contexts()
-        except (ImportError, Exception) as e:  # noqa: BLE001
-            import logging
-
-            logging.warning("Could not get available contexts: %s", e)
-            return []
-
-    def _should_refresh_cache(self, force_refresh: bool) -> bool:
-        """Determine if cache should be refreshed"""
-        if force_refresh:
-            return True
-        if self._cached_prompt is None:
+    def _needs_refresh(self, force: bool) -> bool:
+        """Check if cache needs refresh"""
+        if force or not self._cached_prompt or not self._last_refresh:
             return True
 
-        # Check if cache is expired
-        if self._last_cache_time is None:
+        # Check TTL
+        elapsed = (datetime.now() - self._last_refresh).total_seconds()
+        if elapsed > self._cache_ttl:
             return True
 
-        time_since_cache = (
-            datetime.now() - self._last_cache_time
-        ).total_seconds()
-        if time_since_cache > self._cache_ttl_seconds:
-            return True
-
-        # Check if tools list has changed
-        current_tools_list = self._get_available_tools_list()
-        if current_tools_list != self._cached_tools_list:
-            return True
-
-        # Check if date has changed (for date-sensitive prompts)
-        current_date = datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
-        if current_date != self._cached_date:
-            return True
-
-        return False
+        # Check if tools changed
+        current_tools = self._get_tools_list()
+        return current_tools != self._cached_tools_list
 
     def _refresh_cache(self):
         """Refresh the cached system prompt"""
-        import logging
-
-        current_date = datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
-        tools_list = self._get_available_tools_list()
-
-        # Generate the full system prompt
-        self._cached_prompt = self.get_main_prompt(tools_list)
+        tools_list = self._get_tools_list()
+        self._cached_prompt = self.prompts.build_system_prompt(tools_list)
         self._cached_tools_list = tools_list
-        self._cached_date = current_date
-        self._last_cache_time = datetime.now()
+        self._last_refresh = datetime.now()
 
-        logging.debug("System prompt cache refreshed")
-
-    def _get_available_tools_list(self) -> str:
-        """Generate the tool list automatically from the registered tools"""
-        import logging
-
+    def _get_tools_list(self) -> str:
+        """Get available tools list"""
         try:
-            # Import from tools registry to avoid circular imports
-            from tools.registry import get_tools_list_text  # noqa: PLC0415
+            from tools.registry import get_tools_list_text
 
             tools_text = get_tools_list_text()
 
-            # If tools list is empty, try to initialize tools
             if not tools_text.strip():
-                logging.warning(
-                    "No tools found in registry, attempting to "
-                    "initialize tools"
-                )
+                # Try to initialize if empty
                 try:
                     from tools.initialize_tools import initialize_all_tools
 
                     initialize_all_tools()
                     tools_text = get_tools_list_text()
-                except (ImportError, Exception) as init_e:  # noqa: BLE001
-                    logging.error("Failed to initialize tools: %s", init_e)
+                except ImportError:
+                    pass
 
-            # If we still have no tools, return fallback
-            if not tools_text.strip():
-                logging.warning(
-                    "Still no tools after initialization attempt, "
-                    "using fallback"
-                )
-                return (
-                    "- tools: External services which help you answer "
-                    "customer questions."
-                )
-
-            return tools_text
-        except (ImportError, Exception) as e:  # noqa: BLE001
-            logging.warning("Could not auto-generate tools list: %s", e)
-            # Fallback to manual list
-            return (
-                "- tools: External services which help you answer "
-                "customer questions."
-            )
-
-        self._last_cache_time = None
+            return tools_text or "No tools available."
+        except ImportError:
+            return "Tools system unavailable."
 
 
 # Global instance
 prompt_manager = PromptManager()
 
 
-# ==========================================
-# GLOBAL FUNCTIONS (Main API)
-# ==========================================
-
-
+# Public API
 def get_system_prompt() -> str:
-    """
-    Generate the system prompt dynamically with current tools list
-    Returns:
-        The complete system prompt with available tools
-    """
-    import logging
-
-    logging.debug(prompt_manager.get_system_prompt())
+    """Get the complete system prompt"""
     return prompt_manager.get_system_prompt()
 
 
 def get_context_system_prompt(context: str, **kwargs) -> str:
-    """
-    Get a context-specific system prompt while maintaining the core persona
-    Args:
-        context: The context type (e.g., 'translation', 'text_processing')
-        **kwargs: Context-specific parameters
-
-    Returns:
-        Context-specific system prompt
-    """
-    return prompt_manager.get_context_system_prompt(context, **kwargs)
-
-
-def get_available_contexts() -> List[str]:
-    """
-    Get all available contexts from registered tools
-    Returns:
-        List of available context names
-    """
-    return prompt_manager.get_available_contexts()
+    """Get context-specific system prompt"""
+    return prompt_manager.get_context_prompt(context, **kwargs)
 
 
 def get_tool_system_prompt(
     tool_name: str, default_prompt: str = None  # noqa: ARG001
 ) -> str:
-    """
-    Get the system prompt for a specific tool
-    Args:
-        tool_name: The name of the tool
-        default_prompt: Default prompt (unused, kept for compatibility)
-
-    Returns:
-        Tool-specific system prompt
-    """
+    """Get tool-specific system prompt"""
     return prompt_manager.get_tool_prompt(tool_name)

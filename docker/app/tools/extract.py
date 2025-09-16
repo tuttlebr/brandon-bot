@@ -282,6 +282,7 @@ class WebExtractController(ToolController):
 
             # Create system prompt for extraction
             system_prompt = (
+                "/no_think"
                 "You are a helpful assistant that processes web content.\n"
                 "Your task is to respond to the user's request based on the "
                 "provided web content.\n\n"
@@ -368,6 +369,7 @@ class WebExtractController(ToolController):
 
             # Create system prompt for extraction
             system_prompt = (
+                "/no_think"
                 "You are a helpful assistant that processes web content.\n"
                 "Your task is to respond to the user's request based on the "
                 "provided web content.\n\n"
@@ -533,16 +535,8 @@ class WebExtractTool(BaseTool):
                                 " full extracted content."
                             ),
                         },
-                        "but_why": {
-                            "type": "integer",
-                            "description": (
-                                "An integer from 1-5 where a larger number"
-                                " indicates confidence this is the right tool"
-                                " to help the user."
-                            ),
-                        },
                     },
-                    "required": ["url", "but_why"],
+                    "required": ["url"],
                 },
             },
         }
@@ -589,7 +583,7 @@ def execute_web_extract_batch(
         try:
             result = execute_tool(
                 "extract_web_content",
-                {"url": url, "messages": messages, "but_why": 5},
+                {"url": url, "messages": messages},
             )
             results.append(result)
         except Exception as e:

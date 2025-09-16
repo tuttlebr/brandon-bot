@@ -277,10 +277,6 @@ class ConversationContextService:
                 "messages": limited_messages,
                 "include_document_content": False,  # We handle documents
                 # separately
-                "but_why": (
-                    "An integer from 1-5 where a larger number indicates "
-                    "confidence this is the right tool to help the user."
-                ),
             }
 
             # Execute the context analysis using the tool registry

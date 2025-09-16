@@ -816,16 +816,8 @@ class ConversationContextTool(BaseTool):
                             ),
                             "default": True,
                         },
-                        "but_why": {
-                            "type": "string",
-                            "description": (
-                                "An integer from 1-5 where a larger number"
-                                " indicates confidence this is the right tool"
-                                " to help the user."
-                            ),
-                        },
                     },
-                    "required": ["query", "max_messages", "but_why"],
+                    "required": ["query", "max_messages"],
                 },
             },
         }

@@ -410,16 +410,8 @@ class AssistantTool(BaseTool):
                                 " for translation tasks)"
                             ),
                         },
-                        "but_why": {
-                            "type": "integer",
-                            "description": (
-                                "An integer from 1-5 where a larger number"
-                                " indicates confidence this is the right tool"
-                                " to help the user."
-                            ),
-                        },
                     },
-                    "required": ["task_type", "text", "but_why"],
+                    "required": ["task_type", "text"],
                 },
             },
         }

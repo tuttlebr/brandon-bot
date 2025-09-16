@@ -279,25 +279,6 @@ class BaseTool(ABC):
         required = param_schema.get("required", [])
         properties = param_schema.get("properties", {})
 
-        # Special handling for 'but_why' parameter - provide default for internal calls
-        if "but_why" in required and "but_why" not in params:
-            if "but_why" in properties:
-                but_why_property = properties["but_why"]
-                but_why_type = but_why_property.get("type")
-
-                # Set appropriate default based on expected type
-                if but_why_type == "integer":
-                    params["but_why"] = 5  # High confidence for internal calls
-                else:
-                    params["but_why"] = (
-                        f"Internal call to {self.name} tool for processing"
-                    )
-
-                logger.debug(
-                    f"Added default but_why ({params['but_why']}) for internal"
-                    f" {self.name} call"
-                )
-
         # Check required parameters
         missing = [param for param in required if param not in params]
         if missing:
