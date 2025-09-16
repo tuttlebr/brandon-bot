@@ -5,7 +5,7 @@ from typing import Any, Dict, List
 import streamlit as st
 from models.chat_config import ChatConfig
 from services import ChatService
-from utils.text_processing import TextProcessor, strip_think_tags
+from utils.text_processing import TextProcessor, strip_all_thinking_formats
 
 
 class MessageController:
@@ -173,7 +173,9 @@ class MessageController:
                     # extract context
                     from utils.split_context import extract_context_regex
 
-                    content = strip_think_tags(cleaned_content).strip()
+                    content = strip_all_thinking_formats(
+                        cleaned_content
+                    ).strip()
                     content = extract_context_regex(content).strip()
             else:
                 # Content is already processed, just validate it's not empty

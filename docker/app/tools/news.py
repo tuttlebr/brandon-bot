@@ -552,7 +552,8 @@ Important: Respond ONLY with the JSON object, no other text."""
             response = await client.chat.completions.create(
                 model=model_name,
                 messages=messages,
-                temperature=0.0,
+                temperature=0.2,
+                top_p=1,
                 extra_body={"nvext": {"guided_json": COMPLETENESS_SCHEMA}},
             )
 

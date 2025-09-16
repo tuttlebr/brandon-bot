@@ -162,7 +162,8 @@ TOOL_DEFINITIONS = {
             "DEFAULT: Handle general conversation without external tools. Use"
             " for explanations, discussions, advice, and casual chat. Do not"
             " use for creative writing or when the user asks about the bots"
-            " capabilities."
+            " capabilities. Limit verbosity and be direct. You have access to"
+            " all tools."
         ),
         "is_default": True,
         "trigger_words": [

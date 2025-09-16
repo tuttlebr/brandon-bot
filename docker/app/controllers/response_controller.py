@@ -14,9 +14,9 @@ from ui import ChatHistoryComponent
 from utils.animated_loading import get_animated_loading_html
 from utils.config import config
 from utils.text_processing import (
-    StreamingThinkTagFilter,
+    StreamingCombinedThinkingFilter,
     sanitize_markdown_for_streamlit,
-    strip_think_tags,
+    strip_all_thinking_formats,
 )
 
 
@@ -193,7 +193,7 @@ class ResponseController:
         """
         full_response = ""
         display_text = ""
-        think_filter = StreamingThinkTagFilter()
+        think_filter = StreamingCombinedThinkingFilter()
         first_chunk_received = False
 
         # Progress tracking
@@ -830,7 +830,7 @@ class ResponseController:
         from utils.image import base64_to_pil_image
 
         # First, display the full text response
-        display_response = strip_think_tags(full_response)
+        display_response = strip_all_thinking_formats(full_response)
         sanitized_response = sanitize_markdown_for_streamlit(display_response)
         message_placeholder.markdown(
             sanitized_response, unsafe_allow_html=True

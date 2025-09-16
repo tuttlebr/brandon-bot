@@ -6,7 +6,10 @@ from models.chat_message import ChatMessage
 from services.file_storage_service import FileStorageService
 from utils.image import base64_to_pil_image
 from utils.split_context import extract_context_regex
-from utils.text_processing import escape_markdown_dollars, strip_think_tags
+from utils.text_processing import (
+    escape_markdown_dollars,
+    strip_all_thinking_formats,
+)
 
 
 class ChatHistoryComponent:
@@ -181,11 +184,9 @@ class ChatHistoryComponent:
         """
 
         if context:
-            with st.expander(
-                "📋 View Tool Data Sources (for verification)", expanded=False
-            ):
+            with st.expander("_Sources..._", expanded=False):
                 # Strip think tags before displaying
-                cleaned_context = strip_think_tags(context)
+                cleaned_context = strip_all_thinking_formats(context)
                 # Extract context and escape dollar signs
                 extracted_context = extract_context_regex(cleaned_context)
                 escaped_context = escape_markdown_dollars(extracted_context)

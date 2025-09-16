@@ -10,7 +10,7 @@ dependencies = [
     "beautifulsoup4==4.13.4",
     "langchain==0.3.25",
     "langchain-openai==0.3.23",
-    "openai==1.107.1",
+    "openai==1.107.3",
     "pillow==11.2.1",
     "pillow-heif==0.22.0",
     "pymilvus==2.5.7",

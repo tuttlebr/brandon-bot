@@ -12,7 +12,7 @@ from utils.config import config
 
 # Configure logger
 from utils.logging_config import get_logger
-from utils.text_processing import strip_think_tags
+from utils.text_processing import strip_all_thinking_formats
 
 logger = get_logger(__name__)
 
@@ -520,7 +520,7 @@ class SimilaritySearch:
         title = entity["title"].strip()
         text = entity["text"].replace(title, "").strip()
         # Strip think tags from text content before display
-        text = strip_think_tags(text)
+        text = strip_all_thinking_formats(text)
         source = entity["source"].strip()
         creation_date = entity["creation_date"].strip()
         base_text = (

@@ -19,7 +19,10 @@ from tools.base import (
     ToolView,
 )
 from utils.logging_config import get_logger
-from utils.text_processing import StreamingThinkTagFilter, strip_think_tags
+from utils.text_processing import (
+    StreamingCombinedThinkingFilter,
+    strip_all_thinking_formats,
+)
 
 logger = get_logger(__name__)
 
@@ -85,7 +88,7 @@ class GeneralistController(ToolController):
             result = response.choices[0].message.content.strip()
 
             # Strip think tags from response
-            cleaned_result = strip_think_tags(result)
+            cleaned_result = strip_all_thinking_formats(result)
 
             return {
                 "query": query,
@@ -159,7 +162,7 @@ class GeneralistController(ToolController):
             )
 
             # Create think tag filter for streaming
-            think_filter = StreamingThinkTagFilter()
+            think_filter = StreamingCombinedThinkingFilter()
 
             # Process stream with think tag filtering and yield chunks
             async for chunk in response:
@@ -218,7 +221,7 @@ class GeneralistController(ToolController):
                     # Clean the content
                     content = msg.get("content", "")
                     if isinstance(content, str):
-                        cleaned_content = strip_think_tags(content)
+                        cleaned_content = strip_all_thinking_formats(content)
                         if cleaned_content.strip():
                             conversation_messages.append(
                                 {

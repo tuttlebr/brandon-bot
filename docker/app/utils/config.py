@@ -129,7 +129,7 @@ class LLMConfig:
     """LLM service configuration"""
 
     # Default model parameters
-    DEFAULT_TEMPERATURE: float = 0.25
+    DEFAULT_TEMPERATURE: float = 0.2
     DEFAULT_TOP_P: float = 0.95
     DEFAULT_FREQUENCY_PENALTY: float = 0.002
     DEFAULT_PRESENCE_PENALTY: float = 0.9
@@ -232,7 +232,7 @@ class ToolConfig:
             "generate_image": True,
             "context_generation": True,
             "get_weather": True,
-            "generalist_conversation": True,
+            "generalist_conversation": False,
             "deep_researcher": True,
         }
     )

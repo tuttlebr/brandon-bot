@@ -10,8 +10,8 @@ import re
 from typing import Any, Dict, List, Tuple
 
 from utils.exceptions import LLMServiceError
-
 from utils.logging_config import get_logger
+from utils.text_processing import strip_all_thinking_formats
 
 logger = get_logger(__name__)
 
@@ -49,6 +49,9 @@ class ResponseParsingService:
             # Clean content if custom tool calls were found
             if custom_tool_calls:
                 content = self._clean_tool_instructions(content)
+
+            # Strip all thinking/reasoning formats (think tags and analysis blocks)
+            content = strip_all_thinking_formats(content)
 
             if len(all_tool_calls) == 0:
                 all_tool_calls = None

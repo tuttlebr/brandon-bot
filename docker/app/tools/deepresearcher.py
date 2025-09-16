@@ -24,7 +24,7 @@ from tools.base import (
 )
 from tools.registry import execute_tool
 from utils.logging_config import get_logger
-from utils.text_processing import strip_think_tags
+from utils.text_processing import strip_all_thinking_formats
 
 logger = get_logger(__name__)
 
@@ -1178,7 +1178,9 @@ Keep the synthesis focused and factual."""
                 ],
             )
 
-            synthesis = strip_think_tags(response.choices[0].message.content)
+            synthesis = strip_all_thinking_formats(
+                response.choices[0].message.content
+            )
             # Clean any problematic markdown that might cause display issues
             # synthesis = synthesis.replace(">>>", "").replace("<<<", "")
             # Ensure no repeated quote markers
@@ -1414,7 +1416,7 @@ Return as JSON with:
 
         raw_synthesis = result.get("synthesis", current_synthesis)
         # Clean the synthesis to prevent markdown corruption
-        synthesis = strip_think_tags(raw_synthesis)
+        synthesis = strip_all_thinking_formats(raw_synthesis)
         # Remove any problematic markdown characters that might cause display issues
         # synthesis = synthesis.replace('">">">">', "\n\n")
         # Ensure no repeated quote markers
@@ -1464,7 +1466,7 @@ Text to review:
             stream=False,
         )
 
-        cleaned_synthesis = strip_think_tags(
+        cleaned_synthesis = strip_all_thinking_formats(
             response.choices[0].message.content
         )
         return cleaned_synthesis

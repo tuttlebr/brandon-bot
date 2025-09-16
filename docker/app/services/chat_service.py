@@ -8,7 +8,7 @@ from utils.split_context import (
     START_CONTEXT,
     extract_context_regex,
 )
-from utils.text_processing import strip_think_tags
+from utils.text_processing import strip_all_thinking_formats
 
 
 class ChatService:
@@ -57,7 +57,9 @@ class ChatService:
                     cleaned_content = extract_context_regex(message["content"])
 
                     # Then remove any thinking tags that might be present
-                    cleaned_content = strip_think_tags(cleaned_content)
+                    cleaned_content = strip_all_thinking_formats(
+                        cleaned_content
+                    )
 
                     cleaned_messages.append(
                         {"role": message["role"], "content": cleaned_content}

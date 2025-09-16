@@ -17,7 +17,7 @@ from services.translation_service import TranslationService
 from tools.base import BaseTool, BaseToolResponse, ToolController, ToolView
 from utils.logging_config import get_logger
 from utils.pdf_extractor import PDFDataExtractor
-from utils.text_processing import strip_think_tags
+from utils.text_processing import strip_all_thinking_formats
 
 logger = get_logger(__name__)
 
@@ -218,7 +218,7 @@ class AssistantController(ToolController):
             return {
                 "original_text": text,
                 "task_type": AssistantTaskType.ANALYZE,
-                "result": strip_think_tags(result["result"]),
+                "result": strip_all_thinking_formats(result["result"]),
                 "processing_notes": result.get("processing_notes"),
             }
         else:
@@ -265,7 +265,7 @@ class AssistantController(ToolController):
             return {
                 "original_text": text,
                 "task_type": task_type,
-                "result": strip_think_tags(result["result"]),
+                "result": strip_all_thinking_formats(result["result"]),
                 "improvements": improvements,
                 "summary_length": summary_length,
                 "processing_notes": result.get("processing_notes"),

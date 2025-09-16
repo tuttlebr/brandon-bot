@@ -19,33 +19,29 @@ primaryColor = '#76b900'
 backgroundColor = '#18191a'
 secondaryBackgroundColor = '#403e41'
 font = "nvidia-sans"
-baseFontSize = 14
 headingFont = "nvidia-sans"
 codeFont = "jetbrains-mono"
 
 [[theme.fontFaces]]
 family = "nvidia-sans"
 style = "normal"
-weight = "100 900"
 url = "https://brand-assets.cne.ngc.nvidia.com/assets/fonts/nvidia-sans/1.0.0/NVIDIASans_Rg.woff2"
 
 [[theme.fontFaces]]
 family = "nvidia-sans"
 style = "italic"
-weight = "100 900"
 url = "https://brand-assets.cne.ngc.nvidia.com/assets/fonts/nvidia-sans/1.0.0/NVIDIASans_Lt.woff2"
 
 [[theme.fontFaces]]
 family = "jetbrains-mono"
 style = "normal"
-weight = "100 900"
 url = "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbV2o-flEEny0FZhsfKu5WU4xD2OwGtT0rU3BE.woff2"
 
 [ui]
 hideTopBar = true
 
 [runner]
-fastReruns = false
+fastReruns = true
 
 [logger]
 level = "error"

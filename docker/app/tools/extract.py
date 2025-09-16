@@ -21,7 +21,7 @@ from tools.base import (
 
 # Configure logger
 from utils.logging_config import get_logger
-from utils.text_processing import StreamingThinkTagFilter
+from utils.text_processing import StreamingCombinedThinkingFilter
 from utils.web_extractor import WebDataExtractor
 
 logger = get_logger(__name__)
@@ -312,15 +312,13 @@ class WebExtractController(ToolController):
             response = client.chat.completions.create(
                 model=model_name,
                 messages=messages,
-                temperature=0.28,
-                top_p=0.95,
-                frequency_penalty=0.002,
-                presence_penalty=0.9,
+                temperature=0.2,
+                top_p=1,
                 stream=True,  # Enable streaming for faster latency
             )
 
             # Create think tag filter for streaming
-            think_filter = StreamingThinkTagFilter()
+            think_filter = StreamingCombinedThinkingFilter()
             collected_response = ""
 
             # Process stream with think tag filtering
@@ -403,15 +401,13 @@ class WebExtractController(ToolController):
             response = await client.chat.completions.create(
                 model=model_name,
                 messages=messages,
-                temperature=0.28,
-                top_p=0.95,
-                frequency_penalty=0.002,
-                presence_penalty=0.9,
+                temperature=0.2,
+                top_p=1,
                 stream=True,  # Enable streaming
             )
 
             # Create think tag filter for streaming
-            think_filter = StreamingThinkTagFilter()
+            think_filter = StreamingCombinedThinkingFilter()
 
             # Process stream with think tag filtering and yield chunks
             async for chunk in response:

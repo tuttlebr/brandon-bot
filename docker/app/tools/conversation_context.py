@@ -23,7 +23,7 @@ from utils.config import config as app_config
 # Configure logger
 from utils.logging_config import get_logger
 from utils.pdf_extractor import PDFDataExtractor
-from utils.text_processing import strip_think_tags
+from utils.text_processing import strip_all_thinking_formats
 
 logger = get_logger(__name__)
 
@@ -320,7 +320,7 @@ class ConversationContextController(ToolController):
             result = response.choices[0].message.content.strip()
 
             # Strip think tags from result
-            result = strip_think_tags(result)
+            result = strip_all_thinking_formats(result)
 
             # Extract key topics from the result
             key_topics = self._extract_key_topics(result, context_type)
@@ -370,7 +370,7 @@ class ConversationContextController(ToolController):
         Yields:
             Analysis response chunks
         """
-        from utils.text_processing import StreamingThinkTagFilter
+        from utils.text_processing import StreamingCombinedThinkingFilter
 
         try:
             # Get async LLM client and model
@@ -451,7 +451,7 @@ class ConversationContextController(ToolController):
             )
 
             # Create think tag filter for streaming
-            think_filter = StreamingThinkTagFilter()
+            think_filter = StreamingCombinedThinkingFilter()
 
             # Process stream with think tag filtering and yield chunks
             async for chunk in response:
@@ -551,7 +551,7 @@ class ConversationContextController(ToolController):
             r"<START_CONTEXT>.*?<END_CONTEXT>", "", content, flags=re.DOTALL
         )
         # Remove thinking tags
-        content = strip_think_tags(content)
+        content = strip_all_thinking_formats(content)
         # Remove tool call instructions
         content = re.sub(
             r"<TOOLCALL.*?</TOOLCALL>",

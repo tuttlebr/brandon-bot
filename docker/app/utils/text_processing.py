@@ -73,6 +73,56 @@ def strip_think_tags(text: Optional[str]) -> str:
     return cleaned_text.strip()
 
 
+def strip_analysis_blocks(text: Optional[str]) -> str:
+    """
+    Remove analysis...assistantfinal blocks from text.
+
+    This handles the specific format from gpt-oss-120b model where reasoning
+    content is prefixed with 'analysis' and suffixed with 'assistantfinal'.
+
+    Args:
+        text: The text to process, which may contain analysis blocks
+
+    Returns:
+        The text with analysis blocks removed, keeping only content after
+    """
+    if not text:
+        return ""
+
+    # Look for pattern: "analysis" at start, followed by content, ending with "assistantfinal"
+    # We want to keep everything after this block
+    pattern = r"^analysis.*?assistantfinal"
+    cleaned_text = re.sub(pattern, "", text, flags=re.DOTALL)
+
+    return cleaned_text.strip()
+
+
+def strip_all_thinking_formats(text: Optional[str]) -> str:
+    """
+    Remove all known thinking/reasoning formats from text.
+
+    This includes:
+    - <think>...</think> tags
+    - analysis...assistantfinal blocks
+
+    Args:
+        text: The text to process
+
+    Returns:
+        The text with all thinking formats removed
+    """
+    if not text:
+        return ""
+
+    # First strip think tags
+    text = strip_think_tags(text)
+
+    # Then strip analysis blocks
+    text = strip_analysis_blocks(text)
+
+    return text.strip()
+
+
 def escape_markdown_dollars(text: Optional[str]) -> str:
     """
     Escape dollar signs in text for Streamlit markdown rendering.
@@ -561,6 +611,140 @@ class StreamingThinkTagFilter:
         output = self.buffer
         self.buffer = ""
         return output
+
+
+class StreamingAnalysisBlockFilter:
+    """
+    A stateful filter for removing analysis...assistantfinal blocks from streaming text.
+    Handles cases where the block spans multiple chunks.
+    """
+
+    def __init__(self):
+        self.buffer = ""
+        self.found_analysis_start = False
+        self.found_assistant_final = False
+        self.analysis_block_content = ""
+
+    def process_chunk(self, chunk: str) -> str:
+        """
+        Process a streaming chunk and return displayable text.
+
+        Args:
+            chunk: The new text chunk from the stream
+
+        Returns:
+            Text that can be safely displayed (with analysis blocks removed)
+        """
+        # Add chunk to buffer
+        self.buffer += chunk
+
+        # If we haven't found the analysis start yet
+        if not self.found_analysis_start:
+            # Check if buffer starts with "analysis"
+            if self.buffer.startswith("analysis"):
+                self.found_analysis_start = True
+                self.analysis_block_content = self.buffer
+                # Don't output anything yet
+                return ""
+            elif len(self.buffer) < 8:  # "analysis" is 8 chars
+                # Not enough data to determine, wait for more
+                return ""
+            else:
+                # Buffer doesn't start with "analysis", output and clear
+                output = self.buffer
+                self.buffer = ""
+                return output
+
+        # We're inside an analysis block
+        if self.found_analysis_start and not self.found_assistant_final:
+            self.analysis_block_content += chunk
+
+            # Check if we've found the end marker
+            if "assistantfinal" in self.analysis_block_content:
+                self.found_assistant_final = True
+
+                # Find the position after "assistantfinal"
+                end_index = (
+                    self.analysis_block_content.find("assistantfinal") + 14
+                )
+
+                # Extract content after the block
+                if end_index < len(self.analysis_block_content):
+                    remaining_content = self.analysis_block_content[end_index:]
+                    self.buffer = ""
+                    self.found_analysis_start = False
+                    self.found_assistant_final = False
+                    self.analysis_block_content = ""
+                    return remaining_content
+                else:
+                    # No content after the block yet
+                    self.buffer = ""
+                    return ""
+            else:
+                # Still collecting the analysis block
+                return ""
+
+        # Normal processing after analysis block
+        output = self.buffer
+        self.buffer = ""
+        return output
+
+    def flush(self) -> str:
+        """
+        Get any remaining buffered content (called at end of stream).
+
+        Returns:
+            Any remaining displayable text
+        """
+        # If we're still in an analysis block at the end, discard it
+        if self.found_analysis_start and not self.found_assistant_final:
+            return ""
+
+        # Return any remaining buffer content
+        output = self.buffer
+        self.buffer = ""
+        return output
+
+
+class StreamingCombinedThinkingFilter:
+    """
+    A combined filter that handles both think tags and analysis blocks in streaming text.
+    """
+
+    def __init__(self):
+        self.think_filter = StreamingThinkTagFilter()
+        self.analysis_filter = StreamingAnalysisBlockFilter()
+
+    def process_chunk(self, chunk: str) -> str:
+        """
+        Process a streaming chunk through both filters.
+
+        Args:
+            chunk: The new text chunk from the stream
+
+        Returns:
+            Text that can be safely displayed
+        """
+        # First process through analysis filter
+        intermediate = self.analysis_filter.process_chunk(chunk)
+
+        # Then process through think tag filter
+        if intermediate:
+            return self.think_filter.process_chunk(intermediate)
+        return ""
+
+    def flush(self) -> str:
+        """
+        Flush both filters.
+
+        Returns:
+            Any remaining displayable text
+        """
+        analysis_output = self.analysis_filter.flush()
+        if analysis_output:
+            self.think_filter.buffer += analysis_output
+
+        return self.think_filter.flush()
 
 
 # Usage Examples and Best Practices

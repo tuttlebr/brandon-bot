@@ -122,7 +122,8 @@ class TextProcessorService:
                     client.chat.completions.create(
                         model=model_name,
                         messages=final_messages,
-                        temperature=0.6,
+                        temperature=0.2,
+                        top_p=1,
                     ),
                     timeout=256.0,
                 )
@@ -176,7 +177,7 @@ class TextProcessorService:
         Returns:
             Dictionary with processing result
         """
-        from utils.text_processing import StreamingThinkTagFilter
+        from utils.text_processing import StreamingCombinedThinkingFilter
 
         try:
             # Check if the text is too large for direct processing
@@ -242,7 +243,7 @@ class TextProcessorService:
             )
 
             # Create think tag filter for streaming
-            think_filter = StreamingThinkTagFilter()
+            think_filter = StreamingCombinedThinkingFilter()
             collected_result = ""
 
             # Process stream with think tag filtering

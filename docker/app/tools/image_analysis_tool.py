@@ -296,7 +296,7 @@ class ImageAnalysisTool(BaseTool):
 
             from models.chat_config import ChatConfig
             from openai import OpenAI
-            from utils.text_processing import StreamingThinkTagFilter
+            from utils.text_processing import StreamingCombinedThinkingFilter
 
             # Resize image using 12-tile constraint system
             processed_base64 = self._preprocess_image_for_vlm(image_base64)
@@ -344,7 +344,7 @@ class ImageAnalysisTool(BaseTool):
             )
 
             # Create think tag filter for streaming
-            think_filter = StreamingThinkTagFilter()
+            think_filter = StreamingCombinedThinkingFilter()
             collected_response = ""
 
             # Process stream with think tag filtering
@@ -388,7 +388,7 @@ class ImageAnalysisTool(BaseTool):
 
             from models.chat_config import ChatConfig
             from openai import AsyncOpenAI
-            from utils.text_processing import StreamingThinkTagFilter
+            from utils.text_processing import StreamingCombinedThinkingFilter
 
             # Resize image using 12-tile constraint system
             processed_base64 = await asyncio.to_thread(
@@ -438,7 +438,7 @@ class ImageAnalysisTool(BaseTool):
             )
 
             # Create think tag filter for streaming
-            think_filter = StreamingThinkTagFilter()
+            think_filter = StreamingCombinedThinkingFilter()
 
             # Process stream with think tag filtering and yield chunks
             async for chunk in response:
