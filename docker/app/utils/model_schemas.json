@@ -1,0 +1,20 @@
+{
+  "Qwen/Qwen3-Next-80B-A3B-Thinking": {
+    "thinking_start": null,
+    "thinking_stop": "</think>",
+    "tool_start": "<tool_call>",
+    "tool_stop": "</tool_call>"
+  },
+  "nvidia/llama-3-3-nemotron-super-49b-v1-5": {
+    "thinking_start": "<think>",
+    "thinking_stop": "</think>",
+    "tool_start": null,
+    "tool_stop": null
+  },
+  "nvidia/nvidia-nemotron-nano-9b-v2": {
+    "thinking_start": null,
+    "thinking_stop": "</think>",
+    "tool_start": null,
+    "tool_stop": null
+  }
+}

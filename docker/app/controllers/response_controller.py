@@ -193,7 +193,8 @@ class ResponseController:
         """
         full_response = ""
         display_text = ""
-        think_filter = StreamingCombinedThinkingFilter()
+        # Initialize filter with model name for dynamic schema support
+        think_filter = StreamingCombinedThinkingFilter(model_name=model_name)
         first_chunk_received = False
 
         # Progress tracking
@@ -240,7 +241,7 @@ class ResponseController:
                     # Remove progress marker from chunk before processing
                     chunk = re.sub(r"<<<PROGRESS:[0-9.]+:.+?>>>", "", chunk)
 
-                # Process chunk through streaming filter
+                # Process chunk through streaming filter with model-specific schema
                 filtered_chunk = think_filter.process_chunk(chunk)
                 if filtered_chunk:
                     display_text += filtered_chunk

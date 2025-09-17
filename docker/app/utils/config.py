@@ -6,6 +6,7 @@ environment variables, and constants across the application. It replaces
 scattered hardcoded values and environment variable access throughout the codebase.
 """
 
+import json
 import logging
 import os
 from dataclasses import dataclass, field
@@ -154,6 +155,36 @@ class LLMConfig:
         15  # Minimum turns before injecting context
     )
 
+    # Dynamic schema configuration for thinking and tool calls
+    # Default thinking tags (can be overridden per model)
+    DEFAULT_THINKING_START: str = field(
+        default_factory=lambda: os.getenv("DEFAULT_THINKING_START", "<think>")
+    )
+    DEFAULT_THINKING_STOP: str = field(
+        default_factory=lambda: os.getenv("DEFAULT_THINKING_STOP", "</think>")
+    )
+
+    # Default tool call tags (can be overridden per model)
+    DEFAULT_TOOL_START: str = field(
+        default_factory=lambda: os.getenv("DEFAULT_TOOL_START", "<tool_call>")
+    )
+    DEFAULT_TOOL_STOP: str = field(
+        default_factory=lambda: os.getenv("DEFAULT_TOOL_STOP", "</tool_call>")
+    )
+
+    # Per-model schema overrides (JSON format)
+    # Example: {"model_name": {"thinking_start": "<think>", "thinking_stop": "</think>", "tool_start": "<tool>", "tool_stop": "</tool>"}}
+    MODEL_SCHEMAS: Dict[str, Dict[str, str]] = field(
+        default_factory=lambda: json.loads(os.getenv("MODEL_SCHEMAS", "{}"))
+    )
+
+    # Path to JSON file containing model schemas (alternative to MODEL_SCHEMAS env var)
+    MODEL_SCHEMAS_FILE: Optional[str] = field(
+        default_factory=lambda: os.getenv(
+            "MODEL_SCHEMAS_FILE", "utils/model_schemas.json"
+        )
+    )
+
 
 @dataclass
 class ImageGenerationConfig:
@@ -226,7 +257,8 @@ class ToolConfig:
             "extract_web_content": True,
             "serpapi_internet_search": True,
             "serpapi_news_search": True,
-            "retrieval_search": True,
+            "retrieval_search": False,
+            "veterinary_search": False,
             "pdf_assistant": True,
             "analyze_image": True,
             "generate_image": True,

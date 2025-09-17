@@ -276,6 +276,65 @@ TOOL_DEFINITIONS = {
             "Compare Claude vs GPT-4 (use serpapi_internet_search)",
         ],
     },
+    "veterinary_search": {
+        "description": (
+            "Veterinary knowledge base containing articles written by"
+            " veterinarians for pet health and care. Provides veterinary and"
+            " client education on animal diseases, medications, treatments,"
+            " preventive care, and general pet health advice. Use for"
+            " questions about animal health, veterinary medicine, pet care, or"
+            " any veterinary-related topics."
+        ),
+        "trigger_words": [
+            "veterinary",
+            "vet",
+            "animal",
+            "pet",
+            "dog",
+            "cat",
+            "bird",
+            "reptile",
+            "disease",
+            "medication",
+            "treatment",
+            "vaccine",
+            "health",
+            "care",
+            "symptoms",
+            "diagnosis",
+        ],
+        "anti_trigger_words": [
+            "human",
+            "people",
+            "person",
+            "medical",
+            "doctor",
+            "physician",
+            "hospital",
+            "patient",
+        ],
+        "specialized_domains": ["veterinary", "animal_health", "pet_care"],
+        "strict_domain_check": True,
+        "example_uses": [
+            "What are the symptoms of parvo in dogs?",
+            "How often should I vaccinate my cat?",
+            "What medications are safe for birds?",
+            "My dog has diarrhea, what could cause this?",
+            "How to prevent heartworms in pets?",
+            "What are signs of kidney disease in cats?",
+        ],
+        "example_non_uses": [
+            (
+                "What are symptoms of COVID in humans? (use"
+                " serpapi_internet_search)"
+            ),
+            "How to treat human diabetes? (use serpapi_internet_search)",
+            (
+                "What medications do people take for anxiety? (use"
+                " serpapi_internet_search)"
+            ),
+        ],
+    },
     "conversation_context": {
         "description": (
             "INTERNAL SYSTEM TOOL: Analyze conversation history for context."

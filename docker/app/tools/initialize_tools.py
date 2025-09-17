@@ -43,6 +43,7 @@ def initialize_all_tools():
         )
         from tools.retriever import RetrieverTool
         from tools.serpapi import SerpAPITool
+        from tools.veterinarian import VeterinarianTool
         from tools.weather import WeatherTool
 
         # Register tool classes with lazy loading (instances created on demand)
@@ -58,6 +59,7 @@ def initialize_all_tools():
         register_tool_class("pdf_assistant", PDFAssistantTool)
         register_tool_class("retrieval_search", RetrieverTool)
         register_tool_class("serpapi_internet_search", SerpAPITool)
+        register_tool_class("veterinary_search", VeterinarianTool)
         register_tool_class("get_weather", WeatherTool)
 
         tool_count = len(tool_registry._factory.get_registered_tools())

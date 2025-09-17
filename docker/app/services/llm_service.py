@@ -43,6 +43,9 @@ class LLMService:
         # For backward compatibility
         self.last_tool_responses = []
 
+        # Auto-configure model schemas from environment variables
+        self._auto_configure_model_schemas()
+
     def _get_model_for_type(self, model_type: str) -> str:
         """
         Get the appropriate model name for a given model type
@@ -253,8 +256,10 @@ class LLMService:
                 stream=False,  # Use non-streaming for tool selection
             )
 
-            # Parse response for content and tool calls
-            content, tool_calls = self.parsing_service.parse_response(response)
+            # Parse response for content and tool calls with model name for schema support
+            content, tool_calls = self.parsing_service.parse_response(
+                response, tool_selection_model
+            )
 
             # If there are tool calls, execute them and stream the response
             logger.info(f"All tool calls: {tool_calls}")
@@ -303,12 +308,50 @@ class LLMService:
                     yield chunk
 
             else:
-                # Fallback to streaming if no tool calls
-                logger.info("No tool calls found, streaming response")
-                async for chunk in self.streaming_service.stream_completion(
-                    windowed_messages, model, model_type, tools=None
-                ):
-                    yield chunk
+                # Fallback path when no tool calls - check if streaming should be disabled
+                from utils.llm_schema_manager import schema_manager
+
+                schema = schema_manager.get_schema(model)
+                has_null_thinking_start = not schema.thinking_start
+
+                logger.info(
+                    "Checking schema for model '%s': thinking_start=%s,"
+                    " has_null_thinking_start=%s",
+                    model,
+                    repr(schema.thinking_start),
+                    has_null_thinking_start,
+                )
+
+                if has_null_thinking_start:
+                    logger.info(
+                        "No tool calls found, but model has null"
+                        " thinking_start - using non-streaming mode"
+                    )
+
+                    # Use non-streaming mode to get complete response
+                    complete_response = (
+                        await self.streaming_service.sync_completion(
+                            windowed_messages, model, model_type, stream=False
+                        )
+                    )
+
+                    # Parse the complete response with schema-aware filtering
+                    content, _ = self.parsing_service.parse_response(
+                        complete_response, model
+                    )
+
+                    # Yield the filtered content (thinking content will be removed)
+                    if content and content.strip():
+                        yield content
+                else:
+                    # Standard streaming for models with proper thinking_start
+                    logger.info("No tool calls found, streaming response")
+                    async for (
+                        chunk
+                    ) in self.streaming_service.stream_completion(
+                        windowed_messages, model, model_type, tools=None
+                    ):
+                        yield chunk
 
         except StreamingError as e:
             logger.error(f"Streaming error: {e}")
@@ -580,10 +623,97 @@ class LLMService:
                 f" {response_model}:{response_llm_type} (based on tool"
                 " configuration)"
             )
-            async for chunk in self.streaming_service.stream_completion(
-                extended_messages, response_model, response_llm_type
-            ):
-                yield chunk
+
+            # Check if this model supports streaming with its schema configuration
+            from utils.llm_schema_manager import schema_manager
+
+            schema = schema_manager.get_schema(response_model)
+
+            # Disable streaming if thinking_start is null/empty (entire response might be thinking)
+            has_null_thinking_start = not schema.thinking_start
+            supports_tool_extraction = bool(
+                schema.tool_start and schema.tool_stop
+            )
+
+            if has_null_thinking_start:
+                logger.info(
+                    "Model has null thinking_start - disabling streaming to"
+                    " properly filter thinking content"
+                )
+
+                # Use non-streaming mode to get complete response
+                complete_response = (
+                    await self.streaming_service.sync_completion(
+                        extended_messages,
+                        response_model,
+                        response_llm_type,
+                        stream=False,
+                    )
+                )
+
+                # Parse the complete response with schema-aware filtering
+                content, additional_tool_calls = (
+                    self.parsing_service.parse_response(
+                        complete_response, response_model
+                    )
+                )
+
+                # Execute any additional tool calls found in the response
+                if additional_tool_calls:
+                    logger.info(
+                        "Extracted %d tool calls from complete response",
+                        len(additional_tool_calls),
+                    )
+                    additional_responses = (
+                        await self.tool_execution_service.execute_tools(
+                            additional_tool_calls,
+                            current_user_message=current_user_message,
+                            messages=messages,
+                        )
+                    )
+                    self.last_tool_responses.extend(additional_responses)
+
+                # Yield the filtered content (thinking content will be removed)
+                if content and content.strip():
+                    yield content
+
+            elif supports_tool_extraction:
+                logger.info(
+                    "Model supports dynamic tool extraction, using enhanced"
+                    " streaming"
+                )
+                async for chunk in self.streaming_service.stream_completion(
+                    extended_messages,
+                    response_model,
+                    response_llm_type,
+                    extract_tool_calls=True,
+                ):
+                    yield chunk
+
+                # Check for any tool calls extracted during streaming
+                streaming_tool_calls = (
+                    self.streaming_service.get_extracted_tool_calls()
+                )
+                if streaming_tool_calls:
+                    logger.info(
+                        "Extracted %d additional tool calls during streaming",
+                        len(streaming_tool_calls),
+                    )
+                    # Execute any additional tool calls found during streaming
+                    additional_responses = (
+                        await self.tool_execution_service.execute_tools(
+                            streaming_tool_calls,
+                            current_user_message=current_user_message,
+                            messages=messages,
+                        )
+                    )
+                    self.last_tool_responses.extend(additional_responses)
+            else:
+                # Use standard streaming for models without special requirements
+                async for chunk in self.streaming_service.stream_completion(
+                    extended_messages, response_model, response_llm_type
+                ):
+                    yield chunk
 
     def _apply_sliding_window(
         self, messages: List[Dict[str, Any]], max_turns: Optional[int] = None
@@ -801,3 +931,119 @@ class LLMService:
         final_messages = system_messages + selected_messages
 
         return final_messages, was_truncated
+
+    def _auto_configure_model_schemas(self):
+        """Auto-configure model schemas from environment variables"""
+        try:
+            from utils.model_schema_helper import (
+                configure_model_schema_from_env,
+            )
+
+            # Get all model names from config
+            model_names = [
+                self.config.fast_llm_model_name,
+                self.config.llm_model_name,
+                self.config.intelligent_llm_model_name,
+                self.config.vlm_model_name,
+            ]
+
+            # Filter out None values and duplicates
+            model_names = list(set(filter(None, model_names)))
+
+            configured_count = 0
+            for model_name in model_names:
+                if configure_model_schema_from_env(model_name):
+                    configured_count += 1
+
+            if configured_count > 0:
+                logger.info(
+                    "Auto-configured schemas for %d models from environment"
+                    " variables",
+                    configured_count,
+                )
+
+        except Exception as e:
+            logger.warning("Error auto-configuring model schemas: %s", e)
+
+    async def generate_streaming_response_with_tool_extraction(
+        self,
+        messages: List[Dict[str, Any]],
+        model: str,
+        model_type: str = DEFAULT_LLM_TYPE,
+    ) -> AsyncGenerator[str, None]:
+        """
+        Generate streaming response with dynamic tool call extraction
+
+        This method streams the response while simultaneously extracting tool calls
+        using the model-specific schema configuration. Tool calls are executed
+        as they are detected in the stream.
+
+        Args:
+            messages: Conversation messages
+            model: Model name
+            model_type: Type of model to use
+
+        Yields:
+            Response chunks with thinking filtered and tool calls extracted/executed
+        """
+        try:
+            # Apply sliding window and prepare messages
+            windowed_messages = self._apply_sliding_window(messages)
+            windowed_messages = self._filter_messages_for_llm(
+                windowed_messages
+            )
+
+            # Get tool definitions
+            tools = get_all_tool_definitions()
+
+            # Stream with tool call extraction enabled
+            extracted_tool_calls = []
+
+            async for chunk in self.streaming_service.stream_completion(
+                windowed_messages,
+                model,
+                model_type,
+                tools=tools,
+                extract_tool_calls=True,
+            ):
+                # Yield the filtered chunk to user
+                yield chunk
+
+                # Check for newly extracted tool calls
+                new_tool_calls = (
+                    self.streaming_service.get_extracted_tool_calls()
+                )
+                if new_tool_calls and len(new_tool_calls) > len(
+                    extracted_tool_calls
+                ):
+                    # New tool calls detected, execute them
+                    latest_calls = new_tool_calls[len(extracted_tool_calls) :]
+                    extracted_tool_calls.extend(latest_calls)
+
+                    # Execute the new tool calls
+                    tool_responses = (
+                        await self.tool_execution_service.execute_tools(
+                            latest_calls,
+                            current_user_message={
+                                "content": messages[-1].get("content", "")
+                            },
+                            messages=messages,
+                        )
+                    )
+
+                    # Store for context extraction
+                    self.last_tool_responses.extend(tool_responses)
+
+                    logger.info(
+                        "Executed %d tool calls extracted during streaming",
+                        len(latest_calls),
+                    )
+
+            # Clear extracted tool calls for next request
+            self.streaming_service.clear_extracted_tool_calls()
+
+        except Exception as e:
+            logger.error(
+                "Error in streaming response with tool extraction: %s", e
+            )
+            yield f"Error: {str(e)}"

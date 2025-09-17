@@ -53,6 +53,7 @@ class StreamingService:
         model: str,
         model_type: str,
         tools: Optional[List[Dict[str, Any]]] = None,
+        extract_tool_calls: bool = False,
         **kwargs,
     ) -> AsyncGenerator[str, None]:
         """
@@ -63,15 +64,19 @@ class StreamingService:
             model: Model name
             model_type: Type of model to use
             tools: Optional tool definitions
+            extract_tool_calls: Whether to extract tool calls during streaming
             **kwargs: Additional parameters for the API
 
         Yields:
-            Response chunks
+            Response chunks (with thinking and tool calls filtered if extract_tool_calls=True)
         """
         client = self.get_client(model_type, async_client=True)
 
         logger.debug(
-            "Streaming with model_type: %s, model: %s", model_type, model
+            "Streaming with model_type: %s, model: %s, extract_tool_calls: %s",
+            model_type,
+            model,
+            extract_tool_calls,
         )
 
         try:
@@ -96,10 +101,36 @@ class StreamingService:
             # Create streaming response
             response = await client.chat.completions.create(**api_params)
 
+            # Initialize filter if tool call extraction is requested
+            complete_filter = None
+            if extract_tool_calls:
+                from utils.text_processing import StreamingCompleteFilter
+
+                complete_filter = StreamingCompleteFilter(model_name=model)
+                # Store reference for later tool call extraction
+                self._current_filter = complete_filter
+
             # Process stream
             async for chunk in response:
                 if chunk.choices and chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
+                    chunk_content = chunk.choices[0].delta.content
+
+                    if complete_filter:
+                        # Filter thinking tags and extract tool calls
+                        filtered_content = complete_filter.process_chunk(
+                            chunk_content
+                        )
+                        if filtered_content:
+                            yield filtered_content
+                    else:
+                        # Pass through without filtering
+                        yield chunk_content
+
+            # Flush any remaining content if using filter
+            if complete_filter:
+                final_content = complete_filter.flush()
+                if final_content:
+                    yield final_content
 
         except Exception as e:
             logger.error("Streaming error: %s", e)
@@ -338,3 +369,19 @@ class StreamingService:
             raise StreamingError(
                 f"Failed to get {mode} completion: {e}"
             ) from e
+
+    def get_extracted_tool_calls(self) -> List[Dict[str, Any]]:
+        """
+        Get tool calls extracted during streaming (if extract_tool_calls was enabled)
+
+        Returns:
+            List of extracted tool calls, empty if none extracted
+        """
+        if hasattr(self, "_current_filter") and self._current_filter:
+            return self._current_filter.get_extracted_tool_calls()
+        return []
+
+    def clear_extracted_tool_calls(self):
+        """Clear any extracted tool calls from the current filter"""
+        if hasattr(self, "_current_filter") and self._current_filter:
+            self._current_filter.clear_extracted_tool_calls()

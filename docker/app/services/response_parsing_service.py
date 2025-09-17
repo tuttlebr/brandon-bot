@@ -17,41 +17,65 @@ logger = get_logger(__name__)
 
 
 class ResponseParsingService:
-    """Service for parsing LLM responses and extracting tool calls"""
+    """Service for parsing LLM responses and extracting tool calls with dynamic schema support"""
+
+    def __init__(self, model_name: str = None):
+        """
+        Initialize the response parsing service
+
+        Args:
+            model_name: Name of the model for schema lookup
+        """
+        self.model_name = model_name
 
     def parse_response(
-        self, response: Any
+        self, response: Any, model_name: str = None
     ) -> Tuple[str, List[Dict[str, Any]]]:
         """
         Parse LLM response to extract content and tool calls
 
         Args:
             response: LLM response object
+            model_name: Optional model name for schema lookup (overrides instance model_name)
 
         Returns:
             Tuple of (content, tool_calls)
         """
         try:
+            # Use provided model name or fall back to instance model name
+            effective_model_name = model_name or self.model_name
+
             message = response.choices[0].message
             content = message.content or ""
 
             # Extract standard OpenAI tool calls
             openai_tool_calls = self._extract_openai_tool_calls(message)
 
-            # Extract custom tool calls from content
-            custom_tool_calls = self._extract_custom_tool_calls(content)
+            # Extract custom tool calls from content using dynamic schema
+            custom_tool_calls = self._extract_custom_tool_calls(
+                content, effective_model_name
+            )
+
+            # Extract tool calls from dynamic schema tags
+            schema_tool_calls = self._extract_schema_tool_calls(
+                content, effective_model_name
+            )
 
             # Normalize all tool calls
             all_tool_calls = self._normalize_tool_calls(
-                openai_tool_calls, custom_tool_calls
+                openai_tool_calls, custom_tool_calls, schema_tool_calls
             )
 
-            # Clean content if custom tool calls were found
-            if custom_tool_calls:
-                content = self._clean_tool_instructions(content)
+            # Clean content if any tool calls were found
+            if custom_tool_calls or schema_tool_calls:
+                content = self._clean_tool_instructions(
+                    content, effective_model_name
+                )
 
-            # Strip all thinking/reasoning formats (think tags and analysis blocks)
-            content = strip_all_thinking_formats(content)
+            # Strip all thinking/reasoning formats using dynamic schema
+            content = self._strip_thinking_formats(
+                content, effective_model_name
+            )
 
             if len(all_tool_calls) == 0:
                 all_tool_calls = None
@@ -106,8 +130,10 @@ class ResponseParsingService:
 
         return tool_calls
 
-    def _extract_custom_tool_calls(self, content: str) -> List[Dict[str, Any]]:
-        """Extract custom format tool calls from content"""
+    def _extract_custom_tool_calls(
+        self, content: str, model_name: str = None
+    ) -> List[Dict[str, Any]]:
+        """Extract custom format tool calls from content (legacy TOOLCALL format)"""
         if not content:
             return []
 
@@ -135,10 +161,93 @@ class ResponseParsingService:
 
         return tool_calls
 
+    def _extract_schema_tool_calls(
+        self, content: str, model_name: str = None
+    ) -> List[Dict[str, Any]]:
+        """Extract tool calls using dynamic schema tags"""
+        if not content or not model_name:
+            return []
+
+        try:
+            from utils.llm_schema_manager import schema_manager
+
+            tool_start, tool_stop = schema_manager.get_tool_tags(model_name)
+
+            # If both tool tags are empty/null, don't extract from content
+            # This means the model uses standard OpenAI tool_calls format only
+            if not tool_start or not tool_stop:
+                logger.debug(
+                    "Model '%s' has null tool tags - using OpenAI format only",
+                    model_name,
+                )
+                return []
+
+            # Create pattern for the dynamic tool call tags
+            # Escape special regex characters in the tags
+            escaped_start = re.escape(tool_start)
+            escaped_stop = re.escape(tool_stop)
+            pattern = f"{escaped_start}(.*?){escaped_stop}"
+
+            matches = re.findall(pattern, content, re.DOTALL | re.IGNORECASE)
+
+            tool_calls = []
+            for match in matches:
+                try:
+                    # Try to parse as JSON
+                    tool_call_data = json.loads(match.strip())
+
+                    # Handle single tool call (dict)
+                    if (
+                        isinstance(tool_call_data, dict)
+                        and "name" in tool_call_data
+                    ):
+                        tool_calls.append(
+                            {
+                                "name": tool_call_data["name"],
+                                "arguments": tool_call_data.get(
+                                    "arguments", {}
+                                ),
+                                "source": "dynamic_schema",
+                            }
+                        )
+                    # Handle multiple tool calls (list)
+                    elif isinstance(tool_call_data, list):
+                        for call in tool_call_data:
+                            if isinstance(call, dict) and "name" in call:
+                                tool_calls.append(
+                                    {
+                                        "name": call["name"],
+                                        "arguments": call.get("arguments", {}),
+                                        "source": "dynamic_schema",
+                                    }
+                                )
+
+                except json.JSONDecodeError as e:
+                    logger.warning(
+                        "Failed to parse schema tool call as JSON: %s", e
+                    )
+                except Exception as e:
+                    logger.error("Error parsing schema tool call: %s", e)
+
+            if tool_calls:
+                logger.info(
+                    "Extracted %d tool calls using dynamic schema for"
+                    " model %s",
+                    len(tool_calls),
+                    model_name,
+                )
+
+            return tool_calls
+
+        except Exception as e:
+            logger.error("Error extracting schema tool calls: %s", e)
+            return []
+
     def _normalize_tool_calls(
         self,
         openai_calls: List[Dict[str, Any]],
         custom_calls: List[Dict[str, Any]],
+        schema_calls: List[Dict[str, Any]],
     ) -> List[Dict[str, Any]]:
         """Normalize tool calls to a consistent format"""
         normalized = []
@@ -154,7 +263,7 @@ class ResponseParsingService:
                 }
             )
 
-        # Add custom calls
+        # Add custom calls (legacy format)
         for call in custom_calls:
             normalized.append(
                 {
@@ -165,23 +274,123 @@ class ResponseParsingService:
                 }
             )
 
+        # Add schema calls (dynamic format)
+        for call in schema_calls:
+            normalized.append(
+                {
+                    "name": call["name"],
+                    "arguments": call.get("arguments", {}),
+                    "source": call.get("source", "dynamic_schema"),
+                    "id": None,
+                }
+            )
+
         return normalized
 
-    def _clean_tool_instructions(self, content: str) -> str:
-        """Remove tool call instructions from content"""
+    def _clean_tool_instructions(
+        self, content: str, model_name: str = None
+    ) -> str:
+        """Remove tool call instructions from content using dynamic schema"""
         if not content:
             return content
 
-        # Remove tool call patterns
-        patterns = [
+        cleaned = content
+
+        # Remove legacy tool call patterns first
+        legacy_patterns = [
             r"<TOOLCALL[^>]*?\[.*?\]</TOOLCALL>",
             r"<toolcall[^>]*?\[.*?\]</toolcall>",
         ]
 
-        cleaned = content
-        for pattern in patterns:
+        for pattern in legacy_patterns:
             cleaned = re.sub(
                 pattern, "", cleaned, flags=re.DOTALL | re.IGNORECASE
             )
 
+        # Remove dynamic schema tool call patterns if model is specified
+        if model_name:
+            try:
+                from utils.llm_schema_manager import schema_manager
+
+                tool_start, tool_stop = schema_manager.get_tool_tags(
+                    model_name
+                )
+
+                # Only clean if both tags are present
+                if tool_start and tool_stop:
+                    # Create pattern for the dynamic tool call tags
+                    escaped_start = re.escape(tool_start)
+                    escaped_stop = re.escape(tool_stop)
+                    pattern = f"{escaped_start}.*?{escaped_stop}"
+
+                    cleaned = re.sub(
+                        pattern, "", cleaned, flags=re.DOTALL | re.IGNORECASE
+                    )
+
+            except Exception as e:
+                logger.error("Error cleaning dynamic schema tool calls: %s", e)
+
         return cleaned.strip()
+
+    def _strip_thinking_formats(
+        self, content: str, model_name: str = None
+    ) -> str:
+        """Strip thinking formats using dynamic schema"""
+        if not content:
+            return content
+
+        # If no model name provided, use the default stripping function
+        if not model_name:
+            return strip_all_thinking_formats(content)
+
+        try:
+            from utils.llm_schema_manager import schema_manager
+
+            # Get schema for the model
+            schema = schema_manager.get_schema(model_name)
+
+            # Strip thinking tags - handle asymmetric cases
+            if schema.thinking_start and schema.thinking_stop:
+                # Standard case: both start and stop tags
+                escaped_start = re.escape(schema.thinking_start)
+                escaped_stop = re.escape(schema.thinking_stop)
+                pattern = f"{escaped_start}.*?{escaped_stop}"
+                content = re.sub(
+                    pattern, "", content, flags=re.DOTALL | re.IGNORECASE
+                )
+            elif schema.thinking_stop and not schema.thinking_start:
+                # Only stop tag - remove everything before and including the stop tag
+                stop_index = content.find(schema.thinking_stop)
+                if stop_index != -1:
+                    # Keep only content after the stop tag
+                    content = content[stop_index + len(schema.thinking_stop) :]
+                    logger.info(
+                        "Applied stop-only filtering - removed %d chars before"
+                        " stop tag",
+                        stop_index,
+                    )
+            elif schema.thinking_start and not schema.thinking_stop:
+                # Only start tag - remove everything after the start tag
+                escaped_start = re.escape(schema.thinking_start)
+                pattern = f"{escaped_start}.*$"
+                content = re.sub(
+                    pattern, "", content, flags=re.DOTALL | re.IGNORECASE
+                )
+
+            # Strip analysis blocks if configured
+            if schema.analysis_start and schema.analysis_stop:
+                escaped_start = re.escape(schema.analysis_start)
+                escaped_stop = re.escape(schema.analysis_stop)
+                pattern = f"{escaped_start}.*?{escaped_stop}"
+                content = re.sub(
+                    pattern, "", content, flags=re.DOTALL | re.IGNORECASE
+                )
+
+            return content.strip()
+
+        except Exception as e:
+            logger.error(
+                "Error stripping thinking formats with dynamic schema: %s", e
+            )
+            # Fall back to default stripping
+            return strip_all_thinking_formats(content)

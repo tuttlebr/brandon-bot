@@ -318,8 +318,10 @@ class WebExtractController(ToolController):
                 stream=True,  # Enable streaming for faster latency
             )
 
-            # Create think tag filter for streaming
-            think_filter = StreamingCombinedThinkingFilter()
+            # Create think tag filter for streaming with model name
+            think_filter = StreamingCombinedThinkingFilter(
+                model_name=model_name
+            )
             collected_response = ""
 
             # Process stream with think tag filtering
@@ -408,8 +410,10 @@ class WebExtractController(ToolController):
                 stream=True,  # Enable streaming
             )
 
-            # Create think tag filter for streaming
-            think_filter = StreamingCombinedThinkingFilter()
+            # Create think tag filter for streaming with model name
+            think_filter = StreamingCombinedThinkingFilter(
+                model_name=model_name
+            )
 
             # Process stream with think tag filtering and yield chunks
             async for chunk in response:

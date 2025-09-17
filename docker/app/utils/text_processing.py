@@ -1,6 +1,6 @@
 import re
 import unicodedata
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from utils.logging_config import get_logger
 
@@ -521,12 +521,57 @@ class StreamingThinkTagFilter:
     """
     A stateful filter for removing think tags from streaming text.
     Handles cases where tags span multiple chunks.
+    Now supports dynamic thinking tag configuration per model.
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        model_name: str = None,
+        thinking_start: str = None,
+        thinking_stop: str = None,
+    ):
+        """
+        Initialize the filter with optional model-specific tags
+
+        Args:
+            model_name: Name of the model (for schema lookup)
+            thinking_start: Custom thinking start tag (overrides model schema)
+            thinking_stop: Custom thinking stop tag (overrides model schema)
+        """
         self.buffer = ""
         self.in_think_tag = False
         self.pending_output = ""
+        self.found_stop_tag = False  # Track if we've found the stop tag (for stop-only filtering)
+
+        # Get thinking tags from schema manager or use provided ones
+        if thinking_start is not None and thinking_stop is not None:
+            self.thinking_start = thinking_start
+            self.thinking_stop = thinking_stop
+        elif model_name:
+            from utils.llm_schema_manager import schema_manager
+
+            tags = schema_manager.get_thinking_tags(model_name)
+            self.thinking_start, self.thinking_stop = tags
+        else:
+            # Use default tags
+            from utils.config import config
+
+            self.thinking_start = config.llm.DEFAULT_THINKING_START
+            self.thinking_stop = config.llm.DEFAULT_THINKING_STOP
+
+        # Cache tag lengths for efficiency and check if filtering is enabled
+        self.start_tag_len = (
+            len(self.thinking_start) if self.thinking_start else 0
+        )
+        self.stop_tag_len = (
+            len(self.thinking_stop) if self.thinking_stop else 0
+        )
+        # Enable filtering if we have at least one tag (start OR stop)
+        self.filtering_enabled = bool(
+            self.thinking_start or self.thinking_stop
+        )
+        self.has_start_tag = bool(self.thinking_start)
+        self.has_stop_tag = bool(self.thinking_stop)
 
     def process_chunk(self, chunk: str) -> str:
         """
@@ -538,6 +583,10 @@ class StreamingThinkTagFilter:
         Returns:
             Text that can be safely displayed (with think tags removed)
         """
+        # If filtering is disabled (empty tags), pass through
+        if not self.filtering_enabled:
+            return chunk
+
         # Add chunk to buffer
         self.buffer += chunk
 
@@ -547,42 +596,116 @@ class StreamingThinkTagFilter:
 
         while i < len(self.buffer):
             if self.in_think_tag:
-                # Look for closing tag
-                close_index = self.buffer.find("</think>", i)
-                if close_index != -1:
-                    # Found closing tag, skip to after it
-                    i = close_index + 8  # len('</think>')
-                    self.in_think_tag = False
+                # Look for closing tag (if we have one)
+                if self.has_stop_tag:
+                    close_index = self.buffer.find(self.thinking_stop, i)
+                    if close_index != -1:
+                        # Found closing tag, skip to after it
+                        i = close_index + self.stop_tag_len
+                        self.in_think_tag = False
+                    else:
+                        # No closing tag yet, wait for more chunks
+                        break
                 else:
-                    # No closing tag yet, wait for more chunks
+                    # No stop tag configured, consume everything until end
+                    self.buffer = ""
                     break
             else:
-                # Look for opening tag
-                open_index = self.buffer.find("<think>", i)
-                if open_index != -1:
-                    # Output text before the tag
-                    output += self.buffer[i:open_index]
-                    i = open_index + 7  # len('<think>')
-                    self.in_think_tag = True
-                else:
-                    # Check if we might have a partial tag at the end
-                    partial_tag_start = max(i, len(self.buffer) - 7)
-                    for j in range(partial_tag_start, len(self.buffer)):
-                        if (
-                            self.buffer[j:].startswith("<")
-                            or self.buffer[j:].startswith("<t")
-                            or self.buffer[j:].startswith("<th")
-                            or self.buffer[j:].startswith("<thi")
-                            or self.buffer[j:].startswith("<thin")
-                            or self.buffer[j:].startswith("<think")
+                # Handle different scenarios based on available tags
+                if self.has_start_tag and self.has_stop_tag:
+                    # Standard case: both start and stop tags
+                    open_index = self.buffer.find(self.thinking_start, i)
+                    if open_index != -1:
+                        # Output text before the tag
+                        output += self.buffer[i:open_index]
+                        i = open_index + self.start_tag_len
+                        self.in_think_tag = True
+                    else:
+                        # Check for partial start tag
+                        partial_tag_start = max(
+                            i, len(self.buffer) - self.start_tag_len
+                        )
+                        for j in range(partial_tag_start, len(self.buffer)):
+                            remaining_buffer = self.buffer[j:]
+                            if self.thinking_start.startswith(
+                                remaining_buffer
+                            ):
+                                output += self.buffer[i:j]
+                                self.buffer = self.buffer[j:]
+                                return output
+                        # No partial tags, output the rest
+                        output += self.buffer[i:]
+                        self.buffer = ""
+                        break
+                elif self.has_stop_tag and not self.has_start_tag:
+                    # Only stop tag - this means everything before the stop tag is thinking content
+                    # We need to buffer everything until we find the stop tag
+                    stop_index = self.buffer.find(self.thinking_stop, i)
+                    if stop_index != -1:
+                        # Found stop tag - discard everything before it and the tag itself
+                        # Only output content after the stop tag
+                        remaining_content = self.buffer[
+                            stop_index + self.stop_tag_len :
+                        ]
+                        output += remaining_content
+                        self.buffer = ""
+                        self.found_stop_tag = True
+                        break
+                    else:
+                        # No stop tag found yet - check for partial stop tag
+                        partial_found = False
+                        for j in range(
+                            max(i, len(self.buffer) - self.stop_tag_len),
+                            len(self.buffer),
                         ):
-                            # Might be start of tag, output up to this point
-                            output += self.buffer[i:j]
-                            # Keep the potential tag start in buffer
-                            self.buffer = self.buffer[j:]
-                            return output
+                            remaining_buffer = self.buffer[j:]
+                            if self.thinking_stop.startswith(
+                                remaining_buffer
+                            ) and len(remaining_buffer) < len(
+                                self.thinking_stop
+                            ):
+                                # Found partial stop tag, keep it in buffer and don't output anything
+                                self.buffer = self.buffer[j:]
+                                partial_found = True
+                                break
 
-                    # No partial tags, output the rest
+                        if not partial_found:
+                            # No stop tag found yet - if we already found it in previous chunks,
+                            # output everything. Otherwise, don't output anything (it's thinking content)
+                            if self.found_stop_tag:
+                                output += self.buffer[i:]
+                                self.buffer = ""
+                            else:
+                                # Buffer everything - it might all be thinking content
+                                self.buffer = self.buffer  # Keep entire buffer
+                        break
+                elif self.has_start_tag and not self.has_stop_tag:
+                    # Only start tag - filter everything after start tag
+                    open_index = self.buffer.find(self.thinking_start, i)
+                    if open_index != -1:
+                        # Output text before the tag, then consume everything after
+                        output += self.buffer[i:open_index]
+                        self.buffer = ""
+                        break
+                    else:
+                        # Check for partial start tag
+                        partial_tag_start = max(
+                            i, len(self.buffer) - self.start_tag_len
+                        )
+                        for j in range(partial_tag_start, len(self.buffer)):
+                            remaining_buffer = self.buffer[j:]
+                            if self.thinking_start.startswith(
+                                remaining_buffer
+                            ):
+                                output += self.buffer[i:j]
+                                self.buffer = self.buffer[j:]
+                                return output
+                        # No partial tags, output the rest
+                        output += self.buffer[i:]
+                        self.buffer = ""
+                        break
+                else:
+                    # No tags configured, pass through
                     output += self.buffer[i:]
                     self.buffer = ""
                     break
@@ -617,13 +740,47 @@ class StreamingAnalysisBlockFilter:
     """
     A stateful filter for removing analysis...assistantfinal blocks from streaming text.
     Handles cases where the block spans multiple chunks.
+    Now supports dynamic analysis tag configuration per model.
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        model_name: str = None,
+        analysis_start: str = None,
+        analysis_stop: str = None,
+    ):
+        """
+        Initialize the filter with optional model-specific tags
+
+        Args:
+            model_name: Name of the model (for schema lookup)
+            analysis_start: Custom analysis start tag (overrides model schema)
+            analysis_stop: Custom analysis stop tag (overrides model schema)
+        """
         self.buffer = ""
         self.found_analysis_start = False
         self.found_assistant_final = False
         self.analysis_block_content = ""
+
+        # Get analysis tags from schema manager or use provided ones
+        if analysis_start and analysis_stop:
+            self.analysis_start = analysis_start
+            self.analysis_stop = analysis_stop
+        elif model_name:
+            from utils.llm_schema_manager import schema_manager
+
+            self.analysis_start, self.analysis_stop = (
+                schema_manager.get_analysis_tags(model_name)
+            )
+        else:
+            # Use default tags
+            self.analysis_start = "analysis"
+            self.analysis_stop = "assistantfinal"
+
+        # Handle None values (when analysis blocks aren't used)
+        self.use_analysis_filtering = (
+            self.analysis_start is not None and self.analysis_stop is not None
+        )
 
     def process_chunk(self, chunk: str) -> str:
         """
@@ -635,22 +792,26 @@ class StreamingAnalysisBlockFilter:
         Returns:
             Text that can be safely displayed (with analysis blocks removed)
         """
+        # Skip processing if analysis filtering is disabled
+        if not self.use_analysis_filtering:
+            return chunk
+
         # Add chunk to buffer
         self.buffer += chunk
 
         # If we haven't found the analysis start yet
         if not self.found_analysis_start:
-            # Check if buffer starts with "analysis"
-            if self.buffer.startswith("analysis"):
+            # Check if buffer starts with analysis start tag
+            if self.buffer.startswith(self.analysis_start):
                 self.found_analysis_start = True
                 self.analysis_block_content = self.buffer
                 # Don't output anything yet
                 return ""
-            elif len(self.buffer) < 8:  # "analysis" is 8 chars
+            elif len(self.buffer) < len(self.analysis_start):
                 # Not enough data to determine, wait for more
                 return ""
             else:
-                # Buffer doesn't start with "analysis", output and clear
+                # Buffer doesn't start with analysis start tag, output and clear
                 output = self.buffer
                 self.buffer = ""
                 return output
@@ -660,13 +821,13 @@ class StreamingAnalysisBlockFilter:
             self.analysis_block_content += chunk
 
             # Check if we've found the end marker
-            if "assistantfinal" in self.analysis_block_content:
+            if self.analysis_stop in self.analysis_block_content:
                 self.found_assistant_final = True
 
-                # Find the position after "assistantfinal"
-                end_index = (
-                    self.analysis_block_content.find("assistantfinal") + 14
-                )
+                # Find the position after the analysis stop tag
+                end_index = self.analysis_block_content.find(
+                    self.analysis_stop
+                ) + len(self.analysis_stop)
 
                 # Extract content after the block
                 if end_index < len(self.analysis_block_content):
@@ -709,11 +870,37 @@ class StreamingAnalysisBlockFilter:
 class StreamingCombinedThinkingFilter:
     """
     A combined filter that handles both think tags and analysis blocks in streaming text.
+    Now supports dynamic schema configuration per model.
     """
 
-    def __init__(self):
-        self.think_filter = StreamingThinkTagFilter()
-        self.analysis_filter = StreamingAnalysisBlockFilter()
+    def __init__(
+        self,
+        model_name: str = None,
+        thinking_start: str = None,
+        thinking_stop: str = None,
+        analysis_start: str = None,
+        analysis_stop: str = None,
+    ):
+        """
+        Initialize the combined filter with optional model-specific tags
+
+        Args:
+            model_name: Name of the model (for schema lookup)
+            thinking_start: Custom thinking start tag
+            thinking_stop: Custom thinking stop tag
+            analysis_start: Custom analysis start tag
+            analysis_stop: Custom analysis stop tag
+        """
+        self.think_filter = StreamingThinkTagFilter(
+            model_name=model_name,
+            thinking_start=thinking_start,
+            thinking_stop=thinking_stop,
+        )
+        self.analysis_filter = StreamingAnalysisBlockFilter(
+            model_name=model_name,
+            analysis_start=analysis_start,
+            analysis_stop=analysis_stop,
+        )
 
     def process_chunk(self, chunk: str) -> str:
         """
@@ -740,6 +927,325 @@ class StreamingCombinedThinkingFilter:
         Returns:
             Any remaining displayable text
         """
+        analysis_output = self.analysis_filter.flush()
+        if analysis_output:
+            self.think_filter.buffer += analysis_output
+
+        return self.think_filter.flush()
+
+
+class StreamingToolCallFilter:
+    """
+    A stateful filter for extracting tool calls from streaming text and removing them from display.
+    Handles cases where tool calls span multiple chunks and supports dynamic tool call formats.
+    """
+
+    def __init__(
+        self,
+        model_name: str = None,
+        tool_start: str = None,
+        tool_stop: str = None,
+    ):
+        """
+        Initialize the filter with optional model-specific tags
+
+        Args:
+            model_name: Name of the model (for schema lookup)
+            tool_start: Custom tool call start tag (overrides model schema)
+            tool_stop: Custom tool call stop tag (overrides model schema)
+        """
+        self.buffer = ""
+        self.in_tool_call = False
+        self.tool_call_content = ""
+        self.extracted_tool_calls = []
+
+        # Get tool call tags from schema manager or use provided ones
+        if tool_start is not None and tool_stop is not None:
+            self.tool_start = tool_start
+            self.tool_stop = tool_stop
+        elif model_name:
+            from utils.llm_schema_manager import schema_manager
+
+            self.tool_start, self.tool_stop = schema_manager.get_tool_tags(
+                model_name
+            )
+        else:
+            # Use default tags
+            from utils.config import config
+
+            self.tool_start = config.llm.DEFAULT_TOOL_START
+            self.tool_stop = config.llm.DEFAULT_TOOL_STOP
+
+        # Cache tag lengths for efficiency and check if filtering is enabled
+        self.start_tag_len = len(self.tool_start) if self.tool_start else 0
+        self.stop_tag_len = len(self.tool_stop) if self.tool_stop else 0
+        # Only enable filtering if BOTH start and stop tags are present and non-empty
+        # If both are null/empty, it means use OpenAI format only (no content extraction)
+        self.filtering_enabled = bool(
+            self.tool_start
+            and self.tool_stop
+            and self.tool_start.strip()
+            and self.tool_stop.strip()
+        )
+
+    def process_chunk(self, chunk: str) -> str:
+        """
+        Process a streaming chunk, extract tool calls, and return displayable text.
+
+        Args:
+            chunk: The new text chunk from the stream
+
+        Returns:
+            Text that can be safely displayed (with tool calls removed)
+        """
+        # If filtering is disabled (empty tags), pass through
+        if not self.filtering_enabled:
+            return chunk
+
+        # Add chunk to buffer
+        self.buffer += chunk
+
+        # Process buffer to extract displayable content and tool calls
+        output = ""
+        i = 0
+
+        while i < len(self.buffer):
+            if self.in_tool_call:
+                # Look for closing tag
+                close_index = self.buffer.find(self.tool_stop, i)
+                if close_index != -1:
+                    # Found closing tag, extract the tool call content
+                    self.tool_call_content += self.buffer[i:close_index]
+
+                    # Debug logging
+                    logger.debug(
+                        "Extracted tool call content: %s",
+                        repr(self.tool_call_content),
+                    )
+
+                    # Try to parse the tool call
+                    self._extract_tool_call(self.tool_call_content)
+
+                    # Reset state and skip to after the closing tag
+                    i = close_index + self.stop_tag_len
+                    self.in_tool_call = False
+                    self.tool_call_content = ""
+                else:
+                    # No closing tag yet, accumulate content and wait
+                    self.tool_call_content += self.buffer[i:]
+                    self.buffer = ""  # Clear buffer since we processed it all
+                    return output  # Return what we have so far
+            else:
+                # Look for opening tag
+                open_index = self.buffer.find(self.tool_start, i)
+                if open_index != -1:
+                    # Output text before the tag
+                    output += self.buffer[i:open_index]
+                    i = open_index + self.start_tag_len
+                    self.in_tool_call = True
+                else:
+                    # Check if we might have a partial tag at the end
+                    partial_tag_start = max(
+                        i, len(self.buffer) - self.start_tag_len
+                    )
+                    for j in range(partial_tag_start, len(self.buffer)):
+                        # Check for partial start tag
+                        remaining_buffer = self.buffer[j:]
+                        if self.tool_start.startswith(remaining_buffer):
+                            # Might be start of tag, output up to this point
+                            output += self.buffer[i:j]
+                            # Keep the potential tag start in buffer
+                            self.buffer = self.buffer[j:]
+                            return output
+
+                    # No partial tags, output the rest
+                    output += self.buffer[i:]
+                    self.buffer = ""
+                    break
+
+        # Update buffer to remove processed content
+        if i < len(self.buffer):
+            self.buffer = self.buffer[i:]
+        else:
+            self.buffer = ""
+
+        return output
+
+    def _extract_tool_call(self, tool_call_content: str):
+        """
+        Extract and parse a tool call from the content
+
+        Args:
+            tool_call_content: The content between tool call tags
+        """
+        try:
+            import json
+
+            # Clean and normalize the content
+            cleaned_content = tool_call_content.strip()
+
+            # Remove any leading/trailing whitespace and newlines more aggressively
+            cleaned_content = re.sub(r"^\s+", "", cleaned_content)
+            cleaned_content = re.sub(r"\s+$", "", cleaned_content)
+
+            # Try to extract JSON from the content if it's mixed with other text
+            # Look for JSON-like patterns
+            json_match = re.search(r"\{.*\}", cleaned_content, re.DOTALL)
+            if json_match:
+                cleaned_content = json_match.group(0)
+
+            # Try to parse as JSON
+            tool_call_data = json.loads(cleaned_content)
+
+            # Validate tool call structure
+            if isinstance(tool_call_data, dict) and "name" in tool_call_data:
+                self.extracted_tool_calls.append(
+                    {
+                        "name": tool_call_data["name"],
+                        "arguments": tool_call_data.get("arguments", {}),
+                        "source": "dynamic_schema",
+                    }
+                )
+                logger.debug("Extracted tool call: %s", tool_call_data["name"])
+            elif isinstance(tool_call_data, list):
+                # Handle array of tool calls
+                for call in tool_call_data:
+                    if isinstance(call, dict) and "name" in call:
+                        self.extracted_tool_calls.append(
+                            {
+                                "name": call["name"],
+                                "arguments": call.get("arguments", {}),
+                                "source": "dynamic_schema",
+                            }
+                        )
+                        logger.debug("Extracted tool call: %s", call["name"])
+
+        except json.JSONDecodeError as e:
+            logger.warning(
+                "Failed to parse tool call content as JSON: %s. Content: %s",
+                e,
+                repr(tool_call_content[:100]),
+            )
+        except Exception as e:
+            logger.error("Error extracting tool call: %s", e)
+
+    def get_extracted_tool_calls(self) -> List[Dict[str, Any]]:
+        """
+        Get all extracted tool calls
+
+        Returns:
+            List of extracted tool call dictionaries
+        """
+        return self.extracted_tool_calls.copy()
+
+    def clear_extracted_tool_calls(self):
+        """Clear the list of extracted tool calls"""
+        self.extracted_tool_calls.clear()
+
+    def flush(self) -> str:
+        """
+        Get any remaining buffered content (called at end of stream).
+
+        Returns:
+            Any remaining displayable text
+        """
+        # If we're still in a tool call at the end, it wasn't closed properly
+        # Log this as a warning but don't include it in output
+        if self.in_tool_call:
+            logger.warning("Unclosed tool call detected at end of stream")
+            return ""
+
+        # Return any remaining buffer content
+        output = self.buffer
+        self.buffer = ""
+        return output
+
+
+class StreamingCompleteFilter:
+    """
+    A comprehensive filter that handles thinking tags, analysis blocks, and tool calls
+    with dynamic schema support for different LLM models.
+    """
+
+    def __init__(
+        self,
+        model_name: str = None,
+        thinking_start: str = None,
+        thinking_stop: str = None,
+        analysis_start: str = None,
+        analysis_stop: str = None,
+        tool_start: str = None,
+        tool_stop: str = None,
+    ):
+        """
+        Initialize the complete filter with optional model-specific tags
+
+        Args:
+            model_name: Name of the model (for schema lookup)
+            thinking_start: Custom thinking start tag
+            thinking_stop: Custom thinking stop tag
+            analysis_start: Custom analysis start tag
+            analysis_stop: Custom analysis stop tag
+            tool_start: Custom tool call start tag
+            tool_stop: Custom tool call stop tag
+        """
+        self.think_filter = StreamingThinkTagFilter(
+            model_name=model_name,
+            thinking_start=thinking_start,
+            thinking_stop=thinking_stop,
+        )
+        self.analysis_filter = StreamingAnalysisBlockFilter(
+            model_name=model_name,
+            analysis_start=analysis_start,
+            analysis_stop=analysis_stop,
+        )
+        self.tool_filter = StreamingToolCallFilter(
+            model_name=model_name, tool_start=tool_start, tool_stop=tool_stop
+        )
+
+    def process_chunk(self, chunk: str) -> str:
+        """
+        Process a streaming chunk through all filters.
+
+        Args:
+            chunk: The new text chunk from the stream
+
+        Returns:
+            Text that can be safely displayed
+        """
+        # First process through tool call filter to extract tool calls
+        intermediate = self.tool_filter.process_chunk(chunk)
+
+        # Then process through analysis filter
+        if intermediate:
+            intermediate = self.analysis_filter.process_chunk(intermediate)
+
+        # Finally process through think tag filter
+        if intermediate:
+            return self.think_filter.process_chunk(intermediate)
+        return ""
+
+    def get_extracted_tool_calls(self) -> List[Dict[str, Any]]:
+        """Get all extracted tool calls from the tool filter"""
+        return self.tool_filter.get_extracted_tool_calls()
+
+    def clear_extracted_tool_calls(self):
+        """Clear extracted tool calls"""
+        self.tool_filter.clear_extracted_tool_calls()
+
+    def flush(self) -> str:
+        """
+        Flush all filters.
+
+        Returns:
+            Any remaining displayable text
+        """
+        # Flush tool filter first
+        tool_output = self.tool_filter.flush()
+        if tool_output:
+            self.analysis_filter.buffer += tool_output
+
+        # Flush analysis filter
         analysis_output = self.analysis_filter.flush()
         if analysis_output:
             self.think_filter.buffer += analysis_output

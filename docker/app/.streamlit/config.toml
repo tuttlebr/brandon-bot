@@ -20,7 +20,6 @@ backgroundColor = '#18191a'
 secondaryBackgroundColor = '#403e41'
 font = "nvidia-sans"
 headingFont = "nvidia-sans"
-codeFont = "jetbrains-mono"
 
 [[theme.fontFaces]]
 family = "nvidia-sans"
@@ -31,11 +30,6 @@ url = "https://brand-assets.cne.ngc.nvidia.com/assets/fonts/nvidia-sans/1.0.0/NV
 family = "nvidia-sans"
 style = "italic"
 url = "https://brand-assets.cne.ngc.nvidia.com/assets/fonts/nvidia-sans/1.0.0/NVIDIASans_Lt.woff2"
-
-[[theme.fontFaces]]
-family = "jetbrains-mono"
-style = "normal"
-url = "https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbV2o-flEEny0FZhsfKu5WU4xD2OwGtT0rU3BE.woff2"
 
 [ui]
 hideTopBar = true

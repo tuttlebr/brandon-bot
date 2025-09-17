@@ -242,8 +242,10 @@ class TextProcessorService:
                 stream=True,  # Enable streaming
             )
 
-            # Create think tag filter for streaming
-            think_filter = StreamingCombinedThinkingFilter()
+            # Create think tag filter for streaming with model name
+            think_filter = StreamingCombinedThinkingFilter(
+                model_name=model_name
+            )
             collected_result = ""
 
             # Process stream with think tag filtering
