@@ -120,9 +120,9 @@ class ResponseController:
                 )
 
             try:
-                # Use asyncio.run for simpler async handling
+                # Use asyncio.run for simpler async handling with progress support
                 full_response = asyncio.run(
-                    self._async_stream_response(
+                    self._async_stream_response_with_progress(
                         prepared_messages,
                         model_name,
                         model_type,
@@ -220,6 +220,9 @@ class ResponseController:
                     progress_value = float(progress_match.group(1))
                     progress_message = progress_match.group(2)
 
+                    # Clamp progress value to valid range [0.0, 1.0]
+                    progress_value = max(0.0, min(1.0, progress_value))
+
                     # Initialize progress bar on first progress update
                     if progress_bar is None and not first_chunk_received:
                         # Clear the loading animation
@@ -247,6 +250,134 @@ class ResponseController:
                     display_text += filtered_chunk
 
                     # Update UI with filtered response
+                    # Show content when we have actual text (not just progress)
+                    if display_text.strip():
+                        # Clear progress bar when actual content starts
+                        if progress_container is not None:
+                            progress_container.empty()
+                            progress_container = None
+                            progress_bar = None
+                            progress_text = None
+
+                        if not first_chunk_received:
+                            # Clear animation if needed
+                            message_placeholder.empty()
+                            first_chunk_received = True
+
+                        # Sanitize markdown for proper rendering
+                        sanitized_text = sanitize_markdown_for_streamlit(
+                            display_text
+                        )
+                        message_placeholder.markdown(
+                            sanitized_text, unsafe_allow_html=True
+                        )
+
+                # Small delay for visual effect
+                # await asyncio.sleep(0.01)
+
+            # Process any remaining buffered content
+            final_chunk = think_filter.flush()
+            if final_chunk:
+                display_text += final_chunk
+
+            # Clear any remaining progress bar
+            if progress_container is not None:
+                progress_container.empty()
+
+            # Display final content
+            if display_text.strip():
+                # Sanitize markdown for proper rendering
+                sanitized_text = sanitize_markdown_for_streamlit(display_text)
+                message_placeholder.markdown(
+                    sanitized_text, unsafe_allow_html=True
+                )
+
+        except Exception as e:
+            logging.error("Streaming error: %s", e)
+            raise
+
+        return full_response
+
+    async def _async_stream_response_with_progress(
+        self,
+        prepared_messages: List[Dict[str, Any]],
+        model_name: str,
+        model_type: str,
+        message_placeholder,
+        response_chunks: List[str],
+    ) -> str:
+        """
+        Enhanced async helper to stream response with progress marker support
+        for all types of streaming responses including direct response tools
+
+        Args:
+            prepared_messages: Messages to send
+            model_name: Model to use
+            model_type: Type of model (fast, llm, intelligent)
+            message_placeholder: Streamlit placeholder
+            response_chunks: List to collect chunks
+
+        Returns:
+            Full response text
+        """
+        full_response = ""
+        display_text = ""
+        # Initialize filter with model name for dynamic schema support
+        think_filter = StreamingCombinedThinkingFilter(model_name=model_name)
+        first_chunk_received = False
+
+        # Progress tracking
+        progress_bar = None
+        progress_container = None
+        progress_text = None
+        current_progress = 0.0
+
+        try:
+            # Stream response from LLM service with consistent model type
+            async for chunk in self.llm_service.generate_streaming_response(
+                prepared_messages, model_name, model_type
+            ):
+                response_chunks.append(chunk)
+                full_response += chunk
+
+                # Check for progress markers FIRST (before any other processing)
+                progress_match = re.search(
+                    r"<<<PROGRESS:([0-9.]+):(.+?)>>>", chunk
+                )
+                if progress_match:
+                    # Extract progress info
+                    progress_value = float(progress_match.group(1))
+                    progress_message = progress_match.group(2)
+
+                    # Clamp progress value to valid range [0.0, 1.0]
+                    progress_value = max(0.0, min(1.0, progress_value))
+
+                    # Initialize progress bar on first progress update
+                    if progress_bar is None and not first_chunk_received:
+                        # Clear the loading animation
+                        message_placeholder.empty()
+                        first_chunk_received = True
+
+                        # Create progress container
+                        progress_container = st.container()
+                        with progress_container:
+                            progress_text = st.empty()
+                            progress_bar = st.progress(0.0)
+
+                    # Update progress
+                    if progress_bar is not None:
+                        current_progress = progress_value
+                        progress_bar.progress(current_progress)
+                        progress_text.markdown(f"*{progress_message}*")
+
+                    # Remove progress marker from chunk before processing
+                    chunk = re.sub(r"<<<PROGRESS:[0-9.]+:.+?>>>", "", chunk)
+
+                # Process chunk through streaming filter with model-specific schema
+                filtered_chunk = think_filter.process_chunk(chunk)
+                if filtered_chunk:
+                    display_text += filtered_chunk
+
                     # Show content when we have actual text (not just progress)
                     if display_text.strip():
                         # Clear progress bar when actual content starts

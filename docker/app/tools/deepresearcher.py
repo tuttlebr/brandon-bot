@@ -207,7 +207,7 @@ class DeepResearchController(ToolController):
         return loop.run_until_complete(self.process_async(params))
 
     async def process_async(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """Process the deep research request asynchronously"""
+        """Process the deep research request asynchronously with error recovery"""
         query = params["query"]
         max_iterations = params.get("max_iterations", self.MAX_ITERATIONS)
         target_depth = params.get("target_depth", "moderate")
@@ -215,203 +215,358 @@ class DeepResearchController(ToolController):
 
         logger.info("Starting deep research for query: %s", query)
 
-        # If streaming is requested, return a streaming response
-        if stream:
-            return {
-                "original_query": query,
-                "is_streaming": True,
-                "content_generator": self._stream_research_process(
-                    query, max_iterations, target_depth
-                ),
-            }
+        try:
+            # If streaming is requested, return a streaming response
+            if stream:
+                return {
+                    "original_query": query,
+                    "is_streaming": True,
+                    "content_generator": self._safe_stream_research_process(
+                        query, max_iterations, target_depth
+                    ),
+                }
 
-        # Otherwise, run the non-streaming version
-        return await self._process_non_streaming(
-            query, max_iterations, target_depth
-        )
+            # Otherwise, run the non-streaming version
+            return await self._process_non_streaming(
+                query, max_iterations, target_depth
+            )
+
+        except Exception as e:
+            # Ultimate fallback - return a basic error response
+            logger.error(
+                "Critical error in deep research: %s", e, exc_info=True
+            )
+
+            if stream:
+                # Return a streaming error response
+                async def error_generator():
+                    yield f"⚠️ **Deep Research Error Recovery**\n\n"
+                    yield (
+                        "An error occurred during deep research, but I can"
+                        f' still help with your query: "{query}"\n\n'
+                    )
+                    yield f"**Error:** {str(e)}\n\n"
+                    yield (
+                        f"**Suggestion:** Try rephrasing your query or ask for"
+                        f" a simpler analysis.\n\n"
+                    )
+
+                return {
+                    "original_query": query,
+                    "is_streaming": True,
+                    "content_generator": error_generator(),
+                }
+            else:
+                # Return a non-streaming error response
+                return {
+                    "original_query": query,
+                    "final_synthesis": (
+                        f"Research failed due to error: {str(e)}"
+                    ),
+                    "total_sources": 0,
+                    "confidence_level": ConfidenceLevel.LOW,
+                    "research_depth": "error",
+                    "key_findings": [],
+                    "limitations": [f"Research failed: {str(e)}"],
+                    "references": [],
+                }
+
+    async def _safe_stream_research_process(
+        self, query: str, max_iterations: int, target_depth: str
+    ):
+        """Safe wrapper for streaming research with comprehensive error recovery"""
+        try:
+            async for chunk in self._stream_research_process(
+                query, max_iterations, target_depth
+            ):
+                yield chunk
+        except Exception as e:
+            # Critical error recovery - always provide something useful
+            logger.error(
+                "Error in streaming research process: %s", e, exc_info=True
+            )
+
+            yield f"\n\n⚠️ **Research Error Recovery**\n\n"
+            yield (
+                f"The deep research encountered an error, but here's what I"
+                f" can provide:\n\n"
+            )
+            yield f"**Your Query:** {query}\n\n"
+            yield f"**Error Details:** {str(e)}\n\n"
+            yield f"**Recommendation:** Please try:\n"
+            yield f"- Rephrasing your question more specifically\n"
+            yield f"- Breaking down complex queries into simpler parts\n"
+            yield f"- Using the regular search tools for immediate results\n\n"
+            yield f"*The system has logged this error for investigation.*"
 
     async def _stream_research_process(
         self, query: str, max_iterations: int, target_depth: str
     ):
-        """Stream research progress updates to the user"""
-        # Start with a clean status message
-        yield "_Researching..._\n\n"
+        """Stream research progress updates to the user with error recovery"""
+        # Start with progress indicator
+        yield "<<<PROGRESS:0.1:Starting deep research>>>_Researching..._\n\n"
 
         iterations = []
         all_sources = []
         current_synthesis = ""
         extracted_urls = set()  # Track URLs that have been extracted
 
-        # Provide real-time updates during the search
-        yield "> _Phase 1: Initial research phase_\n\n"
-        iteration = await self._perform_research_iteration(
-            query=query,
-            phase=ResearchPhase.INITIAL_SEARCH,
-            iteration_number=1,
-            previous_synthesis=current_synthesis,
-            all_sources=all_sources,
-            extracted_urls=extracted_urls,
-        )
-        iterations.append(iteration)
-        all_sources.extend(iteration.sources_found)
-        current_synthesis = iteration.synthesis
-
-        # Update status after first iteration
-        yield f"> > _{len(iteration.sources_found)} initial sources_\n\n"
-
-        # Continue iterations with progress updates
-        iteration_count = 1
-        while iteration_count < max_iterations:
-            # Check if we need more research
-            needs_more, next_phase = await self._assess_research_completeness(
-                current_synthesis=current_synthesis,
-                sources=all_sources,
-                target_depth=target_depth,
-                iteration_count=iteration_count,
+        try:
+            # Provide real-time updates during the search
+            yield "<<<PROGRESS:0.2:Phase 1 - Initial research>>>"
+            yield "> _Phase 1: Initial research phase_\n\n"
+            iteration = await self._perform_research_iteration(
+                query=query,
+                phase=ResearchPhase.INITIAL_SEARCH,
+                iteration_number=1,
+                previous_synthesis=current_synthesis,
+                all_sources=all_sources,
+                extracted_urls=extracted_urls,
             )
+            iterations.append(iteration)
+            all_sources.extend(iteration.sources_found)
+            current_synthesis = iteration.synthesis
 
-            # Update status for iteration start
-            phase_description = (
-                "Deep research iteration"
-                if next_phase != ResearchPhase.FOLLOW_UP_SEARCH
-                else "Follow-up search iteration"
-            )
-            yield (
-                f"\n> _Phase {iteration_count + 1}:"
-                f" {phase_description} {iteration_count + 1}/{max_iterations}_\n\n"
-            )
+            # Update status after first iteration
+            progress_val = 0.3 + (0.1 * len(iteration.sources_found) / 10)
+            sources_count = len(iteration.sources_found)
+            progress_msg = f"Found {sources_count} initial sources"
+            yield f"<<<PROGRESS:{progress_val}:{progress_msg}>>>"
+            yield f"> > _{len(iteration.sources_found)} initial sources_\n\n"
 
-            if not needs_more:
-                # Update status to show we're done with iterations
+            # Continue iterations with progress updates
+            iteration_count = 1
+            while iteration_count < max_iterations:
+                # Check if we need more research
+                needs_more, next_phase = (
+                    await self._assess_research_completeness(
+                        current_synthesis=current_synthesis,
+                        sources=all_sources,
+                        target_depth=target_depth,
+                        iteration_count=iteration_count,
+                    )
+                )
+
+                # Update status for iteration start
+                phase_description = (
+                    "Deep research iteration"
+                    if next_phase != ResearchPhase.FOLLOW_UP_SEARCH
+                    else "Follow-up search iteration"
+                )
+                # Calculate progress ensuring it stays within [0.0, 1.0]
+                progress_val = min(0.4 + (iteration_count * 0.15), 0.8)
+                phase_num = iteration_count + 1
+                progress_msg = f"Phase {phase_num} - {phase_description}"
+                yield f"<<<PROGRESS:{progress_val}:{progress_msg}>>>"
                 yield (
-                    "\n_Research complete after"
-                    f" {iteration_count} iterations_\n\n"
-                )
-                break
-
-            # Continue with next iteration
-            iteration_count += 1
-
-            # Generate follow-up questions
-            follow_up_questions = await self._generate_follow_up_questions(
-                original_query=query,
-                current_synthesis=current_synthesis,
-                gaps=iteration.next_questions if iterations else [],
-            )
-
-            if follow_up_questions:
-                # Update status for follow-up questions
-                num_questions = min(2, len(follow_up_questions))
-                yield (
-                    f"> > _Found {num_questions} follow-up questions to"
-                    " explore_\n\n"
+                    f"\n> _Phase {iteration_count + 1}:"
+                    f" {phase_description} {iteration_count + 1}/{max_iterations}_\n\n"
                 )
 
-            # Execute follow-up research
-            questions_to_research = follow_up_questions[:2]
-            for i, question in enumerate(questions_to_research, 1):
-                # Update status for sub-question
-                action = (
-                    "Searching for new sources on"
-                    if next_phase == ResearchPhase.FOLLOW_UP_SEARCH
-                    else "Deep diving into"
-                )
-                yield (
-                    f"> > > _{action} sub-question"
-                    f" {i}/{len(questions_to_research)}..._\n\n"
-                )
+                if not needs_more:
+                    # Update status to show we're done with iterations
+                    yield "<<<PROGRESS:0.8:Research iterations complete>>>"
+                    yield (
+                        "\n_Research complete after"
+                        f" {iteration_count} iterations_\n\n"
+                    )
+                    break
 
-                iteration = await self._perform_research_iteration(
-                    query=question,
-                    phase=next_phase,
-                    iteration_number=iteration_count,
-                    previous_synthesis=current_synthesis,
-                    all_sources=all_sources,
-                    extracted_urls=extracted_urls,
-                )
-                iterations.append(iteration)
-                all_sources.extend(iteration.sources_found)
+                # Continue with next iteration
+                iteration_count += 1
 
-                # Update synthesis
-                current_synthesis = await self._update_synthesis(
-                    previous_synthesis=current_synthesis,
-                    new_iteration=iteration,
+                # Generate follow-up questions
+                follow_up_questions = await self._generate_follow_up_questions(
                     original_query=query,
+                    current_synthesis=current_synthesis,
+                    gaps=iteration.next_questions if iterations else [],
                 )
 
-        # Final synthesis
-        yield "\n_Creating final synthesis..._\n\n"
+                if follow_up_questions:
+                    # Update status for follow-up questions
+                    num_questions = min(2, len(follow_up_questions))
+                    progress_val = min(0.4 + (iteration_count * 0.1), 0.7)
+                    progress_msg = f"Found {num_questions} follow-up questions"
+                    yield f"<<<PROGRESS:{progress_val}:{progress_msg}>>>"
+                    yield (
+                        f"> > _Found {num_questions} follow-up questions to"
+                        " explore_\n\n"
+                    )
 
-        result = await self._create_final_synthesis(
-            query=query,
-            iterations=iterations,
-            all_sources=all_sources,
-            current_synthesis=current_synthesis,
-        )
-        final_synthesis, confidence_level, key_findings, citations_used = (
-            result
-        )
+                # Execute follow-up research
+                questions_to_research = follow_up_questions[:2]
+                for i, question in enumerate(questions_to_research, 1):
+                    # Update status for sub-question
+                    action = (
+                        "Searching for new sources on"
+                        if next_phase == ResearchPhase.FOLLOW_UP_SEARCH
+                        else "Deep diving into"
+                    )
+                    sub_progress = min(
+                        0.5 + (iteration_count * 0.05) + (i * 0.02), 0.75
+                    )
+                    q_count = len(questions_to_research)
+                    progress_msg = f"{action} sub-question {i}/{q_count}"
+                    yield f"<<<PROGRESS:{sub_progress}:{progress_msg}>>>"
+                    yield (
+                        f"> > > _{action} sub-question"
+                        f" {i}/{len(questions_to_research)}..._\n\n"
+                    )
 
-        # Review and clean up markdown formatting
-        # yield "_Reviewing markdown formatting..._\n\n"
-        final_synthesis = await self._review_markdown_formatting(
-            final_synthesis
-        )
+                    iteration = await self._perform_research_iteration(
+                        query=question,
+                        phase=next_phase,
+                        iteration_number=iteration_count,
+                        previous_synthesis=current_synthesis,
+                        all_sources=all_sources,
+                        extracted_urls=extracted_urls,
+                    )
+                    iterations.append(iteration)
+                    all_sources.extend(iteration.sources_found)
 
-        # Determine research depth (not used in streaming mode, but computed for logging)
-        # research_depth = self._determine_research_depth(
-        #     iterations=len(iterations),
-        #     sources=len(all_sources),
-        #     confidence=confidence)
+                    # Update synthesis
+                    current_synthesis = await self._update_synthesis(
+                        previous_synthesis=current_synthesis,
+                        new_iteration=iteration,
+                        original_query=query,
+                    )
 
-        # Final report heading
-        # yield "---\n\n"
-        # yield f"_Research Depth:_ {research_depth.upper()}\n"
-        # yield f"_Confidence Level:_ {confidence:.1%}\n"
-        # yield f"_Key Findings:_ {len(key_findings)}\n\n"
+            # Final synthesis
+            yield "<<<PROGRESS:0.85:Creating final synthesis>>>"
+            yield "\n_Creating final synthesis..._\n\n"
 
-        if key_findings:
-            yield "### Key Findings:\n\n"
-            for finding in key_findings:
-                yield f"- {finding}\n\n"
-            yield "\n"
-
-        yield final_synthesis
-
-        # Add references section (cited sources)
-        references = self._generate_references(all_sources, citations_used)
-        if references:
-            yield "\n\n> _References (Cited):_\n\n"
-            for ref in references:
-                yield f"> >{ref}\n\n"
-
-        # Add all consulted sources if there are uncited ones
-        uncited_sources = [
-            s
-            for s in all_sources
-            if s.citation_id and s.citation_id not in citations_used
-        ]
-        if uncited_sources:
-            yield "\n\n> _Additional Sources Consulted:_\n\n"
-            # Sort by citation ID
-            uncited_sources.sort(
-                key=lambda x: (
-                    int(x.citation_id.strip("[]")) if x.citation_id else 999
-                )
+            result = await self._create_final_synthesis(
+                query=query,
+                iterations=iterations,
+                all_sources=all_sources,
+                current_synthesis=current_synthesis,
             )
-            for source in uncited_sources:
-                ref = self._format_single_reference(source)
-                yield f"> >{ref}\n\n"
+            final_synthesis, confidence_level, key_findings, citations_used = (
+                result
+            )
 
-        # Add limitations if any
-        limitations = await self._identify_limitations(
-            query=query, sources=all_sources, synthesis=final_synthesis
-        )
+            # Review and clean up markdown formatting
+            yield "<<<PROGRESS:0.95:Reviewing formatting>>>"
+            # yield "_Reviewing markdown formatting..._\n\n"
+            final_synthesis = await self._review_markdown_formatting(
+                final_synthesis
+            )
 
-        if limitations:
-            yield "\n\n>_Research Limitations:_\n\n"
-            for limitation in limitations:
-                yield f"> > _{limitation}_\n"
+            # Determine research depth (not used in streaming mode, but computed for logging)
+            # research_depth = self._determine_research_depth(
+            #     iterations=len(iterations),
+            #     sources=len(all_sources),
+            #     confidence=confidence)
+
+            # Final report heading
+            # yield "---\n\n"
+            # yield f"_Research Depth:_ {research_depth.upper()}\n"
+            # yield f"_Confidence Level:_ {confidence:.1%}\n"
+            # yield f"_Key Findings:_ {len(key_findings)}\n\n"
+
+            # Complete progress
+            yield "<<<PROGRESS:1.0:Research complete>>>"
+
+            if key_findings:
+                yield "### Key Findings:\n\n"
+                for finding in key_findings:
+                    yield f"- {finding}\n\n"
+                yield "\n"
+
+            yield final_synthesis
+
+            # Add references section (cited sources)
+            references = self._generate_references(all_sources, citations_used)
+            if references:
+                yield "\n\n> _References (Cited):_\n\n"
+                for ref in references:
+                    yield f"> >{ref}\n\n"
+
+            # Add all consulted sources if there are uncited ones
+            uncited_sources = [
+                s
+                for s in all_sources
+                if s.citation_id and s.citation_id not in citations_used
+            ]
+            if uncited_sources:
+                yield "\n\n> _Additional Sources Consulted:_\n\n"
+                # Sort by citation ID
+                uncited_sources.sort(
+                    key=lambda x: (
+                        int(x.citation_id.strip("[]"))
+                        if x.citation_id
+                        else 999
+                    )
+                )
+                for source in uncited_sources:
+                    ref = self._format_single_reference(source)
+                    yield f"> >{ref}\n\n"
+
+            # Add limitations if any
+            limitations = await self._identify_limitations(
+                query=query, sources=all_sources, synthesis=final_synthesis
+            )
+
+            if limitations:
+                yield "\n\n>_Research Limitations:_\n\n"
+                for limitation in limitations:
+                    yield f"> > _{limitation}_\n"
+
+        except Exception as e:
+            # Critical error handling - always provide useful output
+            logger.error(
+                "Error in deep research process: %s", e, exc_info=True
+            )
+
+            # Provide a useful fallback response based on what we have so far
+            yield (
+                f"\n\n⚠️ **Research encountered an error but collected valuable"
+                f" information:**\n\n"
+            )
+
+            # Show what we managed to collect
+            if iterations:
+                yield (
+                    f"**Completed {len(iterations)} research iterations**\n\n"
+                )
+
+            if all_sources:
+                yield f"**Consulted {len(all_sources)} sources:**\n\n"
+                for i, source in enumerate(
+                    all_sources[:10], 1
+                ):  # Show first 10
+                    yield f"{i}. [{source.title}]({source.url or 'No URL'})\n"
+                if len(all_sources) > 10:
+                    yield f"... and {len(all_sources) - 10} more sources\n\n"
+                yield "\n"
+
+            # Provide the best synthesis we have
+            if current_synthesis:
+                yield "**Research findings so far:**\n\n"
+                yield current_synthesis
+            else:
+                yield "**Initial research findings:**\n\n"
+                # Extract key facts from sources as fallback
+                if all_sources:
+                    for source in all_sources[:3]:  # Use first 3 sources
+                        if source.extracted_facts:
+                            yield f"From {source.title}:\n"
+                            for fact in source.extracted_facts[:3]:
+                                yield f"- {fact}\n"
+                            yield "\n"
+                        elif source.content:
+                            # Show snippet of content
+                            content_preview = source.content[:500]
+                            yield (
+                                "From"
+                                f" {source.title}:\n{content_preview}...\n\n"
+                            )
+
+            yield (
+                f"\n\n*Note: Research was interrupted due to a technical"
+                f" error, but the above information was successfully"
+                f" collected.*"
+            )
 
     async def _process_non_streaming(
         self, query: str, max_iterations: int, target_depth: str
@@ -678,7 +833,7 @@ class DeepResearchController(ToolController):
         all_sources: List[ResearchSource],
         extracted_urls: Optional[set] = None,
     ) -> ResearchIteration:
-        """Perform a single research iteration"""
+        """Perform a single research iteration with error recovery"""
         logger.info(
             "┌─ Iteration %d - Phase: %s\n└─ Query: %s",
             iteration_number,
@@ -686,318 +841,365 @@ class DeepResearchController(ToolController):
             query[:100],
         )
 
-        tools_used = []
-        sources_found = []
+        try:
+            tools_used = []
+            sources_found = []
 
-        # Build a set of all URLs we've already seen across all sources
-        all_urls_seen = {s.url for s in all_sources if s.url}
-        logger.debug(
-            "Starting iteration with %d URLs already seen", len(all_urls_seen)
-        )
-        # Determine which tools to use based on phase
-        if phase in [
-            ResearchPhase.INITIAL_SEARCH,
-            ResearchPhase.FOLLOW_UP_SEARCH,
-        ]:
-            # Broad search using multiple tools
-            logger.info("Starting web search via SerpAPI...")
-            search_results = await self._execute_tool(
-                "serpapi_internet_search",
-                {
-                    "query": query,
-                    # "location_requested": "Saline, Michigan, United States",
-                },
+            # Build a set of all URLs we've already seen across all sources
+            all_urls_seen = {s.url for s in all_sources if s.url}
+            logger.debug(
+                "Starting iteration with %d URLs already seen",
+                len(all_urls_seen),
             )
-            tools_used.append("serpapi_internet_search")
-            logger.info("Web search completed")
-
-            if search_results and hasattr(search_results, "organic_results"):
-                # Determine how many results to process based on phase
-                max_results = (
-                    10 if phase == ResearchPhase.FOLLOW_UP_SEARCH else 5
-                )
-                results_to_process = search_results.organic_results[
-                    :max_results
-                ]
-                logger.info(
-                    "Processing %d search results (phase: %s)",
-                    len(results_to_process),
-                    phase.value,
-                )
-                for i, result in enumerate(results_to_process, 1):
-                    logger.debug(
-                        "Processing result %d/%d: %s",
-                        i,
-                        len(results_to_process),
-                        result.title[:80],
-                    )
-                    # Check if we've already seen this URL
-                    if result.link and result.link in all_urls_seen:
-                        logger.debug(
-                            "Skipping duplicate URL: %s",
-                            result.link[:80],
-                        )
-                        continue
-
-                    # Extract domain from URL
-                    domain = None
-                    if result.link:
-                        try:
-                            from urllib.parse import urlparse
-
-                            parsed = urlparse(result.link)
-                            domain = parsed.netloc.replace("www.", "")
-                        except Exception:
-                            pass
-
-                    # Assign citation ID based on total sources
-                    citation_id = (
-                        f"[{len(all_sources) + len(sources_found) + 1}]"
-                    )
-
-                    source = ResearchSource(
-                        source_type="web",
-                        url=result.link,
-                        title=result.title,
-                        content=(result.extracted_content or result.snippet),
-                        relevance_score=0.8,
-                        citation_id=citation_id,
-                        domain=domain,
-                    )
-                    sources_found.append(source)
-
-                    # Add URL to our seen set
-                    if result.link:
-                        all_urls_seen.add(result.link)
-
-                    logger.debug(
-                        "Added source: %s with citation %s",
-                        source.title[:80],
-                        citation_id,
-                    )
-            else:
-                logger.warning("No search results found")
-
-            # Also try news search for current events
-            logger.info("Attempting news search for recent information...")
-            news_results = await self._execute_tool(
-                "serpapi_news_search",
-                {
-                    "query": query,
-                    "location_requested": "Saline, Michigan, United States",
-                },
-            )
-            tools_used.append("serpapi_news_search")
-            logger.info("News search completed")
-
-            if news_results and hasattr(news_results, "news_results"):
-                # More news results for follow-up searches
-                max_news = 5 if phase == ResearchPhase.FOLLOW_UP_SEARCH else 3
-                news_to_process = news_results.news_results[:max_news]
-                logger.info(
-                    "Processing %d news results (phase: %s)",
-                    len(news_to_process),
-                    phase.value,
-                )
-                for i, result in enumerate(news_to_process, 1):
-                    logger.debug(
-                        "Processing news %d/%d: %s",
-                        i,
-                        len(news_to_process),
-                        result.title[:80],
-                    )
-                    # Check if we've already seen this URL
-                    if result.link and result.link in all_urls_seen:
-                        logger.debug(
-                            "Skipping duplicate news URL: %s",
-                            result.link[:80],
-                        )
-                        continue
-
-                    # Extract domain and date from news results
-                    domain = None
-                    date = None
-                    if result.link:
-                        try:
-                            from urllib.parse import urlparse
-
-                            parsed = urlparse(result.link)
-                            domain = parsed.netloc.replace("www.", "")
-                        except Exception:
-                            pass
-                    if hasattr(result, "date"):
-                        date = result.date
-
-                    # Assign citation ID
-                    citation_id = (
-                        f"[{len(all_sources) + len(sources_found) + 1}]"
-                    )
-
-                    source = ResearchSource(
-                        source_type="news",
-                        url=result.link,
-                        title=result.title,
-                        content=result.snippet,
-                        relevance_score=0.7,
-                        citation_id=citation_id,
-                        domain=domain,
-                        date=date,
-                    )
-                    sources_found.append(source)
-
-                    # Add URL to our seen set
-                    if result.link:
-                        all_urls_seen.add(result.link)
-
-                    logger.debug(
-                        "Added news source: %s with citation %s",
-                        source.title[:80],
-                        citation_id,
-                    )
-            else:
-                logger.info("No news results found")
-        elif phase == ResearchPhase.DEEP_DIVE:
-            # Initialize extracted_urls if not provided
-            if extracted_urls is None:
-                extracted_urls = set()
-
-            # Extract content from specific URLs if we have them
-            # First, identify all candidate URLs
-            all_candidate_urls = [
-                s.url for s in all_sources if s.url and s.relevance_score > 0.7
-            ]
-
-            # Filter out already extracted URLs
-            urls_to_extract = [
-                url for url in all_candidate_urls if url not in extracted_urls
-            ][:3]
-
-            # Log skipped URLs for transparency
-            skipped_urls = [
-                url for url in all_candidate_urls if url in extracted_urls
-            ]
-
-            if skipped_urls:
-                logger.info(
-                    "Skipping %d URLs already extracted: %s",
-                    len(skipped_urls),
-                    ", ".join([url[:50] + "..." for url in skipped_urls[:3]]),
-                )
-
-            logger.info(
-                "Deep dive phase: extracting content from %d URLs "
-                "(filtered from %d candidates, %d already extracted)",
-                len(urls_to_extract),
-                len(all_candidate_urls),
-                len(extracted_urls),
-            )
-
-            for i, url in enumerate(urls_to_extract, 1):
-                logger.info(
-                    "Extracting content %d/%d from: %s",
-                    i,
-                    len(urls_to_extract),
-                    url[:100],
-                )
-                extract_result = await self._execute_tool(
-                    "extract_web_content",
+            # Determine which tools to use based on phase
+            if phase in [
+                ResearchPhase.INITIAL_SEARCH,
+                ResearchPhase.FOLLOW_UP_SEARCH,
+            ]:
+                # Broad search using multiple tools
+                logger.info("Starting web search via SerpAPI...")
+                search_results = await self._execute_tool(
+                    "serpapi_internet_search",
                     {
-                        "url": url,
+                        "query": query,
+                        # "location_requested": "Saline, Michigan, United States",
+                    },
+                )
+                tools_used.append("serpapi_internet_search")
+                logger.info("Web search completed")
+
+                if search_results and hasattr(
+                    search_results, "organic_results"
+                ):
+                    # Determine how many results to process based on phase
+                    max_results = (
+                        10 if phase == ResearchPhase.FOLLOW_UP_SEARCH else 5
+                    )
+                    results_to_process = search_results.organic_results[
+                        :max_results
+                    ]
+                    logger.info(
+                        "Processing %d search results (phase: %s)",
+                        len(results_to_process),
+                        phase.value,
+                    )
+                    for i, result in enumerate(results_to_process, 1):
+                        logger.debug(
+                            "Processing result %d/%d: %s",
+                            i,
+                            len(results_to_process),
+                            result.title[:80],
+                        )
+                        # Check if we've already seen this URL
+                        if result.link and result.link in all_urls_seen:
+                            logger.debug(
+                                "Skipping duplicate URL: %s",
+                                result.link[:80],
+                            )
+                            continue
+
+                        # Extract domain from URL
+                        domain = None
+                        if result.link:
+                            try:
+                                from urllib.parse import urlparse
+
+                                parsed = urlparse(result.link)
+                                domain = parsed.netloc.replace("www.", "")
+                            except Exception:
+                                pass
+
+                        # Assign citation ID based on total sources
+                        citation_id = (
+                            f"[{len(all_sources) + len(sources_found) + 1}]"
+                        )
+
+                        source = ResearchSource(
+                            source_type="web",
+                            url=result.link,
+                            title=result.title,
+                            content=(
+                                result.extracted_content or result.snippet
+                            ),
+                            relevance_score=0.8,
+                            citation_id=citation_id,
+                            domain=domain,
+                        )
+                        sources_found.append(source)
+
+                        # Add URL to our seen set
+                        if result.link:
+                            all_urls_seen.add(result.link)
+
+                        logger.debug(
+                            "Added source: %s with citation %s",
+                            source.title[:80],
+                            citation_id,
+                        )
+                else:
+                    logger.warning("No search results found")
+
+                # Also try news search for current events
+                logger.info("Attempting news search for recent information...")
+                news_results = await self._execute_tool(
+                    "serpapi_news_search",
+                    {
+                        "query": query,
                         "location_requested": (
                             "Saline, Michigan, United States"
                         ),
                     },
                 )
-                tools_used.append("extract_web_content")
-                logger.info("Extraction completed for URL %d", i)
+                tools_used.append("serpapi_news_search")
+                logger.info("News search completed")
 
-                # Mark URL as extracted
-                extracted_urls.add(url)
+                if news_results and hasattr(news_results, "news_results"):
+                    # More news results for follow-up searches
+                    max_news = (
+                        5 if phase == ResearchPhase.FOLLOW_UP_SEARCH else 3
+                    )
+                    news_to_process = news_results.news_results[:max_news]
+                    logger.info(
+                        "Processing %d news results (phase: %s)",
+                        len(news_to_process),
+                        phase.value,
+                    )
+                    for i, result in enumerate(news_to_process, 1):
+                        logger.debug(
+                            "Processing news %d/%d: %s",
+                            i,
+                            len(news_to_process),
+                            result.title[:80],
+                        )
+                        # Check if we've already seen this URL
+                        if result.link and result.link in all_urls_seen:
+                            logger.debug(
+                                "Skipping duplicate news URL: %s",
+                                result.link[:80],
+                            )
+                            continue
 
-                if extract_result and hasattr(extract_result, "content"):
-                    # Find the original source and update it
-                    for source in sources_found:
-                        if source.url == url:
-                            source.content = extract_result.content
-                            break
+                        # Extract domain and date from news results
+                        domain = None
+                        date = None
+                        if result.link:
+                            try:
+                                from urllib.parse import urlparse
 
-        # Extract key facts from sources
-        if sources_found:
-            logger.info(
-                "→ Extracting key facts from %d sources", len(sources_found)
-            )
-            total_facts = 0
-            for i, source in enumerate(sources_found, 1):
-                logger.debug(
-                    "  Extracting from source %d/%d: %s",
-                    i,
-                    len(sources_found),
-                    source.title[:60],
+                                parsed = urlparse(result.link)
+                                domain = parsed.netloc.replace("www.", "")
+                            except Exception:
+                                pass
+                        if hasattr(result, "date"):
+                            date = result.date
+
+                        # Assign citation ID
+                        citation_id = (
+                            f"[{len(all_sources) + len(sources_found) + 1}]"
+                        )
+
+                        source = ResearchSource(
+                            source_type="news",
+                            url=result.link,
+                            title=result.title,
+                            content=result.snippet,
+                            relevance_score=0.7,
+                            citation_id=citation_id,
+                            domain=domain,
+                            date=date,
+                        )
+                        sources_found.append(source)
+
+                        # Add URL to our seen set
+                        if result.link:
+                            all_urls_seen.add(result.link)
+
+                        logger.debug(
+                            "Added news source: %s with citation %s",
+                            source.title[:80],
+                            citation_id,
+                        )
+                else:
+                    logger.info("No news results found")
+            elif phase == ResearchPhase.DEEP_DIVE:
+                # Initialize extracted_urls if not provided
+                if extracted_urls is None:
+                    extracted_urls = set()
+
+                # Extract content from specific URLs if we have them
+                # First, identify all candidate URLs
+                all_candidate_urls = [
+                    s.url
+                    for s in all_sources
+                    if s.url and s.relevance_score > 0.7
+                ]
+
+                # Filter out already extracted URLs
+                urls_to_extract = [
+                    url
+                    for url in all_candidate_urls
+                    if url not in extracted_urls
+                ][:3]
+
+                # Log skipped URLs for transparency
+                skipped_urls = [
+                    url for url in all_candidate_urls if url in extracted_urls
+                ]
+
+                if skipped_urls:
+                    logger.info(
+                        "Skipping %d URLs already extracted: %s",
+                        len(skipped_urls),
+                        ", ".join(
+                            [url[:50] + "..." for url in skipped_urls[:3]]
+                        ),
+                    )
+
+                logger.info(
+                    "Deep dive phase: extracting content from %d URLs "
+                    "(filtered from %d candidates, %d already extracted)",
+                    len(urls_to_extract),
+                    len(all_candidate_urls),
+                    len(extracted_urls),
                 )
-                facts = await self._extract_key_facts(source.content, query)
-                source.extracted_facts = facts
-                total_facts += len(facts)
-                logger.debug("  → Extracted %d facts", len(facts))
-            logger.info("← Total facts extracted: %d", total_facts)
-        else:
-            logger.info("No sources to extract facts from")
 
-        # Synthesize findings from this iteration
-        logger.info(
-            "→ Synthesizing findings from iteration %d", iteration_number
-        )
-        synthesis = await self._synthesize_iteration_findings(
-            query=query,
-            sources=sources_found,
-            previous_synthesis=previous_synthesis,
-        )
-        logger.info(
-            "← Synthesis complete: %d chars (was %d chars)",
-            len(synthesis),
-            len(previous_synthesis),
-        )
+                for i, url in enumerate(urls_to_extract, 1):
+                    logger.info(
+                        "Extracting content %d/%d from: %s",
+                        i,
+                        len(urls_to_extract),
+                        url[:100],
+                    )
+                    extract_result = await self._execute_tool(
+                        "extract_web_content",
+                        {
+                            "url": url,
+                            "location_requested": (
+                                "Saline, Michigan, United States"
+                            ),
+                        },
+                    )
+                    tools_used.append("extract_web_content")
+                    logger.info("Extraction completed for URL %d", i)
 
-        # Determine if more research is needed
-        needs_more = len(sources_found) < 2 or phase != ResearchPhase.SYNTHESIS
-        # Generate next questions if needed
-        next_questions = []
-        if needs_more:
-            next_questions = await self._identify_knowledge_gaps(
-                query=query, current_sources=sources_found, synthesis=synthesis
+                    # Mark URL as extracted
+                    extracted_urls.add(url)
+
+                    if extract_result and hasattr(extract_result, "content"):
+                        # Find the original source and update it
+                        for source in sources_found:
+                            if source.url == url:
+                                source.content = extract_result.content
+                                break
+
+            # Extract key facts from sources
+            if sources_found:
+                logger.info(
+                    "→ Extracting key facts from %d sources",
+                    len(sources_found),
+                )
+                total_facts = 0
+                for i, source in enumerate(sources_found, 1):
+                    logger.debug(
+                        "  Extracting from source %d/%d: %s",
+                        i,
+                        len(sources_found),
+                        source.title[:60],
+                    )
+                    facts = await self._extract_key_facts(
+                        source.content, query
+                    )
+                    source.extracted_facts = facts
+                    total_facts += len(facts)
+                    logger.debug("  → Extracted %d facts", len(facts))
+                logger.info("← Total facts extracted: %d", total_facts)
+            else:
+                logger.info("No sources to extract facts from")
+
+            # Synthesize findings from this iteration
+            logger.info(
+                "→ Synthesizing findings from iteration %d", iteration_number
+            )
+            synthesis = await self._synthesize_iteration_findings(
+                query=query,
+                sources=sources_found,
+                previous_synthesis=previous_synthesis,
+            )
+            logger.info(
+                "← Synthesis complete: %d chars (was %d chars)",
+                len(synthesis),
+                len(previous_synthesis),
             )
 
-        result = ResearchIteration(
-            iteration_number=iteration_number,
-            phase=phase,
-            query=query,
-            tools_used=tools_used,
-            sources_found=sources_found,
-            synthesis=synthesis,
-            needs_more_research=needs_more,
-            next_questions=next_questions,
-        )
+            # Determine if more research is needed
+            needs_more = (
+                len(sources_found) < 2 or phase != ResearchPhase.SYNTHESIS
+            )
+            # Generate next questions if needed
+            next_questions = []
+            if needs_more:
+                next_questions = await self._identify_knowledge_gaps(
+                    query=query,
+                    current_sources=sources_found,
+                    synthesis=synthesis,
+                )
 
-        # Calculate how many URLs were new vs duplicates
-        new_urls_count = len([s for s in sources_found if s.url])
-        total_urls_after = len(
-            {s.url for s in all_sources + sources_found if s.url}
-        )
-        duplicates_avoided = len(all_urls_seen) - (
-            total_urls_after - new_urls_count
-        )
+            result = ResearchIteration(
+                iteration_number=iteration_number,
+                phase=phase,
+                query=query,
+                tools_used=tools_used,
+                sources_found=sources_found,
+                synthesis=synthesis,
+                needs_more_research=needs_more,
+                next_questions=next_questions,
+            )
 
-        logger.info(
-            "└─ Iteration %d results: %d sources (%d new URLs, "
-            "%d duplicates skipped), %d tools used, needs_more=%s",
-            iteration_number,
-            len(sources_found),
-            new_urls_count,
-            duplicates_avoided,
-            len(tools_used),
-            needs_more,
-        )
+            # Calculate how many URLs were new vs duplicates
+            new_urls_count = len([s for s in sources_found if s.url])
+            total_urls_after = len(
+                {s.url for s in all_sources + sources_found if s.url}
+            )
+            duplicates_avoided = len(all_urls_seen) - (
+                total_urls_after - new_urls_count
+            )
 
-        return result
+            logger.info(
+                "└─ Iteration %d results: %d sources (%d new URLs, "
+                "%d duplicates skipped), %d tools used, needs_more=%s",
+                iteration_number,
+                len(sources_found),
+                new_urls_count,
+                duplicates_avoided,
+                len(tools_used),
+                needs_more,
+            )
+
+            return result
+
+        except Exception as e:
+            # Error recovery for research iteration
+            logger.error(
+                "Error in research iteration %d: %s",
+                iteration_number,
+                e,
+                exc_info=True,
+            )
+
+            # Return a minimal iteration with whatever we have
+            return ResearchIteration(
+                iteration_number=iteration_number,
+                phase=phase,
+                query=query,
+                tools_used=tools_used if "tools_used" in locals() else [],
+                sources_found=(
+                    sources_found if "sources_found" in locals() else []
+                ),
+                synthesis=previous_synthesis
+                or f"Error in iteration {iteration_number}: {str(e)}",
+                needs_more_research=False,  # Stop on error
+                next_questions=[],
+            )
 
     async def _execute_tool(
         self, tool_name: str, params: Dict[str, Any]
@@ -1102,12 +1304,31 @@ Focus on specific, verifiable information."""
         # Guided JSON (xgrammar) is mandatory; any failure should raise.
         response = await client.chat.completions.create(
             model=self._get_model_name(),
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "system", "content": "/no_think"},
+                {"role": "user", "content": prompt},
+            ],
             stream=False,
+            temperature=0,
             extra_body={"nvext": {"guided_json": FACTS_SCHEMA}},
         )
 
-        result = json.loads(response.choices[0].message.content)
+        # Check for empty response content
+        response_content = response.choices[0].message.content
+        if not response_content or not response_content.strip():
+            logger.error("Empty response from LLM for key facts extraction")
+            return []
+
+        try:
+            result = json.loads(response_content)
+        except json.JSONDecodeError as e:
+            logger.error(
+                "JSON parsing error in key facts extraction: %s. "
+                "Raw content: %s",
+                e,
+                repr(response_content),
+            )
+            return []
         # Handle both dict and list responses
         if isinstance(result, dict):
             return result.get("facts", [])
@@ -1171,8 +1392,10 @@ Keep the synthesis focused and factual."""
             response = await client.chat.completions.create(
                 model=self._get_model_name(),
                 messages=[
+                    {"role": "system", "content": "/no_think"},
                     {"role": "user", "content": prompt},
                 ],
+                temperature=0,
             )
 
             synthesis = strip_all_thinking_formats(
@@ -1223,13 +1446,38 @@ Return a JSON object with:
         response = await client.chat.completions.create(
             model=self._get_model_name(),
             messages=[
+                {"role": "system", "content": "/no_think"},
                 {"role": "user", "content": prompt},
             ],
             stream=False,
+            temperature=0,
             extra_body={"nvext": {"guided_json": COMPLETENESS_SCHEMA}},
         )
 
-        result = json.loads(response.choices[0].message.content)
+        # Check for empty response content
+        response_content = response.choices[0].message.content
+        if not response_content or not response_content.strip():
+            logger.error(
+                "Empty response from LLM for research completeness assessment"
+            )
+            return (
+                True,
+                ResearchPhase.DEEP_DIVE,
+            )  # Default to continuing research
+
+        try:
+            result = json.loads(response_content)
+        except json.JSONDecodeError as e:
+            logger.error(
+                "JSON parsing error in research completeness assessment: %s. "
+                "Raw content: %s",
+                e,
+                repr(response_content),
+            )
+            return (
+                True,
+                ResearchPhase.DEEP_DIVE,
+            )  # Default to continuing research
         needs_more = result.get("needs_more_research", True)
 
         # Validate next_phase since we removed enum constraint for xgrammar
@@ -1289,9 +1537,11 @@ Example format: {{"questions": ["question1", "question2", "question3"]}}"""
         response = await client.chat.completions.create(
             model=self._get_model_name(),
             messages=[
+                {"role": "system", "content": "/no_think"},
                 {"role": "user", "content": prompt},
             ],
             stream=False,
+            temperature=0,
             extra_body={"nvext": {"guided_json": QUESTIONS_SCHEMA}},
         )
 
@@ -1342,16 +1592,17 @@ Example format: {{"questions": ["question1", "question2", "question3"]}}"""
         iterations: List[ResearchIteration],
         all_sources: List[ResearchSource],
         current_synthesis: str,
-    ) -> tuple[str, float, List[str]]:
-        """Create final comprehensive synthesis"""
-        client = self.llm_client_service.get_async_client(self.llm_type)
+    ) -> tuple[str, ConfidenceLevel, List[str], List[str]]:
+        """Create final comprehensive synthesis with error recovery"""
+        try:
+            client = self.llm_client_service.get_async_client(self.llm_type)
 
-        # Compile all findings
-        all_facts = []
-        for source in all_sources:
-            all_facts.extend(source.extracted_facts)
+            # Compile all findings
+            all_facts = []
+            for source in all_sources:
+                all_facts.extend(source.extracted_facts)
 
-        prompt = f"""Create a final, comprehensive research synthesis \
+            prompt = f"""Create a final, comprehensive research synthesis \
 for: "{query}"
 
 Research conducted:
@@ -1391,55 +1642,91 @@ Return as JSON with:
 - key_findings: array of strings
 - citations_used: array of citation IDs that were actually referenced (e.g., ["[1]", "[3]", "[5]"])"""
 
-        # Guided JSON (xgrammar) is mandatory; any failure should raise.
-        response = await client.chat.completions.create(
-            model=self._get_model_name(),
-            messages=[
-                {"role": "user", "content": prompt},
-            ],
-            stream=False,
-            extra_body={"nvext": {"guided_json": SYNTHESIS_SCHEMA}},
-        )
-
-        result_content = response.choices[0].message.content
-        try:
-            result = json.loads(result_content)
-        except json.JSONDecodeError:
-            logger.warning(
-                "Final synthesis JSON parsing failed, attempting fallback text"
-                " extraction"
+            # Guided JSON (xgrammar) is mandatory; any failure should raise.
+            response = await client.chat.completions.create(
+                model=self._get_model_name(),
+                messages=[
+                    {"role": "system", "content": "/no_think"},
+                    {"role": "user", "content": prompt},
+                ],
+                stream=False,
+                temperature=0,
+                extra_body={"nvext": {"guided_json": SYNTHESIS_SCHEMA}},
             )
-            result = {}
 
-        raw_synthesis = result.get("synthesis", current_synthesis)
-        # Clean the synthesis to prevent markdown corruption
-        synthesis = strip_all_thinking_formats(raw_synthesis)
-        # Remove any problematic markdown characters that might cause display issues
-        # synthesis = synthesis.replace('">">">">', "\n\n")
-        # Ensure no repeated quote markers
-        # synthesis = re.sub(r">{2,}", "\n\n", synthesis)
+            result_content = response.choices[0].message.content
+            try:
+                result = json.loads(result_content)
+            except json.JSONDecodeError:
+                logger.warning(
+                    "Final synthesis JSON parsing failed, attempting fallback"
+                    " text extraction"
+                )
+                result = {}
 
-        # Get confidence level from response, default to medium
-        confidence_str = result.get("confidence_level", "medium")
-        try:
-            confidence_level = ConfidenceLevel(confidence_str.lower())
-        except ValueError:
-            logger.warning(
-                f"Invalid confidence level '{confidence_str}', defaulting to"
-                " medium"
+            raw_synthesis = result.get("synthesis", current_synthesis)
+            # Clean the synthesis to prevent markdown corruption
+            synthesis = strip_all_thinking_formats(raw_synthesis)
+            # Remove any problematic markdown characters that might cause display issues
+            # synthesis = synthesis.replace('">">">">', "\n\n")
+            # Ensure no repeated quote markers
+            # synthesis = re.sub(r">{2,}", "\n\n", synthesis)
+
+            # Get confidence level from response, default to medium
+            confidence_str = result.get("confidence_level", "medium")
+            try:
+                confidence_level = ConfidenceLevel(confidence_str.lower())
+            except ValueError:
+                logger.warning(
+                    f"Invalid confidence level '{confidence_str}', defaulting"
+                    " to medium"
+                )
+                confidence_level = ConfidenceLevel.MEDIUM
+
+            key_findings = result.get("key_findings", [])
+            citations_used = result.get("citations_used", [])
+
+            return synthesis, confidence_level, key_findings, citations_used
+
+        except Exception as e:
+            # Error recovery for final synthesis
+            logger.error("Error in final synthesis: %s", e, exc_info=True)
+
+            # Create a fallback synthesis from available data
+            fallback_synthesis = (
+                current_synthesis
+                or "Research completed with partial results due to synthesis error."
             )
-            confidence_level = ConfidenceLevel.MEDIUM
 
-        key_findings = result.get("key_findings", [])
-        citations_used = result.get("citations_used", [])
+            if all_sources:
+                fallback_synthesis += (
+                    f"\n\nConsulted {len(all_sources)} sources:\n"
+                )
+                for i, source in enumerate(all_sources[:5], 1):
+                    fallback_synthesis += f"{i}. {source.title}\n"
+                if len(all_sources) > 5:
+                    fallback_synthesis += (
+                        f"... and {len(all_sources) - 5} more sources\n"
+                    )
 
-        return synthesis, confidence_level, key_findings, citations_used
+            # Extract key findings from source facts
+            fallback_findings = []
+            for source in all_sources[:3]:
+                fallback_findings.extend(source.extracted_facts[:2])
+
+            return (
+                fallback_synthesis,
+                ConfidenceLevel.LOW,
+                fallback_findings[:5],  # Limit to 5 findings
+                [],  # No citations due to error
+            )
 
     async def _review_markdown_formatting(self, synthesis: str) -> str:
         """Review and clean up markdown formatting in the final synthesis"""
-        client = self.llm_client_service.get_async_client(self.llm_type)
+        try:
+            client = self.llm_client_service.get_async_client(self.llm_type)
 
-        prompt = f"""Review the following research synthesis and fix any \
+            prompt = f"""Review the following research synthesis and fix any \
 markdown formatting issues to ensure it renders correctly.
 
 Focus on:
@@ -1455,18 +1742,26 @@ Return ONLY the cleaned text without any explanations or meta-commentary.
 Text to review:
 {synthesis}"""
 
-        response = await client.chat.completions.create(
-            model=self._get_model_name(),
-            messages=[
-                {"role": "user", "content": prompt},
-            ],
-            stream=False,
-        )
+            response = await client.chat.completions.create(
+                model=self._get_model_name(),
+                messages=[
+                    {"role": "system", "content": "/no_think"},
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0,
+                stream=False,
+            )
 
-        cleaned_synthesis = strip_all_thinking_formats(
-            response.choices[0].message.content
-        )
-        return cleaned_synthesis
+            cleaned_synthesis = strip_all_thinking_formats(
+                response.choices[0].message.content
+            )
+            return cleaned_synthesis
+
+        except Exception as e:
+            # Error recovery for markdown formatting
+            logger.error("Error in markdown formatting: %s", e, exc_info=True)
+            # Return original synthesis if formatting fails
+            return synthesis
 
     def _generate_references(
         self, all_sources: List[ResearchSource], citations_used: List[str]
@@ -1584,9 +1879,11 @@ Example format: {{"gaps": ["gap1", "gap2", "gap3"]}}"""
         response = await client.chat.completions.create(
             model=self._get_model_name(),
             messages=[
+                {"role": "system", "content": "/no_think"},
                 {"role": "user", "content": prompt},
             ],
             stream=False,
+            temperature=0,
             extra_body={"nvext": {"guided_json": GAPS_SCHEMA}},
         )
 
@@ -1782,7 +2079,7 @@ class DeepResearcherTool(BaseTool):
                             "type": "integer",
                             "description": (
                                 "Maximum number of research iterations "
-                                "(default: 5)"
+                                "(default: 3)"
                             ),
                             "minimum": 1,
                             "maximum": 5,

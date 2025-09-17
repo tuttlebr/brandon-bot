@@ -349,7 +349,7 @@ requires-dist = [
     { name = "pytz", specifier = "==2025.2" },
     { name = "seaborn", marker = "extra == 'jupyterlab'", specifier = "==0.13.2" },
     { name = "serpapi", specifier = "==0.1.5" },
-    { name = "streamlit", specifier = "==1.46.1" },
+    { name = "streamlit", specifier = "==1.49.1" },
     { name = "streamlit-authenticator", specifier = "==0.4.2" },
     { name = "theme-darcula", marker = "extra == 'jupyterlab'", specifier = "==4.0.0" },
     { name = "uvicorn", specifier = "==0.24.0" },
@@ -2600,7 +2600,7 @@ wheels = [
 
 [[package]]
 name = "streamlit"
-version = "1.46.1"
+version = "1.49.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "altair" },
@@ -2622,9 +2622,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "watchdog", marker = "sys_platform != 'darwin'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/bd/7e/c7499c447b7021657fa5c851091072c1c7a26f1dda0369c21c0243fc35e7/streamlit-1.46.1.tar.gz", hash = "sha256:2cc4ad01cfeded9ad953a21829eb879b90aa77af4068c68397411c2d5c8862cf", size = 9651018, upload-time = "2025-06-26T16:03:05.66Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/24/17/c8024e4ef311dc7833987c603a7d0ebe82f8aa352aaca53b27be3f6b7f01/streamlit-1.49.1.tar.gz", hash = "sha256:6f213f1e43f035143a56f58ad50068d8a09482f0a2dad1050d7e7e99a9689818", size = 9640116, upload-time = "2025-08-29T18:35:45.055Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/84/3b/35400175788cdd6a43c90dce1e7f567eb6843a3ba0612508c0f19ee31f5f/streamlit-1.46.1-py3-none-any.whl", hash = "sha256:dffa373230965f87ccc156abaff848d7d731920cf14106f3b99b1ea18076f728", size = 10051346, upload-time = "2025-06-26T16:03:02.934Z" },
+    { url = "https://files.pythonhosted.org/packages/85/9e/146cdef515ad07e56c3aa942d087562498592d441aa3bae845ef0cd8fca3/streamlit-1.49.1-py3-none-any.whl", hash = "sha256:ad7b6d0dc35db168587acf96f80378249467fc057ed739a41c511f6bf5aa173b", size = 10044388, upload-time = "2025-08-29T18:35:42.239Z" },
 ]
 
 [[package]]

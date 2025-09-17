@@ -17,7 +17,7 @@ logger = get_logger(__name__)
 
 
 class ResponseParsingService:
-    """Service for parsing LLM responses and extracting tool calls with dynamic schema support"""
+    """Service for parsing LLM responses and extracting tool calls"""
 
     def __init__(self, model_name: str = None):
         """
@@ -36,7 +36,8 @@ class ResponseParsingService:
 
         Args:
             response: LLM response object
-            model_name: Optional model name for schema lookup (overrides instance model_name)
+            model_name: Optional model name for schema lookup
+                       (overrides instance model_name)
 
         Returns:
             Tuple of (content, tool_calls)
@@ -60,6 +61,31 @@ class ResponseParsingService:
             schema_tool_calls = self._extract_schema_tool_calls(
                 content, effective_model_name
             )
+
+            # Fallback: If no structured tool calls were found but we have
+            # content, try additional content-based extraction methods for
+            # models that may embed tool calls in content instead of using
+            # structured format
+            if (
+                not openai_tool_calls
+                and not custom_tool_calls
+                and not schema_tool_calls
+                and content
+            ):
+                logger.debug(
+                    "No structured tool calls found, attempting "
+                    "content-based fallback extraction"
+                )
+                fallback_tool_calls = self._extract_fallback_tool_calls(
+                    content, effective_model_name
+                )
+                if fallback_tool_calls:
+                    logger.info(
+                        "Found %d tool calls using fallback content "
+                        "extraction",
+                        len(fallback_tool_calls),
+                    )
+                    schema_tool_calls.extend(fallback_tool_calls)
 
             # Normalize all tool calls
             all_tool_calls = self._normalize_tool_calls(
@@ -102,9 +128,30 @@ class ResponseParsingService:
                     repr(raw_args),
                 )
 
-                # Parse the arguments
-                logger.info(f"Raw arguments: {raw_args}")
-                parsed_args = json.loads(raw_args)
+                # Handle empty or invalid arguments gracefully
+                if not raw_args or not raw_args.strip():
+                    logger.warning(
+                        "Empty or whitespace-only arguments for tool call "
+                        "'%s', using empty dict",
+                        tool_call.function.name,
+                    )
+                    parsed_args = {}
+                else:
+                    # Parse the arguments
+                    logger.info(f"Raw arguments: {raw_args}")
+                    try:
+                        parsed_args = json.loads(raw_args)
+                    except json.JSONDecodeError as e:
+                        logger.error(
+                            "JSON parsing error for tool call '%s': %s. "
+                            "Raw arguments: %s. Using empty dict as "
+                            "fallback.",
+                            tool_call.function.name,
+                            e,
+                            repr(raw_args),
+                        )
+                        # Fallback to empty dict instead of failing
+                        parsed_args = {}
 
                 tool_calls.append(
                     {
@@ -113,17 +160,10 @@ class ResponseParsingService:
                         "id": getattr(tool_call, "id", None),
                     }
                 )
-            except json.JSONDecodeError as e:
-                logger.error(
-                    "JSON parsing error for tool call '%s': %s. "
-                    "Raw arguments: %s",
-                    tool_call.function.name,
-                    e,
-                    repr(tool_call.function.arguments),
-                )
             except Exception as e:
                 logger.error(
-                    "Error parsing OpenAI tool call '%s': %s",
+                    "Error parsing OpenAI tool call '%s': %s. "
+                    "Skipping this tool call.",
                     tool_call.function.name,
                     e,
                 )
@@ -133,7 +173,8 @@ class ResponseParsingService:
     def _extract_custom_tool_calls(
         self, content: str, model_name: str = None
     ) -> List[Dict[str, Any]]:
-        """Extract custom format tool calls from content (legacy TOOLCALL format)"""
+        """Extract custom format tool calls from content
+        (legacy TOOLCALL format)"""
         if not content:
             return []
 
@@ -242,6 +283,106 @@ class ResponseParsingService:
         except Exception as e:
             logger.error("Error extracting schema tool calls: %s", e)
             return []
+
+    def _extract_fallback_tool_calls(
+        self, content: str, model_name: str = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Fallback method to extract tool calls from content using various
+        patterns. This is used when structured tool calls are empty but
+        content might contain tool calls in different formats.
+        """
+        if not content:
+            return []
+
+        tool_calls = []
+
+        # Pattern 1: Look for JSON-like function calls in content
+        # Matches patterns like: function_name({"arg": "value"})
+        json_function_pattern = r"(\w+)\s*\(\s*(\{[^}]*\})\s*\)"
+        json_matches = re.findall(json_function_pattern, content, re.DOTALL)
+
+        for func_name, args_str in json_matches:
+            try:
+                args = json.loads(args_str)
+                tool_calls.append(
+                    {
+                        "name": func_name,
+                        "arguments": args,
+                        "source": "fallback_json_function",
+                    }
+                )
+                logger.debug(
+                    f"Extracted fallback tool call: {func_name} "
+                    f"with args: {args}"
+                )
+            except json.JSONDecodeError:
+                continue
+
+        # Pattern 2: Look for explicit function call declarations
+        # Matches patterns like: "I'll use the search_web function with
+        # query: 'example'"
+        function_intent_pattern = (
+            r"(?:I'll use|using|call|invoke)\s+(?:the\s+)?(\w+)\s+"
+            r"(?:function|tool)(?:\s+with\s+(\w+):\s*['\"]([^'\"]+)"
+            r"['\"])?|(\w+)\(['\"]([^'\"]*)['\"](?:,\s*['\"]([^'\"]*)"
+            r"['\"])*\)"
+        )
+        intent_matches = re.findall(
+            function_intent_pattern, content, re.IGNORECASE
+        )
+
+        for match in intent_matches:
+            func_name = match[0] or match[3]
+            if func_name:
+                # Try to extract arguments from the context
+                args = {}
+                if match[1] and match[2]:  # parameter name and value
+                    args[match[1]] = match[2]
+                elif match[4]:  # positional argument found
+                    args["query"] = match[4]  # Common parameter name
+
+                tool_calls.append(
+                    {
+                        "name": func_name,
+                        "arguments": args,
+                        "source": "fallback_intent",
+                    }
+                )
+                logger.debug(
+                    f"Extracted fallback intent tool call: {func_name} "
+                    f"with args: {args}"
+                )
+
+        # Pattern 3: Look for markdown-style code blocks with function calls
+        # Matches patterns like: ```function_name\n{"arg": "value"}\n```
+        code_block_pattern = r"```(\w+)\s*\n(\{.*?\})\s*\n```"
+        code_matches = re.findall(code_block_pattern, content, re.DOTALL)
+
+        for func_name, args_str in code_matches:
+            try:
+                args = json.loads(args_str)
+                tool_calls.append(
+                    {
+                        "name": func_name,
+                        "arguments": args,
+                        "source": "fallback_code_block",
+                    }
+                )
+                logger.debug(
+                    "Extracted fallback code block tool call: "
+                    f"{func_name} with args: {args}"
+                )
+            except json.JSONDecodeError:
+                continue
+
+        if tool_calls:
+            logger.info(
+                "Fallback extraction found %d potential tool calls in content",
+                len(tool_calls),
+            )
+
+        return tool_calls
 
     def _normalize_tool_calls(
         self,
@@ -359,7 +500,8 @@ class ResponseParsingService:
                     pattern, "", content, flags=re.DOTALL | re.IGNORECASE
                 )
             elif schema.thinking_stop and not schema.thinking_start:
-                # Only stop tag - remove everything before and including the stop tag
+                # Only stop tag - remove everything before and including
+                # the stop tag
                 stop_index = content.find(schema.thinking_stop)
                 if stop_index != -1:
                     # Keep only content after the stop tag

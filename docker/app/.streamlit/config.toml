@@ -7,8 +7,8 @@ showErrorDetails = "none"
 [server]
 headless = true
 runOnSave = false
-# enableCORS = false
-# enableXsrfProtection = false
+enableCORS = false
+enableXsrfProtection = false
 maxMessageSize = 200
 maxUploadSize = 200
 disconnectedSessionTTL = 3600
@@ -35,8 +35,8 @@ url = "https://brand-assets.cne.ngc.nvidia.com/assets/fonts/nvidia-sans/1.0.0/NV
 hideTopBar = true
 
 [runner]
-fastReruns = true
+fastReruns = false
 
 [logger]
-level = "error"
+level = "info"
 messageFormat = "%(asctime)s %(levelname)s %(filename)s:%(lineno)d %(message)s"
