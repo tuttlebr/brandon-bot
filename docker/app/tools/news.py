@@ -86,14 +86,14 @@ class ExtractionConfig(BaseModel):
         default=5, description="Max parallel web extractions"
     )
     extraction_timeout: float = Field(
-        default=10.0, description="Timeout for each extraction"
+        default=15.0, description="Timeout for each extraction"
     )
     retry_on_failure: bool = Field(
         default=True, description="Retry failed extractions"
     )
-    max_retries: int = Field(default=2, description="Max retry attempts")
+    max_retries: int = Field(default=15, description="Max retry attempts")
     always_extract_top_n: int = Field(
-        default=5,
+        default=1,
         description="Always extract top N results regardless of analysis",
     )
     use_cached_content: bool = Field(

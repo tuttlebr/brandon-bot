@@ -286,25 +286,25 @@ class DeepResearchController(ToolController):
                 "Error in streaming research process: %s", e, exc_info=True
             )
 
-            yield f"\n\n⚠️ **Research Error Recovery**\n\n"
+            yield "\n\n⚠️ **Research Error Recovery**\n\n"
             yield (
-                f"The deep research encountered an error, but here's what I"
-                f" can provide:\n\n"
+                "The deep research encountered an error, but here's what I "
+                "can provide:\n\n"
             )
             yield f"**Your Query:** {query}\n\n"
             yield f"**Error Details:** {str(e)}\n\n"
-            yield f"**Recommendation:** Please try:\n"
-            yield f"- Rephrasing your question more specifically\n"
-            yield f"- Breaking down complex queries into simpler parts\n"
-            yield f"- Using the regular search tools for immediate results\n\n"
-            yield f"*The system has logged this error for investigation.*"
+            yield "**Recommendation:** Please try:\n"
+            yield "- Rephrasing your question more specifically\n"
+            yield "- Breaking down complex queries into simpler parts\n"
+            yield "- Using the regular search tools for immediate results\n\n"
+            yield "*The system has logged this error for investigation.*"
 
     async def _stream_research_process(
         self, query: str, max_iterations: int, target_depth: str
     ):
         """Stream research progress updates to the user with error recovery"""
         # Start with progress indicator
-        yield "<<<PROGRESS:0.1:Starting deep research>>>_Researching..._\n\n"
+        yield "<<<PROGRESS:0.1:Starting deep research>>>"
 
         iterations = []
         all_sources = []
@@ -313,8 +313,7 @@ class DeepResearchController(ToolController):
 
         try:
             # Provide real-time updates during the search
-            yield "<<<PROGRESS:0.2:Phase 1 - Initial research>>>"
-            yield "> _Phase 1: Initial research phase_\n\n"
+            yield "<<<PROGRESS:0.2:Phase 1: Initial research phase>>>"
             iteration = await self._perform_research_iteration(
                 query=query,
                 phase=ResearchPhase.INITIAL_SEARCH,
@@ -332,7 +331,6 @@ class DeepResearchController(ToolController):
             sources_count = len(iteration.sources_found)
             progress_msg = f"Found {sources_count} initial sources"
             yield f"<<<PROGRESS:{progress_val}:{progress_msg}>>>"
-            yield f"> > _{len(iteration.sources_found)} initial sources_\n\n"
 
             # Continue iterations with progress updates
             iteration_count = 1
@@ -356,20 +354,15 @@ class DeepResearchController(ToolController):
                 # Calculate progress ensuring it stays within [0.0, 1.0]
                 progress_val = min(0.4 + (iteration_count * 0.15), 0.8)
                 phase_num = iteration_count + 1
-                progress_msg = f"Phase {phase_num} - {phase_description}"
-                yield f"<<<PROGRESS:{progress_val}:{progress_msg}>>>"
-                yield (
-                    f"\n> _Phase {iteration_count + 1}:"
-                    f" {phase_description} {iteration_count + 1}/{max_iterations}_\n\n"
+                progress_msg = (
+                    f"Phase {phase_num}:"
+                    f" {phase_description} {iteration_count + 1}/{max_iterations}"
                 )
+                yield f"<<<PROGRESS:{progress_val}:{progress_msg}>>>"
 
                 if not needs_more:
                     # Update status to show we're done with iterations
                     yield "<<<PROGRESS:0.8:Research iterations complete>>>"
-                    yield (
-                        "\n_Research complete after"
-                        f" {iteration_count} iterations_\n\n"
-                    )
                     break
 
                 # Continue with next iteration
@@ -386,12 +379,10 @@ class DeepResearchController(ToolController):
                     # Update status for follow-up questions
                     num_questions = min(2, len(follow_up_questions))
                     progress_val = min(0.4 + (iteration_count * 0.1), 0.7)
-                    progress_msg = f"Found {num_questions} follow-up questions"
-                    yield f"<<<PROGRESS:{progress_val}:{progress_msg}>>>"
-                    yield (
-                        f"> > _Found {num_questions} follow-up questions to"
-                        " explore_\n\n"
+                    progress_msg = (
+                        f"Found {num_questions} follow-up questions to explore"
                     )
+                    yield f"<<<PROGRESS:{progress_val}:{progress_msg}>>>"
 
                 # Execute follow-up research
                 questions_to_research = follow_up_questions[:2]
@@ -408,10 +399,6 @@ class DeepResearchController(ToolController):
                     q_count = len(questions_to_research)
                     progress_msg = f"{action} sub-question {i}/{q_count}"
                     yield f"<<<PROGRESS:{sub_progress}:{progress_msg}>>>"
-                    yield (
-                        f"> > > _{action} sub-question"
-                        f" {i}/{len(questions_to_research)}..._\n\n"
-                    )
 
                     iteration = await self._perform_research_iteration(
                         query=question,
@@ -433,7 +420,6 @@ class DeepResearchController(ToolController):
 
             # Final synthesis
             yield "<<<PROGRESS:0.85:Creating final synthesis>>>"
-            yield "\n_Creating final synthesis..._\n\n"
 
             result = await self._create_final_synthesis(
                 query=query,
@@ -446,8 +432,7 @@ class DeepResearchController(ToolController):
             )
 
             # Review and clean up markdown formatting
-            yield "<<<PROGRESS:0.95:Reviewing formatting>>>"
-            # yield "_Reviewing markdown formatting..._\n\n"
+            yield "<<<PROGRESS:0.95:Finalizing research>>>"
             final_synthesis = await self._review_markdown_formatting(
                 final_synthesis
             )
@@ -467,20 +452,23 @@ class DeepResearchController(ToolController):
             # Complete progress
             yield "<<<PROGRESS:1.0:Research complete>>>"
 
-            if key_findings:
-                yield "### Key Findings:\n\n"
-                for finding in key_findings:
-                    yield f"- {finding}\n\n"
-                yield "\n"
+            # Now yield the final content all at once without progress markers
+            final_content = ""
 
-            yield final_synthesis
+            if key_findings:
+                final_content += "### Key Findings:\n\n"
+                for finding in key_findings:
+                    final_content += f"- {finding}\n"
+                final_content += "\n"
+
+            final_content += final_synthesis
 
             # Add references section (cited sources)
             references = self._generate_references(all_sources, citations_used)
             if references:
-                yield "\n\n> _References (Cited):_\n\n"
+                final_content += "\n\n### References (Cited)\n\n"
                 for ref in references:
-                    yield f"> >{ref}\n\n"
+                    final_content += f"> _{ref}_\n\n"
 
             # Add all consulted sources if there are uncited ones
             uncited_sources = [
@@ -489,7 +477,7 @@ class DeepResearchController(ToolController):
                 if s.citation_id and s.citation_id not in citations_used
             ]
             if uncited_sources:
-                yield "\n\n> _Additional Sources Consulted:_\n\n"
+                final_content += "\n\n### Additional Sources Consulted\n\n"
                 # Sort by citation ID
                 uncited_sources.sort(
                     key=lambda x: (
@@ -500,7 +488,7 @@ class DeepResearchController(ToolController):
                 )
                 for source in uncited_sources:
                     ref = self._format_single_reference(source)
-                    yield f"> >{ref}\n\n"
+                    final_content += f"> _{ref}_\n\n"
 
             # Add limitations if any
             limitations = await self._identify_limitations(
@@ -508,9 +496,11 @@ class DeepResearchController(ToolController):
             )
 
             if limitations:
-                yield "\n\n>_Research Limitations:_\n\n"
+                final_content += "\n\n### Research Limitations\n\n"
                 for limitation in limitations:
-                    yield f"> > _{limitation}_\n"
+                    final_content += f"- _{limitation}_\n\n"
+
+            yield final_content
 
         except Exception as e:
             # Critical error handling - always provide useful output
@@ -518,55 +508,61 @@ class DeepResearchController(ToolController):
                 "Error in deep research process: %s", e, exc_info=True
             )
 
-            # Provide a useful fallback response based on what we have so far
-            yield (
-                f"\n\n⚠️ **Research encountered an error but collected valuable"
-                f" information:**\n\n"
+            # Build error recovery content as a single block
+            error_content = "⚠️ **Research Error Recovery**\n\n"
+            error_content += (
+                "The deep research encountered an error, but here's what was "
+                "collected:\n\n"
             )
 
             # Show what we managed to collect
             if iterations:
-                yield (
+                error_content += (
                     f"**Completed {len(iterations)} research iterations**\n\n"
                 )
 
             if all_sources:
-                yield f"**Consulted {len(all_sources)} sources:**\n\n"
-                for i, source in enumerate(
-                    all_sources[:10], 1
-                ):  # Show first 10
-                    yield f"{i}. [{source.title}]({source.url or 'No URL'})\n"
+                error_content += (
+                    f"**Consulted {len(all_sources)} sources:**\n\n"
+                )
+                for i, source in enumerate(all_sources[:10], 1):
+                    error_content += (
+                        f"{i}. [{source.title}]({source.url or 'No URL'})\n"
+                    )
                 if len(all_sources) > 10:
-                    yield f"... and {len(all_sources) - 10} more sources\n\n"
-                yield "\n"
+                    error_content += (
+                        f"... and {len(all_sources) - 10} more sources\n"
+                    )
+                error_content += "\n"
 
             # Provide the best synthesis we have
             if current_synthesis:
-                yield "**Research findings so far:**\n\n"
-                yield current_synthesis
+                error_content += "**Research findings so far:**\n\n"
+                error_content += current_synthesis
             else:
-                yield "**Initial research findings:**\n\n"
+                error_content += "**Initial research findings:**\n\n"
                 # Extract key facts from sources as fallback
                 if all_sources:
                     for source in all_sources[:3]:  # Use first 3 sources
                         if source.extracted_facts:
-                            yield f"From {source.title}:\n"
+                            error_content += f"From {source.title}:\n"
                             for fact in source.extracted_facts[:3]:
-                                yield f"- {fact}\n"
-                            yield "\n"
+                                error_content += f"- {fact}\n"
+                            error_content += "\n"
                         elif source.content:
                             # Show snippet of content
                             content_preview = source.content[:500]
-                            yield (
+                            error_content += (
                                 "From"
                                 f" {source.title}:\n{content_preview}...\n\n"
                             )
 
-            yield (
-                f"\n\n*Note: Research was interrupted due to a technical"
-                f" error, but the above information was successfully"
-                f" collected.*"
+            error_content += (
+                "\n*Note: Research was interrupted due to a technical error, "
+                "but the above information was successfully collected.*"
             )
+
+            yield error_content
 
     async def _process_non_streaming(
         self, query: str, max_iterations: int, target_depth: str

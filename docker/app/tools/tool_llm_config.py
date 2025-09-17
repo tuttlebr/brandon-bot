@@ -18,12 +18,12 @@ TOOL_LLM_TYPES = {
     "serpapi_news_search": "fast",
     "serpapi_internet_search": "fast",
     "retrieval_search": "fast",
-    "pdf_assistant": "llm",
+    "pdf_assistant": "intelligent",
     "text_assistant": "llm",
     "generate_image": "llm",
     "analyze_image": "vlm",
     "generalist_conversation": "fast",
-    "tool_selection": "intelligent",
+    "tool_selection": "llm",
     "deep_researcher": "llm",
 }
 

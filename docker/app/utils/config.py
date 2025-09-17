@@ -257,14 +257,14 @@ class ToolConfig:
             "extract_web_content": True,
             "serpapi_internet_search": True,
             "serpapi_news_search": True,
-            "retrieval_search": False,
-            "veterinary_search": False,
+            "retrieval_search": True,
+            "veterinary_search": True,
             "pdf_assistant": True,
             "analyze_image": True,
             "generate_image": True,
             "context_generation": True,
             "get_weather": True,
-            "generalist_conversation": False,
+            "generalist_conversation": True,
             "deep_researcher": True,
         }
     )

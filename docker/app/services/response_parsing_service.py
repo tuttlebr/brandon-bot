@@ -297,12 +297,22 @@ class ResponseParsingService:
 
         tool_calls = []
 
+        # Get valid tool names for validation
+        valid_tool_names = self._get_valid_tool_names()
+
         # Pattern 1: Look for JSON-like function calls in content
         # Matches patterns like: function_name({"arg": "value"})
         json_function_pattern = r"(\w+)\s*\(\s*(\{[^}]*\})\s*\)"
         json_matches = re.findall(json_function_pattern, content, re.DOTALL)
 
         for func_name, args_str in json_matches:
+            # Validate tool name before processing
+            if func_name not in valid_tool_names:
+                logger.debug(
+                    f"Ignoring invalid tool name '{func_name}' from "
+                    "fallback extraction"
+                )
+                continue
             try:
                 args = json.loads(args_str)
                 tool_calls.append(
@@ -335,6 +345,13 @@ class ResponseParsingService:
         for match in intent_matches:
             func_name = match[0] or match[3]
             if func_name:
+                # Validate tool name before processing
+                if func_name not in valid_tool_names:
+                    logger.debug(
+                        f"Ignoring invalid tool name '{func_name}' from "
+                        "fallback intent extraction"
+                    )
+                    continue
                 # Try to extract arguments from the context
                 args = {}
                 if match[1] and match[2]:  # parameter name and value
@@ -360,6 +377,13 @@ class ResponseParsingService:
         code_matches = re.findall(code_block_pattern, content, re.DOTALL)
 
         for func_name, args_str in code_matches:
+            # Validate tool name before processing
+            if func_name not in valid_tool_names:
+                logger.debug(
+                    f"Ignoring invalid tool name '{func_name}' from "
+                    "fallback code block extraction"
+                )
+                continue
             try:
                 args = json.loads(args_str)
                 tool_calls.append(
@@ -383,6 +407,23 @@ class ResponseParsingService:
             )
 
         return tool_calls
+
+    def _get_valid_tool_names(self) -> set:
+        """Get set of valid tool names from the registry for validation"""
+        try:
+            from tools.registry import ToolRegistry
+
+            registry = ToolRegistry.get_instance()
+            # Get both registered instances and lazy-loaded tool names
+            all_tool_names = set(registry._tools.keys()) | set(
+                registry._factory.get_registered_tools()
+            )
+            return all_tool_names
+        except Exception as e:
+            logger.error(f"Error getting valid tool names: {e}")
+            # Return empty set to be safe - will reject all fallback
+            # extractions
+            return set()
 
     def _normalize_tool_calls(
         self,

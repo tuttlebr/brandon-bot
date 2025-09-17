@@ -18,6 +18,7 @@ class SystemPrompts:
         # Model-specific reasoning control can be added here
         # e.g., "/no_think" for disabling reasoning, "<thinking>" for enabling
         return (
+            "/no_think"
             f"You are {bot_name}, an AI assistant. "
             f"Today is {current_datetime}.\n"
         )
