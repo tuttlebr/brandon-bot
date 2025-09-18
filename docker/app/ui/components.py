@@ -88,7 +88,7 @@ class ChatHistoryComponent:
                                     st.image(
                                         image,
                                         caption=f"{enhanced_prompt}",
-                                        use_container_width=True,
+                                        width="content",
                                     )
                                 else:
                                     logging.error(

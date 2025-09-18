@@ -135,17 +135,9 @@ class ImageGenerationTool(BaseTool):
                         "aspect_ratio": {
                             "type": "string",
                             "description": (
-                                "Aspect ratio for the image. Choose based on"
-                                " the content: 'square' for balanced"
-                                " compositions, social media posts, or general"
-                                " purpose images; 'portrait' for vertical"
-                                " subjects like people, tall buildings, or"
-                                " phone wallpapers; 'landscape' for wide"
-                                " scenes, natural vistas, or desktop"
-                                " wallpapers."
+                                "Aspect ratio for the image: square, portrait,"
+                                " or landscape"
                             ),
-                            "enum": ALLOWED_ASPECT_RATIOS,
-                            "default": "square",
                         },
                         "use_conversation_context": {
                             "type": "boolean",
@@ -155,7 +147,6 @@ class ImageGenerationTool(BaseTool):
                                 " images related to ongoing discussions or"
                                 " stories."
                             ),
-                            "default": True,
                         },
                         "enhanced_prompt": {
                             "type": "string",

@@ -150,11 +150,8 @@ class NewsTool(BaseTool):
                         "top_n": {
                             "type": "integer",
                             "description": (
-                                "Number of top results to process (default: 2)"
+                                "Number of top results to process (1-3)"
                             ),
-                            "default": 2,
-                            "maximum": 3,
-                            "minimum": 1,
                         },
                     },
                     "required": ["query"],

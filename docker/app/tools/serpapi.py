@@ -202,16 +202,12 @@ class SerpAPITool(BaseTool):
                                 "Country' (e.g., 'New York, NY, "
                                 "United States')."
                             ),
-                            "default": "Saline, Michigan, United States",
                         },
                         "top_n": {
                             "type": "integer",
                             "description": (
-                                "Number of top results to process (default: 2)"
+                                "Number of top results to process (1-3)"
                             ),
-                            "default": 2,
-                            "maximum": 3,
-                            "minimum": 1,
                         },
                     },
                     "required": ["query"],
@@ -390,7 +386,7 @@ class SerpAPITool(BaseTool):
                     result = future.result(timeout=30.0)
                     analysis_results.append(result)
                 except Exception as e:
-                    logger.error("Snippet analysis failed: %s", e)
+                    logger.warning("Search snippet analysis failed: %s", e)
                     # Default to extraction on failure
                     analysis_results.append((True, ""))
 
@@ -502,7 +498,7 @@ class SerpAPITool(BaseTool):
             finally:
                 loop.close()
         except Exception as e:
-            logger.warning("Failed to analyze snippet: %s", e)
+            logger.warning("Failed to analyze search snippet: %s", e)
             return (True, "")
 
     def _extract_with_retry(self, url: str) -> Optional[str]:
@@ -619,20 +615,22 @@ Important: Respond ONLY with the JSON object, no other text."""
 
             raw_content = response.choices[0].message.content
             if not raw_content:
-                logger.error("Empty response from LLM for snippet analysis")
+                logger.error(
+                    "Empty response from LLM for search snippet analysis"
+                )
                 return (True, "")
 
             # Log raw response for debugging
             logger.debug(
-                "Raw LLM response for snippet analysis: %s", raw_content
+                "Raw LLM response for search snippet analysis: %s", raw_content
             )
 
             try:
                 decision_data = json.loads(raw_content)
             except json.JSONDecodeError as json_err:
                 logger.error(
-                    "Failed to parse JSON from LLM response: %s. Raw"
-                    " content: %s",
+                    "Failed to parse JSON from LLM response for search snippet"
+                    " analysis: %s. Raw content: %s",
                     json_err,
                     raw_content[:200],  # Log first 200 chars
                 )
@@ -641,7 +639,8 @@ Important: Respond ONLY with the JSON object, no other text."""
             # Validate response is a dictionary
             if not isinstance(decision_data, dict):
                 logger.error(
-                    "LLM response is not a dictionary. Type: %s, Content: %s",
+                    "LLM response is not a dictionary for search snippet"
+                    " analysis. Type: %s, Content: %s",
                     type(decision_data).__name__,
                     str(decision_data)[:200],
                 )

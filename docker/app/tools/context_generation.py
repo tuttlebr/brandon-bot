@@ -92,41 +92,31 @@ class ContextGenerationTool(BaseTool):
                         "aspect_ratio": {
                             "type": "string",
                             "description": (
-                                "Aspect ratio for output image. Use "
-                                "'match_input_image' to maintain the same "
-                                "aspect ratio as input, or specify 'square', "
-                                "'portrait', or 'landscape'"
+                                "Aspect ratio for output image:"
+                                " match_input_image, square, portrait, or"
+                                " landscape"
                             ),
-                            "enum": ["match_input_image"],
-                            "default": "match_input_image",
                         },
                         "steps": {
                             "type": "integer",
                             "description": (
-                                "Number of generation steps (higher = better "
-                                "quality but slower)"
+                                "Number of generation steps (25-35, higher ="
+                                " better quality)"
                             ),
-                            "default": 30,
-                            "minimum": 25,
-                            "maximum": 35,
                         },
                         "cfg_scale": {
                             "type": "number",
                             "description": (
-                                "Guidance scale (1.5-4.5). Higher values "
-                                "follow the prompt more closely"
+                                "Guidance scale (1.5-4.5). Higher values"
+                                " follow the prompt more closely"
                             ),
-                            "default": 3.5,
-                            "minimum": 2.5,
-                            "maximum": 4.5,
                         },
                         "seed": {
                             "type": "integer",
                             "description": (
-                                "Random seed for reproducible results. "
-                                "Use 0 for random"
+                                "Random seed for reproducible results. Use 0"
+                                " for random"
                             ),
-                            "default": 42,
                         },
                     },
                     "required": ["prompt"],

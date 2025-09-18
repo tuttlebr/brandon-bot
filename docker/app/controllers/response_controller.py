@@ -558,7 +558,7 @@ class ResponseController:
             st.image(
                 generated_image,
                 caption=enhanced_prompt,
-                use_container_width=True,
+                width="content",
             )
 
             # Store image in session state
@@ -982,7 +982,7 @@ class ResponseController:
                         st.image(
                             generated_image,
                             caption=image_data["enhanced_prompt"],
-                            use_container_width=True,
+                            width="content",
                         )
 
                         # Store image in session state

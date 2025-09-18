@@ -336,26 +336,13 @@ class PDFAssistantTool(BaseTool):
                     "properties": {
                         "operation": {
                             "type": "string",
-                            "enum": [
-                                "summarize",
-                                "query",
-                                "extract",
-                                "analyze",
-                                "info",
-                            ],
-                            "default": "query",
                             "description": (
-                                "Operation to perform: "
-                                "'summarize' for document summary, "
-                                "'query' for Q&A, "
-                                "'extract' for page extraction, "
-                                "'analyze' for detailed analysis, "
-                                "'info' for PDF information, "
+                                "Operation to perform: summarize, query,"
+                                " extract, analyze, or info"
                             ),
                         },
                         "query": {
                             "type": "string",
-                            "default": "Please summarize the PDF",
                             "description": (
                                 "User's question or instruction. Required for"
                                 " query, analyze, and auto operations. For"
@@ -368,22 +355,19 @@ class PDFAssistantTool(BaseTool):
                             "items": {"type": "integer"},
                             "description": (
                                 "Specific page numbers for extraction"
-                                " (optional)"
                             ),
                         },
                         "summary_type": {
                             "type": "string",
-                            "enum": ["pages", "all"],
-                            "default": "all",
                             "description": (
-                                "Type of summary for summarize operation"
+                                "Type of summary for summarize operation:"
+                                " pages or all"
                             ),
                         },
                         "max_chunks": {
                             "type": "integer",
-                            "default": 10,
                             "description": (
-                                "Maximum chunks to retrieve for Q&A (advanced)"
+                                "Maximum chunks to retrieve for Q&A"
                             ),
                         },
                     },

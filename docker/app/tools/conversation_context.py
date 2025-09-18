@@ -783,32 +783,18 @@ class ConversationContextTool(BaseTool):
                     "properties": {
                         "query": {
                             "type": "string",
-                            "enum": [
-                                "conversation_summary",
-                                "recent_topics",
-                                "user_preferences",
-                                "task_continuity",
-                                "creative_director",
-                                "document_analysis",
-                            ],
                             "description": (
-                                "Type of context analysis to perform. Choose"
-                                " 'conversation_summary' for overall summary,"
-                                " 'recent_topics' to list discussion topics,"
-                                " 'user_preferences' for user patterns,"
-                                " 'task_continuity' for tracking tasks,"
-                                " 'creative_director' for creative projects,"
-                                " or 'document_analysis' for document-related"
-                                " context."
+                                "Type of context analysis to perform:"
+                                " conversation_summary, recent_topics,"
+                                " user_preferences, task_continuity,"
+                                " creative_director, or document_analysis"
                             ),
                         },
                         "max_messages": {
                             "type": "integer",
                             "description": (
                                 "Maximum number of messages to analyze"
-                                " (default: 20)"
                             ),
-                            "default": 20,
                         },
                         "include_document_content": {
                             "type": "boolean",
@@ -816,7 +802,6 @@ class ConversationContextTool(BaseTool):
                                 "Whether to include full document content in"
                                 " analysis if documents are present"
                             ),
-                            "default": True,
                         },
                     },
                     "required": ["query", "max_messages"],

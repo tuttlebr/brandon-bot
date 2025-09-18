@@ -23,13 +23,13 @@ TOOL_LLM_TYPES = {
     "generate_image": "llm",
     "analyze_image": "vlm",
     "generalist_conversation": "fast",
-    "tool_selection": "llm",
-    "deep_researcher": "llm",
+    "tool_selection": "intelligent",
+    "deep_researcher": "intelligent",
 }
 
 
 # Default LLM type if not specified
-DEFAULT_LLM_TYPE = "llm"
+DEFAULT_LLM_TYPE = "fast"
 
 
 def get_tool_llm_type(tool_name: str) -> str:

@@ -57,13 +57,13 @@ GAPS_SCHEMA = {
     "required": ["gaps"],
 }
 
-# Test with most basic schema first
+# Minimal schema for xgrammar compatibility
 COMPLETENESS_SCHEMA = {
     "type": "object",
     "properties": {
         "needs_more_research": {"type": "boolean"},
         "next_phase": {"type": "string"},
-        "confidence": {"type": "string", "enum": ["low", "medium", "high"]},
+        "confidence": {"type": "string"},
         "reasoning": {"type": "string"},
     },
     "required": [
@@ -74,15 +74,12 @@ COMPLETENESS_SCHEMA = {
     ],
 }
 
-# Basic schema for synthesis
+# Minimal schema for synthesis
 SYNTHESIS_SCHEMA = {
     "type": "object",
     "properties": {
         "synthesis": {"type": "string"},
-        "confidence_level": {
-            "type": "string",
-            "enum": ["low", "medium", "high"],
-        },
+        "confidence_level": {"type": "string"},
         "key_findings": {"type": "array", "items": {"type": "string"}},
         "citations_used": {"type": "array", "items": {"type": "string"}},
     },
@@ -2060,26 +2057,16 @@ class DeepResearcherTool(BaseTool):
                         },
                         "target_depth": {
                             "type": "string",
-                            "enum": [
-                                "basic",
-                                "moderate",
-                                "deep",
-                                "comprehensive",
-                            ],
                             "description": (
-                                "Target depth of research (default: moderate)"
+                                "Target depth of research: basic, moderate,"
+                                " deep, or comprehensive"
                             ),
-                            "default": "moderate",
                         },
                         "max_iterations": {
                             "type": "integer",
                             "description": (
-                                "Maximum number of research iterations "
-                                "(default: 3)"
+                                "Maximum number of research iterations (1-5)"
                             ),
-                            "minimum": 1,
-                            "maximum": 5,
-                            "default": 3,
                         },
                     },
                     "required": ["query"],
